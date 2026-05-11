@@ -31,6 +31,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -231,6 +232,7 @@ export default function DashboardLayout({
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{t("student.title")}</DialogTitle>
+            <DialogDescription>{t("student.description")}</DialogDescription>
           </DialogHeader>
           {loadingStudent || !studentInfo ? (
             <div className="flex flex-col gap-3">

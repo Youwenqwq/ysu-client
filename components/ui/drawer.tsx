@@ -6,9 +6,28 @@ import { Drawer as DrawerPrimitive } from "vaul"
 import { cn } from "@/lib/utils"
 
 function Drawer({
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
-  return <DrawerPrimitive.Root data-slot="drawer" {...props} />
+  // Blur the active element on close so vaul does not flip aria-hidden onto
+  // a still-focused descendant (Chrome a11y warning).
+  const handleOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (!open && typeof document !== "undefined") {
+        const el = document.activeElement
+        if (el instanceof HTMLElement) el.blur()
+      }
+      onOpenChange?.(open)
+    },
+    [onOpenChange]
+  )
+  return (
+    <DrawerPrimitive.Root
+      data-slot="drawer"
+      {...props}
+      onOpenChange={handleOpenChange}
+    />
+  )
 }
 
 function DrawerTrigger({

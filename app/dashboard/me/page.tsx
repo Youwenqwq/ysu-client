@@ -140,7 +140,7 @@ export default function MePage() {
               <span className="text-sm">{t("app.theme")}</span>
               <ToggleGroup
                 type="single"
-                value={mounted ? theme : undefined}
+                value={mounted ? theme ?? "" : ""}
                 onValueChange={(v) => v && setTheme(v)}
                 variant="outline"
                 size="sm"

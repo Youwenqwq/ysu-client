@@ -10,7 +10,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CalendarOff } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import type { Course, ClassPeriod } from "@/lib/types";
@@ -139,6 +139,11 @@ export function ScheduleDesktop({ courses, periods, currentWeekday }: Props) {
                   section: overlapDialog.section,
                 })}
             </DialogTitle>
+            <DialogDescription>
+              {overlapDialog
+                ? t("schedule.overlapCourses", { count: overlapDialog.courses.length })
+                : ""}
+            </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             {overlapDialog?.courses.map((c, i) => (

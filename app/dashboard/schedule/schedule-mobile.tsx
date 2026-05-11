@@ -253,7 +253,10 @@ export function ScheduleMobile({
               <button
                 key={`block-${idx}`}
                 type="button"
-                onClick={() => setDetailDrawer(c)}
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  setDetailDrawer(c);
+                }}
                 className={cn(
                   "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1 text-left transition-opacity active:opacity-60",
                   COURSE_BG_CLASSES[colorIdx],
@@ -280,9 +283,10 @@ export function ScheduleMobile({
             <button
               key={`block-${idx}`}
               type="button"
-              onClick={() =>
-                setOverlapDrawer({ day: block.day, section: block.start, courses: block.courses })
-              }
+              onClick={(e) => {
+                e.currentTarget.blur();
+                setOverlapDrawer({ day: block.day, section: block.start, courses: block.courses });
+              }}
               className="relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60"
               style={blockStyle(block)}
             >
@@ -374,7 +378,8 @@ export function ScheduleMobile({
                 <button
                   key={i}
                   type="button"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.currentTarget.blur();
                     setOverlapDrawer(null);
                     setDetailDrawer(c);
                   }}

@@ -833,6 +833,9 @@ export default function EvaluationPage() {
         <ResponsiveModalContent className="sm:max-w-xl overflow-hidden">
           <ResponsiveModalHeader>
             <ResponsiveModalTitle>{t("evaluation.previewResult")}</ResponsiveModalTitle>
+            <ResponsiveModalDescription className="sr-only">
+              {t("evaluation.previewResultDesc")}
+            </ResponsiveModalDescription>
           </ResponsiveModalHeader>
           <ResponsiveModalBody className="flex flex-col gap-3 text-sm">
             {previewResult && Object.entries(previewResult).map(([k, v]) => (
@@ -969,45 +972,55 @@ export default function EvaluationPage() {
       <ResponsiveModal
         open={batchPreviewOpen}
         onOpenChange={(v) => {
+          if (!v && batchDetailIdx !== null) {
+            setBatchDetailIdx(null);
+            return;
+          }
           setBatchPreviewOpen(v);
           if (!v) setBatchDetailIdx(null);
         }}
       >
-        <ResponsiveModalContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden">
+        <ResponsiveModalContent className="flex flex-col sm:max-w-3xl max-h-[90vh] overflow-hidden">
+          <div
+            key={batchDetailIdx === null ? "list" : "detail"}
+            className="flex min-h-0 flex-1 flex-col animate-in fade-in-50 duration-200"
+          >
           {batchDetailIdx === null ? (
             <>
               <ResponsiveModalHeader>
                 <ResponsiveModalTitle>{t("evaluation.batchPreviewTitle")}</ResponsiveModalTitle>
                 <ResponsiveModalDescription>{t("evaluation.batchPreviewDesc")}</ResponsiveModalDescription>
               </ResponsiveModalHeader>
-              <ResponsiveModalBody className="flex flex-col gap-2 pt-1 md:gap-3">
-                {batchTasks.map((r, idx) => (
-                  <Card
-                    key={idx}
-                    className={cn(
-                      "cursor-pointer py-3 transition-colors hover:bg-muted/40 md:py-4",
-                      r.status === "failed" && "opacity-60",
-                    )}
-                    onClick={() => setBatchDetailIdx(idx)}
-                  >
-                    <CardHeader className="py-0 md:py-0">
-                      <CardTitle className="text-base truncate">{r.task.course_name}</CardTitle>
-                      <CardDescription className="truncate">{r.task.teacher_name}</CardDescription>
-                      <CardAction className="self-center">
-                        <div className="flex items-center gap-1.5">
-                          <Badge variant={r.status === "filled" ? "default" : r.status === "failed" ? "destructive" : "secondary"}>
-                            {r.status === "filled"
-                              ? t("evaluation.batchTaskStatusSuccess")
-                              : r.status === "failed"
-                                ? t("evaluation.batchTaskStatusFailed")
-                                : t("evaluation.batchTaskStatusPending")}
-                          </Badge>
-                          <ChevronRight className="size-4 text-muted-foreground" />
-                        </div>
-                      </CardAction>
-                    </CardHeader>
-                  </Card>
-                ))}
+              <ResponsiveModalBody className="min-h-0 flex-1 overflow-y-auto">
+                <div className="flex flex-col gap-2 px-0.5 py-1 md:gap-3 md:px-2 md:pb-2">
+                  {batchTasks.map((r, idx) => (
+                    <Card
+                      key={idx}
+                      className={cn(
+                        "cursor-pointer py-3 transition-colors hover:bg-muted/40 md:py-4",
+                        r.status === "failed" && "opacity-60",
+                      )}
+                      onClick={() => setBatchDetailIdx(idx)}
+                    >
+                      <CardHeader className="py-0 md:py-0">
+                        <CardTitle className="text-base truncate">{r.task.course_name}</CardTitle>
+                        <CardDescription className="truncate">{r.task.teacher_name}</CardDescription>
+                        <CardAction className="self-center">
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant={r.status === "filled" ? "default" : r.status === "failed" ? "destructive" : "secondary"}>
+                              {r.status === "filled"
+                                ? t("evaluation.batchTaskStatusSuccess")
+                                : r.status === "failed"
+                                  ? t("evaluation.batchTaskStatusFailed")
+                                  : t("evaluation.batchTaskStatusPending")}
+                            </Badge>
+                            <ChevronRight className="size-4 text-muted-foreground" />
+                          </div>
+                        </CardAction>
+                      </CardHeader>
+                    </Card>
+                  ))}
+                </div>
               </ResponsiveModalBody>
               <ResponsiveModalFooter className="flex flex-col sm:flex-row gap-2">
                 <Button variant="outline" onClick={() => setBatchPreviewOpen(false)}>
@@ -1028,7 +1041,7 @@ export default function EvaluationPage() {
                     <ResponsiveModalTitle className="truncate">{r.task.course_name}</ResponsiveModalTitle>
                     <ResponsiveModalDescription className="truncate">{r.task.teacher_name}</ResponsiveModalDescription>
                   </ResponsiveModalHeader>
-                  <ResponsiveModalBody className="flex flex-col gap-4 text-sm">
+                  <ResponsiveModalBody className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto text-sm">
                     {r.status === "filled" && r.scoreResult && (
                       <div className="flex flex-col gap-2 rounded-md bg-muted/50 p-3">
                         {Object.entries(r.scoreResult).map(([k, v]) => (
@@ -1044,11 +1057,11 @@ export default function EvaluationPage() {
                         <span className="text-xs font-medium text-muted-foreground">{t("evaluation.batchAnswers")}</span>
                         <div className="flex flex-col divide-y divide-border">
                           {formatAnswerPreview(r.detail, r.answers).map((item) => (
-                            <div key={item.order} className="flex flex-col gap-1 py-2 md:flex-row md:items-start md:justify-between md:gap-3">
+                            <div key={item.order} className="flex flex-col gap-1 py-2">
                               <span className="text-muted-foreground" title={item.text}>
                                 {item.order}. {item.text}
                               </span>
-                              <span className="font-medium md:shrink-0 md:text-right" title={item.answer}>{item.answer}</span>
+                              <span className="font-medium" title={item.answer}>{item.answer}</span>
                             </div>
                           ))}
                         </div>
@@ -1067,6 +1080,7 @@ export default function EvaluationPage() {
               );
             })()
           )}
+          </div>
         </ResponsiveModalContent>
       </ResponsiveModal>
     </div>
