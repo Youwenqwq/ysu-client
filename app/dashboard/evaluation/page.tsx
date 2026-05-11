@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,6 +36,15 @@ import type {
 } from "@/lib/types";
 import { Sparkles } from "lucide-react";
 
+interface BatchTaskResult {
+  task: EvaluationTask;
+  detail: EvaluationDetail;
+  answers: Record<string, EvaluationAnswer>;
+  scoreResult: Record<string, unknown> | null;
+  status: "pending" | "filling" | "filled" | "submitting" | "submitted" | "failed";
+  error?: string;
+}
+
 function getTaskStatus(task: EvaluationTask, t: ReturnType<typeof useTranslation>["t"]): { active: boolean; label: string; variant: "default" | "secondary" | "destructive" | "outline" } {
   const now = new Date();
   if (task.start_time) {
@@ -65,12 +74,16 @@ export default function EvaluationPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [previewResult, setPreviewResult] = useState<Record<string, unknown> | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [batchAutoLoading, setBatchAutoLoading] = useState(false);
 
-  // Batch selection dialog states
+  // Batch dialog states
   const [batchSelectOpen, setBatchSelectOpen] = useState(false);
-  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false);
+  const [batchPreviewOpen, setBatchPreviewOpen] = useState(false);
+  const [batchProgressOpen, setBatchProgressOpen] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [batchTasks, setBatchTasks] = useState<BatchTaskResult[]>([]);
+  const [batchCurrentIdx, setBatchCurrentIdx] = useState(0);
+  const [batchPhase, setBatchPhase] = useState<"fill" | "submit">("fill");
+  const abortRef = useRef(false);
 
   useEffect(() => {
     if (!credential) return;
@@ -146,27 +159,16 @@ export default function EvaluationPage() {
     if (!d) return {};
     const next: Record<string, EvaluationAnswer> = targetAnswers ? { ...targetAnswers } : { ...answers };
     for (const q of d.questions) {
-      if (!q.options.length) {
-        if (q.question_type !== "01" && q.question_type !== "07") {
-          next[q.tmid] = {
-            tmid: q.tmid,
-            question_type: q.question_type || "",
-            option_ids: [],
-            text: "优秀",
-          };
-        }
-        continue;
-      }
       if (q.question_type === "01") {
-        const best = [...q.options].sort((a, b) => b.score - a.score)[0];
-        if (best) {
-          next[q.tmid] = {
-            tmid: q.tmid,
-            question_type: q.question_type || "",
-            option_ids: [best.wid],
-            text: "",
-          };
-        }
+        const best = q.options.length > 0
+          ? [...q.options].sort((a, b) => b.score - a.score)[0]
+          : null;
+        next[q.tmid] = {
+          tmid: q.tmid,
+          question_type: q.question_type || "",
+          option_ids: best ? [best.wid] : [],
+          text: "",
+        };
       } else if (q.question_type === "07") {
         const positive = q.options.filter((o) => o.score > 0);
         const toSelect = positive.length > 0 ? positive : q.options;
@@ -175,6 +177,13 @@ export default function EvaluationPage() {
           question_type: q.question_type || "",
           option_ids: toSelect.map((o) => o.wid),
           text: "",
+        };
+      } else {
+        next[q.tmid] = {
+          tmid: q.tmid,
+          question_type: q.question_type || "",
+          option_ids: [],
+          text: "优秀",
         };
       }
     }
@@ -218,13 +227,13 @@ export default function EvaluationPage() {
     try {
       const res = await calculateScore(credential, {
         group_no: selectedTask.group_no || "",
-        wjid: detail.wjid || "",
+        wjid: selectedTask.wjid || detail.wjid || "",
         eval_type: selectedTask.eval_type || "",
         answers: buildAnswers(),
         teacher_relation_id: selectedTask.teacher_id || "",
         course_name: selectedTask.course_name || "",
         teacher_name: selectedTask.teacher_name || "",
-        sequence: selectedTask.sequence,
+        sequence: Number(selectedTask.sequence),
       });
       setPreviewResult(res);
       setPreviewOpen(true);
@@ -247,13 +256,13 @@ export default function EvaluationPage() {
     try {
       await submitEvaluation(credential, {
         group_no: selectedTask.group_no || "",
-        wjid: detail.wjid || "",
+        wjid: selectedTask.wjid || detail.wjid || "",
         eval_type: selectedTask.eval_type || "",
         answers: buildAnswers(),
         teacher_relation_id: selectedTask.teacher_id || "",
         course_name: selectedTask.course_name || "",
         teacher_name: selectedTask.teacher_name || "",
-        sequence: selectedTask.sequence,
+        sequence: Number(selectedTask.sequence),
       });
       toast.success(t("evaluation.submit"));
       setDialogOpen(false);
@@ -300,31 +309,41 @@ export default function EvaluationPage() {
     setSelectedTaskIds(new Set());
   }
 
-  function goToBatchConfirm() {
+  function goToBatchPreview() {
     if (selectedTaskIds.size === 0) {
-      toast.error("请至少选择一个任务");
-      return;
-    }
-    setBatchSelectOpen(false);
-    setBatchConfirmOpen(true);
-  }
-
-  async function executeBatchAutoFill() {
-    if (!credential || !selectedType) return;
-    const tasksToProcess = tasks.filter(
-      (task) => selectedTaskIds.has(task.wid || "") && getTaskStatus(task, t).active
-    );
-    if (tasksToProcess.length === 0) {
       toast.error(t("evaluation.noActiveTasks"));
       return;
     }
-    setBatchConfirmOpen(false);
-    setBatchAutoLoading(true);
-    let success = 0;
-    let failed = 0;
-    for (const task of tasksToProcess) {
+    setBatchSelectOpen(false);
+    const tasksToProcess = tasks.filter(
+      (task) => selectedTaskIds.has(task.wid || "") && getTaskStatus(task, t).active
+    );
+    const initialResults: BatchTaskResult[] = tasksToProcess.map((task) => ({
+      task,
+      detail: { questions: [] },
+      answers: {},
+      scoreResult: null,
+      status: "pending",
+    }));
+    setBatchTasks(initialResults);
+    setBatchCurrentIdx(0);
+    setBatchPhase("fill");
+    abortRef.current = false;
+    setBatchProgressOpen(true);
+    runBatchFill(initialResults);
+  }
+
+  async function runBatchFill(initialResults: BatchTaskResult[]) {
+    if (!credential) return;
+    const results = [...initialResults];
+    for (let i = 0; i < results.length; i++) {
+      if (abortRef.current) break;
+      setBatchCurrentIdx(i);
+      results[i] = { ...results[i], status: "filling" };
+      setBatchTasks([...results]);
       try {
-        const d = await getEvaluationDetail(credential!, task.group_no || "", task.eval_type || "", task.sequence);
+        const task = results[i].task;
+        const d = await getEvaluationDetail(credential, task.group_no || "", task.eval_type || "", task.sequence);
         const initial: Record<string, EvaluationAnswer> = {};
         for (const q of d.questions) {
           initial[q.tmid] = {
@@ -337,39 +356,87 @@ export default function EvaluationPage() {
         const filled = autoFillMaxScore(initial, d);
         const err = validateAnswers(filled, d);
         if (err) {
-          failed++;
+          results[i] = { ...results[i], detail: d, answers: filled, status: "failed", error: err };
+          setBatchTasks([...results]);
           continue;
         }
-        await calculateScore(credential!, {
+        const scoreRes = await calculateScore(credential, {
           group_no: task.group_no || "",
-          wjid: d.wjid || "",
+          wjid: task.wjid || d.wjid || "",
           eval_type: task.eval_type || "",
           answers: Object.values(filled),
           teacher_relation_id: task.teacher_id || "",
           course_name: task.course_name || "",
           teacher_name: task.teacher_name || "",
-          sequence: task.sequence,
+          sequence: Number(task.sequence),
         });
-        await submitEvaluation(credential!, {
-          group_no: task.group_no || "",
-          wjid: d.wjid || "",
-          eval_type: task.eval_type || "",
-          answers: Object.values(filled),
-          teacher_relation_id: task.teacher_id || "",
-          course_name: task.course_name || "",
-          teacher_name: task.teacher_name || "",
-          sequence: task.sequence,
-        });
-        success++;
-      } catch {
-        failed++;
+        results[i] = { ...results[i], detail: d, answers: filled, scoreResult: scoreRes, status: "filled" };
+        setBatchTasks([...results]);
+      } catch (err) {
+        results[i] = { ...results[i], status: "failed", error: (err as Error).message };
+        setBatchTasks([...results]);
       }
     }
-    setBatchAutoLoading(false);
+    setBatchCurrentIdx(results.length);
+    if (!abortRef.current) {
+      setBatchProgressOpen(false);
+      setBatchPreviewOpen(true);
+    }
+  }
+
+  async function runBatchSubmit() {
+    if (!credential) return;
+    const toSubmit = batchTasks.filter((r) => r.status === "filled");
+    if (toSubmit.length === 0) {
+      toast.error(t("evaluation.batchNoResults"));
+      return;
+    }
+    setBatchPreviewOpen(false);
+    setBatchCurrentIdx(0);
+    setBatchPhase("submit");
+    abortRef.current = false;
+    setBatchProgressOpen(true);
+    const results = [...batchTasks];
+    for (let i = 0; i < results.length; i++) {
+      if (abortRef.current) break;
+      if (results[i].status !== "filled") continue;
+      setBatchCurrentIdx(i);
+      results[i] = { ...results[i], status: "submitting" };
+      setBatchTasks([...results]);
+      try {
+        const task = results[i].task;
+        const d = results[i].detail;
+        await submitEvaluation(credential, {
+          group_no: task.group_no || "",
+          wjid: task.wjid || d.wjid || "",
+          eval_type: task.eval_type || "",
+          answers: Object.values(results[i].answers),
+          teacher_relation_id: task.teacher_id || "",
+          course_name: task.course_name || "",
+          teacher_name: task.teacher_name || "",
+          sequence: Number(task.sequence),
+        });
+        results[i] = { ...results[i], status: "submitted" };
+        setBatchTasks([...results]);
+      } catch (err) {
+        results[i] = { ...results[i], status: "failed", error: (err as Error).message };
+        setBatchTasks([...results]);
+      }
+    }
+    setBatchCurrentIdx(results.length);
+    setBatchProgressOpen(false);
+    const success = results.filter((r) => r.status === "submitted").length;
+    const failed = results.filter((r) => r.status === "failed").length;
     toast.success(t("evaluation.batchSuccess", { success, failed }));
     if (selectedType) {
       handleSelectType(selectedType);
     }
+  }
+
+  function abortBatch() {
+    abortRef.current = true;
+    setBatchProgressOpen(false);
+    toast.info(t("evaluation.cancel"));
   }
 
   if (loadingTypes) {
@@ -391,9 +458,9 @@ export default function EvaluationPage() {
               <CardDescription>{t("evaluation.description")}</CardDescription>
             </div>
             {selectedType && tasks.filter((task) => getTaskStatus(task, t).active).length > 0 && (
-              <Button variant="outline" size="sm" onClick={openBatchSelect} disabled={batchAutoLoading}>
+              <Button variant="outline" size="sm" onClick={openBatchSelect}>
                 <Sparkles className="size-4 mr-1" />
-                {batchAutoLoading ? t("evaluation.batchAutoLoading") : t("evaluation.batchAuto")}
+                {t("evaluation.batchAuto")}
               </Button>
             )}
           </div>
@@ -664,38 +731,116 @@ export default function EvaluationPage() {
             <Button variant="outline" onClick={() => setBatchSelectOpen(false)}>
               {t("evaluation.cancel")}
             </Button>
-            <Button onClick={goToBatchConfirm} disabled={selectedTaskIds.size === 0}>
+            <Button onClick={goToBatchPreview} disabled={selectedTaskIds.size === 0}>
               {t("evaluation.nextStep")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Batch confirmation dialog */}
-      <Dialog open={batchConfirmOpen} onOpenChange={setBatchConfirmOpen}>
-        <DialogContent className="sm:max-w-2xl">
+      {/* Batch progress dialog */}
+      <Dialog open={batchProgressOpen} onOpenChange={(v) => { if (!v) abortBatch(); }}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t("evaluation.batchConfirmTitle")}</DialogTitle>
+            <DialogTitle>{t("evaluation.batchProgressTitle")}</DialogTitle>
             <DialogDescription>
-              {t("evaluation.batchConfirmDesc", { count: selectedTaskIds.size })}
+              {batchPhase === "fill" ? t("evaluation.batchPhaseFill") : t("evaluation.batchPhaseSubmit")}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-2 max-h-[40vh] overflow-auto">
-            {tasks
-              .filter((task) => selectedTaskIds.has(task.wid || ""))
-              .map((task) => (
-                <div key={task.wid} className="flex items-center gap-2 rounded-lg border p-2 text-sm">
-                  <span className="font-medium">{task.course_name}</span>
-                  <span className="text-muted-foreground text-xs">· {task.teacher_name}</span>
-                </div>
-              ))}
+          <div className="flex flex-col gap-4">
+            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-primary h-full transition-all duration-300"
+                style={{
+                  width: `${batchTasks.length > 0 ? ((batchCurrentIdx + 1) / batchTasks.length) * 100 : 0}%`,
+                }}
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {batchCurrentIdx < batchTasks.length
+                ? `${batchCurrentIdx + 1} / ${batchTasks.length} · ${batchTasks[batchCurrentIdx]?.task.course_name || ""}`
+                : `${t("evaluation.batchSuccess", { success: batchTasks.filter((r) => r.status === "submitted").length, failed: batchTasks.filter((r) => r.status === "failed").length })}`}
+            </div>
+            <div className="flex flex-col gap-2 max-h-[40vh] overflow-auto">
+              {batchTasks.map((r, idx) => {
+                const statusMap = {
+                  pending: { label: t("evaluation.batchTaskStatusPending"), color: "text-muted-foreground" },
+                  filling: { label: t("evaluation.batchTaskStatusProcessing"), color: "text-primary" },
+                  filled: { label: t("evaluation.batchTaskStatusSuccess"), color: "text-green-600" },
+                  submitting: { label: t("evaluation.batchTaskStatusProcessing"), color: "text-primary" },
+                  submitted: { label: t("evaluation.batchTaskStatusSuccess"), color: "text-green-600" },
+                  failed: { label: t("evaluation.batchTaskStatusFailed"), color: "text-destructive" },
+                };
+                const s = statusMap[r.status];
+                return (
+                  <div key={idx} className="flex items-center justify-between rounded-lg border p-2 text-sm">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="font-medium truncate">{r.task.course_name}</span>
+                      <span className="text-xs text-muted-foreground truncate">{r.task.teacher_name}</span>
+                    </div>
+                    <span className={`shrink-0 text-xs ${s.color}`}>{s.label}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBatchConfirmOpen(false)}>
+            <Button variant="destructive" onClick={abortBatch}>
+              {t("evaluation.batchAbort")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch preview dialog */}
+      <Dialog open={batchPreviewOpen} onOpenChange={setBatchPreviewOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>{t("evaluation.batchPreviewTitle")}</DialogTitle>
+            <DialogDescription>{t("evaluation.batchPreviewDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            {batchTasks.map((r, idx) => (
+              <Card key={idx} className={r.status === "failed" ? "opacity-60" : ""}>
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <div className="min-w-0">
+                      <CardTitle className="text-base truncate">{r.task.course_name}</CardTitle>
+                      <CardDescription className="truncate">{r.task.teacher_name}</CardDescription>
+                    </div>
+                    <Badge variant={r.status === "filled" ? "default" : r.status === "failed" ? "destructive" : "secondary"}>
+                      {r.status === "filled"
+                        ? t("evaluation.batchTaskStatusSuccess")
+                        : r.status === "failed"
+                          ? t("evaluation.batchTaskStatusFailed")
+                          : t("evaluation.batchTaskStatusPending")}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2 text-sm">
+                  {r.status === "filled" && r.scoreResult && (
+                    <div className="flex flex-col gap-1">
+                      {Object.entries(r.scoreResult).map(([k, v]) => (
+                        <div key={k} className="flex justify-between">
+                          <span className="text-muted-foreground">{k}</span>
+                          <span className="font-medium">{String(v)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {r.status === "failed" && r.error && (
+                    <span className="text-destructive text-xs">{r.error}</span>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setBatchPreviewOpen(false)}>
               {t("evaluation.cancel")}
             </Button>
-            <Button onClick={executeBatchAutoFill}>
-              {t("evaluation.confirmSubmit")}
+            <Button onClick={runBatchSubmit} disabled={batchTasks.filter((r) => r.status === "filled").length === 0}>
+              {t("evaluation.batchContinue")}
             </Button>
           </DialogFooter>
         </DialogContent>
