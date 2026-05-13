@@ -462,7 +462,7 @@ function UpdateSection({
             </span>
             <span className="text-xs text-muted-foreground">{progress}%</span>
           </div>
-          <Progress value={progress} className="ml-8 mr-4" />
+          <Progress value={progress} className="ml-8 mr-4 w-auto" />
         </div>
       );
 

@@ -176,6 +176,15 @@ function secureMatches(cookie: SimpleCookie, url: string): boolean {
 
 export class SimpleCookieJar {
   private cookies: SimpleCookie[] = [];
+  private _dirty = true;
+
+  isDirty(): boolean {
+    return this._dirty;
+  }
+
+  markClean(): void {
+    this._dirty = false;
+  }
 
   async setCookie(
     cookieStr: string,
@@ -194,6 +203,7 @@ export class SimpleCookieJar {
           ),
       );
       this.cookies.push(parsed);
+      this._dirty = true;
     } catch (e) {
       if (!options?.ignoreError) throw e;
     }
@@ -232,6 +242,7 @@ export class SimpleCookieJar {
     this.cookies = this.cookies.filter(
       (c) => !(c.domain === domain && c.path === path && c.name === key),
     );
+    this._dirty = true;
   }
 
   toJSON(): string {
@@ -364,19 +375,22 @@ async function capacitorHttpSend(
   }
 
   // Push jar cookies → native store so HttpURLConnection sends them.
-  // setCookie() overwrites existing cookies by name, so stale entries are replaced.
-  const jarCookies = await jar.getAllCookies();
-  for (const c of jarCookies) {
-    if (!c.value) continue;
-    try {
-      const host = c.domain.replace(/^\./, '') || 'localhost';
-      await CapacitorCookies?.setCookie?.({
-        url: `https://${host}${c.path}`,
-        key: c.name,
-        value: c.value,
-        path: c.path,
-      });
-    } catch { /* ignore individual failures */ }
+  // Only push when jar is dirty (cookies changed since last push).
+  if (jar.isDirty()) {
+    const jarCookies = await jar.getAllCookies();
+    for (const c of jarCookies) {
+      if (!c.value) continue;
+      try {
+        const host = c.domain.replace(/^\./, '') || 'localhost';
+        await CapacitorCookies?.setCookie?.({
+          url: `https://${host}${c.path}`,
+          key: c.name,
+          value: c.value,
+          path: c.path,
+        });
+      } catch { /* ignore individual failures */ }
+    }
+    jar.markClean();
   }
 
   const headers: Record<string, string> = { ...(req.headers ?? {}) };

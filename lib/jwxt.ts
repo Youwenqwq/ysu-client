@@ -417,6 +417,9 @@ export async function restoreSession(session: JWXTSession): Promise<void> {
 export function resetJWXT(): void {
   jwxtJar = new SimpleCookieJar();
   hydrationDone = Promise.resolve();
+  authorized = false;
+  ensuredWeuApps.clear();
+  cachedCurrentTerm = null;
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────── //
@@ -557,13 +560,16 @@ async function emapPost(
 }
 
 let inflightAuth: Promise<unknown> | null = null;
+let authorized = false;
 
 async function ensureAuthorized(): Promise<void> {
+  if (authorized) return;
   await getCredentialApplied();
   await hydrationDone;
   const cookies = await jwxtJar.getAllCookies();
   for (const c of cookies) {
     if (c.domain && c.domain.includes(JWXT_COOKIE_DOMAIN_KEYWORD)) {
+      authorized = true;
       return;
     }
   }
@@ -574,6 +580,7 @@ async function ensureAuthorized(): Promise<void> {
   inflightAuth = authorize(JWXT_PORTAL_URL, jwxtJar);
   try {
     await inflightAuth;
+    authorized = true;
   } finally {
     inflightAuth = null;
   }
@@ -589,7 +596,10 @@ async function reauthorize(): Promise<void> {
   await authorize(JWXT_PORTAL_URL, jwxtJar);
 }
 
+const ensuredWeuApps = new Set<string>();
+
 async function ensureWeu(appId: string): Promise<void> {
+  if (ensuredWeuApps.has(appId)) return;
   const url = `${APP_SHOW_URL}?id=${encodeURIComponent(appId)}`;
   try {
     await fetchWithJar(jwxtJar, {
@@ -604,6 +614,7 @@ async function ensureWeu(appId: string): Promise<void> {
   } catch {
     // appShow 可能 302 跳转或失败,_WEU 在 cookie jar 上下发了就行
   }
+  ensuredWeuApps.add(appId);
 }
 
 async function post(
@@ -614,10 +625,13 @@ async function post(
   return emapPost(url, data);
 }
 
+let cachedCurrentTerm: string | null = null;
+
 async function getCurrentTerm(
   appId: string,
   pathKey: keyof typeof API_PATHS,
 ): Promise<string> {
+  if (cachedCurrentTerm) return cachedCurrentTerm;
   await ensureWeu(appId);
   const datas = await post(API_PATHS[pathKey]);
   const segments = pathKey.split('_');
@@ -632,6 +646,7 @@ async function getCurrentTerm(
   if (!term) {
     throw new JWXTProtocolError('current term query returned empty DM');
   }
+  cachedCurrentTerm = term;
   return term;
 }
 
