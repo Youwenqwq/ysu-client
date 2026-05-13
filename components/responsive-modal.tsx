@@ -55,7 +55,7 @@ export function ResponsiveModalContent({
   const isMobile = useIsMobile();
   if (isMobile) {
     return (
-      <DrawerContent className={cn("max-h-[92dvh]", drawerClassName)}>
+      <DrawerContent className={cn("max-h-[92svh]", drawerClassName)}>
         {children}
       </DrawerContent>
     );

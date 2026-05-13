@@ -241,10 +241,27 @@ export default function GradesPage() {
     return true;
   });
 
+  const termWeightedGpa = useMemo(() => {
+    if (term === ALL_TERM) return null;
+    let totalWeightedPoints = 0;
+    let totalCredits = 0;
+    for (const g of filtered) {
+      const gp = parseFloat(g.grade_point ?? "");
+      const cr = parseFloat(g.credit ?? "");
+      if (Number.isFinite(gp) && Number.isFinite(cr) && cr > 0) {
+        totalWeightedPoints += gp * cr;
+        totalCredits += cr;
+      }
+    }
+    if (totalCredits === 0) return null;
+    return (totalWeightedPoints / totalCredits).toFixed(4);
+  }, [filtered, term]);
+
   const basicGpaItems = [
     { label: t("grades.gpaInitial"), value: gpa?.gpa_initial },
     { label: t("dashboard.weightedAvg"), value: gpa?.weighted_avg },
     { label: t("dashboard.arithmeticAvg"), value: gpa?.arithmetic_avg },
+    ...(termWeightedGpa !== null ? [{ label: t("grades.termWeightedGpa"), value: termWeightedGpa }] : []),
   ];
 
   const extraGpaItems = [
@@ -398,7 +415,12 @@ export default function GradesPage() {
                       <TableCell>{g.grade_point}</TableCell>
                       <TableCell>{g.credit}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{g.course_type}</Badge>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="secondary">{g.course_type}</Badge>
+                          {g.is_degree_course && (
+                            <Badge variant="outline">{t("grades.degreeCourse")}</Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {g.is_pass ? (
@@ -473,6 +495,11 @@ export default function GradesPage() {
                   ) : (
                     <Badge variant="destructive" className="text-[10px]">
                       {t("grades.table.fail")}
+                    </Badge>
+                  )}
+                  {g.is_degree_course && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {t("grades.degreeCourse")}
                     </Badge>
                   )}
                 </div>

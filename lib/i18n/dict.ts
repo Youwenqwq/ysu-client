@@ -181,6 +181,8 @@ export const zh = {
     requiredGpaHighest: "必修最高",
     degreeGpaInitial: "学位课初始",
     degreeWeightedAvg: "学位课加权",
+    termWeightedGpa: "本学期加权绩点",
+    degreeCourse: "学位课",
     stats: {
       title: "成绩统计",
       description: "查看课程成绩统计、分布与排名",
@@ -578,6 +580,8 @@ export const en = {
     requiredGpaHighest: "Req. Highest",
     degreeGpaInitial: "Degree Initial",
     degreeWeightedAvg: "Degree Weighted",
+    termWeightedGpa: "Term Weighted GPA",
+    degreeCourse: "Degree Course",
     stats: {
       title: "Grade Statistics",
       description: "View statistics, distribution, and ranking for a course",
