@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -32,14 +32,14 @@ const COUNTDOWN_SECONDS = 120;
 
 export function MFAModal() {
   const { t } = useTranslation();
-  const { open, username, mobileHint, methodCode, cancelMFA, submitMFA } =
+  const { open, username, mobileHint, cancelMFA, submitMFA } =
     useMFAModalStore();
   const [mfaMethod, setMfaMethod] = useState<"sms" | "cpdaily">("cpdaily");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [localHint, setLocalHint] = useState(mobileHint);
-  const [localMethodCode, setLocalMethodCode] = useState(methodCode);
   const [countdown, setCountdown] = useState(0);
+  const requestingRef = useRef(false);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -56,14 +56,16 @@ export function MFAModal() {
   }, [countdown]);
 
   useEffect(() => {
-    if (!open) {
-      setCountdown(0);
-      setCode("");
-    }
-  }, [open]);
+    if (!open) return;
+    setCode("");
+    setMfaMethod("cpdaily");
+    setLocalHint(mobileHint);
+    setCountdown(mobileHint ? COUNTDOWN_SECONDS : 0);
+  }, [open, mobileHint]);
 
   async function handleRequestCode() {
-    if (!username || countdown > 0) return;
+    if (!username || countdown > 0 || requestingRef.current) return;
+    requestingRef.current = true;
     setLoading(true);
     try {
       const res = await requestMFACode(
@@ -71,12 +73,12 @@ export function MFAModal() {
         undefined,
       );
       setLocalHint(res.mobile_hint);
-      setLocalMethodCode(res.method_code);
       setCountdown(COUNTDOWN_SECONDS);
     } catch (err) {
       toast.error((err as Error).message || t("login.errorMfaRequestFailed"));
     } finally {
       setLoading(false);
+      requestingRef.current = false;
     }
   }
 

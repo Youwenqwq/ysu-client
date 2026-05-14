@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -61,6 +61,7 @@ export default function LoginPage() {
   const [mobileHint, setMobileHint] = useState("");
   const [methodCode, setMethodCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const requestingMfaCodeRef = useRef(false);
 
   useEffect(() => {
     loadRememberedCredentials().then((r) => {
@@ -143,7 +144,8 @@ export default function LoginPage() {
   }
 
   async function handleRequestMFACode() {
-    if (!tempCredential) return;
+    if (!tempCredential || requestingMfaCodeRef.current) return;
+    requestingMfaCodeRef.current = true;
     setLoading(true);
     try {
       const res = await requestMFACode(
@@ -152,11 +154,11 @@ export default function LoginPage() {
       );
       setMobileHint(res.mobile_hint);
       setMethodCode(res.method_code);
-      toast.success(`${t("login.mfaSent")} ${res.mobile_hint}`);
     } catch (err) {
       toast.error((err as Error).message || t("login.errorMfaRequestFailed"));
     } finally {
       setLoading(false);
+      requestingMfaCodeRef.current = false;
     }
   }
 
