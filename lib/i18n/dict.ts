@@ -95,7 +95,7 @@ export const zh = {
     mfaRequest: "获取验证码",
     mfaRequesting: "发送中...",
     mfaResend: "已发送 ({seconds}s)",
-    mfaSent: "验证码将发送至",
+    mfaSent: "验证码已发送至",
     mfaSentCpdailyApp: "今日校园 App",
     mfaCodeLabel: "验证码",
     mfaCodePlaceholder: "请输入验证码",
