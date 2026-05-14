@@ -22,8 +22,8 @@ export const UPDATE_MIRRORS: readonly UpdateMirror[] = [
   { label: "ghfast.top", value: "https://ghfast.top/" },
 ];
 
-const GITHUB_API =
-  "https://api.github.com/repos/Youwenqwq/ysu-client/releases/latest";
+const RELEASE_ASSET_BASE =
+  "https://github.com/Youwenqwq/ysu-client/releases/latest/download";
 const ASSET_NAME = "dist.zip";
 const VERSION_JSON_NAME = "version.json";
 const LAST_CHECK_KEY = "ysu-last-update-check";
@@ -49,6 +49,11 @@ const EMPTY_RESULT: UpdateInfo = {
   apkDownloadUrl: "",
 };
 
+function toMirrorAssetUrl(url: string, mirrorPrefix: string): string {
+  if (!mirrorPrefix) return url;
+  return `${mirrorPrefix}${url}`;
+}
+
 /** Check GitHub Releases for a newer version. Respects 30-min cooldown when `auto` is true. */
 export async function checkForUpdate(
   auto = false,
@@ -61,12 +66,17 @@ export async function checkForUpdate(
     }
   }
 
-  const apiUrl = mirrorPrefix ? `${mirrorPrefix}${GITHUB_API}` : GITHUB_API;
+  const versionJsonUrl = toMirrorAssetUrl(
+    `${RELEASE_ASSET_BASE}/${VERSION_JSON_NAME}`,
+    mirrorPrefix,
+  );
+  const distZipUrl = toMirrorAssetUrl(
+    `${RELEASE_ASSET_BASE}/${ASSET_NAME}`,
+    mirrorPrefix,
+  );
 
   try {
-    const res = await fetch(apiUrl, {
-      headers: { Accept: "application/vnd.github+json" },
-    });
+    const res = await fetch(versionJsonUrl);
 
     if (res.status === 403) {
       throw new Error("RATE_LIMIT");
@@ -75,57 +85,38 @@ export async function checkForUpdate(
       throw new Error(`HTTP ${res.status}`);
     }
 
-    const data = await res.json();
-    const tagName: string = data.tag_name ?? "";
-    const version = tagName.replace(/^v/, "");
-    const body: string = data.body ?? "";
-    const assets: Array<{ name: string; browser_download_url: string }> =
-      data.assets ?? [];
-    const asset = assets.find((a) => a.name === ASSET_NAME);
-
-    if (!asset || !version) {
+    const data = await res.json() as {
+      webVersion?: string;
+      apkVersionCode?: number;
+      apkDownloadUrl?: string;
+    };
+    const version = data.webVersion ?? "";
+    if (!version) {
       return EMPTY_RESULT;
     }
 
     localStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
 
-    const downloadUrl = mirrorPrefix
-      ? `${mirrorPrefix}${asset.browser_download_url}`
-      : asset.browser_download_url;
-
     const result: UpdateInfo = {
       available: isNewer(APP_VERSION, version),
       version,
-      downloadUrl,
-      body,
+      downloadUrl: distZipUrl,
+      body: "",
       apkUpdateAvailable: false,
       apkDownloadUrl: "",
     };
 
-    // Check version.json for APK version info
-    const vjAsset = assets.find((a) => a.name === VERSION_JSON_NAME);
-    if (vjAsset) {
-      const vjUrl = mirrorPrefix
-        ? `${mirrorPrefix}${vjAsset.browser_download_url}`
-        : vjAsset.browser_download_url;
-      try {
-        const vjRes = await fetch(vjUrl);
-        if (vjRes.ok) {
-          const vj = await vjRes.json();
-          const installed = await App.getInfo();
-          if (vj.apkVersionCode > Number(installed.build)) {
-            result.apkUpdateAvailable = true;
-            result.apkDownloadUrl = mirrorPrefix
-              ? `${mirrorPrefix}${vj.apkDownloadUrl}`
-              : vj.apkDownloadUrl;
-            // If APK needs update, web update is moot — force APK-only flow
-            if (result.apkUpdateAvailable && result.available) {
-              result.available = false;
-            }
-          }
+    if (typeof data.apkVersionCode === "number") {
+      const installed = await App.getInfo();
+      if (data.apkVersionCode > Number(installed.build)) {
+        result.apkUpdateAvailable = true;
+        result.apkDownloadUrl = data.apkDownloadUrl
+          ? toMirrorAssetUrl(data.apkDownloadUrl, mirrorPrefix)
+          : "";
+        // If APK needs update, web update is moot — force APK-only flow
+        if (result.apkUpdateAvailable && result.available) {
+          result.available = false;
         }
-      } catch {
-        // version.json fetch failed — proceed with web-only check
       }
     }
 

@@ -8,6 +8,7 @@ import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,7 @@ import { useTranslation } from "@/lib/i18n/use-translation";
 import { getStudentInfo } from "@/lib/api";
 import { cacheGet, cacheSet, cacheKey } from "@/lib/cache";
 import { resetSDK } from "@/lib/sdk";
+import { useUpdateStore } from "@/lib/update-store";
 import { APP_VERSION, APP_BUILD } from "@/lib/version";
 import type { StudentInfo } from "@/lib/types";
 
@@ -46,6 +48,7 @@ export default function MePage() {
   const credential = useAuthStore((s) => s.credential);
   const username = useAuthStore((s) => s.username);
   const clearCredential = useAuthStore((s) => s.clearCredential);
+  const hasUpdate = useUpdateStore((s) => s.hasUpdate);
   const { t, locale, setLocale } = useTranslation();
   const { theme, setTheme } = useTheme();
 
@@ -230,13 +233,23 @@ export default function MePage() {
       <div className="flex items-center justify-between px-1 pt-2 text-sm">
         <Link
           href="/dashboard/about"
-          className="text-primary underline underline-offset-2"
+          className="relative text-primary underline underline-offset-2"
         >
           {t("about.title")}
+          {hasUpdate && (
+            <span className="absolute -top-1 -right-2 size-2 rounded-full bg-destructive" />
+          )}
         </Link>
-        <span className="font-mono text-xs text-muted-foreground">
-          v{APP_VERSION} · {APP_BUILD}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs text-muted-foreground">
+            v{APP_VERSION} · {APP_BUILD}
+          </span>
+          {hasUpdate && (
+            <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+              {t("me.updateAvailable")}
+            </Badge>
+          )}
+        </div>
       </div>
 
       <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>

@@ -37,6 +37,7 @@ import {
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { isCapacitor } from "@/lib/platform";
 import { useSettingsStore } from "@/lib/settings-store";
+import { useUpdateStore } from "@/lib/update-store";
 import { useLongPress } from "@/hooks/use-long-press";
 import {
   APP_VERSION,
@@ -71,6 +72,7 @@ export function AboutContent() {
 
   const updateMirror = useSettingsStore((s) => s.updateMirror);
   const setUpdateMirror = useSettingsStore((s) => s.setUpdateMirror);
+  const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus);
 
   // Dialog-local state
   const [dialogPreset, setDialogPreset] = useState("");
@@ -108,6 +110,7 @@ export function AboutContent() {
       const { checkForUpdate } = await import("@/lib/updater");
       const info = await checkForUpdate(false, updateMirror);
       setUpdateInfo(info);
+      setUpdateStatus(info.available || info.apkUpdateAvailable);
       if (info.apkUpdateAvailable) {
         setState("apk-available");
       } else if (info.available) {
@@ -124,7 +127,7 @@ export function AboutContent() {
       }
       setState("error");
     }
-  }, [t, updateMirror]);
+  }, [setUpdateStatus, t, updateMirror]);
 
   const handleDownload = useCallback(async () => {
     if (!updateInfo) return;
