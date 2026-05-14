@@ -13,16 +13,13 @@ importers:
         version: 8.0.0
       '@capacitor/android':
         specifier: ^8.3.3
-        version: 8.3.3(@capacitor/core@8.3.3)
-      '@capacitor/app':
-        specifier: ^8.1.0
-        version: 8.1.0(@capacitor/core@8.3.3)
+        version: 8.3.4(@capacitor/core@8.3.4)
       '@capacitor/core':
         specifier: ^8.3.3
-        version: 8.3.3
+        version: 8.3.4
       '@capgo/capacitor-updater':
         specifier: ^8.45.11
-        version: 8.45.11(@capacitor/core@8.3.3)
+        version: 8.45.11(@capacitor/core@8.3.4)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -71,7 +68,7 @@ importers:
         version: 3.0.5(@types/node@25.7.0)(typescript@5.9.3)
       '@capacitor/cli':
         specifier: ^8.3.3
-        version: 8.3.3
+        version: 8.3.4
       '@eslint/eslintrc':
         specifier: ^3
         version: 3.3.5
@@ -248,8 +245,8 @@ packages:
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
 
-  '@capacitor/android@8.3.3':
-    resolution: {integrity: sha512-Km7/voqtWVrN+qDHktoYb7DIliW+eakglH4jyT7C0dxODW/gDrMi19yC0ATNM2+rtaj3e2i46pgZ3A5UCa+44Q==}
+  '@capacitor/android@8.3.4':
+    resolution: {integrity: sha512-7gJjrG3X32Am1QMLqgMztWTYMLMVNE+VZwhekNxhvYizH4mOV05vH+rC9B+f17bCkYZfyu/qXQX6hoY7kLeVZw==}
     peerDependencies:
       '@capacitor/core': ^8.3.0
 
@@ -268,13 +265,13 @@ packages:
     engines: {node: '>=16.0.0'}
     hasBin: true
 
-  '@capacitor/cli@8.3.3':
-    resolution: {integrity: sha512-FHebL02KEyU5vs+Os5s1yZuE8QT3FzxoO4nZLywGk7Ny957E6gOujKouGKsnKYq01eAWWJGGV/Fv04rY27tSsw==}
+  '@capacitor/cli@8.3.4':
+    resolution: {integrity: sha512-QEmyNdiDDVNYl0Mahm7YTVA/3t2tKcy7FWYDapeKGavS6HDNHZSjyTVwQpUXQbDZrrs/PS2Wau3Aii+LIFwm/A==}
     engines: {node: '>=22.0.0'}
     hasBin: true
 
-  '@capacitor/core@8.3.3':
-    resolution: {integrity: sha512-xx1FIriZQ5jwqEkZwmWQHfXNEn5a9ZLOtdFoJXslh0ian6T/EU+QJtRmZw3KRsmcUV6p5ufczBrzF1rVP8Nu3A==}
+  '@capacitor/core@8.3.4':
+    resolution: {integrity: sha512-CqRQCkb6HXxcx/N7s+hHTN6ef2CmamFiRMITwm4qB840ph56mS42bzUgn6tKCP+RZjdDweiRHj9ytDDeN6jFag==}
 
   '@capacitor/ios@8.3.4':
     resolution: {integrity: sha512-XvvnPFWWP/gwwO811ue7nEBKSZqDCIB8hxGgWV6iXA7DSVLqMOEmQdfHj94kkVxof2wL9XWHypu3ayDULo7U5w==}
@@ -2937,7 +2934,6 @@ packages:
   git-raw-commits@2.0.11:
     resolution: {integrity: sha512-VnctFhw+xfj8Va1xtfEqCUD2XDrbAPSJx+hSrE5K7fGdjZruW7XV+QOrN7LF/RJyvspRiD2I0asWsxFp0ya26A==}
     engines: {node: '>=10'}
-    deprecated: This package is no longer maintained. For the JavaScript API, please use @conventional-changelog/git-client instead.
     hasBin: true
 
   git-remote-origin-url@2.0.0:
@@ -2971,7 +2967,6 @@ packages:
   glob@9.3.4:
     resolution: {integrity: sha512-qaSc49hojMOv1EPM4EuyITjDSgSKI0rthoHnvE81tcOi1SCVndHko7auqxdQ14eiQG2NDBJBE86+2xIrbIvrbA==}
     engines: {node: '>=16 || 14 >=14.17'}
-    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   globals@14.0.0:
     resolution: {integrity: sha512-oahGvuMGQlPw/ivIYBjVSrWAfWLBeku5tpPE2fOPLi+WHffIWbuh2tCjhyQhTBPMf5E9jDEH4FOmTYgYwbKwtQ==}
@@ -4648,7 +4643,6 @@ packages:
   tar@6.2.1:
     resolution: {integrity: sha512-DZ4yORTwrbTj/7MZYq2w+/ZFdI6OZ/f9SFHR+71gIVUZhOQPHzVCLpvRnPgyaMpfWxxk/4ONva3GQSyNIKRv6A==}
     engines: {node: '>=10'}
-    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   tar@7.5.15:
     resolution: {integrity: sha512-dzGK0boVlC4W5QFuQN1EFSl3bIDYsk7Tj40U6eIBnK2k/8ml7TZ5agbI5j5+qnoVcAA+rNtBml8SEiLxZpNqRQ==}
@@ -4901,7 +4895,6 @@ packages:
 
   uuid@7.0.3:
     resolution: {integrity: sha512-DPSke0pXhTZgoF/d+WSt2QaKMCFSfx7QegxEWT+JOuHF5aWrKEn0G+ztjuJg/gG8/ItK+rbPCD/yNv8yyih6Cg==}
-    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   v8-compile-cache-lib@3.0.1:
@@ -5118,11 +5111,11 @@ snapshots:
 
   '@aparajita/capacitor-secure-storage@8.0.0':
     dependencies:
-      '@capacitor/android': 8.3.3(@capacitor/core@8.3.3)
-      '@capacitor/app': 8.1.0(@capacitor/core@8.3.3)
-      '@capacitor/core': 8.3.3
-      '@capacitor/ios': 8.3.4(@capacitor/core@8.3.3)
-      '@capacitor/keyboard': 8.0.3(@capacitor/core@8.3.3)
+      '@capacitor/android': 8.3.4(@capacitor/core@8.3.4)
+      '@capacitor/app': 8.1.0(@capacitor/core@8.3.4)
+      '@capacitor/core': 8.3.4
+      '@capacitor/ios': 8.3.4(@capacitor/core@8.3.4)
+      '@capacitor/keyboard': 8.0.3(@capacitor/core@8.3.4)
 
   '@babel/code-frame@7.29.0':
     dependencies:
@@ -5310,13 +5303,13 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
-  '@capacitor/android@8.3.3(@capacitor/core@8.3.3)':
+  '@capacitor/android@8.3.4(@capacitor/core@8.3.4)':
     dependencies:
-      '@capacitor/core': 8.3.3
+      '@capacitor/core': 8.3.4
 
-  '@capacitor/app@8.1.0(@capacitor/core@8.3.3)':
+  '@capacitor/app@8.1.0(@capacitor/core@8.3.4)':
     dependencies:
-      '@capacitor/core': 8.3.3
+      '@capacitor/core': 8.3.4
 
   '@capacitor/assets@3.0.5(@types/node@25.7.0)(typescript@5.9.3)':
     dependencies:
@@ -5365,7 +5358,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@capacitor/cli@8.3.3':
+  '@capacitor/cli@8.3.4':
     dependencies:
       '@ionic/cli-framework-output': 2.2.8
       '@ionic/utils-subprocess': 3.0.1
@@ -5387,21 +5380,21 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@capacitor/core@8.3.3':
+  '@capacitor/core@8.3.4':
     dependencies:
       tslib: 2.8.1
 
-  '@capacitor/ios@8.3.4(@capacitor/core@8.3.3)':
+  '@capacitor/ios@8.3.4(@capacitor/core@8.3.4)':
     dependencies:
-      '@capacitor/core': 8.3.3
+      '@capacitor/core': 8.3.4
 
-  '@capacitor/keyboard@8.0.3(@capacitor/core@8.3.3)':
+  '@capacitor/keyboard@8.0.3(@capacitor/core@8.3.4)':
     dependencies:
-      '@capacitor/core': 8.3.3
+      '@capacitor/core': 8.3.4
 
-  '@capgo/capacitor-updater@8.45.11(@capacitor/core@8.3.3)':
+  '@capgo/capacitor-updater@8.45.11(@capacitor/core@8.3.4)':
     dependencies:
-      '@capacitor/core': 8.3.3
+      '@capacitor/core': 8.3.4
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
