@@ -30,6 +30,7 @@ export const zh = {
     sectionAcademic: "学业",
     sectionPreferences: "偏好设置",
     sectionAccount: "账户",
+    updateAvailable: "有新版本",
   },
   about: {
     title: "关于",
@@ -64,7 +65,7 @@ export const zh = {
     retry: "重试",
     releaseNotes: "更新日志",
     mirrorSettings: "连接设置",
-    mirrorSettingsDesc: "选择代理服务器以加速更新检查",
+    mirrorSettingsDesc: "选择代理服务器以加速 Release 资源下载",
     mirrorDirect: "直连",
     mirrorCustom: "自定义",
     mirrorPlaceholder: "输入代理地址前缀...",
@@ -430,6 +431,7 @@ export const en = {
     sectionAcademic: "Academic",
     sectionPreferences: "Preferences",
     sectionAccount: "Account",
+    updateAvailable: "Update available",
   },
   about: {
     title: "About",
@@ -464,7 +466,7 @@ export const en = {
     retry: "Retry",
     releaseNotes: "Release Notes",
     mirrorSettings: "Connection",
-    mirrorSettingsDesc: "Select a proxy server to speed up update checks",
+    mirrorSettingsDesc: "Select a proxy server to speed up Release asset downloads",
     mirrorDirect: "Direct",
     mirrorCustom: "Custom",
     mirrorPlaceholder: "Enter proxy URL prefix...",
