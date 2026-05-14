@@ -152,7 +152,10 @@ export default function LoginPage() {
         { username, method: mfaMethod },
         tempCredential,
       );
-      setMobileHint(res.mobile_hint);
+      setMobileHint(
+        res.mobile_hint ||
+          (mfaMethod === "cpdaily" ? t("login.mfaSentCpdailyApp") : ""),
+      );
       setMethodCode(res.method_code);
     } catch (err) {
       toast.error((err as Error).message || t("login.errorMfaRequestFailed"));

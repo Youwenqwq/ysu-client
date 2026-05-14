@@ -32,12 +32,13 @@ const COUNTDOWN_SECONDS = 120;
 
 export function MFAModal() {
   const { t } = useTranslation();
-  const { open, username, mobileHint, cancelMFA, submitMFA } =
+  const { open, username, mobileHint, methodCode, cancelMFA, submitMFA } =
     useMFAModalStore();
   const [mfaMethod, setMfaMethod] = useState<"sms" | "cpdaily">("cpdaily");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [localHint, setLocalHint] = useState(mobileHint);
+  const [localMethodCode, setLocalMethodCode] = useState(methodCode);
   const [countdown, setCountdown] = useState(0);
   const requestingRef = useRef(false);
 
@@ -60,8 +61,9 @@ export function MFAModal() {
     setCode("");
     setMfaMethod("cpdaily");
     setLocalHint(mobileHint);
-    setCountdown(mobileHint ? COUNTDOWN_SECONDS : 0);
-  }, [open, mobileHint]);
+    setLocalMethodCode(methodCode);
+    setCountdown(methodCode ? COUNTDOWN_SECONDS : 0);
+  }, [open, mobileHint, methodCode]);
 
   async function handleRequestCode() {
     if (!username || countdown > 0 || requestingRef.current) return;
@@ -73,6 +75,7 @@ export function MFAModal() {
         undefined,
       );
       setLocalHint(res.mobile_hint);
+      setLocalMethodCode(res.method_code);
       setCountdown(COUNTDOWN_SECONDS);
     } catch (err) {
       toast.error((err as Error).message || t("login.errorMfaRequestFailed"));
@@ -132,9 +135,10 @@ export function MFAModal() {
                   ? t("login.mfaRequesting")
                   : t("login.mfaRequest")}
             </Button>
-            {localHint && (
+            {localMethodCode && (
               <FieldDescription>
-                {t("login.mfaSent")} {localHint}
+                {t("login.mfaSent")}{" "}
+                {localHint || t("login.mfaSentCpdailyApp")}
               </FieldDescription>
             )}
             <Field>
