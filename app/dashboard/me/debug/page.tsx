@@ -10,7 +10,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { isCapacitor, isTauri, isWeb } from "@/lib/platform";
 import { getJar as getCasJar, isAuthenticated as checkCASAuth } from "@/lib/cas";
-import { getJar as getJwxtJar } from "@/lib/jwxt";
+import { getJar as getJwxtJar, ensureMobileAuthorized } from "@/lib/jwxt";
 import { loadCASTGC, loadRememberedCredentials } from "@/lib/secure-storage";
 import {
   getStudentInfo,
@@ -21,7 +21,6 @@ import {
 import { RefreshCw, Trash2, Bug } from "lucide-react";
 import { toast } from "sonner";
 import { clearAllCache } from "@/lib/cache";
-import { fetchWithJar } from "@/lib/cookie";
 
 interface DiagnosticResult {
   platform: {
@@ -166,22 +165,10 @@ export default function DebugPage() {
           result.apiTests.currentWeek = { ok: false, error: (e as Error).message };
         }
 
-        // Mobile auth test: access /jwmobile directly
-        // Authenticated → 404, Unauthenticated → 401
+        // Mobile auth test: run the full mobile authorization flow
         try {
-          const resp = await fetchWithJar(jwxtJar, {
-            method: "GET",
-            url: "https://jwxt.ysu.edu.cn/jwmobile",
-            redirect: "manual",
-            timeoutMs: 10000,
-          });
-          if (resp.status === 404) {
-            result.apiTests.mobileAuth = { ok: true };
-          } else if (resp.status === 401) {
-            result.apiTests.mobileAuth = { ok: false, error: t("debug.unauthenticated") };
-          } else {
-            result.apiTests.mobileAuth = { ok: false, error: `HTTP ${resp.status}` };
-          }
+          await ensureMobileAuthorized();
+          result.apiTests.mobileAuth = { ok: true };
         } catch (e) {
           result.apiTests.mobileAuth = { ok: false, error: (e as Error).message };
         }

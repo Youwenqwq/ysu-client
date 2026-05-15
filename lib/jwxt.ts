@@ -13,6 +13,7 @@ import {
   headerSingle,
 } from './cookie';
 import { authorize, getCredentialApplied } from './cas';
+import { useAuthStore } from './auth-store';
 
 // ─── Constants ────────────────────────────────────────────────────────── //
 
@@ -424,6 +425,15 @@ export function resetJWXT(): void {
   authorized = false;
   ensuredWeuApps.clear();
   cachedCurrentTerm = null;
+  resetMobileAuth();
+}
+
+/** 将当前 JWXT jar 中的会话持久化到 auth-store（包含 mobile auth token）。 */
+async function persistSession(): Promise<void> {
+  const session = await JWXTSession.fromJar(jwxtJar);
+  if (!session.isEmpty()) {
+    useAuthStore.getState().setJWXTSession(session.toJSON());
+  }
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────── //
@@ -1692,7 +1702,7 @@ async function captureMobileToken(): Promise<string | null> {
   return null;
 }
 
-async function ensureMobileAuthorized(): Promise<void> {
+export async function ensureMobileAuthorized(): Promise<void> {
   if (mobileAuthorized) return;
   if (inflightMobileAuth) {
     await inflightMobileAuth;
@@ -1719,6 +1729,7 @@ async function ensureMobileAuthorized(): Promise<void> {
   try {
     await inflightMobileAuth;
     mobileAuthorized = true;
+    void persistSession();
   } finally {
     inflightMobileAuth = null;
   }
@@ -1777,13 +1788,17 @@ async function mobileRequest(
   }
 
   const data = result['data'];
+  let returnData: Record<string, unknown>;
   if (data === undefined || data === null) {
-    return {};
+    returnData = {};
+  } else if (typeof data !== 'object') {
+    returnData = { _value: data };
+  } else {
+    returnData = data as Record<string, unknown>;
   }
-  if (typeof data !== 'object') {
-    return { _value: data };
-  }
-  return data as Record<string, unknown>;
+
+  void persistSession();
+  return returnData;
 }
 
 async function mobilePost(
