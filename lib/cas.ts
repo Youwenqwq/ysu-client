@@ -309,6 +309,18 @@ let casJar = new SimpleCookieJar();
 let timeoutMs = 30_000;
 let credentialApplied: Promise<void> = Promise.resolve();
 
+// Cache Capacitor core module to avoid dynamic import overhead.
+let capCoreCache: typeof import('@capacitor/core') | null = null;
+async function getCapacitorCore(): Promise<typeof import('@capacitor/core') | null> {
+  if (capCoreCache) return capCoreCache;
+  try {
+    capCoreCache = await import('@capacitor/core');
+    return capCoreCache;
+  } catch {
+    return null;
+  }
+}
+
 export function getJar(): SimpleCookieJar {
   return casJar;
 }
@@ -356,21 +368,19 @@ export async function restoreCASCookies(): Promise<void> {
   const tgc = await loadCASTGC();
   if (!tgc) return;
 
-  try {
-    const capCore = (await import('@capacitor/core')) as Record<string, unknown>;
-    const CapacitorCookies = capCore['CapacitorCookies'] as {
-      setCookie?: (opts: { url: string; key: string; value: string; path?: string }) => Promise<void>;
-    } | undefined;
-    if (CapacitorCookies?.setCookie) {
-      await CapacitorCookies.setCookie({
-        url: CER_BASE_URL,
-        key: 'CASTGC',
-        value: tgc,
-        path: '/authserver',
-      });
-    }
-  } catch {
-    // Not on Capacitor — ignore
+  const capCore = await getCapacitorCore();
+  if (!capCore) return;
+
+  const CapacitorCookies = (capCore as Record<string, unknown>)['CapacitorCookies'] as {
+    setCookie?: (opts: { url: string; key: string; value: string; path?: string }) => Promise<void>;
+  } | undefined;
+  if (CapacitorCookies?.setCookie) {
+    await CapacitorCookies.setCookie({
+      url: CER_BASE_URL,
+      key: 'CASTGC',
+      value: tgc,
+      path: '/authserver',
+    });
   }
 }
 
@@ -392,26 +402,24 @@ export async function prepareLogin(): Promise<void> {
 }
 
 async function syncJarCookiesToWebView(): Promise<void> {
-  try {
-    const capCore = (await import('@capacitor/core')) as Record<string, unknown>;
-    const CapacitorCookies = capCore['CapacitorCookies'] as {
-      setCookie?: (opts: { url: string; key: string; value: string; path?: string }) => Promise<void>;
-    } | undefined;
-    if (!CapacitorCookies?.setCookie) return;
-    const cookies = await casJar.getAllCookies();
-    for (const c of cookies) {
-      if (!c.value) continue;
-      const host = c.domain.replace(/^\./, '');
-      if (!host.includes('cer.ysu.edu.cn')) continue;
-      await CapacitorCookies.setCookie({
-        url: `https://${host}${c.path}`,
-        key: c.name,
-        value: c.value,
-        path: c.path,
-      });
-    }
-  } catch {
-    // Not on Capacitor — ignore
+  const capCore = await getCapacitorCore();
+  if (!capCore) return;
+
+  const CapacitorCookies = (capCore as Record<string, unknown>)['CapacitorCookies'] as {
+    setCookie?: (opts: { url: string; key: string; value: string; path?: string }) => Promise<void>;
+  } | undefined;
+  if (!CapacitorCookies?.setCookie) return;
+  const cookies = await casJar.getAllCookies();
+  for (const c of cookies) {
+    if (!c.value) continue;
+    const host = c.domain.replace(/^\./, '');
+    if (!host.includes('cer.ysu.edu.cn')) continue;
+    await CapacitorCookies.setCookie({
+      url: `https://${host}${c.path}`,
+      key: c.name,
+      value: c.value,
+      path: c.path,
+    });
   }
 }
 

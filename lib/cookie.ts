@@ -321,6 +321,15 @@ export async function fetchWithJar(
 
 import { isCapacitor } from './platform';
 
+// Cache Capacitor core module to avoid dynamic import overhead on every request.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let capCoreCache: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getCapacitorCore(): Promise<any> {
+  if (!capCoreCache) capCoreCache = await import('@capacitor/core');
+  return capCoreCache;
+}
+
 async function send(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
   if (isCapacitor()) {
     return capacitorHttpSend(jar, req);
@@ -363,8 +372,7 @@ async function capacitorHttpSend(
   jar: SimpleCookieJar,
   req: HttpRequest,
 ): Promise<HttpResponse> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const capCore = (await import('@capacitor/core')) as any;
+  const capCore = await getCapacitorCore();
   const CapacitorHttp = capCore?.CapacitorHttp;
   const CapacitorCookies = capCore?.CapacitorCookies;
   if (!CapacitorHttp?.request) {
