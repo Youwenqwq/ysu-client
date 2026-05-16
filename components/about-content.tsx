@@ -6,7 +6,6 @@ import {
   Code,
   CircleFadingArrowUp,
   ExternalLink,
-  Download,
   RotateCcw,
   CheckCircle2,
   AlertCircle,
@@ -19,7 +18,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,18 +47,9 @@ import {
   APP_OPEN_SOURCE,
   APP_PEOPLE,
 } from "@/lib/version";
-import type { UpdateInfo } from "@/lib/updater";
 import { UPDATE_MIRRORS } from "@/lib/updater";
 
-type UpdateState =
-  | "idle"
-  | "checking"
-  | "available"
-  | "downloading"
-  | "downloaded"
-  | "up-to-date"
-  | "apk-available"
-  | "error";
+type UpdateState = "idle" | "checking" | "up-to-date" | "error";
 
 const DEBUG_TAP_THRESHOLD = 7;
 const DEBUG_TAP_WINDOW_MS = 3000;
@@ -69,15 +58,14 @@ export function AboutContent() {
   const router = useRouter();
   const { t } = useTranslation();
   const [state, setState] = useState<UpdateState>("idle");
-  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
-  const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
-  const [showRestartDialog, setShowRestartDialog] = useState(false);
   const [showMirrorDialog, setShowMirrorDialog] = useState(false);
 
   const updateMirror = useSettingsStore((s) => s.updateMirror);
   const setUpdateMirror = useSettingsStore((s) => s.setUpdateMirror);
   const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus);
+  const setUpdateInfo = useUpdateStore((s) => s.setUpdateInfo);
+  const setShowDialog = useUpdateStore((s) => s.setShowDialog);
 
   // Dialog-local state
   const [dialogPreset, setDialogPreset] = useState("");
@@ -126,12 +114,11 @@ export function AboutContent() {
     try {
       const { checkForUpdate } = await import("@/lib/updater");
       const info = await checkForUpdate(false, updateMirror);
-      setUpdateInfo(info);
       setUpdateStatus(info.available || info.apkUpdateAvailable);
-      if (info.apkUpdateAvailable) {
-        setState("apk-available");
-      } else if (info.available) {
-        setState("available");
+      if (info.apkUpdateAvailable || info.available) {
+        setUpdateInfo(info);
+        setShowDialog(true);
+        setState("idle");
       } else {
         setState("up-to-date");
       }
@@ -144,32 +131,7 @@ export function AboutContent() {
       }
       setState("error");
     }
-  }, [setUpdateStatus, t, updateMirror]);
-
-  const handleDownload = useCallback(async () => {
-    if (!updateInfo) return;
-    setState("downloading");
-    setProgress(0);
-    try {
-      const { downloadAndApply } = await import("@/lib/updater");
-      await downloadAndApply(updateInfo, setProgress);
-      setState("downloaded");
-    } catch {
-      setErrorMsg(t("update.errorDownload"));
-      setState("error");
-    }
-  }, [updateInfo, t]);
-
-  const handleRestart = useCallback(async () => {
-    setShowRestartDialog(false);
-    try {
-      const { applyAndRestart } = await import("@/lib/updater");
-      await applyAndRestart();
-    } catch {
-      setErrorMsg(t("update.errorUnknown"));
-      setState("error");
-    }
-  }, [t]);
+  }, [setUpdateStatus, setUpdateInfo, setShowDialog, t, updateMirror]);
 
   const handleReset = useCallback(async () => {
     try {
@@ -180,13 +142,6 @@ export function AboutContent() {
       // ignore
     }
   }, []);
-
-  const handleApkDownload = useCallback(() => {
-    if (!updateInfo?.apkDownloadUrl) return;
-    import("@/lib/updater").then(({ openApkDownload }) => {
-      openApkDownload(updateInfo.apkDownloadUrl);
-    });
-  }, [updateInfo]);
 
   const canCheck = isCapacitor();
 
@@ -232,17 +187,12 @@ export function AboutContent() {
           {canCheck ? (
             <UpdateSection
               state={state}
-              updateInfo={updateInfo}
-              progress={progress}
               errorMsg={errorMsg}
               onCheck={handleCheck}
-              onDownload={handleDownload}
-              onRestart={() => setShowRestartDialog(true)}
               onRetry={handleCheck}
               onReset={handleReset}
               onOpenMirror={openMirrorDialog}
               onLongPress={openMirrorDialog}
-              onApkDownload={handleApkDownload}
               t={t}
             />
           ) : (
@@ -328,23 +278,6 @@ export function AboutContent() {
         </p>
       </div>
 
-      <Dialog open={showRestartDialog} onOpenChange={setShowRestartDialog}>
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>{t("update.confirmRestart")}</DialogTitle>
-            <DialogDescription>
-              {t("update.confirmRestartDesc")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRestartDialog(false)}>
-              {t("update.cancel")}
-            </Button>
-            <Button onClick={handleRestart}>{t("update.confirm")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={showMirrorDialog} onOpenChange={setShowMirrorDialog}>
         <DialogContent>
           <DialogHeader>
@@ -415,31 +348,21 @@ export function AboutContent() {
 
 function UpdateSection({
   state,
-  updateInfo,
-  progress,
   errorMsg,
   onCheck,
-  onDownload,
-  onRestart,
   onRetry,
   onReset,
   onOpenMirror,
   onLongPress,
-  onApkDownload,
   t,
 }: {
   state: UpdateState;
-  updateInfo: UpdateInfo | null;
-  progress: number;
   errorMsg: string;
   onCheck: () => void;
-  onDownload: () => void;
-  onRestart: () => void;
   onRetry: () => void;
   onReset: () => void;
   onOpenMirror: () => void;
   onLongPress: () => void;
-  onApkDownload: () => void;
   t: (key: string) => string;
 }) {
   const longPressHandlers = useLongPress(onLongPress);
@@ -470,68 +393,6 @@ function UpdateSection({
           <span className="flex-1 text-left text-sm text-muted-foreground">
             {t("update.checking")}
           </span>
-        </div>
-      );
-
-    case "available":
-      return (
-        <div className="flex flex-col gap-2 py-3">
-          <div className="flex items-center gap-3">
-            <CircleFadingArrowUp className="size-5 shrink-0 text-primary" />
-            <span className="flex-1 text-left text-sm font-medium text-primary">
-              {t("update.available").replace("{version}", updateInfo?.version ?? "")}
-            </span>
-          </div>
-          <Button size="sm" onClick={onDownload} className="ml-8">
-            <Download className="size-4" />
-            {t("update.download")}
-          </Button>
-        </div>
-      );
-
-    case "apk-available":
-      return (
-        <div className="flex flex-col gap-2 py-3">
-          <div className="flex items-center gap-3">
-            <CircleFadingArrowUp className="size-5 shrink-0 text-primary" />
-            <span className="flex-1 text-left text-sm font-medium text-primary">
-              {t("update.apkAvailable").replace("{version}", updateInfo?.version ?? "")}
-            </span>
-          </div>
-          <Button size="sm" onClick={onApkDownload} className="ml-8">
-            <Download className="size-4" />
-            {t("update.apkDownload")}
-          </Button>
-        </div>
-      );
-
-    case "downloading":
-      return (
-        <div className="flex flex-col gap-2 py-3">
-          <div className="flex items-center gap-3">
-            <Download className="size-5 shrink-0 text-muted-foreground animate-pulse" />
-            <span className="flex-1 text-left text-sm text-muted-foreground">
-              {t("update.downloading")}
-            </span>
-            <span className="text-xs text-muted-foreground">{progress}%</span>
-          </div>
-          <Progress value={progress} className="ml-8 mr-4 w-auto" />
-        </div>
-      );
-
-    case "downloaded":
-      return (
-        <div className="flex flex-col gap-2 py-3">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
-            <span className="flex-1 text-left text-sm">
-              {t("update.downloaded")}
-            </span>
-          </div>
-          <Button size="sm" onClick={onRestart} className="ml-8">
-            <RotateCcw className="size-4" />
-            {t("update.restartNow")}
-          </Button>
         </div>
       );
 

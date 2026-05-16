@@ -61,6 +61,7 @@ import { MobileTopBar } from "@/components/mobile-top-bar";
 import { RefreshIndicator } from "@/components/refresh-indicator";
 import { StaleIndicator } from "@/components/stale-indicator";
 import { AboutContent } from "@/components/about-content";
+import { UpdateDialog } from "@/components/update-dialog";
 import { APP_VERSION, APP_BUILD } from "@/lib/version";
 
 export default function DashboardLayout({
@@ -185,6 +186,7 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider style={{ "--sidebar-width": "18rem" } as React.CSSProperties}>
+      <UpdateDialog />
       <Sidebar
         collapsible="icon"
         className="[&_[data-sidebar=menu-button]]:py-3"

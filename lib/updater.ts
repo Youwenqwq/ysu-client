@@ -89,6 +89,7 @@ export async function checkForUpdate(
       webVersion?: string;
       apkVersionCode?: number;
       apkDownloadUrl?: string;
+      body?: string;
     };
     const version = data.webVersion ?? "";
     if (!version) {
@@ -103,7 +104,7 @@ export async function checkForUpdate(
       available: isNewer(APP_VERSION, version),
       version,
       downloadUrl: distZipUrl,
-      body: "",
+      body: data.body ?? "",
       apkUpdateAvailable: false,
       apkDownloadUrl: "",
     };

@@ -39,14 +39,10 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
           .then((info) => {
             const hasUpdate = info.available || info.apkUpdateAvailable;
             setUpdateStatus(hasUpdate);
-            if (info.apkUpdateAvailable) {
-              toast.info(
-                t("update.apkAvailable").replace("{version}", info.version),
-              );
-            } else if (info.available) {
-              toast.info(
-                t("update.available").replace("{version}", info.version),
-              );
+            if (hasUpdate) {
+              const { setUpdateInfo, setShowDialog } = useUpdateStore.getState();
+              setUpdateInfo(info);
+              setShowDialog(true);
             }
           })
           .catch(() => {});

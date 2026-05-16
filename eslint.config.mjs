@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated / build artifacts
+    "dist/**",
+    "android/app/build/**",
+    "android/app/src/main/assets/public/**",
   ]),
   {
     rules: {

@@ -77,6 +77,10 @@ export const zh = {
     apkAvailable: "发现新版本 v{version}，需下载安装",
     apkDownload: "下载安装包",
     apkDownloading: "正在跳转下载...",
+    newVersionTitle: "发现新版本 v{version}",
+    apkNewVersionTitle: "发现新版本 v{version}（需重新安装）",
+    skip: "稍后提醒",
+    noReleaseNotes: "暂无更新说明",
   },
   login: {
     title: "燕大终端",
@@ -544,6 +548,10 @@ export const en = {
     apkAvailable: "New version v{version} available, download required",
     apkDownload: "Download APK",
     apkDownloading: "Redirecting to download...",
+    newVersionTitle: "New version v{version} available",
+    apkNewVersionTitle: "New version v{version} available (reinstall required)",
+    skip: "Remind me later",
+    noReleaseNotes: "No release notes",
   },
   login: {
     title: "YSU Terminal",
