@@ -9,7 +9,6 @@ import {
   prepareLogin,
   getJar,
 } from "./cas";
-import { checkRateLimit, recordLoginAttempt } from "./rate-limit";
 import { resetJWXT } from "./jwxt";
 import { initSDK } from "./sdk";
 import { useAuthStore } from "./auth-store";
@@ -28,22 +27,6 @@ export async function tryAutoLogin(): Promise<boolean> {
   inflightAutoLogin = (async () => {
     try {
       await prepareLogin();
-
-      const limit = checkRateLimit();
-      if (!limit.allowed) {
-        const totalSeconds = Math.ceil(limit.retryAfterMs / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        const message =
-          limit.reason === "window"
-            ? getText("autoLogin.errorRateLimitWindow")
-                .replace("{minutes}", String(minutes))
-                .replace("{seconds}", seconds.toString().padStart(2, "0"))
-            : getText("autoLogin.errorRateLimitInterval").replace("{seconds}", String(seconds));
-        toast.error(message);
-        return false;
-      }
-      recordLoginAttempt();
 
       resetCAS();
       resetJWXT();

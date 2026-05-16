@@ -39,6 +39,7 @@ import {
 import { toast } from "sonner";
 import { getStudentInfo } from "@/lib/api";
 import { resetSDK } from "@/lib/sdk";
+import { checkRateLimit } from "@/lib/rate-limit";
 import type { StudentInfo } from "@/lib/types";
 import {
   BookOpen,
@@ -135,6 +136,21 @@ export default function DashboardLayout({
   }
 
   async function handleRelogin() {
+    const limit = checkRateLimit();
+    if (!limit.allowed) {
+      const totalSeconds = Math.ceil(limit.retryAfterMs / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      const message =
+        limit.reason === "window"
+          ? t("autoLogin.errorRateLimitWindow")
+              .replace("{minutes}", String(minutes))
+              .replace("{seconds}", seconds.toString().padStart(2, "0"))
+          : t("autoLogin.errorRateLimitInterval").replace("{seconds}", String(seconds));
+      toast.error(message);
+      return;
+    }
+
     try {
       const { tryAutoLogin } = await import("@/lib/auto-login");
       const success = await tryAutoLogin();
