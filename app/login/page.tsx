@@ -33,6 +33,7 @@ import {
   requestMFACode,
   submitMFACode,
 } from "@/lib/api";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { useMFAModalStore } from "@/lib/mfa-modal-store";
 
 export default function LoginPage() {
@@ -47,6 +48,8 @@ export default function LoginPage() {
   const [captchaUrl, setCaptchaUrl] = useState<string | null>(null);
   const [needsCaptcha, setNeedsCaptcha] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [skipRateLimit, setSkipRateLimit] = useState(false);
 
   useEffect(() => {
     loadRememberedCredentials().then((r) => {
@@ -57,6 +60,20 @@ export default function LoginPage() {
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [countdown]);
 
   function showCaptcha() {
     setNeedsCaptcha(true);
@@ -81,12 +98,40 @@ export default function LoginPage() {
       toast.error(t("login.errorMissingCredentials"));
       return;
     }
+
+    if (!skipRateLimit) {
+      const limit = checkRateLimit();
+      if (!limit.allowed) {
+        const totalSeconds = Math.ceil(limit.retryAfterMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const message =
+          limit.reason === "window"
+            ? t("login.errorRateLimitWindow")
+                .replace("{minutes}", String(minutes))
+                .replace("{seconds}", seconds.toString().padStart(2, "0"))
+            : t("login.errorRateLimitInterval").replace("{seconds}", String(seconds));
+
+        toast.error(message, {
+          action: {
+            label: t("login.skipRateLimit"),
+            onClick: () => setSkipRateLimit(true),
+          },
+        });
+        setCountdown(totalSeconds);
+        return;
+      }
+    }
+
+    setSkipRateLimit(false);
+
     setLoading(true);
     try {
       const res = await loginStep1({
         username,
         password,
         captcha: needsCaptcha ? captcha : undefined,
+        skip_rate_limit: skipRateLimit,
       });
 
       if (res.authenticated && res.credential) {
@@ -216,9 +261,13 @@ export default function LoginPage() {
                   {t("login.remember")}
                 </FieldLabel>
               </Field>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading || countdown > 0}>
                 {loading && <Spinner data-icon="inline-start" />}
-                {loading ? t("login.loggingIn") : t("login.submit")}
+                {loading
+                  ? t("login.loggingIn")
+                  : countdown > 0
+                    ? t("login.retryAfter").replace("{seconds}", String(countdown))
+                    : t("login.submit")}
               </Button>
             </FieldGroup>
           </form>

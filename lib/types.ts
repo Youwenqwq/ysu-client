@@ -7,6 +7,7 @@ export interface Step1Request {
   username: string;
   password: string;
   captcha?: string;
+  skip_rate_limit?: boolean;
 }
 
 export interface Step1Response {

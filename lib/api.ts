@@ -86,6 +86,10 @@ import {
   MobileBusinessError,
 } from "./jwmobile";
 import {
+  checkRateLimit,
+  recordLoginAttempt,
+} from "./rate-limit";
+import {
   queryCurrentLesson as _queryCurrentLesson,
   querySigninDetail as _querySigninDetail,
   queryStudentSigninStatus as _queryStudentSigninStatus,
@@ -113,6 +117,12 @@ function mapSdkError(e: unknown): Error {
       String(e.code ?? "JWXT_BUSINESS_ERROR"),
       400,
     );
+  }
+  if (
+    e instanceof Error &&
+    (e as Error & { code?: string }).code === "RATE_LIMITED"
+  ) {
+    return apiError(e.message, "RATE_LIMITED", 429);
   }
   if (e instanceof NeedCaptchaError) {
     return apiError(e.message, "NEED_CAPTCHA", 403);
@@ -142,6 +152,18 @@ export async function checkCaptchaNeeded(username: string): Promise<boolean> {
 
 export async function loginStep1(payload: Step1Request): Promise<Step1Response> {
   try {
+    if (!payload.skip_rate_limit) {
+      const limit = checkRateLimit();
+      if (!limit.allowed) {
+        const err = new Error("RATE_LIMITED");
+        (err as Error & { code?: string; retryAfterMs?: number; reason?: string }).code = "RATE_LIMITED";
+        (err as Error & { code?: string; retryAfterMs?: number; reason?: string }).retryAfterMs = limit.retryAfterMs;
+        (err as Error & { code?: string; retryAfterMs?: number; reason?: string }).reason = limit.reason ?? undefined;
+        throw err;
+      }
+      recordLoginAttempt();
+    }
+
     const result = await _loginStep1(
       payload.username,
       payload.password,

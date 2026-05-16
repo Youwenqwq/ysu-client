@@ -111,6 +111,10 @@ export const zh = {
     errorMfaVerifyFailed: "MFA 验证失败",
     mfaRequired: "需要 MFA 验证",
     loginSuccess: "登录成功",
+    errorRateLimitInterval: "登录过于频繁，请 {seconds} 秒后再试",
+    errorRateLimitWindow: "15分钟内登录次数已达上限，请 {minutes}:{seconds} 后再试",
+    retryAfter: "{seconds} 秒后可重试",
+    skipRateLimit: "仍然登录",
   },
   autoLogin: {
     failed: "自动登录失败，请重新登录",
@@ -572,6 +576,10 @@ export const en = {
     errorMfaVerifyFailed: "MFA verification failed",
     mfaRequired: "MFA verification required",
     loginSuccess: "Logged in",
+    errorRateLimitInterval: "Too many login attempts. Please try again in {seconds}s",
+    errorRateLimitWindow: "Login limit reached (3 per 15 min). Please try again in {minutes}:{seconds}",
+    retryAfter: "Retry in {seconds}s",
+    skipRateLimit: "Login anyway",
   },
   autoLogin: {
     failed: "Auto-login failed, please log in again",
