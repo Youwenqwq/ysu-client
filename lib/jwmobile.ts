@@ -226,10 +226,33 @@ async function captureMobileToken(): Promise<string | null> {
   return null;
 }
 
-export async function ensureMobileAuthorized(): Promise<void> {
+async function verifyMobileToken(): Promise<boolean> {
+  try {
+    const resp = await fetchWithJar(mobileJar, {
+      method: 'GET',
+      url: `${MOBILE_API_BASE}/`,
+      redirect: 'follow',
+      timeoutMs,
+    });
+    // 已认证时返回 404；未认证时返回 200 但 body 中 code: 401
+    if (resp.status === 404) return true;
+    const text = await resp.text();
+    try {
+      const data = JSON.parse(text) as Record<string, unknown>;
+      const code = data['code'];
+      if (code === 401 || code === '401') return false;
+    } catch {
+      // non-JSON 响应，保守视为有效
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function ensureMobileAuthorized(verify = false): Promise<void> {
   if (mobileAuthorized) return;
 
-  // 如果 jar 中已有 Authorization cookie（从持久化存储恢复），直接视为已授权
   const cookies = await mobileJar.getAllCookies();
   const hasAuthCookie = cookies.some(
     (c) =>
@@ -238,8 +261,18 @@ export async function ensureMobileAuthorized(): Promise<void> {
       c.domain.includes(MOBILE_COOKIE_DOMAIN),
   );
   if (hasAuthCookie) {
-    mobileAuthorized = true;
-    return;
+    if (verify) {
+      const valid = await verifyMobileToken();
+      if (valid) {
+        mobileAuthorized = true;
+        return;
+      }
+      // Token 已过期，清除过期的 cookie 继续重新获取
+      await mobileJar.removeCookie(MOBILE_COOKIE_DOMAIN, '/jwmobile', 'Authorization');
+    } else {
+      mobileAuthorized = true;
+      return;
+    }
   }
 
   if (inflightMobileAuth) {

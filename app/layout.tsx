@@ -48,15 +48,15 @@ export default function RootLayout({
     >
       <body>
         <I18nProvider>
-          <SDKProvider>
-            <ThemeProvider>
+          <ThemeProvider>
+            <SDKProvider>
               <TooltipProvider>
                 {children}
                 <Toaster />
                 <MFAModal />
               </TooltipProvider>
-            </ThemeProvider>
-          </SDKProvider>
+            </SDKProvider>
+          </ThemeProvider>
         </I18nProvider>
       </body>
     </html>

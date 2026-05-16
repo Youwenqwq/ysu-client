@@ -419,6 +419,7 @@ export async function restoreSession(session: JWXTSession): Promise<void> {
 }
 
 let cachedStudentInfo: StudentInfo | null = null;
+let inflightStudentInfo: Promise<StudentInfo> | null = null;
 
 export function resetJWXT(): void {
   jwxtJar = new SimpleCookieJar();
@@ -428,6 +429,10 @@ export function resetJWXT(): void {
   inflightWeu.clear();
   cachedCurrentTerm = null;
   cachedStudentInfo = null;
+  inflightStudentInfo = null;
+  inflightCurrentTerm = null;
+  cachedCurrentWeek = null;
+  inflightCurrentWeek = null;
 }
 
 /** 将当前 JWXT jar 中的会话持久化到 auth-store（包含 mobile auth token）。 */
@@ -620,13 +625,15 @@ async function ensureWeu(appId: string): Promise<void> {
   const promise = (async () => {
     const url = `${APP_SHOW_URL}?id=${encodeURIComponent(appId)}`;
     try {
+      // _WEU is issued in the appShow.do 302 response; no need to follow
+      // the redirect to *default/index.do, which only returns HTML.
       await fetchWithJar(jwxtJar, {
         method: 'GET',
         url,
         headers: {
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
-        redirect: 'follow',
+        redirect: 'manual',
         timeoutMs,
       });
       ensuredWeuApps.add(appId);
@@ -644,6 +651,18 @@ async function ensureWeu(appId: string): Promise<void> {
   }
 }
 
+/** 并行预热常用 EMAP 应用的 WEU，避免首次 API 调用时被 appShow.do 阻塞。 */
+export async function warmupWEU(): Promise<void> {
+  const apps = [
+    APP_IDS.xsjbxxgl,
+    APP_IDS.wdkb,
+    APP_IDS.studentWdksapApp,
+    APP_IDS.cjcx,
+    APP_IDS.wdkb_sy,
+  ];
+  await Promise.all(apps.map((id) => ensureWeu(id).catch(() => {})));
+}
+
 async function post(
   path: string,
   data: Record<string, string> = {},
@@ -653,28 +672,42 @@ async function post(
 }
 
 let cachedCurrentTerm: string | null = null;
+let inflightCurrentTerm: Promise<string> | null = null;
+
+let cachedCurrentWeek: { key: string; value: CurrentWeek } | null = null;
+let inflightCurrentWeek: Promise<CurrentWeek> | null = null;
 
 async function getCurrentTerm(
   appId: string,
   pathKey: keyof typeof API_PATHS,
 ): Promise<string> {
   if (cachedCurrentTerm) return cachedCurrentTerm;
-  await ensureWeu(appId);
-  const datas = await post(API_PATHS[pathKey]);
-  const segments = pathKey.split('_');
-  const tail = segments[segments.length - 1]!;
-  const rows = extractRows(datas, tail);
-  if (rows.length === 0) {
-    throw new JWXTProtocolError('current term query returned empty result');
-  }
-  const first = rows[0] as Record<string, unknown>;
-  const raw = first['DM'];
-  const term = typeof raw === 'string' ? raw : String(raw ?? '');
-  if (!term) {
-    throw new JWXTProtocolError('current term query returned empty DM');
-  }
-  cachedCurrentTerm = term;
-  return term;
+  if (inflightCurrentTerm) return inflightCurrentTerm;
+
+  inflightCurrentTerm = (async () => {
+    try {
+      await ensureWeu(appId);
+      const datas = await post(API_PATHS[pathKey]);
+      const segments = pathKey.split('_');
+      const tail = segments[segments.length - 1]!;
+      const rows = extractRows(datas, tail);
+      if (rows.length === 0) {
+        throw new JWXTProtocolError('current term query returned empty result');
+      }
+      const first = rows[0] as Record<string, unknown>;
+      const raw = first['DM'];
+      const term = typeof raw === 'string' ? raw : String(raw ?? '');
+      if (!term) {
+        throw new JWXTProtocolError('current term query returned empty DM');
+      }
+      cachedCurrentTerm = term;
+      return term;
+    } finally {
+      inflightCurrentTerm = null;
+    }
+  })();
+
+  return inflightCurrentTerm;
 }
 
 async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
@@ -694,22 +727,32 @@ async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
 
 export async function queryStudentInfo(): Promise<StudentInfo> {
   if (cachedStudentInfo) return cachedStudentInfo;
-  return runWithReauth(async () => {
-    await ensureWeu(APP_IDS.xsjbxxgl);
-    const data = {
-      querySetting: '[]',
-      pageSize: '12',
-      pageNumber: '1',
-    };
-    const datas = await post(API_PATHS.xsjbxx, data);
-    const rows = extractRows(datas, 'cxxsjbxxlb');
-    if (rows.length === 0) {
-      throw new JWXTProtocolError('queryStudentInfo returned empty result');
+  if (inflightStudentInfo) return inflightStudentInfo;
+
+  inflightStudentInfo = (async () => {
+    try {
+      return await runWithReauth(async () => {
+        await ensureWeu(APP_IDS.xsjbxxgl);
+        const data = {
+          querySetting: '[]',
+          pageSize: '12',
+          pageNumber: '1',
+        };
+        const datas = await post(API_PATHS.xsjbxx, data);
+        const rows = extractRows(datas, 'cxxsjbxxlb');
+        if (rows.length === 0) {
+          throw new JWXTProtocolError('queryStudentInfo returned empty result');
+        }
+        const info = parseStudentInfo(rows[0] as Record<string, unknown>);
+        cachedStudentInfo = info;
+        return info;
+      });
+    } finally {
+      inflightStudentInfo = null;
     }
-    const info = parseStudentInfo(rows[0] as Record<string, unknown>);
-    cachedStudentInfo = info;
-    return info;
-  });
+  })();
+
+  return inflightStudentInfo;
 }
 
 // ─── Public: Grades ───────────────────────────────────────────────────── //
@@ -1002,13 +1045,27 @@ export async function queryCurrentWeek(opts?: {
       term = await getCurrentTerm(APP_IDS.studentWdksapApp, 'wdksap_dqxnxq');
     }
     const date = opts?.date ?? todayDate();
-    const { xn, xq } = splitTerm(term);
-    const datas = await post(API_PATHS.dqzc, { XN: xn, XQ: xq, RQ: date });
-    const rows = extractRows(datas, 'dqzc');
-    if (rows.length === 0) {
-      throw new JWXTProtocolError('queryCurrentWeek returned empty result');
-    }
-    return parseCurrentWeek(rows[0] as Record<string, unknown>);
+    const cacheKey = `${term}|${date}`;
+    if (cachedCurrentWeek?.key === cacheKey) return cachedCurrentWeek.value;
+    if (inflightCurrentWeek) return inflightCurrentWeek;
+
+    inflightCurrentWeek = (async () => {
+      try {
+        const { xn, xq } = splitTerm(term!);
+        const datas = await post(API_PATHS.dqzc, { XN: xn, XQ: xq, RQ: date });
+        const rows = extractRows(datas, 'dqzc');
+        if (rows.length === 0) {
+          throw new JWXTProtocolError('queryCurrentWeek returned empty result');
+        }
+        const result = parseCurrentWeek(rows[0] as Record<string, unknown>);
+        cachedCurrentWeek = { key: cacheKey, value: result };
+        return result;
+      } finally {
+        inflightCurrentWeek = null;
+      }
+    })();
+
+    return inflightCurrentWeek;
   });
 }
 
