@@ -132,6 +132,13 @@ function parseSetCookie(str: string, url: string): SimpleCookie | null {
         }
         break;
       }
+      case 'max-age': {
+        const seconds = Number(val);
+        if (Number.isFinite(seconds)) {
+          expires = Math.floor(Date.now() / 1000) + seconds;
+        }
+        break;
+      }
       case 'secure':
         secure = true;
         break;
@@ -312,17 +319,7 @@ export async function fetchWithJar(
   return followRedirects(jar, req);
 }
 
-function isCapacitor(): boolean {
-  try {
-    return (
-      typeof window !== 'undefined' &&
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).Capacitor?.isNativePlatform?.() === true
-    );
-  } catch {
-    return false;
-  }
-}
+import { isCapacitor } from './platform';
 
 async function send(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
   if (isCapacitor()) {
@@ -441,7 +438,8 @@ async function capacitorHttpSend(
   // (e.g. GS_SESSIONID from JWXT) in its native store. These are NOT exposed in
   // the response headers JS sees. Sync them back into our jar.
   try {
-    const nativeCookies: Record<string, string> = await CapacitorCookies?.getCookies?.();
+    const nativeCookies: Record<string, string> =
+      await CapacitorCookies?.getCookies?.({ url: req.url });
     if (nativeCookies && typeof nativeCookies === 'object') {
       const jarAll = await jar.getAllCookies();
       const jarNames = new Set(jarAll.filter((c) => c.value).map((c) => c.name));
@@ -582,8 +580,9 @@ function toHttpResponse(response: Response, requestUrl: string): HttpResponse {
       : splitSetCookie(response.headers.get('set-cookie') ?? '');
 
   for (const [k, v] of response.headers.entries()) {
-    if (k === 'set-cookie') continue;
-    headers[k] = v;
+    const lowerK = k.toLowerCase();
+    if (lowerK === 'set-cookie') continue;
+    headers[lowerK] = v;
   }
   if (setCookies.length > 0) {
     headers['set-cookie'] = setCookies;

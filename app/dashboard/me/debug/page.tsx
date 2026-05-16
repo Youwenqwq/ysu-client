@@ -10,7 +10,8 @@ import { useAuthStore } from "@/lib/auth-store";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { isCapacitor, isTauri, isWeb } from "@/lib/platform";
 import { getJar as getCasJar, isAuthenticated as checkCASAuth } from "@/lib/cas";
-import { getJar as getJwxtJar, ensureMobileAuthorized } from "@/lib/jwxt";
+import { getJar as getJwxtJar } from "@/lib/jwxt";
+import { ensureMobileAuthorized } from "@/lib/jwmobile";
 import { loadCASTGC, loadRememberedCredentials } from "@/lib/secure-storage";
 import {
   getStudentInfo,

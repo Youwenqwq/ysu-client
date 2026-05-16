@@ -401,8 +401,10 @@ async function syncJarCookiesToWebView(): Promise<void> {
     const cookies = await casJar.getAllCookies();
     for (const c of cookies) {
       if (!c.value) continue;
+      const host = c.domain.replace(/^\./, '');
+      if (!host.includes('cer.ysu.edu.cn')) continue;
       await CapacitorCookies.setCookie({
-        url: `https://${c.domain.replace(/^\./, '')}${c.path}`,
+        url: `https://${host}${c.path}`,
         key: c.name,
         value: c.value,
         path: c.path,
@@ -485,6 +487,7 @@ export async function loginStep1(
     dllt: 'generalLogin',
     lt: '',
     execution,
+    rememberMe: 'true',
   });
 
   const encodedService = encodeURIComponent(DEFAULT_LOGIN_SERVICE);
@@ -701,14 +704,21 @@ export async function authorize(
 // ─── Internal helpers ─────────────────────────────────────────────────── //
 
 let loginPageCache: { html: string; finalUrl: string; ts: number } | null = null;
+let loginPageInflight: Promise<{ html: string; finalUrl: string }> | null = null;
 const LOGIN_PAGE_CACHE_TTL = 300_000;
 
 async function getLoginPage(): Promise<{ html: string; finalUrl: string }> {
   if (loginPageCache && Date.now() - loginPageCache.ts < LOGIN_PAGE_CACHE_TTL) {
-    return loginPageCache;
+    return { html: loginPageCache.html, finalUrl: loginPageCache.finalUrl };
   }
-  loginPageCache = null;
-  const url = `${AUTH_LOGIN_URL}?service=${encodeURIComponent(DEFAULT_LOGIN_SERVICE)}`;
+  if (loginPageInflight) {
+    return loginPageInflight;
+  }
+
+  loginPageInflight = (async () => {
+    try {
+      loginPageCache = null;
+      const url = `${AUTH_LOGIN_URL}?service=${encodeURIComponent(DEFAULT_LOGIN_SERVICE)}`;
 
   // Follow redirects so we land on the actual destination.
   // If TGC is valid, CAS 302s to the service page (already authenticated).
@@ -749,6 +759,12 @@ async function getLoginPage(): Promise<{ html: string; finalUrl: string }> {
   const result = { html: await resp.text(), finalUrl: resp.url };
   loginPageCache = { ...result, ts: Date.now() };
   return result;
+    } finally {
+      loginPageInflight = null;
+    }
+  })();
+
+  return loginPageInflight;
 }
 
 async function classifyStep1Response(

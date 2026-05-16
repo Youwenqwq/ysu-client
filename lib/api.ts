@@ -32,7 +32,6 @@ import type {
   AcademicWarning,
   TrainingPlan,
   ClassPeriod,
-  LessonActivity,
   CurrentLesson,
   SigninActivityDetail,
   StudentSigninStatus,
@@ -81,11 +80,17 @@ import {
   getEvaluationDetail as _getEvaluationDetail,
   calculateEvaluationScore as _calculateEvaluationScore,
   submitEvaluation as _submitEvaluation,
+} from "./jwxt";
+import {
+  MobileNotLoggedInError,
+  MobileBusinessError,
+} from "./jwmobile";
+import {
   queryCurrentLesson as _queryCurrentLesson,
   querySigninDetail as _querySigninDetail,
   queryStudentSigninStatus as _queryStudentSigninStatus,
   studentSign as _studentSign,
-} from "./jwxt";
+} from "./jwmobile";
 
 function apiError(message: string, code?: string, status?: number): Error {
   const err = new Error(message);
@@ -95,10 +100,14 @@ function apiError(message: string, code?: string, status?: number): Error {
 }
 
 function mapSdkError(e: unknown): Error {
-  if (e instanceof NotLoggedInError || e instanceof NotAuthenticatedError) {
+  if (
+    e instanceof NotLoggedInError ||
+    e instanceof NotAuthenticatedError ||
+    e instanceof MobileNotLoggedInError
+  ) {
     return apiError(e.message, "AUTH_REQUIRED", 401);
   }
-  if (e instanceof JWXTBusinessError) {
+  if (e instanceof JWXTBusinessError || e instanceof MobileBusinessError) {
     return apiError(
       e.msg ?? e.message,
       String(e.code ?? "JWXT_BUSINESS_ERROR"),
@@ -233,7 +242,9 @@ async function withJWXT<T>(fn: () => Promise<T>): Promise<T> {
   try {
     const result = await fn();
     // 异步持久化 JWXT 会话,不阻塞返回
-    void persistJWXTSession();
+    persistJWXTSession().catch(() => {
+      // ignore persist failures
+    });
     return result;
   } catch (e) {
     throw mapSdkError(e);
@@ -750,7 +761,7 @@ export async function getCurrentLesson(
     end_node: number;
   },
 ): Promise<CurrentLesson> {
-  return withJWXT(async () => {
+  try {
     const result = await _queryCurrentLesson({
       teachClassId: params.teach_class_id,
       teachClassType: params.teach_class_type,
@@ -777,7 +788,9 @@ export async function getCurrentLesson(
       })),
       raw: result.raw,
     };
-  });
+  } catch (e) {
+    throw mapSdkError(e);
+  }
 }
 
 export async function getSigninDetail(
@@ -787,7 +800,7 @@ export async function getSigninDetail(
     title?: string;
   },
 ): Promise<SigninActivityDetail> {
-  return withJWXT(async () => {
+  try {
     const result = await _querySigninDetail({
       activityId: params.activity_id,
       title: params.title,
@@ -801,7 +814,9 @@ export async function getSigninDetail(
       start_time: result.startTime,
       raw: result.raw,
     };
-  });
+  } catch (e) {
+    throw mapSdkError(e);
+  }
 }
 
 export async function getStudentSigninStatus(
@@ -811,7 +826,7 @@ export async function getStudentSigninStatus(
     title?: string;
   },
 ): Promise<StudentSigninStatus> {
-  return withJWXT(async () => {
+  try {
     const result = await _queryStudentSigninStatus({
       activityId: params.activity_id,
       title: params.title,
@@ -823,7 +838,9 @@ export async function getStudentSigninStatus(
       signin_type: result.signinType,
       raw: result.raw,
     };
-  });
+  } catch (e) {
+    throw mapSdkError(e);
+  }
 }
 
 export async function doStudentSign(
@@ -836,7 +853,7 @@ export async function doStudentSign(
     code?: string;
   },
 ): Promise<StudentSignResult> {
-  return withJWXT(async () => {
+  try {
     const result = await _studentSign({
       activityId: params.activity_id,
       accuracy: params.accuracy,
@@ -851,5 +868,7 @@ export async function doStudentSign(
       signin_type: result.signinType,
       raw: result.raw,
     };
-  });
+  } catch (e) {
+    throw mapSdkError(e);
+  }
 }
