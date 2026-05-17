@@ -16,19 +16,21 @@ export interface UpdateMirror {
   value: string;
 }
 
+const OFFICIAL_BASE = "https://ysu.welain.com/updates/";
+const GITHUB_RELEASE_BASE =
+  "https://github.com/Youwenqwq/ysu-client/releases/latest/download";
+const ASSET_NAME = "dist.zip";
+const VERSION_JSON_NAME = "version.json";
+const APK_NAME = "app-release.apk";
+const LAST_CHECK_KEY = "ysu-last-update-check";
+const CHECK_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+
 export const UPDATE_MIRRORS: readonly UpdateMirror[] = [
-  { label: "官方源", value: "https://your-domain.com/updates/" },
+  { label: "官方源", value: OFFICIAL_BASE },
   { label: "GitHub 直连", value: "" },
   { label: "ghproxy.com", value: "https://ghproxy.com/" },
   { label: "ghfast.top", value: "https://ghfast.top/" },
 ];
-
-const RELEASE_ASSET_BASE =
-  "https://github.com/Youwenqwq/ysu-client/releases/latest/download";
-const ASSET_NAME = "dist.zip";
-const VERSION_JSON_NAME = "version.json";
-const LAST_CHECK_KEY = "ysu-last-update-check";
-const CHECK_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 
 /** Compare two semver strings (major.minor.patch). Returns true if target > current. */
 export function isNewer(current: string, target: string): boolean {
@@ -50,12 +52,41 @@ const EMPTY_RESULT: UpdateInfo = {
   apkDownloadUrl: "",
 };
 
-function toMirrorAssetUrl(url: string, mirrorPrefix: string): string {
-  if (!mirrorPrefix) return url;
-  return `${mirrorPrefix}${url}`;
+function isOfficialSource(prefix: string): boolean {
+  return prefix === OFFICIAL_BASE;
 }
 
-/** Check GitHub Releases for a newer version. Respects 30-min cooldown when `auto` is true. */
+function getVersionJsonUrl(mirrorPrefix: string): string {
+  if (isOfficialSource(mirrorPrefix)) {
+    return `${OFFICIAL_BASE}${VERSION_JSON_NAME}`;
+  }
+  if (!mirrorPrefix) {
+    return `${GITHUB_RELEASE_BASE}/${VERSION_JSON_NAME}`;
+  }
+  return `${mirrorPrefix}${GITHUB_RELEASE_BASE}/${VERSION_JSON_NAME}`;
+}
+
+function getDistZipUrl(mirrorPrefix: string): string {
+  if (isOfficialSource(mirrorPrefix)) {
+    return `${OFFICIAL_BASE}${ASSET_NAME}`;
+  }
+  if (!mirrorPrefix) {
+    return `${GITHUB_RELEASE_BASE}/${ASSET_NAME}`;
+  }
+  return `${mirrorPrefix}${GITHUB_RELEASE_BASE}/${ASSET_NAME}`;
+}
+
+function getApkUrl(mirrorPrefix: string, githubUrl: string): string {
+  if (isOfficialSource(mirrorPrefix)) {
+    return `${OFFICIAL_BASE}${APK_NAME}`;
+  }
+  if (!mirrorPrefix) {
+    return githubUrl;
+  }
+  return `${mirrorPrefix}${githubUrl}`;
+}
+
+/** Check for a newer version. Respects 30-min cooldown when `auto` is true. */
 export async function checkForUpdate(
   auto = false,
   mirrorPrefix = "",
@@ -67,14 +98,8 @@ export async function checkForUpdate(
     }
   }
 
-  const versionJsonUrl = toMirrorAssetUrl(
-    `${RELEASE_ASSET_BASE}/${VERSION_JSON_NAME}`,
-    mirrorPrefix,
-  );
-  const distZipUrl = toMirrorAssetUrl(
-    `${RELEASE_ASSET_BASE}/${ASSET_NAME}`,
-    mirrorPrefix,
-  );
+  const versionJsonUrl = getVersionJsonUrl(mirrorPrefix);
+  const distZipUrl = getDistZipUrl(mirrorPrefix);
 
   try {
     const res = await fetch(versionJsonUrl);
@@ -115,7 +140,7 @@ export async function checkForUpdate(
       if (data.apkVersionCode > Number(installed.build)) {
         result.apkUpdateAvailable = true;
         result.apkDownloadUrl = data.apkDownloadUrl
-          ? toMirrorAssetUrl(data.apkDownloadUrl, mirrorPrefix)
+          ? getApkUrl(mirrorPrefix, data.apkDownloadUrl)
           : "";
         // If APK needs update, web update is moot — force APK-only flow
         if (result.apkUpdateAvailable && result.available) {
