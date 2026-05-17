@@ -28,8 +28,6 @@ const CHECK_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 export const UPDATE_MIRRORS: readonly UpdateMirror[] = [
   { label: "官方源", value: OFFICIAL_BASE },
   { label: "GitHub 直连", value: "" },
-  { label: "ghproxy.com", value: "https://ghproxy.com/" },
-  { label: "ghfast.top", value: "https://ghfast.top/" },
 ];
 
 /** Compare two semver strings (major.minor.patch). Returns true if target > current. */
