@@ -2,22 +2,14 @@
 
 import { useEffect } from "react";
 import { useSettingsStore } from "@/lib/settings-store";
-import { saveBackgroundImage, isLegacyBase64Image } from "@/lib/background-storage";
 
 export function BackgroundImage() {
   const backgroundImage = useSettingsStore((s) => s.backgroundImage);
-  const setBackgroundImage = useSettingsStore((s) => s.setBackgroundImage);
   const overlayOpacity = useSettingsStore((s) => s.backgroundOverlayOpacity);
   const backgroundStyle = useSettingsStore((s) => s.backgroundStyle);
   const backgroundBlurAmount = useSettingsStore((s) => s.backgroundBlurAmount);
   const cardStyle = useSettingsStore((s) => s.cardStyle);
   const cardOpacity = useSettingsStore((s) => s.cardOpacity);
-
-  useEffect(() => {
-    if (isLegacyBase64Image(backgroundImage)) {
-      saveBackgroundImage(backgroundImage).then(setBackgroundImage).catch(() => {});
-    }
-  }, [backgroundImage, setBackgroundImage]);
 
   useEffect(() => {
     if (!backgroundImage || cardStyle === "solid") {

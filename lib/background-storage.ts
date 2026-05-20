@@ -18,7 +18,7 @@ export async function saveBackgroundImage(dataUrl: string): Promise<string> {
     path: BG_FILE,
     directory: Directory.Data,
   });
-  return Capacitor.convertFileSrc(uri);
+  return `${Capacitor.convertFileSrc(uri)}?t=${Date.now()}`;
 }
 
 export async function removeBackgroundImage(): Promise<void> {
@@ -38,13 +38,9 @@ export async function loadBackgroundImage(): Promise<string | null> {
       path: BG_FILE,
       directory: Directory.Data,
     });
-    return Capacitor.convertFileSrc(uri);
+    return `${Capacitor.convertFileSrc(uri)}?t=${Date.now()}`;
   } catch {
     return null;
   }
 }
 
-/** 检测 store 中的值是否为旧版 base64 数据 */
-export function isLegacyBase64Image(value: string): boolean {
-  return value.startsWith("data:image/");
-}

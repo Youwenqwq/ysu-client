@@ -434,7 +434,7 @@ export default function GradesPage() {
               key={idx}
               type="button"
               onClick={() => handleOpenStats(g)}
-              className="rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 active:bg-muted/70"
+              className="rounded-lg border bg-card p-3 text-left transition-colors hover:bg-muted/50 active:bg-muted/70"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
