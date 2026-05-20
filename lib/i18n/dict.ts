@@ -189,6 +189,10 @@ export const zh = {
     courseNameLabel: "课程名",
     courseNamePlaceholder: "搜索课程...",
     search: "查询",
+    sortLabel: "排序",
+    sortDefault: "默认",
+    sortAsc: "升序",
+    sortDesc: "降序",
     table: {
       term: "学期",
       courseName: "课程名",
@@ -680,6 +684,10 @@ export const en = {
     courseNameLabel: "Course Name",
     courseNamePlaceholder: "Search courses...",
     search: "Search",
+    sortLabel: "Sort",
+    sortDefault: "Default",
+    sortAsc: "Ascending",
+    sortDesc: "Descending",
     table: {
       term: "Term",
       courseName: "Course",

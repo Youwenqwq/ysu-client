@@ -21,14 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Drawer,
   DrawerContent,
   DrawerDescription,
@@ -68,7 +60,7 @@ import type {
   GradeDistribution,
   GradeRanking,
 } from "@/lib/types";
-import { Search, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 export default function GradesPage() {
   const credential = useAuthStore((s) => s.credential);
@@ -89,6 +81,7 @@ export default function GradesPage() {
   const [rankingResult, setRankingResult] = useState<GradeRanking | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [statsScope, setStatsScope] = useState<"class" | "course">("class");
+  const [sortMode, setSortMode] = useState<"default" | "asc" | "desc">("default");
   const didAutoSelectTerm = useRef(false);
 
   const terms = useMemo(
@@ -226,23 +219,54 @@ export default function GradesPage() {
     await fetchStatsForScope(selectedGrade, scope);
   }
 
+  function cycleSort() {
+    setSortMode((prev) => (prev === "default" ? "desc" : prev === "desc" ? "asc" : "default"));
+  }
+
+  const SortIcon = sortMode === "asc" ? ArrowUp : sortMode === "desc" ? ArrowDown : ArrowUpDown;
+
   useMobileHeaderRight(
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={() => setFilterDrawerOpen(true)}
-      className="h-8 px-2 text-sm"
-    >
-      {term === ALL_TERM ? t("grades.allTerms") : term}
-      <ChevronDown className="ml-0.5 size-3.5" />
-    </Button>,
-    [term, t],
+    <div className="flex items-center gap-0.5">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={cycleSort}
+        aria-label={t("grades.sortLabel")}
+        className={sortMode !== "default" ? "text-primary" : ""}
+      >
+        <SortIcon className="size-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setFilterDrawerOpen(true)}
+        className="h-8 px-2 text-sm"
+      >
+        {term === ALL_TERM ? t("grades.allTerms") : term}
+        <ChevronDown className="ml-0.5 size-3.5" />
+      </Button>
+    </div>,
+    [term, sortMode, t],
   );
 
   const filtered = grades.filter((g) => {
     if (term !== ALL_TERM && g.term !== term) return false;
     return true;
   });
+
+  const sorted = useMemo(() => {
+    if (sortMode === "default") return filtered;
+    return [...filtered].sort((a, b) => {
+      const scoreA = parseFloat(a.score || "");
+      const scoreB = parseFloat(b.score || "");
+      const validA = Number.isFinite(scoreA);
+      const validB = Number.isFinite(scoreB);
+      if (!validA && !validB) return 0;
+      if (!validA) return 1;
+      if (!validB) return -1;
+      return sortMode === "asc" ? scoreA - scoreB : scoreB - scoreA;
+    });
+  }, [filtered, sortMode]);
 
   const termWeightedGpa = useMemo(() => {
     if (term === ALL_TERM) return null;
@@ -310,6 +334,26 @@ export default function GradesPage() {
           onChange={(e) => setCourseName(e.target.value)}
           placeholder={t("grades.courseNamePlaceholder")}
         />
+      </Field>
+      <Field>
+        <FieldLabel>{t("grades.sortLabel")}</FieldLabel>
+        <ToggleGroup
+          type="single"
+          value={sortMode}
+          onValueChange={(v) => v && setSortMode(v as "default" | "asc" | "desc")}
+          variant="outline"
+          size="sm"
+        >
+          <ToggleGroupItem value="default" aria-label={t("grades.sortDefault")}>
+            <ArrowUpDown className="size-4" />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="asc" aria-label={t("grades.sortAsc")}>
+            <ArrowUp className="size-4" />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="desc" aria-label={t("grades.sortDesc")}>
+            <ArrowDown className="size-4" />
+          </ToggleGroupItem>
+        </ToggleGroup>
       </Field>
       <Button
         onClick={() => {
@@ -379,75 +423,13 @@ export default function GradesPage() {
         <CardContent>{filterControls}</CardContent>
       </Card>
 
-      <Card className="hidden md:block">
-        <CardContent className="pt-6">
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("grades.table.term")}</TableHead>
-                  <TableHead>{t("grades.table.courseName")}</TableHead>
-                  <TableHead>{t("grades.table.courseCode")}</TableHead>
-                  <TableHead>{t("grades.table.score")}</TableHead>
-                  <TableHead>{t("grades.table.gradeLevel")}</TableHead>
-                  <TableHead>{t("grades.table.gradePoint")}</TableHead>
-                  <TableHead>{t("grades.table.credit")}</TableHead>
-                  <TableHead>{t("grades.table.type")}</TableHead>
-                  <TableHead>{t("grades.table.status")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground">
-                      {t("grades.table.noData")}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((g, idx) => (
-                    <TableRow
-                      key={idx}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => handleOpenStats(g)}
-                    >
-                      <TableCell>{g.term}</TableCell>
-                      <TableCell className="font-medium">{g.course_name}</TableCell>
-                      <TableCell>{g.course_code}</TableCell>
-                      <TableCell>{g.score}</TableCell>
-                      <TableCell>{g.grade_level || "-"}</TableCell>
-                      <TableCell>{g.grade_point}</TableCell>
-                      <TableCell>{g.credit}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          <Badge variant="secondary">{g.course_type}</Badge>
-                          {g.is_degree_course && (
-                            <Badge variant="outline">{t("grades.degreeCourse")}</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {g.is_pass ? (
-                          <Badge variant="default">{t("grades.table.pass")}</Badge>
-                        ) : (
-                          <Badge variant="destructive">{t("grades.table.fail")}</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex flex-col gap-2 md:hidden">
-        {filtered.length === 0 ? (
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+        {sorted.length === 0 ? (
           <p className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
             {t("grades.table.noData")}
           </p>
         ) : (
-          filtered.map((g, idx) => (
+          sorted.map((g, idx) => (
             <button
               key={idx}
               type="button"
