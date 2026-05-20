@@ -155,7 +155,6 @@ export default function GradesPage() {
     setLoading(true);
     try {
       const g = await getGrades(credential, {
-        term: term === ALL_TERM ? undefined : term,
         course_name: courseName || undefined,
       });
       setGrades(g);
