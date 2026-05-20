@@ -22,7 +22,6 @@
 
 # misc
 .DS_Store
-*.pem
 
 # debug
 npm-debug.log*
@@ -33,14 +32,19 @@ pnpm-debug.log*
 # env files
 .env
 .env*.local
+*.pem
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 # Claude Code
+.claude/
+.agents/
+/docs/
 CLAUDE.md
 capacitor_*_*doc.md
+skills-lock.json
 
 # Android
 *.keystore
@@ -51,13 +55,9 @@ gradle.properties
 website/node_modules/
 website/dist/
 website/.astro/
+website/src/data/changelog.json
 
-# Claude skills
-.agents/
-.claude/skills/
-skills-lock.json
 # Tencent Cloud EdgeOne
-.env
 .edgeone/*
 .tef_dist/*
 
@@ -67,7 +67,3 @@ website/.edgeone/
 # Backup files
 *.bak
 
-# Superpowers docs (generated)
-/docs/
-
-website/src/data/changelog.json

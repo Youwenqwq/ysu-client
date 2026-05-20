@@ -47,6 +47,7 @@ import {
   ClipboardCheck,
   FileText,
   GraduationCap,
+  Image,
   Info,
   LayoutDashboard,
   LogIn,
@@ -116,6 +117,7 @@ export default function DashboardLayout({
     "/dashboard/evaluation": t("app.evaluation"),
     "/dashboard/student": t("app.studentInfo"),
     "/dashboard/me": t("app.me"),
+    "/dashboard/me/background": t("app.backgroundSettings"),
     "/dashboard/about": t("about.title"),
   };
   const pageTitle = titleByPath[pathname] ?? t("app.name");
@@ -273,6 +275,10 @@ export default function DashboardLayout({
                   {studentInfo?.student_id && (
                     <span className="text-xs text-muted-foreground">{studentInfo.student_id}</span>
                   )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/dashboard/me/background")}>
+                  <Image aria-hidden="true" />
+                  {t("app.backgroundSettings")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setStudentDialogOpen(true)}>
                   <User />
