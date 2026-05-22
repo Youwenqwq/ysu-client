@@ -21,6 +21,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { useAuthStore } from "@/lib/auth-store";
+import { useSettingsStore } from "@/lib/settings-store";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { getExams } from "@/lib/api";
 import { syncExamsToWidget } from "@/lib/widget-bridge";
@@ -66,6 +67,7 @@ export default function ExamsPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [term, setTerm] = useState("");
+  const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours);
 
   useEffect(() => {
     if (!credential) return;
@@ -73,7 +75,7 @@ export default function ExamsPage() {
       try {
         const e = await getExams(credential!);
         setExams(e);
-        syncExamsToWidget(e).catch(() => {});
+        syncExamsToWidget(e, widgetSyncReminderHours).catch(() => {});
       } catch (err) {
         toast.error((err as Error).message || t("app.updating"));
       } finally {
@@ -81,7 +83,7 @@ export default function ExamsPage() {
       }
     }
     load();
-  }, [credential, t]);
+  }, [credential, t, widgetSyncReminderHours]);
 
   async function handleQuery() {
     if (!credential) return;
@@ -89,7 +91,7 @@ export default function ExamsPage() {
     try {
       const e = await getExams(credential, term || undefined);
       setExams(e);
-      syncExamsToWidget(e).catch(() => {});
+      syncExamsToWidget(e, widgetSyncReminderHours).catch(() => {});
     } catch (err) {
       toast.error((err as Error).message || t("app.updating"));
     } finally {

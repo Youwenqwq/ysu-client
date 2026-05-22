@@ -52,10 +52,14 @@ class WidgetBridgePlugin : Plugin() {
     @PluginMethod
     fun syncExams(call: PluginCall) {
         val examsJson = call.getString("examsJson", "[]")
+        val syncReminderHours = call.getInt("syncReminderHours", 24) ?: 24
 
         val prefs = context.getSharedPreferences(WidgetConfig.PREFS_NAME, android.content.Context.MODE_PRIVATE)
         prefs.edit().apply {
             putString(WidgetConfig.KEY_EXAMS, examsJson)
+            putBoolean(WidgetConfig.KEY_HAS_SYNCED_EXAMS, true)
+            putLong(WidgetConfig.KEY_LAST_EXAM_SYNC_TIME, System.currentTimeMillis())
+            putInt(WidgetConfig.KEY_SYNC_REMINDER_HOURS, syncReminderHours)
             apply()
         }
 

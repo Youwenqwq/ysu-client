@@ -9,6 +9,7 @@ export interface WidgetBridgePlugin {
   }): Promise<void>;
   syncExams(options: {
     examsJson: string;
+    syncReminderHours: number;
   }): Promise<void>;
   syncWidgetSettings(options: {
     syncReminderHours: number;
@@ -109,7 +110,10 @@ export async function syncWidgetSettingsToWidget(
   }
 }
 
-export async function syncExamsToWidget(exams: Exam[]): Promise<void> {
+export async function syncExamsToWidget(
+  exams: Exam[],
+  syncReminderHours: number = 24,
+): Promise<void> {
   try {
     const widgetExams: WidgetExam[] = exams.map((e) => ({
       name: e.name,
@@ -122,6 +126,7 @@ export async function syncExamsToWidget(exams: Exam[]): Promise<void> {
 
     await WidgetBridge.syncExams({
       examsJson: JSON.stringify(widgetExams),
+      syncReminderHours,
     });
   } catch {
     // Widget sync is best-effort; fail silently

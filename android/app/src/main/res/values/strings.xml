@@ -17,7 +17,8 @@
     <string name="widget_exam_name">考试提醒</string>
     <string name="widget_exam_description">显示未来考试安排</string>
     <string name="widget_exam_count">%d场待考</string>
-    <string name="widget_exam_empty">7天内无考试</string>
+    <string name="widget_exam_empty_sync">打开 App 同步考试</string>
+    <string name="widget_exam_empty">暂无待考</string>
     <string name="widget_sync_just_now">刚刚同步</string>
     <string name="widget_sync_hours_ago">%d小时前同步</string>
     <string name="widget_sync_days_ago">%d天前同步</string>

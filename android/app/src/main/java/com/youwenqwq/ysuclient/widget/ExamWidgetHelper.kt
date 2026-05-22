@@ -39,26 +39,47 @@ class ExamWidgetHelper(private val context: Context) {
         }
     }
 
+    data class ExamSyncInfo(
+        val hasSynced: Boolean,
+        val lastSyncTime: Long,
+        val syncReminderHours: Int
+    )
+
     fun updateWidget(appWidgetId: Int, appWidgetManager: AppWidgetManager) {
         val exams = loadExams()
         val upcomingExams = filterUpcomingExams(exams)
         val totalCount = upcomingExams.size
         val nearestExam = upcomingExams.firstOrNull()
+        val syncInfo = loadExamSyncInfo()
 
         val views = RemoteViews(context.packageName, R.layout.exam_widget)
 
         // Header: show exam date (short format) instead of date range
         val headerText = nearestExam?.examDate?.let { formatShortDate(it) } ?: ""
         views.setTextViewText(R.id.exam_header_date, headerText)
-        views.setTextViewText(
-            R.id.exam_header_count,
-            context.getString(R.string.widget_exam_count, totalCount)
-        )
+
+        val headerCountText = if (nearestExam == null) {
+            if (syncInfo.hasSynced && syncInfo.lastSyncTime > 0) {
+                formatExamSyncAge(syncInfo.lastSyncTime)
+            } else ""
+        } else {
+            if (isExamSyncStale(syncInfo)) {
+                formatExamSyncAge(syncInfo.lastSyncTime)
+            } else {
+                context.getString(R.string.widget_exam_count, totalCount)
+            }
+        }
+        views.setTextViewText(R.id.exam_header_count, headerCountText)
 
         if (nearestExam == null) {
             views.setViewVisibility(R.id.exam_countdown_content, android.view.View.GONE)
             views.setViewVisibility(R.id.exam_empty_state, android.view.View.VISIBLE)
-            views.setTextViewText(R.id.exam_empty_text, context.getString(R.string.widget_exam_empty))
+            val emptyText = if (syncInfo.hasSynced) {
+                context.getString(R.string.widget_exam_empty)
+            } else {
+                context.getString(R.string.widget_exam_empty_sync)
+            }
+            views.setTextViewText(R.id.exam_empty_text, emptyText)
         } else {
             views.setViewVisibility(R.id.exam_countdown_content, android.view.View.VISIBLE)
             views.setViewVisibility(R.id.exam_empty_state, android.view.View.GONE)
@@ -89,21 +110,36 @@ class ExamWidgetHelper(private val context: Context) {
         val upcomingExams = filterUpcomingExams(exams)
         val totalCount = upcomingExams.size
         val nearestExam = upcomingExams.firstOrNull()
+        val syncInfo = loadExamSyncInfo()
 
         val views = RemoteViews(context.packageName, R.layout.exam_widget_2x2)
 
         // Header: show exam date (short format)
         val headerText = nearestExam?.examDate?.let { formatShortDate(it) } ?: ""
         views.setTextViewText(R.id.exam_header_date, headerText)
-        views.setTextViewText(
-            R.id.exam_header_count,
-            context.getString(R.string.widget_exam_count, totalCount)
-        )
+
+        val headerCountText = if (nearestExam == null) {
+            if (syncInfo.hasSynced && syncInfo.lastSyncTime > 0) {
+                formatExamSyncAge(syncInfo.lastSyncTime)
+            } else ""
+        } else {
+            if (isExamSyncStale(syncInfo)) {
+                formatExamSyncAge(syncInfo.lastSyncTime)
+            } else {
+                context.getString(R.string.widget_exam_count, totalCount)
+            }
+        }
+        views.setTextViewText(R.id.exam_header_count, headerCountText)
 
         if (nearestExam == null) {
             views.setViewVisibility(R.id.exam_countdown_content, android.view.View.GONE)
             views.setViewVisibility(R.id.exam_empty_state, android.view.View.VISIBLE)
-            views.setTextViewText(R.id.exam_empty_text, context.getString(R.string.widget_exam_empty))
+            val emptyText = if (syncInfo.hasSynced) {
+                context.getString(R.string.widget_exam_empty)
+            } else {
+                context.getString(R.string.widget_exam_empty_sync)
+            }
+            views.setTextViewText(R.id.exam_empty_text, emptyText)
         } else {
             views.setViewVisibility(R.id.exam_countdown_content, android.view.View.VISIBLE)
             views.setViewVisibility(R.id.exam_empty_state, android.view.View.GONE)
@@ -176,13 +212,10 @@ class ExamWidgetHelper(private val context: Context) {
 
     private fun filterUpcomingExams(exams: List<WidgetExam>): List<WidgetExam> {
         val now = Calendar.getInstance()
-        val thirtyDaysLater = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, 30) }
-
         return exams.filter { exam ->
             val examDate = parseExamDate(exam)
             if (examDate == null) return@filter false
-            // Include exams that haven't ended yet and are within 30 days
-            examDate.after(now) && examDate.before(thirtyDaysLater)
+            examDate.after(now)
         }.sortedBy { exam ->
             parseExamDate(exam)?.timeInMillis ?: Long.MAX_VALUE
         }
@@ -227,6 +260,35 @@ class ExamWidgetHelper(private val context: Context) {
             "${month}.${day}"
         } catch (_: Exception) {
             null
+        }
+    }
+
+    private fun loadExamSyncInfo(): ExamSyncInfo {
+        val prefs = context.getSharedPreferences(WidgetConfig.PREFS_NAME, Context.MODE_PRIVATE)
+        val hasSynced = prefs.getBoolean(WidgetConfig.KEY_HAS_SYNCED_EXAMS, false)
+        val lastSyncTime = prefs.getLong(WidgetConfig.KEY_LAST_EXAM_SYNC_TIME, 0L)
+        val syncReminderHours = prefs.getInt(WidgetConfig.KEY_SYNC_REMINDER_HOURS, 24)
+        return ExamSyncInfo(hasSynced, lastSyncTime, syncReminderHours)
+    }
+
+    private fun isExamSyncStale(syncInfo: ExamSyncInfo): Boolean {
+        if (!syncInfo.hasSynced || syncInfo.lastSyncTime <= 0) return false
+        if (syncInfo.syncReminderHours == 0) return true
+        val elapsedMs = System.currentTimeMillis() - syncInfo.lastSyncTime
+        val thresholdMs = syncInfo.syncReminderHours * 60L * 60L * 1000L
+        return elapsedMs > thresholdMs
+    }
+
+    private fun formatExamSyncAge(lastSyncTime: Long): String {
+        val elapsedMs = System.currentTimeMillis() - lastSyncTime
+        val elapsedHours = elapsedMs / (60 * 60 * 1000)
+        return when {
+            elapsedHours < 1 -> context.getString(R.string.widget_sync_just_now)
+            elapsedHours < 24 -> context.getString(R.string.widget_sync_hours_ago, elapsedHours.toInt())
+            else -> {
+                val elapsedDays = elapsedHours / 24
+                context.getString(R.string.widget_sync_days_ago, elapsedDays.toInt())
+            }
         }
     }
 }
