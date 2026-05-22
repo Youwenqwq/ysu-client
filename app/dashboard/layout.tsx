@@ -223,7 +223,7 @@ export default function DashboardLayout({
           </button>
         </SidebarFooter>
       </Sidebar>
-      <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] pb-[calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))] md:overflow-auto md:pb-0 md:pt-0">
+      <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] pb-[calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))] md:overflow-auto md:pb-[env(safe-area-inset-bottom)] md:pt-[env(safe-area-inset-top)]">
         <MobileTopBar title={pageTitle} showBack={showBack} />
         <header className="hidden items-center justify-between gap-4 border-b px-6 py-4 md:flex">
           <div className="flex items-center gap-3">
@@ -237,7 +237,7 @@ export default function DashboardLayout({
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={() => router.push("/dashboard/me/background")}
+              onClick={() => router.push("/dashboard/me/settings")}
               aria-label={t("app.settings")}
             >
               <Settings className="size-4" />
