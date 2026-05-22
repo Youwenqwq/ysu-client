@@ -6,8 +6,9 @@ import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/lib/auth-store";
+import { useSettingsStore } from "@/lib/settings-store";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { getStudentInfo, getCurrentWeek, getGPAStats, getExperimentalSchedule, getExams, getClassPeriods } from "@/lib/api";
 import { cacheGet, cacheSet, cacheKey } from "@/lib/cache";
@@ -61,6 +62,7 @@ function getExamEndTime(exam: Exam): Date | null {
 export default function DashboardPage() {
   const router = useRouter();
   const credential = useAuthStore((s) => s.credential);
+  const avatarImage = useSettingsStore((s) => s.avatarImage);
   const { t } = useTranslation();
   const [student, setStudent] = useState<StudentInfo | null>(null);
   const [currentWeek, setCurrentWeek] = useState<CurrentWeek | null>(null);
@@ -222,6 +224,7 @@ export default function DashboardPage() {
       <Card className="md:hidden">
         <CardHeader className="flex flex-row items-center gap-3 pb-3">
           <Avatar className="size-14 shrink-0">
+            {avatarImage && <AvatarImage src={avatarImage} alt="avatar" />}
             <AvatarFallback className="text-base font-medium">
               {student?.name ? student.name.slice(-2) : "--"}
             </AvatarFallback>

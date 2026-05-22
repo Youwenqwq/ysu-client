@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,6 +64,7 @@ export default function DashboardLayout({
 
   const credential = useAuthStore((s) => s.credential);
   const backgroundImage = useSettingsStore((s) => s.backgroundImage);
+  const avatarImage = useSettingsStore((s) => s.avatarImage);
   const hasBackground = !!backgroundImage;
 
   const navItems = [
@@ -88,6 +89,7 @@ export default function DashboardLayout({
     "/dashboard/me/gpa": t("app.gpa"),
     "/dashboard/me/background": t("app.backgroundSettings"),
     "/dashboard/me/settings": t("settings.title"),
+    "/dashboard/me/avatar": t("app.avatarSettings"),
     "/dashboard/me/about": t("about.title"),
   };
   const pageTitle = titleByPath[pathname] ?? t("app.name");
@@ -246,6 +248,7 @@ export default function DashboardLayout({
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative size-8 rounded-full">
                   <Avatar className="size-8">
+                    {avatarImage && <AvatarImage src={avatarImage} alt="avatar" />}
                     <AvatarFallback className="text-xs">
                       {username?.slice(-2) || "U"}
                     </AvatarFallback>

@@ -15,6 +15,7 @@ interface SettingsState {
   cardOpacity: number;
   defaultLandingPage: LandingPage;
   widgetSyncReminderHours: number;
+  avatarImage: string;
   hasHydrated: boolean;
   setUpdateMirror: (mirror: string) => void;
   setBackgroundImage: (image: string) => void;
@@ -25,6 +26,7 @@ interface SettingsState {
   setCardOpacity: (opacity: number) => void;
   setDefaultLandingPage: (page: LandingPage) => void;
   setWidgetSyncReminderHours: (hours: number) => void;
+  setAvatarImage: (image: string) => void;
   setHasHydrated: (v: boolean) => void;
 }
 
@@ -40,6 +42,7 @@ export const useSettingsStore = create<SettingsState>()(
       cardOpacity: 100,
       defaultLandingPage: "overview",
       widgetSyncReminderHours: 24,
+      avatarImage: "",
       hasHydrated: false,
       setUpdateMirror: (updateMirror) => set({ updateMirror }),
       setBackgroundImage: (backgroundImage) => set({ backgroundImage }),
@@ -50,6 +53,7 @@ export const useSettingsStore = create<SettingsState>()(
       setCardOpacity: (cardOpacity) => set({ cardOpacity }),
       setDefaultLandingPage: (defaultLandingPage) => set({ defaultLandingPage }),
       setWidgetSyncReminderHours: (widgetSyncReminderHours) => set({ widgetSyncReminderHours }),
+      setAvatarImage: (avatarImage) => set({ avatarImage }),
       setHasHydrated: (v) => set({ hasHydrated: v }),
     }),
     {

@@ -38,6 +38,7 @@ import {
   Sun,
   Globe,
   Clock,
+  UserCircle,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -196,6 +197,16 @@ export default function SettingsPage() {
                 <span className="text-sm text-muted-foreground">{t("settings.widgetSyncReminderUnit")}</span>
               </div>
             </div>
+
+            {/* 头像 */}
+            <Link
+              href="/dashboard/me/avatar"
+              className="flex items-center gap-3 border-t border-border py-3 transition-colors active:bg-muted/60"
+            >
+              <UserCircle className="size-5 shrink-0 text-muted-foreground" />
+              <span className="flex-1 text-sm">{t("app.avatarSettings")}</span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            </Link>
 
             {/* 背景图 */}
             <Link

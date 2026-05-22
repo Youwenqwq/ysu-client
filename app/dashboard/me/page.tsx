@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import {
   User,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { useSettingsStore } from "@/lib/settings-store";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useMobileHeaderRight } from "@/lib/mobile-header-store";
 import { getStudentInfo } from "@/lib/api";
@@ -130,6 +131,8 @@ export default function MePage() {
     { href: "/dashboard/training-plan", label: t("app.trainingPlan"), icon: BookOpen, mobileOnly: true },
   ];
 
+  const avatarImage = useSettingsStore((s) => s.avatarImage);
+
   const displayName = student?.name || username || t("me.profileFallback");
   const initials = (student?.name || username || "U").slice(-2);
 
@@ -138,6 +141,7 @@ export default function MePage() {
       <Card>
         <CardContent className="flex items-center gap-4 py-5">
           <Avatar className="size-14">
+            {avatarImage && <AvatarImage src={avatarImage} alt="avatar" />}
             <AvatarFallback className="text-lg">{initials}</AvatarFallback>
           </Avatar>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
