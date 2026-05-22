@@ -743,6 +743,7 @@ export async function warmupWEU(): Promise<void> {
     APP_IDS.studentWdksapApp,
     APP_IDS.cjcx,
     APP_IDS.wdkb_sy,
+    APP_IDS.pjapp,
   ];
   await Promise.all(apps.map((id) => ensureWeu(id).catch(() => {})));
 }
@@ -801,6 +802,10 @@ async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
     return await fn();
   } catch (e) {
     if (e instanceof NotLoggedInError) {
+      await reauthorize();
+      return await fn();
+    }
+    if (e instanceof JWXTProtocolError && e.message.includes('HTTP 404')) {
       await reauthorize();
       return await fn();
     }
