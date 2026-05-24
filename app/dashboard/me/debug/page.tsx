@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuthStore } from "@/lib/auth-store";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { isCapacitor } from "@/lib/platform";
+import { getSchoolConfig, getSchoolId, serverConfig } from "@/lib/server-config";
 import { getJar as getCasJar, isAuthenticated as checkCASAuth } from "@/lib/cas";
 import { getJar as getJwxtJar, resetJWXT } from "@/lib/jwxt";
 import { ensureMobileAuthorized } from "@/lib/jwmobile";
@@ -23,6 +24,16 @@ import { toast } from "sonner";
 import { clearAllCache } from "@/lib/cache";
 
 interface DiagnosticResult {
+  school: {
+    id: string;
+    name: string;
+    nameEn: string;
+    cerBaseUrl: string;
+    jwxtBaseUrl: string;
+    hasMobile: boolean;
+    hasLabSchedule: boolean;
+    hasMfa: boolean;
+  };
   platform: {
     name: string;
     userAgent: string;
@@ -93,7 +104,18 @@ export default function DebugPage() {
       const castgc = await loadCASTGC();
       const rememberMe = await loadRememberedCredentials();
 
+      const schoolConfig = getSchoolConfig();
       const result: DiagnosticResult = {
+        school: {
+          id: getSchoolId(),
+          name: schoolConfig.name,
+          nameEn: schoolConfig.nameEn,
+          cerBaseUrl: serverConfig.cerBaseUrl,
+          jwxtBaseUrl: serverConfig.jwxtBaseUrl,
+          hasMobile: schoolConfig.features.hasMobile,
+          hasLabSchedule: schoolConfig.features.hasLabSchedule,
+          hasMfa: schoolConfig.features.hasMfa,
+        },
         platform: {
           name: platformName,
           userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "N/A",
@@ -259,6 +281,42 @@ export default function DebugPage() {
               <div className="flex flex-col gap-0.5">
                 <span className="text-muted-foreground">{t("debug.platformUserAgent")}</span>
                 <span className="break-all text-[10px] font-mono text-muted-foreground">{diag.platform.userAgent}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">{t("debug.schoolInfo")}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t("debug.schoolId")}</span>
+                <span className="font-mono text-xs">{diag.school.id}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t("debug.schoolName")}</span>
+                <span className="font-mono text-xs">{diag.school.name} ({diag.school.nameEn})</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t("debug.schoolCasUrl")}</span>
+                <span className="font-mono text-xs break-all">{diag.school.cerBaseUrl}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t("debug.schoolJwxtUrl")}</span>
+                <span className="font-mono text-xs break-all">{diag.school.jwxtBaseUrl}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t("debug.schoolHasMobile")}</span>
+                {statusBadge(diag.school.hasMobile)}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t("debug.schoolHasLabSchedule")}</span>
+                {statusBadge(diag.school.hasLabSchedule)}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t("debug.schoolHasMfa")}</span>
+                {statusBadge(diag.school.hasMfa)}
               </div>
             </CardContent>
           </Card>

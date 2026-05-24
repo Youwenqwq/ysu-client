@@ -10,6 +10,8 @@
   },
   "jwxt": {
     "jwxtBaseUrl": "https://ehall.nbu.edu.cn",
+    "portalPath": "",
+    "appShowPath": "",
     "appIds": {
       "cjcx": "TODO",
       "wdkb": "TODO",

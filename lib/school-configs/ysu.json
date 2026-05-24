@@ -16,6 +16,8 @@
   },
   "jwxt": {
     "jwxtBaseUrl": "https://jwxt.ysu.edu.cn",
+    "portalPath": "/jwapp/sys/emaphome/portal/index.do",
+    "appShowPath": "/jwapp/sys/emaphome/appShow.do",
     "appIds": {
       "cjcx": "d71f7b57b4f348368f06c3e9a2a0988f",
       "wdkb": "377b6493556d4f0b86d116ca00cd1b6e",
@@ -59,6 +61,7 @@
   },
   "features": {
     "hasMobile": true,
-    "hasLabSchedule": true
+    "hasLabSchedule": true,
+    "hasMfa": true
   }
 }

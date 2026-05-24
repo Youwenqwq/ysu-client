@@ -22,6 +22,8 @@ export interface SchoolConfig {
   };
   readonly jwxt: {
     readonly jwxtBaseUrl: string;
+    readonly portalPath: string;
+    readonly appShowPath: string;
     readonly appIds: Readonly<Record<string, string>>;
     readonly apiPaths: Readonly<Record<string, string>>;
   };
@@ -72,8 +74,8 @@ export const casUrls = {
 export const jwxtUrls = {
   get jwxtBase() { return serverConfig.jwxtBaseUrl; },
   get appBase() { return `${serverConfig.jwxtBaseUrl}/jwapp/sys`; },
-  get portal() { return `${serverConfig.jwxtBaseUrl}/jwapp/sys/emaphome/portal/index.do`; },
-  get appShow() { return `${serverConfig.jwxtBaseUrl}/jwapp/sys/emaphome/appShow.do`; },
+  get portal() { return `${serverConfig.jwxtBaseUrl}${currentSchoolConfig.jwxt.portalPath}`; },
+  get appShow() { return `${serverConfig.jwxtBaseUrl}${currentSchoolConfig.jwxt.appShowPath}`; },
 };
 
 export const mobileUrls = {
