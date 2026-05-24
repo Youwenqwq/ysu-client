@@ -7,6 +7,7 @@ import { useSettingsStore } from "@/lib/settings-store";
 import { RefreshIndicator } from "@/components/refresh-indicator";
 import { StaleIndicator } from "@/components/stale-indicator";
 import { cn } from "@/lib/utils";
+import { IS_DEMO } from "@/lib/demo-data";
 
 interface Props {
   title: string;
@@ -39,6 +40,11 @@ export function MobileTopBar({ title, showBack }: Props) {
           </button>
         )}
         <h1 className="truncate text-base font-semibold">{title}</h1>
+        {IS_DEMO && (
+          <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+            演示
+          </span>
+        )}
         <RefreshIndicator />
         <StaleIndicator />
       </div>

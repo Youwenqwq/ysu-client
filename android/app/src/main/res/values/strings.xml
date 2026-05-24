@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">燕大终端</string>
-    <string name="title_activity_main">燕大终端</string>
-    <string name="package_name">com.youwenqwq.ysuclient</string>
-    <string name="custom_url_scheme">com.youwenqwq.ysuclient</string>
+    <string name="app_name">燕大终端(演示版)</string>
+    <string name="title_activity_main">燕大终端(演示版)</string>
+    <string name="package_name">com.youwenqwq.ysuclient.demo</string>
+    <string name="custom_url_scheme">com.youwenqwq.ysuclient.demo</string>
 
     <!-- Widget -->
     <string name="widget_name">今日课表</string>

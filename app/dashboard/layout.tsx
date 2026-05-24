@@ -50,6 +50,7 @@ import { RefreshIndicator } from "@/components/refresh-indicator";
 import { StaleIndicator } from "@/components/stale-indicator";
 import { UpdateDialog } from "@/components/update-dialog";
 import { APP_VERSION, APP_BUILD } from "@/lib/version";
+import { IS_DEMO } from "@/lib/demo-data";
 
 export default function DashboardLayout({
   children,
@@ -169,6 +170,11 @@ export default function DashboardLayout({
           <div className="flex items-center gap-2 px-2 py-3">
             <GraduationCap className="size-6 shrink-0 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]" />
             <span className="font-semibold">{t("app.name")}</span>
+            {IS_DEMO && (
+              <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                演示版
+              </span>
+            )}
           </div>
         </SidebarHeader>
         <SidebarContent className="gap-0">
@@ -232,6 +238,11 @@ export default function DashboardLayout({
             <h1 className="text-lg font-semibold animate-in fade-in slide-in-from-left-2 duration-300">
               {pageTitle}
             </h1>
+            {IS_DEMO && (
+              <span className="shrink-0 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                演示版
+              </span>
+            )}
             <RefreshIndicator />
             <StaleIndicator />
           </div>
