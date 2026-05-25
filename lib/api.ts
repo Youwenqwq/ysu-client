@@ -58,6 +58,7 @@ import {
   NotLoggedInError,
   JWXTBusinessError,
 } from "./jwxt";
+import { getText } from "./i18n/get-text";
 import {
   queryStudentInfo as _queryStudentInfo,
   queryGrades as _queryGrades,
@@ -110,7 +111,7 @@ function mapSdkError(e: unknown): Error {
     e instanceof NotAuthenticatedError ||
     e instanceof MobileNotLoggedInError
   ) {
-    return apiError(e.message, "AUTH_REQUIRED", 401);
+    return apiError(getText("app.sessionExpired"), "AUTH_REQUIRED", 401);
   }
   if (e instanceof JWXTBusinessError || e instanceof MobileBusinessError) {
     return apiError(
