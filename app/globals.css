@@ -158,6 +158,13 @@
   }
 }
 
+/* Dialog centering fallback for browsers that don't support the translate property (Chromium < 104) */
+@supports not (translate: 0) {
+  [data-slot="dialog-content"] {
+    transform: translate(-50%, -50%);
+  }
+}
+
 [data-sonner-toaster] .cn-toast-mobile {
   padding: 0.625rem 0.75rem;
   font-size: 0.8125rem;
