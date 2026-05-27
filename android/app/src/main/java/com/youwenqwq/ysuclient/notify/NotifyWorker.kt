@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.youwenqwq.ysuclient.MainActivity
+import com.youwenqwq.ysuclient.R
 import com.youwenqwq.ysuclient.cache.UnifiedCache
 import org.json.JSONArray
 import org.json.JSONObject
@@ -29,7 +30,6 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         const val TAG = "YsuNotifyWorker"
         const val WORK_NAME = "ysu_notify_work"
         const val CHANNEL_ID = "ysu_notify_channel"
-        const val CHANNEL_NAME = "成绩/考试通知"
         const val NOTIFICATION_ID_BASE = 1000
 
         @Volatile
@@ -89,7 +89,7 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                     if (diff.isNotEmpty()) {
                         hasChanges = true
                         for (grade in diff) {
-                            val courseName = grade.optString("course_name", "未知课程")
+                            val courseName = grade.optString("course_name", ctx.getString(R.string.notify_fallback_course_name))
                             val score = grade.optString("score", "")
                             sendGradeNotification(ctx, courseName, score)
                         }
@@ -115,7 +115,7 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                     if (diff.isNotEmpty()) {
                         hasChanges = true
                         for (exam in diff) {
-                            val name = exam.optString("name", "未知考试")
+                            val name = exam.optString("name", ctx.getString(R.string.notify_fallback_exam_name))
                             val date = exam.optString("exam_date", "")
                             val time = exam.optString("exam_time", "")
                             val location = exam.optString("exam_location", "")
@@ -145,10 +145,10 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            CHANNEL_NAME,
+            ctx.getString(R.string.notify_channel_name),
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "检测到新成绩发布或考试安排变更时推送通知"
+            description = ctx.getString(R.string.notify_channel_desc)
         }
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(channel)
@@ -168,12 +168,16 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         createNotificationChannel(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val content = if (score.isNotEmpty()) "成绩: $score" else "新成绩已发布"
+        val text = if (score.isNotEmpty()) {
+            ctx.getString(R.string.notify_grade_text, courseName, score)
+        } else {
+            ctx.getString(R.string.notify_grade_text_no_score, courseName)
+        }
 
         val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("新成绩发布")
-            .setContentText("$courseName — $content")
+            .setContentTitle(ctx.getString(R.string.notify_grade_title))
+            .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(getOpenAppIntent(ctx))
             .setAutoCancel(true)
@@ -188,15 +192,20 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val details = buildList {
-            if (date.isNotEmpty()) add(date)
             if (time.isNotEmpty()) add(time)
             if (location.isNotEmpty()) add(location)
         }.joinToString(" ")
 
+        val text = if (details.isNotEmpty()) {
+            ctx.getString(R.string.notify_exam_text, name, details)
+        } else {
+            ctx.getString(R.string.notify_exam_text_no_details, name)
+        }
+
         val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("考试安排更新")
-            .setContentText("$name${if (details.isNotEmpty()) " — $details" else ""}")
+            .setContentTitle(ctx.getString(R.string.notify_exam_title))
+            .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(getOpenAppIntent(ctx))
             .setAutoCancel(true)
@@ -212,8 +221,8 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
 
         val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("会话已过期")
-            .setContentText("请打开应用重新登录以恢复通知功能")
+            .setContentTitle(ctx.getString(R.string.notify_session_expired_title))
+            .setContentText(ctx.getString(R.string.notify_session_expired_text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(getOpenAppIntent(ctx))
             .setAutoCancel(true)

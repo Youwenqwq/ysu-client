@@ -300,7 +300,6 @@ object NotifyHelper {
             Log.d(TAG, "CAS step $step: code=$code, url=$finalUrl")
 
             if (code !in setOf(301, 302, 303, 307, 308)) {
-                Log.d(TAG, "CAS final body: ${body.take(500)}")
                 if (finalUrl.contains("authserver/login") || body.contains("authserver/login")) {
                     Log.w(TAG, "CASTGC expired, bounced back to CAS login")
                     return@withCookieHandlerDisabled false

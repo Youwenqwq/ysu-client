@@ -10,6 +10,7 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.youwenqwq.ysuclient.MainActivity
+import com.youwenqwq.ysuclient.R
 import com.youwenqwq.ysuclient.cache.UnifiedCache
 import org.json.JSONArray
 import org.json.JSONObject
@@ -20,7 +21,6 @@ class ClassAlarmReceiver : BroadcastReceiver() {
     companion object {
         const val TAG = "YsuClassAlarm"
         const val CHANNEL_ID = "ysu_class_alarm_channel"
-        const val CHANNEL_NAME = "上课提醒"
         const val EXTRA_ALARM_ID = "alarm_id"
     }
 
@@ -46,7 +46,7 @@ class ClassAlarmReceiver : BroadcastReceiver() {
                 return
             }
 
-            val courseName = alarmConfig.optString("courseName", "课程")
+            val courseName = alarmConfig.optString("courseName", context.getString(R.string.notify_fallback_alarm_course))
             val classroom = alarmConfig.optString("classroom", "")
             val startTime = alarmConfig.optString("startTime", "")
             val remindMinutes = alarmConfig.optInt("remindMinutes", 15)
@@ -108,10 +108,13 @@ class ClassAlarmReceiver : BroadcastReceiver() {
         createNotificationChannel(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val content = buildString {
-            append("${remindMinutes}分钟后上课")
-            if (classroom.isNotEmpty()) append(" · $classroom")
-            if (startTime.isNotEmpty()) append(" · $startTime 开始")
+        val content = when {
+            classroom.isNotEmpty() && startTime.isNotEmpty() ->
+                ctx.getString(R.string.class_alarm_text_classroom_time, remindMinutes, classroom, startTime)
+            classroom.isNotEmpty() ->
+                ctx.getString(R.string.class_alarm_text_classroom, remindMinutes, classroom)
+            else ->
+                ctx.getString(R.string.class_alarm_text, remindMinutes)
         }
 
         val openIntent = Intent(ctx, MainActivity::class.java).apply {
@@ -138,10 +141,10 @@ class ClassAlarmReceiver : BroadcastReceiver() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            CHANNEL_NAME,
+            ctx.getString(R.string.class_alarm_channel_name),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "课前提醒通知"
+            description = ctx.getString(R.string.class_alarm_channel_desc)
         }
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(channel)

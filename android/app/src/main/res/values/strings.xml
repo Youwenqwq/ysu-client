@@ -22,4 +22,26 @@
     <string name="widget_sync_just_now">刚刚同步</string>
     <string name="widget_sync_hours_ago">%d小时前同步</string>
     <string name="widget_sync_days_ago">%d天前同步</string>
+
+    <!-- Notify: grade/exam change detection -->
+    <string name="notify_channel_name">成绩/考试通知</string>
+    <string name="notify_channel_desc">检测到新成绩发布或考试安排变更时推送通知</string>
+    <string name="notify_grade_title">新成绩发布</string>
+    <string name="notify_grade_text">%1$s — 成绩: %2$s</string>
+    <string name="notify_grade_text_no_score">%1$s — 新成绩已发布</string>
+    <string name="notify_exam_title">考试安排更新</string>
+    <string name="notify_exam_text">%1$s — %2$s</string>
+    <string name="notify_exam_text_no_details">%1$s</string>
+    <string name="notify_session_expired_title">会话已过期</string>
+    <string name="notify_session_expired_text">请打开应用重新登录以恢复通知功能</string>
+
+    <!-- Notify: class alarm -->
+    <string name="class_alarm_channel_name">上课提醒</string>
+    <string name="class_alarm_channel_desc">课前提醒通知</string>
+    <string name="class_alarm_text">%1$d分钟后上课</string>
+    <string name="class_alarm_text_classroom">%1$d分钟后上课 · %2$s</string>
+    <string name="class_alarm_text_classroom_time">%1$d分钟后上课 · %2$s · %3$s 开始</string>
+    <string name="notify_fallback_course_name">未知课程</string>
+    <string name="notify_fallback_exam_name">未知考试</string>
+    <string name="notify_fallback_alarm_course">课程</string>
 </resources>
