@@ -33,9 +33,7 @@ export async function onRequestPost({ request, env }) {
     const ua = extra.ua || request.headers.get('user-agent') || 'unknown';
 
     const key = `stats:${date}`;
-    const existing = await STATS_KV.get(key);
-    let data = { count: 0, entries: [] };
-    try { if (existing) data = JSON.parse(existing); } catch { /* corrupted KV */ }
+    const data = await STATS_KV.get(key, 'json') || { count: 0, entries: [] };
 
     // Migrate old format if needed
     if (data.userAgents && !data.entries) {
@@ -90,9 +88,7 @@ export async function onRequestGet({ env }) {
 
     const date = new Date().toISOString().split('T')[0];
     const key = `stats:${date}`;
-    const existing = await STATS_KV.get(key);
-    let data = { count: 0 };
-    try { if (existing) data = JSON.parse(existing); } catch { /* corrupted KV */ }
+    const data = await STATS_KV.get(key, 'json') || { count: 0 };
 
     return new Response(JSON.stringify({ count: data.count || 0 }), {
       headers: {

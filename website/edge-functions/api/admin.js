@@ -50,14 +50,10 @@ export async function onRequestGet({ request, env }) {
           if (cursor) opts.cursor = cursor;
           const result = await STATS_KV.list(opts);
           for (const k of result.keys) {
-            const val = await STATS_KV.get(k.key);
-            if (!val) continue;
-            try {
-              const data = JSON.parse(val);
-              if (Array.isArray(data.entries)) {
-                all.push(...data.entries);
-              }
-            } catch { /* skip corrupted key */ }
+            const data = await STATS_KV.get(k.key, 'json');
+            if (data && Array.isArray(data.entries)) {
+              all.push(...data.entries);
+            }
           }
           cursor = result.cursor;
         } while (cursor);
@@ -160,20 +156,16 @@ export async function onRequestPost({ request, env }) {
     if (dateMatch) {
       const dateStr = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
       const key = `feedback:${dateStr}`;
-      const existing = await STATS_KV.get(key);
-      if (existing) {
-        let data;
-        try { data = JSON.parse(existing); } catch { /* skip corrupted */ }
-        if (data) {
-          const entry = data.entries?.find((e) => e.id === id);
-          if (entry) {
-            entry.adminReply = reply;
-            entry.repliedAt = Date.now();
-            await STATS_KV.put(key, JSON.stringify(data));
-            return new Response(JSON.stringify({ success: true }), {
-              headers: { 'content-type': 'application/json' },
-            });
-          }
+      const data = await STATS_KV.get(key, 'json');
+      if (data) {
+        const entry = data.entries?.find((e) => e.id === id);
+        if (entry) {
+          entry.adminReply = reply;
+          entry.repliedAt = Date.now();
+          await STATS_KV.put(key, JSON.stringify(data));
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { 'content-type': 'application/json' },
+          });
         }
       }
     }
@@ -185,10 +177,8 @@ export async function onRequestPost({ request, env }) {
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       const key = `feedback:${dateStr}`;
-      const existing = await STATS_KV.get(key);
-      if (!existing) continue;
-      let data;
-      try { data = JSON.parse(existing); } catch { continue; }
+      const data = await STATS_KV.get(key, 'json');
+      if (!data) continue;
       const entry = data.entries?.find((e) => e.id === id);
       if (entry) {
         entry.adminReply = reply;
