@@ -573,7 +573,12 @@ export function AboutContent() {
                   )}
                   {item.replied && item.replyText && (
                     <div className="mt-2 rounded-md bg-muted p-2">
-                      <p className="text-xs font-medium text-muted-foreground">{t("about.feedbackDevReply")}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-muted-foreground">{t("about.feedbackDevReply")}</p>
+                        {item.repliedAt && (
+                          <p className="text-[10px] text-muted-foreground">{new Date(item.repliedAt).toLocaleDateString()}</p>
+                        )}
+                      </div>
                       <p className="mt-1 text-sm">{item.replyText}</p>
                     </div>
                   )}

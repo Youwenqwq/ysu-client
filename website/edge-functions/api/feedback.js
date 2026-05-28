@@ -30,21 +30,10 @@ export async function onRequestPost({ request, env }) {
       );
     }
 
-    const id = String(body.id || '').slice(0, 32);
-    if (!id) {
-      return new Response(
-        JSON.stringify({ error: 'Missing feedback id' }),
-        {
-          status: 400,
-          headers: {
-            'content-type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          },
-        }
-      );
-    }
-
     const date = new Date().toISOString().split('T')[0];
+    const datePrefix = date.replace(/-/g, '');
+    const randomPart = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+    const id = `${datePrefix}-${randomPart}`;
     const ua = String(body.ua || '').slice(0, 512) || request.headers.get('user-agent') || 'unknown';
     const key = `feedback:${date}`;
     const data = await STATS_KV.get(key, 'json') || { entries: [] };
@@ -63,6 +52,7 @@ export async function onRequestPost({ request, env }) {
       );
     }
 
+    const ts = Date.now();
     data.entries.push({
       id,
       rating,
@@ -72,7 +62,7 @@ export async function onRequestPost({ request, env }) {
       screen: String(body.screen || '').slice(0, 32),
       platform: String(body.platform || '').slice(0, 16),
       ua,
-      ts: Date.now(),
+      ts,
     });
 
     // Limit entries per day to avoid KV size limits
@@ -82,7 +72,7 @@ export async function onRequestPost({ request, env }) {
 
     await STATS_KV.put(key, JSON.stringify(data));
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, id, ts }), {
       headers: {
         'content-type': 'application/json',
         'Access-Control-Allow-Origin': '*',
@@ -120,6 +110,7 @@ export async function onRequestGet({ request, env }) {
 
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
+    const ts = Number(url.searchParams.get('ts'));
     if (!id) {
       return new Response(
         JSON.stringify({ error: 'Missing id parameter' }),
@@ -140,10 +131,12 @@ export async function onRequestGet({ request, env }) {
       const key = `feedback:${dateStr}`;
       const data = await STATS_KV.get(key, 'json');
       if (data) {
-        const entry = data.entries?.find((e) => e.id === id);
+        const entry = data.entries?.find((e) => e.id === id && (!ts || e.ts === ts));
         if (entry) {
           return new Response(
             JSON.stringify({
+              ts: entry.ts,
+              replied: !!entry.adminReply,
               adminReply: entry.adminReply || null,
               repliedAt: entry.repliedAt || null,
             }),
@@ -167,10 +160,12 @@ export async function onRequestGet({ request, env }) {
       const key = `feedback:${dateStr}`;
       const data = await STATS_KV.get(key, 'json');
       if (!data) continue;
-      const entry = data.entries?.find((e) => e.id === id);
+      const entry = data.entries?.find((e) => e.id === id && (!ts || e.ts === ts));
       if (entry) {
         return new Response(
           JSON.stringify({
+            ts: entry.ts,
+            replied: !!entry.adminReply,
             adminReply: entry.adminReply || null,
             repliedAt: entry.repliedAt || null,
           }),

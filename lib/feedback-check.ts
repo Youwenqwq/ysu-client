@@ -13,7 +13,8 @@ export async function syncFeedbackReplies(): Promise<void> {
   let history = [...state.feedbackHistory];
 
   for (const id of feedbackIds) {
-    const result = await checkFeedbackReply(id);
+    const entry = history.find((h) => h.id === id);
+    const result = await checkFeedbackReply(id, entry?.ts);
     if (result === null) continue;
 
     if ("notFound" in result) {
@@ -25,19 +26,19 @@ export async function syncFeedbackReplies(): Promise<void> {
       continue;
     }
 
-    if ("reply" in result) {
+    if ("replied" in result) {
       const idx = history.findIndex((h) => h.id === id);
       if (idx >= 0) {
         const wasReplied = history[idx].replied;
         history[idx] = {
           ...history[idx],
-          replied: true,
-          replyText: result.reply,
-          repliedAt: result.repliedAt,
+          replied: result.replied,
+          replyText: result.reply || history[idx].replyText,
+          repliedAt: result.repliedAt || history[idx].repliedAt,
         };
 
         // Toast only if this reply hasn't been notified yet
-        if (!wasReplied && !history[idx].notifiedAt) {
+        if (result.replied && !wasReplied && !history[idx].notifiedAt) {
           history[idx] = { ...history[idx], notifiedAt: Date.now() };
           toast.success(getText("about.feedbackNewReply"), {
             duration: 8000,

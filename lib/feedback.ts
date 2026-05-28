@@ -4,26 +4,11 @@ import { useSettingsStore } from "@/lib/settings-store";
 
 const FEEDBACK_ENDPOINT = "https://ysu.welain.com/api/feedback";
 
-function generateId(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  const now = new Date();
-  const datePrefix = now.getFullYear().toString() +
-    String(now.getMonth() + 1).padStart(2, "0") +
-    String(now.getDate()).padStart(2, "0");
-  let randomPart = "";
-  for (let i = 0; i < 8; i++) {
-    randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return `${datePrefix}-${randomPart}`;
-}
-
 export async function submitFeedback(rating: number, text: string): Promise<string> {
-  const id = generateId();
   const res = await fetch(FEEDBACK_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      id,
       rating,
       text: text.trim(),
       version: APP_VERSION,
@@ -39,11 +24,14 @@ export async function submitFeedback(rating: number, text: string): Promise<stri
     throw new Error(body.error || `HTTP ${res.status}`);
   }
 
+  const { id, ts } = await res.json();
+  if (!id) throw new Error("Server did not return feedback id");
+
   const state = useSettingsStore.getState();
   const newIds = [id, ...state.feedbackIds.filter((fid) => fid !== id)];
   state.setFeedbackIds(newIds);
   const newHistory = [
-    { id, rating, text: text.trim(), ts: Date.now() },
+    { id, rating, text: text.trim(), ts: ts ?? Date.now() },
     ...state.feedbackHistory.filter((h) => h.id !== id),
   ];
   state.setFeedbackHistory(newHistory);
@@ -52,22 +40,26 @@ export async function submitFeedback(rating: number, text: string): Promise<stri
 }
 
 export type FeedbackReplyResult =
-  | { reply: string; repliedAt: number }
+  | { ts: number; replied: boolean; reply: string; repliedAt: number }
   | { notFound: true }
   | null;
 
-export async function checkFeedbackReply(id: string): Promise<FeedbackReplyResult> {
+export async function checkFeedbackReply(id: string, ts?: number): Promise<FeedbackReplyResult> {
   try {
-    const res = await fetch(`${FEEDBACK_ENDPOINT}?id=${id}`, { method: "GET" });
+    const params = new URLSearchParams({ id });
+    if (ts) params.set("ts", String(ts));
+    const res = await fetch(`${FEEDBACK_ENDPOINT}?${params}`, { method: "GET" });
     if (res.status === 404) {
       return { notFound: true };
     }
     if (!res.ok) return null;
     const data = await res.json();
-    if (data.adminReply) {
-      return { reply: data.adminReply, repliedAt: data.repliedAt };
-    }
-    return null;
+    return {
+      ts: data.ts,
+      replied: data.replied,
+      reply: data.adminReply || "",
+      repliedAt: data.repliedAt || 0,
+    };
   } catch {
     return null;
   }
