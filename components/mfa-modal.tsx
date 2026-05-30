@@ -37,7 +37,7 @@ type WechatStatus = 'idle' | 'initiating' | 'waiting' | 'scanned' | 'confirmed' 
 
 export function MFAModal() {
   const { t } = useTranslation();
-  const { open, username, cancelMFA, submitMFA, completeWechatMFA: storeComplete, setMethodInfo } =
+  const { open, username, cancelMFA, submitMFA, completeWechatMFA: storeComplete } =
     useMFAModalStore();
   const showWechat = isTablet();
   const defaultMethod = showWechat ? "weixin" : "sms";
@@ -103,7 +103,6 @@ export function MFAModal() {
       setLocalHint(res.mobile_hint);
       setLocalMethodCode(res.method_code);
       setCountdown(COUNTDOWN_SECONDS);
-      setMethodInfo(method, res.method_code, res.mobile_hint);
     } catch (err) {
       toast.error((err as Error).message || t("login.errorMfaRequestFailed"));
     } finally {
@@ -114,8 +113,12 @@ export function MFAModal() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!code) return;
-    submitMFA(code);
+    if (!code || !localMethodCode || isWechat) return;
+    submitMFA({
+      method: mfaMethod as "sms" | "cpdaily",
+      methodCode: localMethodCode,
+      code,
+    });
     setCode("");
   }
 

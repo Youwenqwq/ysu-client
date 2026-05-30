@@ -66,6 +66,7 @@ export const serverConfig = {
 export const casUrls = {
   get cerBase() { return serverConfig.cerBaseUrl; },
   get authLogin() { return `${serverConfig.cerBaseUrl}/authserver/login`; },
+  get authLogout() { return `${serverConfig.cerBaseUrl}/authserver/logout`; },
   get authIndex() { return `${serverConfig.cerBaseUrl}/authserver/index.do`; },
   get checkCaptcha() { return `${serverConfig.cerBaseUrl}/authserver/checkNeedCaptcha.htl`; },
   get captcha() { return `${serverConfig.cerBaseUrl}/authserver/getCaptcha.htl`; },

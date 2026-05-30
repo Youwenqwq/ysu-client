@@ -402,6 +402,31 @@ export async function restoreCASCookies(): Promise<void> {
   }
 }
 
+/**
+ * Logout CAS server session with CASTGC.
+ */
+export async function logoutCAS(): Promise<void> {
+  let tgc = await loadCASTGC();
+  if (!tgc) {
+    const staleTgc = await collectCookies(casJar, (e) => e.name === 'CASTGC');
+    tgc = staleTgc[0]?.value ?? '';
+  }
+  if (!tgc) return;
+
+  const logoutJar = new SimpleCookieJar();
+  await logoutJar.setCookie(
+    `CASTGC=${tgc}; Domain=${getCasCookieDomain()}; Path=/authserver; Secure`,
+    casUrls.authLogout,
+    { ignoreError: true },
+  );
+  await fetchWithJar(logoutJar, {
+    method: 'GET',
+    url: casUrls.authLogout,
+    redirect: 'follow',
+    timeoutMs,
+  });
+}
+
 // ─── Internal fetch wrapper ───────────────────────────────────────────── //
 
 async function _fetch(req: Parameters<typeof fetchWithJar>[1]): Promise<HttpResponse> {

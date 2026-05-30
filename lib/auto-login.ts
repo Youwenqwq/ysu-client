@@ -51,24 +51,20 @@ export async function tryAutoLogin(): Promise<boolean> {
         const store = useMFAModalStore.getState();
 
         try {
-          const code = await store.showMFA({ username: remembered.username });
-
-          // WeChat MFA completed in the modal (credential already saved).
-          if (!code) {
+          const result = await store.showMFA({ username: remembered.username });
+          if (result.type === "wechat") {
             await initSDK();
             return true;
           }
-
-          const { mfaMethod, methodCode } = useMFAModalStore.getState();
           const credential = await submitMFACode(
             {
-              method: mfaMethod as "sms" | "cpdaily",
-              methodCode,
+              method: result.method,
+              methodCode: result.methodCode,
               mobileHint: "",
               username: remembered.username,
               raw: {},
             },
-            code,
+            result.code,
           );
           const json = credential.toJSON();
           useAuthStore.getState().setCredential(json, remembered.username);

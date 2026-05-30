@@ -3,28 +3,38 @@ import { create } from "zustand";
 interface MFAModalState {
   open: boolean;
   username: string;
-  mobileHint: string;
-  methodCode: string;
-  mfaMethod: "sms" | "cpdaily" | "weixin";
-  resolve: ((value: string) => void) | null;
+  resolve: ((value: {
+    type: "code";
+    method: "sms" | "cpdaily";
+    methodCode: string;
+    code: string;
+  } | {
+    type: "wechat";
+  }) => void) | null;
   reject: (() => void) | null;
   showMFA: (opts: {
     username: string;
     method?: "sms" | "cpdaily" | "weixin";
-  }) => Promise<string>;
-  setMethodInfo: (method: "sms" | "cpdaily" | "weixin", methodCode: string, mobileHint: string) => void;
-  submitMFA: (code: string) => void;
+  }) => Promise<{
+    type: "code";
+    method: "sms" | "cpdaily";
+    methodCode: string;
+    code: string;
+  } | {
+    type: "wechat";
+  }>;
+  submitMFA: (payload: {
+    method: "sms" | "cpdaily";
+    methodCode: string;
+    code: string;
+  }) => void;
   completeWechatMFA: () => void;
   cancelMFA: () => void;
-  resetState: () => void;
 }
 
 export const useMFAModalStore = create<MFAModalState>((set, get) => ({
   open: false,
   username: "",
-  mobileHint: "",
-  methodCode: "",
-  mfaMethod: "weixin",
   resolve: null,
   reject: null,
 
@@ -33,27 +43,20 @@ export const useMFAModalStore = create<MFAModalState>((set, get) => ({
       set({
         open: true,
         username: opts.username,
-        methodCode: "",
-        mobileHint: "",
-        mfaMethod: opts.method ?? "weixin",
         resolve,
         reject,
       });
     }),
 
-  setMethodInfo: (method, methodCode, mobileHint) => {
-    set({ mfaMethod: method, methodCode, mobileHint });
-  },
-
-  submitMFA: (code) => {
+  submitMFA: (payload) => {
     const { resolve } = get();
-    if (resolve) resolve(code);
+    if (resolve) resolve({ type: "code", ...payload });
     set({ open: false, resolve: null, reject: null });
   },
 
   completeWechatMFA: () => {
     const { resolve } = get();
-    if (resolve) resolve('');
+    if (resolve) resolve({ type: "wechat" });
     set({ open: false, resolve: null, reject: null });
   },
 
@@ -61,17 +64,5 @@ export const useMFAModalStore = create<MFAModalState>((set, get) => ({
     const { reject } = get();
     if (reject) reject();
     set({ open: false, resolve: null, reject: null });
-  },
-
-  resetState: () => {
-    set({
-      open: false,
-      username: "",
-      mobileHint: "",
-      methodCode: "",
-      mfaMethod: "weixin",
-      resolve: null,
-      reject: null,
-    });
   },
 }));

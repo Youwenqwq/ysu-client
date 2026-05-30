@@ -8,6 +8,7 @@ import {
   restoreCredential,
   resetCAS,
   restoreCASCookies,
+  logoutCAS,
   getJar as getCasJar,
 } from "./cas";
 import {
@@ -29,7 +30,6 @@ import { useRefreshStore } from "./refresh-store";
 import { isCapacitor } from "./platform";
 import { stopNotify } from "./notify";
 import { removeCASTGC } from "./secure-storage";
-import { useMFAModalStore } from "./mfa-modal-store";
 
 /** 从 auth-store 恢复 CAS 凭据、JWXT 会话和 mobile 会话到各自的 jar。 */
 export async function initSDK(): Promise<void> {
@@ -133,11 +133,18 @@ async function cleanOtaArtifacts(): Promise<void> {
 
 /** 重置所有 SDK 状态(登出时调用)。 */
 export function resetSDK(): void {
+  void (async () => {
+    try {
+      await logoutCAS();
+    } catch {
+      // 忽略 CAS 服务端登出失败
+    } finally {
+      await removeCASTGC().catch(() => {});
+    }
+  })();
   resetCAS();
   resetJWXT();
   resetMobileAuth();
-  useMFAModalStore.getState().resetState();
-  void removeCASTGC();
   clearAllCache();
   useRefreshStore.setState({ count: 0, stale: 0 });
   // Stop all notification services on logout
