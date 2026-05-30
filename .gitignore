@@ -22,6 +22,12 @@
 /android/*
 !/android/build.gradle
 !/android/variables.gradle
+!/android/gradle/
+/android/gradle/*
+!/android/gradle/wrapper/
+!/android/gradlew
+!/android/gradlew.bat
+!/android/settings.gradle
 !/android/app/
 /android/app/*
 !/android/app/build.gradle
