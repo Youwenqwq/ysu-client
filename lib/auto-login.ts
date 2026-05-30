@@ -25,10 +25,9 @@ export async function tryAutoLogin(): Promise<boolean> {
 
   inflightAutoLogin = (async () => {
     try {
-      await prepareLogin();
-
       resetCAS();
       resetJWXT();
+      await prepareLogin();
 
       if (await checkCaptchaNeeded(remembered.username)) {
         toast.error(getText("autoLogin.captchaRequired"));

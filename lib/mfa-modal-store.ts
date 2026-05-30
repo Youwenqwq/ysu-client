@@ -16,6 +16,7 @@ interface MFAModalState {
   submitMFA: (code: string) => void;
   completeWechatMFA: () => void;
   cancelMFA: () => void;
+  resetState: () => void;
 }
 
 export const useMFAModalStore = create<MFAModalState>((set, get) => ({
@@ -60,5 +61,17 @@ export const useMFAModalStore = create<MFAModalState>((set, get) => ({
     const { reject } = get();
     if (reject) reject();
     set({ open: false, resolve: null, reject: null });
+  },
+
+  resetState: () => {
+    set({
+      open: false,
+      username: "",
+      mobileHint: "",
+      methodCode: "",
+      mfaMethod: "weixin",
+      resolve: null,
+      reject: null,
+    });
   },
 }));

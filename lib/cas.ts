@@ -352,6 +352,8 @@ export function setTimeoutMs(ms: number): void {
 export function resetCAS(): void {
   casJar = new SimpleCookieJar();
   credentialApplied = Promise.resolve();
+  loginPageCache = null;
+  loginPageInflight = null;
 }
 
 export async function restoreCredential(credential: CASCredential): Promise<void> {
