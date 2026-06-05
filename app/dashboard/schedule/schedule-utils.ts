@@ -69,7 +69,10 @@ export function isCourseActiveInWeek(course: Course, week: number): boolean {
 
 export function coursesSignature(courses: Course[]): string {
   return courses
-    .map((c) => `${c.code ?? ""}|${c.name ?? ""}|${c.teacher ?? ""}|${c.classroom ?? ""}`)
+    .map(
+      (c) =>
+        `${c.code ?? ""}|${c.name ?? ""}|${c.teacher ?? ""}|${c.classroom ?? ""}|${c.start_section}|${c.end_section}`,
+    )
     .sort()
     .join("\n");
 }
