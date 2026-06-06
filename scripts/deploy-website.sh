@@ -44,19 +44,45 @@ EOF
   echo "Announcement saved."
 }
 
-# Fetch latest OTA files from GitHub release so download page keeps working
-echo "Fetching latest OTA files from GitHub release..."
-LATEST_TAG=$(gh release list --repo "$REPO" --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || true)
+TMP_RELEASE_DIR=""
+cleanup() {
+  [[ -n "${TMP_RELEASE_DIR:-}" ]] && rm -rf "$TMP_RELEASE_DIR"
+}
+trap cleanup EXIT
+
+# Fetch latest stable OTA files from GitHub release so download page keeps working.
+# Prerelease bundles are versioned as dist-<version>.zip and are preserved locally.
+echo "Fetching latest stable OTA files from GitHub release..."
+LATEST_TAG=$(gh api "repos/${REPO}/releases/latest" -q '.tag_name' 2>/dev/null || true)
 
 if [[ -n "${LATEST_TAG:-}" ]]; then
   mkdir -p website/public/updates
-  # Remove old OTA files before downloading fresh ones
-  rm -f website/public/updates/dist.zip website/public/updates/app-release.apk website/public/updates/version.json
+  TMP_RELEASE_DIR=$(mktemp -d)
   gh release download "$LATEST_TAG" --repo "$REPO" \
     --pattern "dist.zip" --pattern "app-release.apk" --pattern "version.json" \
-    --dir website/public/updates/ 2>/dev/null || true
+    --dir "$TMP_RELEASE_DIR" 2>/dev/null || true
+
+  [[ -f "$TMP_RELEASE_DIR/dist.zip" ]] && cp "$TMP_RELEASE_DIR/dist.zip" website/public/updates/dist.zip
+  [[ -f "$TMP_RELEASE_DIR/app-release.apk" ]] && cp "$TMP_RELEASE_DIR/app-release.apk" website/public/updates/app-release.apk
+
+  if [[ -f "$TMP_RELEASE_DIR/version.json" ]]; then
+    if [[ -f website/public/updates/version.json ]]; then
+      jq -s '
+        .[0] as $fresh |
+        .[1] as $existing |
+        if ($existing.channels.prerelease? != null) then
+          $fresh | .channels = ((.channels // {}) + { prerelease: $existing.channels.prerelease })
+        else
+          $fresh
+        end
+      ' "$TMP_RELEASE_DIR/version.json" website/public/updates/version.json > "$TMP_RELEASE_DIR/version-merged.json"
+      cp "$TMP_RELEASE_DIR/version-merged.json" website/public/updates/version.json
+    else
+      cp "$TMP_RELEASE_DIR/version.json" website/public/updates/version.json
+    fi
+  fi
 else
-  echo "Warning: no GitHub release found, skipping OTA files."
+  echo "Warning: no stable GitHub release found, skipping OTA files."
 fi
 
 # Announcement management

@@ -51,7 +51,7 @@ import {
   APP_OPEN_SOURCE,
   APP_PEOPLE,
 } from "@/lib/version";
-import { UPDATE_MIRRORS } from "@/lib/updater";
+import { UPDATE_MIRRORS, type UpdateChannel } from "@/lib/updater";
 
 type UpdateState = "idle" | "checking" | "up-to-date" | "error";
 
@@ -66,7 +66,9 @@ export function AboutContent() {
   const [showMirrorDialog, setShowMirrorDialog] = useState(false);
 
   const updateMirror = useSettingsStore((s) => s.updateMirror);
+  const updateChannel = useSettingsStore((s) => s.updateChannel);
   const setUpdateMirror = useSettingsStore((s) => s.setUpdateMirror);
+  const setUpdateChannel = useSettingsStore((s) => s.setUpdateChannel);
   const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus);
   const setUpdateInfo = useUpdateStore((s) => s.setUpdateInfo);
   const setShowDialog = useUpdateStore((s) => s.setShowDialog);
@@ -74,6 +76,7 @@ export function AboutContent() {
   // Dialog-local state
   const [dialogPreset, setDialogPreset] = useState("");
   const [dialogCustomValue, setDialogCustomValue] = useState("");
+  const [dialogChannel, setDialogChannel] = useState<UpdateChannel>("stable");
 
   // Feedback state
   const [showFeedback, setShowFeedback] = useState(false);
@@ -108,6 +111,7 @@ export function AboutContent() {
       setDialogPreset("__custom__");
       setDialogCustomValue(updateMirror);
     }
+    setDialogChannel(updateChannel);
     setShowMirrorDialog(true);
   }
 
@@ -119,6 +123,7 @@ export function AboutContent() {
         dialogPreset === "__direct__" ? "" : dialogPreset,
       );
     }
+    setUpdateChannel(dialogChannel);
     setShowMirrorDialog(false);
   }
 
@@ -126,7 +131,7 @@ export function AboutContent() {
     setState("checking");
     try {
       const { checkForUpdate } = await import("@/lib/updater");
-      const info = await checkForUpdate(false, updateMirror);
+      const info = await checkForUpdate(false, updateMirror, updateChannel);
       setUpdateStatus(info.available || info.apkUpdateAvailable);
       if (info.apkUpdateAvailable || info.available) {
         setUpdateInfo(info);
@@ -144,7 +149,7 @@ export function AboutContent() {
       }
       setState("error");
     }
-  }, [setUpdateStatus, setUpdateInfo, setShowDialog, t, updateMirror]);
+  }, [setUpdateStatus, setUpdateInfo, setShowDialog, t, updateMirror, updateChannel]);
 
   const handleReset = useCallback(async () => {
     try {
@@ -396,6 +401,33 @@ export function AboutContent() {
                 className="text-xs"
               />
             )}
+            <Separator />
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium">{t("update.channel")}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t("update.channelDesc")}
+                </span>
+              </div>
+              <ToggleGroup
+                type="single"
+                value={dialogChannel}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  setDialogChannel(v as UpdateChannel);
+                }}
+                variant="outline"
+                size="sm"
+                className="flex flex-wrap"
+              >
+                <ToggleGroupItem value="stable" className="text-xs">
+                  {t("update.channelStable")}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="prerelease" className="text-xs">
+                  {t("update.channelPrerelease")}
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
           </div>
           <Separator />
           <div className="flex items-center justify-between">

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { UpdateChannel } from "./updater";
 
 export type CardStyle = "solid" | "translucent" | "glass";
 export type BackgroundStyle = "overlay" | "blur-overlay";
@@ -19,6 +20,7 @@ export interface FeedbackHistoryItem {
 
 interface SettingsState {
   updateMirror: string;
+  updateChannel: UpdateChannel;
   backgroundImage: string;
   backgroundOverlayOpacity: number;
   backgroundStyle: BackgroundStyle;
@@ -48,6 +50,7 @@ interface SettingsState {
   feedbackHistory: FeedbackHistoryItem[];
   hasHydrated: boolean;
   setUpdateMirror: (mirror: string) => void;
+  setUpdateChannel: (channel: UpdateChannel) => void;
   setBackgroundImage: (image: string) => void;
   setBackgroundOverlayOpacity: (opacity: number) => void;
   setBackgroundStyle: (style: BackgroundStyle) => void;
@@ -82,6 +85,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       updateMirror: "https://ysu.welain.com/updates/",
+      updateChannel: "stable",
       backgroundImage: "",
       backgroundOverlayOpacity: 75,
       backgroundStyle: "overlay",
@@ -111,6 +115,7 @@ export const useSettingsStore = create<SettingsState>()(
       feedbackHistory: [],
       hasHydrated: false,
       setUpdateMirror: (updateMirror) => set({ updateMirror }),
+      setUpdateChannel: (updateChannel) => set({ updateChannel }),
       setBackgroundImage: (backgroundImage) => set({ backgroundImage }),
       setBackgroundOverlayOpacity: (backgroundOverlayOpacity) => set({ backgroundOverlayOpacity }),
       setBackgroundStyle: (backgroundStyle) => set({ backgroundStyle }),

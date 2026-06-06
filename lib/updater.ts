@@ -1,7 +1,10 @@
 import { CapacitorUpdater } from "@capgo/capacitor-updater";
 import { App } from "@capacitor/app";
 import { registerPlugin } from "@capacitor/core";
+import { clean, compare, gt, prerelease, valid } from "semver";
 import { APP_VERSION } from "./version";
+
+export type UpdateChannel = "stable" | "prerelease";
 
 export interface UpdateInfo {
   available: boolean;
@@ -15,6 +18,23 @@ export interface UpdateInfo {
 export interface UpdateMirror {
   label: string;
   value: string;
+}
+
+interface VersionManifestEntry {
+  webVersion?: string;
+  webDownloadUrl?: string;
+  apkVersionCode?: number;
+  apkDownloadUrl?: string;
+  body?: string;
+}
+
+interface VersionManifest extends VersionManifestEntry {
+  channels?: Partial<Record<UpdateChannel, VersionManifestEntry>>;
+}
+
+interface UpdateCandidate extends VersionManifestEntry {
+  webVersion: string;
+  normalizedVersion: string;
 }
 
 const OFFICIAL_BASE = "https://ysu.welain.com/updates/";
@@ -32,15 +52,26 @@ export const UPDATE_MIRRORS: readonly UpdateMirror[] = [
   { label: "GitHub 直连", value: "" },
 ];
 
-/** Compare two semver strings (major.minor.patch). Returns true if target > current. */
-export function isNewer(current: string, target: string): boolean {
-  const c = current.split(".").map(Number);
-  const t = target.split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((t[i] ?? 0) > (c[i] ?? 0)) return true;
-    if ((t[i] ?? 0) < (c[i] ?? 0)) return false;
-  }
-  return false;
+function normalizeVersion(version: string): string | null {
+  const trimmed = version.trim();
+  return valid(trimmed) ?? clean(trimmed) ?? null;
+}
+
+function isAllowedTarget(version: string, channel: UpdateChannel): boolean {
+  return channel === "prerelease" || prerelease(version) === null;
+}
+
+/** Compare two semver strings. Returns true if target > current for the channel. */
+export function isNewer(
+  current: string,
+  target: string,
+  channel: UpdateChannel = "stable",
+): boolean {
+  const currentVersion = normalizeVersion(current);
+  const targetVersion = normalizeVersion(target);
+  if (!currentVersion || !targetVersion) return false;
+  if (!isAllowedTarget(targetVersion, channel)) return false;
+  return gt(targetVersion, currentVersion);
 }
 
 const EMPTY_RESULT: UpdateInfo = {
@@ -76,6 +107,18 @@ function getDistZipUrl(mirrorPrefix: string): string {
   return `${mirrorPrefix}${GITHUB_RELEASE_BASE}/${ASSET_NAME}`;
 }
 
+function getWebDownloadUrl(
+  mirrorPrefix: string,
+  webDownloadUrl: string | undefined,
+  fallbackUrl: string,
+): string {
+  if (!webDownloadUrl) return fallbackUrl;
+  if (mirrorPrefix && !isOfficialSource(mirrorPrefix) && webDownloadUrl.startsWith("https://github.com/")) {
+    return `${mirrorPrefix}${webDownloadUrl}`;
+  }
+  return webDownloadUrl;
+}
+
 function getApkUrl(mirrorPrefix: string, githubUrl: string): string {
   if (isOfficialSource(mirrorPrefix)) {
     return `${OFFICIAL_BASE}${APK_NAME}`;
@@ -86,13 +129,68 @@ function getApkUrl(mirrorPrefix: string, githubUrl: string): string {
   return `${mirrorPrefix}${githubUrl}`;
 }
 
+function toTopLevelEntry(data: VersionManifest): VersionManifestEntry {
+  return {
+    webVersion: data.webVersion,
+    webDownloadUrl: data.webDownloadUrl,
+    apkVersionCode: data.apkVersionCode,
+    apkDownloadUrl: data.apkDownloadUrl,
+    body: data.body,
+  };
+}
+
+function getChannelCandidates(
+  data: VersionManifest,
+  channel: UpdateChannel,
+): UpdateCandidate[] {
+  const topLevel = toTopLevelEntry(data);
+  const stable = data.channels?.stable
+    ? { ...topLevel, ...data.channels.stable }
+    : topLevel;
+  const entries = channel === "stable"
+    ? [stable]
+    : [stable, data.channels?.prerelease];
+
+  return entries.flatMap((entry) => {
+    if (!entry?.webVersion) return [];
+    const normalizedVersion = normalizeVersion(entry.webVersion);
+    if (!normalizedVersion || !isAllowedTarget(normalizedVersion, channel)) {
+      return [];
+    }
+    return [{ ...entry, webVersion: entry.webVersion, normalizedVersion }];
+  });
+}
+
+function getHighestVersionCandidate(candidates: UpdateCandidate[]): UpdateCandidate | undefined {
+  const sorted = [...candidates].sort((a, b) =>
+    compare(a.normalizedVersion, b.normalizedVersion),
+  );
+  return sorted[sorted.length - 1];
+}
+
+async function getApkUpdateCandidate(
+  candidates: UpdateCandidate[],
+): Promise<UpdateCandidate | undefined> {
+  const installed = await App.getInfo();
+  const installedBuild = Number(installed.build);
+  const sorted = candidates
+    .filter(
+      (candidate) =>
+        typeof candidate.apkVersionCode === "number" &&
+        candidate.apkVersionCode > installedBuild,
+    )
+    .sort((a, b) => (a.apkVersionCode ?? 0) - (b.apkVersionCode ?? 0));
+  return sorted[sorted.length - 1];
+}
+
 /** Check for a newer version. Respects 30-min cooldown when `auto` is true. */
 export async function checkForUpdate(
   auto = false,
   mirrorPrefix = OFFICIAL_BASE,
+  channel: UpdateChannel = "stable",
 ): Promise<UpdateInfo> {
   if (auto) {
-    const last = localStorage.getItem(LAST_CHECK_KEY);
+    const last = localStorage.getItem(`${LAST_CHECK_KEY}:${channel}`);
     if (last && Date.now() - Number(last) < CHECK_COOLDOWN_MS) {
       return EMPTY_RESULT;
     }
@@ -111,41 +209,50 @@ export async function checkForUpdate(
       throw new Error(`HTTP ${res.status}`);
     }
 
-    const data = await res.json() as {
-      webVersion?: string;
-      apkVersionCode?: number;
-      apkDownloadUrl?: string;
-      body?: string;
-    };
-    const version = data.webVersion ?? "";
-    if (!version) {
+    const data = await res.json() as VersionManifest;
+    const candidates = getChannelCandidates(data, channel);
+    if (!candidates.length) {
       return EMPTY_RESULT;
     }
 
     if (auto) {
-      localStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
+      localStorage.setItem(`${LAST_CHECK_KEY}:${channel}`, String(Date.now()));
+    }
+
+    const webUpdateCandidate = getHighestVersionCandidate(
+      candidates.filter((candidate) =>
+        isNewer(APP_VERSION, candidate.webVersion, channel),
+      ),
+    );
+    const displayCandidate = webUpdateCandidate ?? getHighestVersionCandidate(candidates);
+    if (!displayCandidate) {
+      return EMPTY_RESULT;
     }
 
     const result: UpdateInfo = {
-      available: isNewer(APP_VERSION, version),
-      version,
-      downloadUrl: distZipUrl,
-      body: data.body ?? "",
+      available: Boolean(webUpdateCandidate),
+      version: displayCandidate.webVersion,
+      downloadUrl: getWebDownloadUrl(
+        mirrorPrefix,
+        displayCandidate.webDownloadUrl,
+        distZipUrl,
+      ),
+      body: displayCandidate.body ?? "",
       apkUpdateAvailable: false,
       apkDownloadUrl: "",
     };
 
-    if (typeof data.apkVersionCode === "number") {
-      const installed = await App.getInfo();
-      if (data.apkVersionCode > Number(installed.build)) {
-        result.apkUpdateAvailable = true;
-        result.apkDownloadUrl = data.apkDownloadUrl
-          ? getApkUrl(mirrorPrefix, data.apkDownloadUrl)
-          : "";
-        // If APK needs update, web update is moot — force APK-only flow
-        if (result.apkUpdateAvailable && result.available) {
-          result.available = false;
-        }
+    const apkUpdateCandidate = await getApkUpdateCandidate(candidates);
+    if (apkUpdateCandidate) {
+      result.version = apkUpdateCandidate.webVersion;
+      result.body = apkUpdateCandidate.body ?? "";
+      result.apkUpdateAvailable = true;
+      result.apkDownloadUrl = apkUpdateCandidate.apkDownloadUrl
+        ? getApkUrl(mirrorPrefix, apkUpdateCandidate.apkDownloadUrl)
+        : "";
+      // If APK needs update, web update is moot — force APK-only flow
+      if (result.available) {
+        result.available = false;
       }
     }
 

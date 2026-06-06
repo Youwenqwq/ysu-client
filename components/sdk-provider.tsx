@@ -28,6 +28,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const settingsHydrated = useSettingsStore((s) => s.hasHydrated);
   const updateMirror = useSettingsStore((s) => s.updateMirror);
+  const updateChannel = useSettingsStore((s) => s.updateChannel);
   const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus);
   const didInit = useRef(false);
   const [sdkReady, setSdkReady] = useState(false);
@@ -36,7 +37,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
   const performUpdateCheck = useCallback(async () => {
     if (!isCapacitor()) return;
     const { checkForUpdate } = await import("@/lib/updater");
-    const info = await checkForUpdate(true, updateMirror);
+    const info = await checkForUpdate(true, updateMirror, updateChannel);
     const hasUpdate = info.available || info.apkUpdateAvailable;
     setUpdateStatus(hasUpdate);
     if (hasUpdate) {
@@ -44,7 +45,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
       setUpdateInfo(info);
       setShowDialog(true);
     }
-  }, [updateMirror, setUpdateStatus]);
+  }, [updateMirror, updateChannel, setUpdateStatus]);
 
   const checkAnnouncementsThenUpdates = useCallback(async () => {
     const info = await checkAnnouncement();
@@ -149,7 +150,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
         // false alarms caused by transient network issues.
         setSdkReady(true);
       });
-  }, [hasHydrated, settingsHydrated, setUpdateStatus, t, updateMirror, checkAnnouncementsThenUpdates]);
+  }, [hasHydrated, settingsHydrated, setUpdateStatus, t, updateMirror, updateChannel, checkAnnouncementsThenUpdates]);
 
   if (!hasHydrated || !settingsHydrated || !sdkReady) {
     return (
