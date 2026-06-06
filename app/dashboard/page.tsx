@@ -2,49 +2,48 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAuthStore } from "@/lib/auth-store";
 import { useSettingsStore } from "@/lib/settings-store";
 import { useTranslation } from "@/lib/i18n/use-translation";
-import { getStudentInfo, getCurrentWeek, getGPAStats, getExperimentalSchedule, getExams, getClassPeriods } from "@/lib/api";
-import { useCachedData, LONG_TTL_MS } from "@/lib/use-cached-data";
+import {
+  useClassPeriods,
+  useCurrentWeek,
+  useExams,
+  useGPAStats,
+  useSchedule,
+  useStudentInfo,
+} from "@/providers/hooks";
 import { cn } from "@/lib/utils";
-import { isCourseActiveInWeek, buildSectionTimeMap, isCoursePast } from "@/app/dashboard/schedule/schedule-utils";
+import {
+  buildSectionTimeMap,
+  courseEndSection,
+  courseStartSection,
+  courseWeekDay,
+  isCourseActiveInWeek,
+  isCoursePast,
+  periodIsInUse,
+} from "@/app/dashboard/schedule/schedule-utils";
 import { syncScheduleToWidget, syncExamsToWidget } from "@/lib/widget-bridge";
 import { syncClassAlarmsToNative } from "@/lib/notify";
-import type { StudentInfo, CurrentWeek, GPAStats, Course, Exam, ClassPeriod } from "@/lib/types";
+import type { Course, Exam } from "@/providers/types";
 import { Calendar, GraduationCap, BarChart3, Clock, BookOpen, Eye, EyeOff } from "lucide-react";
 
 function isCourseActiveToday(course: Course, currentWeek: number, currentWeekday: number): boolean {
-  if (course.week_day !== currentWeekday) return false;
+  if (courseWeekDay(course) !== currentWeekday) return false;
   return isCourseActiveInWeek(course, currentWeek);
 }
 
-async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 800): Promise<T> {
-  let lastErr: unknown;
-  for (let i = 0; i <= retries; i++) {
-    try {
-      return await fn();
-    } catch (e) {
-      lastErr = e;
-      if (i < retries) {
-        await new Promise((r) => setTimeout(r, delay * (i + 1)));
-      }
-    }
-  }
-  throw lastErr;
-}
-
 function getExamEndTime(exam: Exam): Date | null {
-  if (!exam.exam_date) return null;
-  const base = new Date(exam.exam_date.replace(/-/g, "/"));
+  if (!exam.examDate) return null;
+  const base = new Date(exam.examDate.replace(/-/g, "/"));
   if (Number.isNaN(base.getTime())) return null;
 
-  if (exam.exam_time) {
-    const times = exam.exam_time.match(/\d{1,2}:\d{2}/g);
+  if (exam.examTime) {
+    const times = exam.examTime.match(/\d{1,2}:\d{2}/g);
     if (times && times.length >= 2) {
       const [h, m] = times[times.length - 1].split(":").map(Number);
       base.setHours(h, m, 0, 0);
@@ -61,59 +60,46 @@ function getExamEndTime(exam: Exam): Date | null {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const credential = useAuthStore((s) => s.credential);
   const avatarImage = useSettingsStore((s) => s.avatarImage);
+  const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours);
+  const widgetShowNextDaySchedule = useSettingsStore((s) => s.widgetShowNextDaySchedule);
   const { t } = useTranslation();
   const [showGPA, setShowGPA] = useState(false);
 
-  const student = useCachedData<StudentInfo>(["student", credential], {
-    fetch: () => withRetry(() => getStudentInfo()),
-    ttl: LONG_TTL_MS,
-  });
+  const student = useStudentInfo();
+  const currentWeek = useCurrentWeek();
+  const gpa = useGPAStats();
+  const schedule = useSchedule({ courseCategory: "all", includeLabSchedule: true });
+  const exams = useExams();
+  const periodsRaw = useClassPeriods();
 
-  const currentWeek = useCachedData<CurrentWeek>(["week", credential], {
-    fetch: () => withRetry(() => getCurrentWeek(credential!)),
-    fallback: () => null,
-  });
-
-  const gpa = useCachedData<GPAStats>(["gpa", credential], {
-    fetch: () => withRetry(() => getGPAStats(credential!)),
-    fallback: () => null,
-  });
-
-  const courses = useCachedData<Course[]>(["schedule", credential], {
-    fetch: () => withRetry(() => getExperimentalSchedule(credential!, undefined, "all")),
-    fallback: () => null,
-  });
-
-  const exams = useCachedData<Exam[]>(["exams", credential], {
-    fetch: () => withRetry(() => getExams(credential!)),
-    fallback: () => null,
-  });
-
-  const periodsRaw = useCachedData<ClassPeriod[]>(["periods", credential], {
-    fetch: () => withRetry(() => getClassPeriods()),
-    fallback: () => null,
-  });
-
+  const courses = useMemo(() => schedule.data ?? [], [schedule.data]);
+  const examRows = useMemo(() => exams.data ?? [], [exams.data]);
   const periods = useMemo(() => {
     if (!periodsRaw.data) return [];
-    return periodsRaw.data.filter((x) => x.is_in_use).sort((a, b) => a.section - b.section);
+    return periodsRaw.data.filter(periodIsInUse).sort((a, b) => a.section - b.section);
   }, [periodsRaw.data]);
 
-  const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours);
-  const widgetShowNextDaySchedule = useSettingsStore((s) => s.widgetShowNextDaySchedule);
+  const errors = useMemo(
+    () => [student.error, currentWeek.error, gpa.error, schedule.error, exams.error, periodsRaw.error].filter(Boolean),
+    [student.error, currentWeek.error, gpa.error, schedule.error, exams.error, periodsRaw.error],
+  );
+
+  useEffect(() => {
+    if (errors.length === 0) return;
+    toast.error(errors[0]?.message || t("app.updating"));
+  }, [errors, t]);
 
   // Sync courses to widget when fresh data arrives
   const activeCoursesForWidget = useMemo(() => {
-    if (!currentWeek.data || !courses.data) return null;
-    return courses.data.filter((c) => isCourseActiveInWeek(c, currentWeek.data!.week));
-  }, [courses.data, currentWeek.data]);
+    if (!currentWeek.data || !schedule.data) return null;
+    return schedule.data.filter((c) => isCourseActiveInWeek(c, currentWeek.data!.week));
+  }, [schedule.data, currentWeek.data]);
 
   useEffect(() => {
     if (activeCoursesForWidget) {
-      syncScheduleToWidget(activeCoursesForWidget, currentWeek.data, periods, widgetSyncReminderHours, widgetShowNextDaySchedule).catch(() => {});
-      syncClassAlarmsToNative(activeCoursesForWidget, currentWeek.data, periods).catch(() => {});
+      syncScheduleToWidget(activeCoursesForWidget, currentWeek.data ?? null, periods, widgetSyncReminderHours, widgetShowNextDaySchedule).catch(() => {});
+      syncClassAlarmsToNative(activeCoursesForWidget, currentWeek.data ?? null, periods).catch(() => {});
     }
   }, [activeCoursesForWidget, currentWeek.data, periods, widgetSyncReminderHours, widgetShowNextDaySchedule]);
 
@@ -124,37 +110,37 @@ export default function DashboardPage() {
     }
   }, [exams.data, widgetSyncReminderHours]);
 
-  const hooks = [student, currentWeek, gpa, courses, exams, periodsRaw];
-  const anyLoading = hooks.some((h) => h.loading);
+  const hooks = [student, currentWeek, gpa, schedule, exams, periodsRaw];
+  const anyLoading = hooks.some((h) => h.isLoading);
   const hasAnyData = hooks.some((h) => h.data != null);
 
   const todayCourses = useMemo(() => {
     if (!currentWeek.data) return [];
-    return (courses.data ?? [])
+    return courses
       .filter((c) => isCourseActiveToday(c, currentWeek.data!.week, currentWeek.data!.weekday))
-      .sort((a, b) => a.start_section - b.start_section);
-  }, [courses.data, currentWeek.data]);
+      .sort((a, b) => courseStartSection(a) - courseStartSection(b));
+  }, [courses, currentWeek.data]);
 
   const upcomingExams = useMemo(() => {
     const now = new Date();
-    return (exams.data ?? [])
+    return examRows
       .filter((e) => {
         const end = getExamEndTime(e);
         if (!end) return false;
         return end >= now;
       })
       .sort((a, b) => {
-        const da = new Date((a.exam_date || "").replace(/-/g, "/")).getTime();
-        const db = new Date((b.exam_date || "").replace(/-/g, "/")).getTime();
+        const da = new Date((a.examDate || "").replace(/-/g, "/")).getTime();
+        const db = new Date((b.examDate || "").replace(/-/g, "/")).getTime();
         if (da !== db) return da - db;
-        const ta = a.exam_time?.match(/\d{1,2}:\d{2}/g);
-        const tb = b.exam_time?.match(/\d{1,2}:\d{2}/g);
+        const ta = a.examTime?.match(/\d{1,2}:\d{2}/g);
+        const tb = b.examTime?.match(/\d{1,2}:\d{2}/g);
         const ha = ta ? parseInt(ta[0], 10) : 0;
         const hb = tb ? parseInt(tb[0], 10) : 0;
         return ha - hb;
       })
       .slice(0, 3);
-  }, [exams.data]);
+  }, [examRows]);
 
   const [nowMinutes, setNowMinutes] = useState(() => {
     const now = new Date();
@@ -174,7 +160,7 @@ export default function DashboardPage() {
   const currentCourse = useMemo(() => {
     if (Object.keys(timeMap).length === 0) return null;
     for (const c of todayCourses) {
-      for (let s = c.start_section; s <= c.end_section; s++) {
+      for (let s = courseStartSection(c); s <= courseEndSection(c); s++) {
         const range = timeMap[s];
         if (range && nowMinutes >= range[0] && nowMinutes <= range[1]) {
           return c;
@@ -229,7 +215,7 @@ export default function DashboardPage() {
             </div>
             <span className="truncate text-xs text-muted-foreground">
               {currentWeek.data?.weekday ? t(`dashboard.weekdayNames.${currentWeek.data.weekday}`) : "-"}
-              {currentWeek.data?.term && ` · ${currentWeek.data.term}`}
+              {currentWeek.data?.semester && ` · ${currentWeek.data.semester}`}
             </span>
           </div>
           <button
@@ -247,7 +233,7 @@ export default function DashboardPage() {
               )}
             </div>
             <span className="truncate text-base font-semibold tabular-nums">
-              {showGPA ? gpa.data?.gpa_initial || "-" : "***"}
+              {showGPA ? gpa.data?.gpaInitial || "-" : "***"}
             </span>
           </button>
         </CardContent>
@@ -259,7 +245,7 @@ export default function DashboardPage() {
             <GraduationCap className="size-6 text-primary shrink-0" />
             <div className="min-w-0">
               <CardTitle className="text-base truncate">{student.data?.name || "-"}</CardTitle>
-              <CardDescription className="truncate">{student.data?.student_id || ""}</CardDescription>
+              <CardDescription className="truncate">{student.data?.studentId || ""}</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground truncate">
@@ -276,7 +262,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            {currentWeek.data?.term || ""}
+            {currentWeek.data?.semester || ""}
           </CardContent>
         </Card>
 
@@ -285,14 +271,14 @@ export default function DashboardPage() {
             <BarChart3 className="size-6 text-primary shrink-0" />
             <div>
               <CardTitle className="text-base">
-                {showGPA ? gpa.data?.gpa_initial || "-" : "***"}
+                {showGPA ? gpa.data?.gpaInitial || "-" : "***"}
               </CardTitle>
               <CardDescription>{t("dashboard.gpaInitial")}</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
             {showGPA
-              ? `${t("dashboard.weightedAvg")} ${gpa.data?.weighted_avg || "-"} · ${t("dashboard.arithmeticAvg")} ${gpa.data?.arithmetic_avg || "-"}`
+              ? `${t("dashboard.weightedAvg")} ${gpa.data?.weightedAvg || "-"} · ${t("dashboard.arithmeticAvg")} ${gpa.data?.arithmeticAvg || "-"}`
               : t("dashboard.gpaInitial")
             }
           </CardContent>
@@ -349,7 +335,7 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <Badge variant="outline" className="shrink-0">
-                      {t("dashboard.sectionRange", { start: c.start_section, end: c.end_section })}
+                      {t("dashboard.sectionRange", { start: courseStartSection(c), end: courseEndSection(c) })}
                     </Badge>
                   </div>
                 );
@@ -377,11 +363,11 @@ export default function DashboardPage() {
                   <div className="flex flex-col gap-0.5">
                     <span className="font-medium text-sm">{exam.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {exam.exam_time} · {exam.exam_location}
+                      {exam.examTime} · {exam.examLocation}
                     </span>
                   </div>
-                  {exam.seat_number && (
-                    <Badge variant="outline" className="shrink-0">{t("dashboard.seatNumber", { num: exam.seat_number })}</Badge>
+                  {exam.seatNumber && (
+                    <Badge variant="outline" className="shrink-0">{t("dashboard.seatNumber", { num: exam.seatNumber })}</Badge>
                   )}
                 </div>
               ))}

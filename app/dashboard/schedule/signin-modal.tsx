@@ -15,9 +15,8 @@ import {
   ResponsiveModalTitle,
 } from "@/components/responsive-modal";
 import { useTranslation } from "@/lib/i18n/use-translation";
-import { useAuthStore } from "@/lib/auth-store";
-import { getSigninDetail, getStudentSigninStatus, doStudentSign } from "@/lib/api";
-import type { SigninActivityDetail, StudentSigninStatus } from "@/lib/types";
+import { useProvider } from "@/providers/use-provider";
+import type { SigninActivityDetail, StudentSigninStatus } from "@/providers/types";
 import {
   CheckCircle2,
   XCircle,
@@ -38,7 +37,7 @@ interface Props {
 
 export function SigninModal({ activityId, signinType, open, onOpenChange }: Props) {
   const { t } = useTranslation();
-  const credential = useAuthStore((s) => s.credential);
+  const provider = useProvider();
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState<SigninActivityDetail | null>(null);
   const [status, setStatus] = useState<StudentSigninStatus | null>(null);
@@ -53,7 +52,7 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
   const codeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!open || !activityId || !credential) {
+    if (!open || !activityId || !provider.mobile) {
       setDetail(null);
       setStatus(null);
       setResult(null);
@@ -63,23 +62,23 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
     }
 
     async function load() {
-      if (!activityId || !credential) return;
+      if (!activityId || !provider.mobile) return;
       setLoading(true);
       try {
         const [d, s] = await Promise.all([
-          getSigninDetail(credential, {
-            activity_id: activityId,
+          provider.mobile.getSigninDetail({
+            activityId,
             title: t("activity.signin"),
           }),
-          getStudentSigninStatus(credential, {
-            activity_id: activityId,
+          provider.mobile.getStudentSigninStatus({
+            activityId,
             title: t("activity.signin"),
           }),
         ]);
         setDetail(d);
         setStatus(s);
-        if (d.left_seconds > 0) {
-          setCountdown(d.left_seconds);
+        if (d.leftSeconds > 0) {
+          setCountdown(d.leftSeconds);
         }
       } catch (err) {
         toast.error((err as Error).message || t("activity.loadFailed"));
@@ -88,7 +87,7 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
       }
     }
     load();
-  }, [open, activityId, credential, t]);
+  }, [open, activityId, provider.mobile, t]);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -105,26 +104,26 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
   }, [countdown]);
 
   async function handleSign(codeValue?: string) {
-    if (!activityId || !credential) return;
+    if (!activityId || !provider.mobile) return;
     setSigning(true);
     try {
-      const res = await doStudentSign(credential, {
-        activity_id: activityId,
+      const res = await provider.mobile.doStudentSign({
+        activityId,
         accuracy: 0,
         latitude: 0,
         longitude: 0,
         code: codeValue,
       });
-      if (res.sign_order > 0 || res.sign_status !== 0) {
+      if (res.signOrder > 0 || res.signStatus !== 0) {
         setResult({
           success: true,
-          rank: res.sign_order,
-          attendanceStatus: res.attendance_status,
+          rank: res.signOrder,
+          attendanceStatus: res.attendanceStatus,
         });
       } else {
         setResult({
           success: false,
-          attendanceStatus: res.attendance_status,
+          attendanceStatus: res.attendanceStatus,
         });
       }
     } catch (err) {
@@ -148,8 +147,8 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
     return `${m}:${String(s).padStart(2, "0")}`;
   }
 
-  const alreadySigned = status && status.sign_status !== 0;
-  const expired = detail && detail.left_seconds <= 0 && !alreadySigned;
+  const alreadySigned = status && status.signStatus !== 0;
+  const expired = detail && detail.leftSeconds <= 0 && !alreadySigned;
 
   return (
     <ResponsiveModal open={open} onOpenChange={onOpenChange}>
@@ -185,9 +184,9 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                   <CheckCircle2 className="size-12 text-green-500" />
                   <div className="text-center">
                     <p className="text-lg font-semibold">{t("activity.alreadySigned")}</p>
-                    {status.sign_order > 0 && status.sign_order !== 999999 && (
+                    {status.signOrder > 0 && status.signOrder !== 999999 && (
                       <p className="text-sm text-muted-foreground">
-                        {t("activity.signRank", { rank: status.sign_order })}
+                        {t("activity.signRank", { rank: status.signOrder })}
                       </p>
                     )}
                   </div>
