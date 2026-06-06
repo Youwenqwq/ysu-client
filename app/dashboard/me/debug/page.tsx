@@ -364,19 +364,6 @@ export default function DebugPage() {
     }
   }
 
-  async function handleNativeGetState() {
-    if (!isCapacitor()) {
-      logNative("非 Capacitor 平台，跳过");
-      return;
-    }
-    try {
-      const result = await NotifyPlugin.checkPermissions();
-      logNative(`权限状态: granted=${result.granted}`);
-    } catch (e) {
-      logNative(`获取状态失败: ${(e as Error).message}`);
-    }
-  }
-
   function handleNativeClearLog() {
     setNativeTestLog([]);
   }

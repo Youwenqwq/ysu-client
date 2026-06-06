@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Code,
   CircleFadingArrowUp,
@@ -186,12 +187,13 @@ export function AboutContent() {
             onClick={handleIconClick}
             className="size-24 overflow-hidden rounded-3xl shadow-sm ring-1 ring-border transition-transform active:scale-95"
           >
-            <img
+            <Image
               src="/icon.svg"
               alt="App icon"
               width={96}
               height={96}
               className="size-full dark:invert"
+              unoptimized
             />
           </button>
           <div className="flex flex-col items-center gap-1">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import {
   Dialog,
   DialogContent,
@@ -252,7 +253,7 @@ export function MFAModal() {
                   <FieldGroup>
                     {qrImageUrl && (
                       <div className="flex justify-center">
-                        <img src={qrImageUrl} alt="WeChat QR" className="size-40" />
+                        <Image src={qrImageUrl} alt="WeChat QR" width={160} height={160} className="size-40" unoptimized />
                       </div>
                     )}
                     <FieldDescription>
