@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useAuthStore } from "@/lib/stores/auth";
-import { startNotifyIfNeeded, stopNotify, syncServerConfigToNative } from "@/lib/native/notify";
+import { startNotifyIfNeeded, stopNotify } from "@/lib/native/notify";
 import { isCapacitor } from "@/lib/native/platform";
 import { useProvider } from "@/providers/use-provider";
 
@@ -17,7 +17,6 @@ export function NotifyProvider() {
 
   useEffect(() => {
     if (!isCapacitor() || !isAuthenticated || !nativeNotification) return;
-    syncServerConfigToNative(nativeNotification).catch(() => {});
     startNotifyIfNeeded(nativeNotification);
     return () => {
       stopNotify();

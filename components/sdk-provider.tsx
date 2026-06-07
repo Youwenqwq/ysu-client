@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { mutate } from "swr";
 import { toast } from "sonner";
-import { getActiveProvider, initializeActiveProvider } from "@/providers/provider-service";
+import { getActiveProvider, initializeActiveProvider, setActiveProviderSchool } from "@/providers/provider-service";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useSettingsStore } from "@/lib/stores/settings";
 import { useUpdateStore } from "@/lib/stores/update";
@@ -26,6 +26,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
   }, [locale]);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const settingsHydrated = useSettingsStore((s) => s.hasHydrated);
+  const schoolId = useSettingsStore((s) => s.schoolId);
   const updateMirror = useSettingsStore((s) => s.updateMirror);
   const updateChannel = useSettingsStore((s) => s.updateChannel);
   const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus);
@@ -84,6 +85,8 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
         CapacitorUpdater.notifyAppReady().catch(() => {});
       });
     }
+
+    setActiveProviderSchool(schoolId);
 
     initializeActiveProvider()
       .then(() => {
@@ -145,7 +148,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
         // Silently ignore non-auth errors during startup to avoid
         // false alarms caused by transient network issues.
       });
-  }, [hasHydrated, settingsHydrated, setUpdateStatus, t, updateMirror, updateChannel, checkAnnouncementsThenUpdates]);
+  }, [hasHydrated, settingsHydrated, schoolId, setUpdateStatus, t, updateMirror, updateChannel, checkAnnouncementsThenUpdates]);
 
   if (!hasHydrated || !settingsHydrated) {
     return (

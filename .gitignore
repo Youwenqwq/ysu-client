@@ -65,7 +65,6 @@ next-env.d.ts
 .claude/
 .agents/
 /docs/
-CLAUDE.md
 capacitor_*_*doc.md
 skills-lock.json
 
