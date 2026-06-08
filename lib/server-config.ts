@@ -10,6 +10,7 @@ import {
   DEFAULT_SCHOOL_ID,
   getSchoolConfigById,
   getVisibleSchoolConfigs,
+  registerSchoolConfig as registerBundledSchoolConfig,
 } from './school-configs';
 import type { SchoolConfig } from './school-configs/types';
 
@@ -73,6 +74,22 @@ export function getSchoolConfig(): SchoolConfig {
 
 export function getSchoolId(): string {
   return currentSchoolId;
+}
+
+export function getSchoolConfigScope(): string {
+  return JSON.stringify({
+    schoolId: currentSchoolId,
+    cerBaseUrl: serverConfig.cerBaseUrl,
+    jwxtBaseUrl: serverConfig.jwxtBaseUrl,
+  });
+}
+
+export function registerSchoolConfig(config: SchoolConfig): void {
+  registerBundledSchoolConfig(config);
+  if (config.id === currentSchoolId) {
+    currentSchoolConfig = config;
+    onSchoolConfigChanged();
+  }
 }
 
 export function isFeatureAvailable(feature: keyof SchoolConfig['features']): boolean {

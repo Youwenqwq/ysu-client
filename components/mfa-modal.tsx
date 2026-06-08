@@ -26,6 +26,7 @@ import {
 import { useMFAModalStore } from "@/lib/stores/mfa-modal";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { getActiveProvider } from "@/providers/provider-service";
+import type { YSUMfaMethod } from "@/providers/ysu";
 import { useAuthStore } from "@/lib/stores/auth";
 import { isTablet } from "@/lib/native/platform";
 import { toast } from "sonner";
@@ -40,7 +41,7 @@ export function MFAModal() {
     useMFAModalStore();
   const showWechat = isTablet();
   const defaultMethod = showWechat ? "weixin" : "sms";
-  const [mfaMethod, setMfaMethod] = useState<"sms" | "cpdaily" | "weixin">(defaultMethod);
+  const [mfaMethod, setMfaMethod] = useState<YSUMfaMethod>(defaultMethod);
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [localHint, setLocalHint] = useState("");
@@ -94,8 +95,7 @@ export function MFAModal() {
     requestingRef.current = true;
     setLoading(true);
     try {
-      const method = mfaMethod as "sms" | "cpdaily";
-      const res = await getActiveProvider().requestMfaCode({ username, method });
+      const res = await getActiveProvider().requestMfaCode({ username, method: mfaMethod });
       setLocalHint(res.mobileHint);
       setLocalMethodCode(res.methodCode);
       setCountdown(COUNTDOWN_SECONDS);
@@ -111,7 +111,7 @@ export function MFAModal() {
     e.preventDefault();
     if (!code || !localMethodCode || isWechat) return;
     submitMFA({
-      method: mfaMethod as "sms" | "cpdaily",
+      method: mfaMethod,
       methodCode: localMethodCode,
       code,
     });
@@ -190,7 +190,7 @@ export function MFAModal() {
   function handleMethodChange(v: string) {
     if (!v) return;
     pollingRef.current = false;
-    setMfaMethod(v as "sms" | "cpdaily" | "weixin");
+    setMfaMethod(v as YSUMfaMethod);
     setLocalMethodCode('');
     setLocalHint('');
     setCountdown(0);

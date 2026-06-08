@@ -5,7 +5,7 @@ interface MFAModalState {
   username: string;
   resolve: ((value: {
     type: "code";
-    method: "sms" | "cpdaily";
+    method: string;
     methodCode: string;
     code: string;
   } | {
@@ -14,17 +14,17 @@ interface MFAModalState {
   reject: (() => void) | null;
   showMFA: (opts: {
     username: string;
-    method?: "sms" | "cpdaily" | "weixin";
+    method?: string;
   }) => Promise<{
     type: "code";
-    method: "sms" | "cpdaily";
+    method: string;
     methodCode: string;
     code: string;
   } | {
     type: "wechat";
   }>;
   submitMFA: (payload: {
-    method: "sms" | "cpdaily";
+    method: string;
     methodCode: string;
     code: string;
   }) => void;

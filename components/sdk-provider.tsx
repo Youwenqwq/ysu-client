@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { mutate } from "swr";
 import { toast } from "sonner";
-import { getActiveProvider, initializeActiveProvider, setActiveProviderSchool } from "@/providers/provider-service";
+import { initializeActiveProvider, setActiveProviderSchool } from "@/providers/provider-service";
+import { useProviderContext } from "@/providers/provider-context";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useSettingsStore } from "@/lib/stores/settings";
 import { useUpdateStore } from "@/lib/stores/update";
@@ -30,7 +31,13 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
   const updateMirror = useSettingsStore((s) => s.updateMirror);
   const updateChannel = useSettingsStore((s) => s.updateChannel);
   const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus);
-  const didInit = useRef(false);
+  const {
+    markProviderInitializing,
+    markProviderReady,
+    markProviderError,
+  } = useProviderContext();
+  const didNotifyAppReady = useRef(false);
+  const didRunStartupSideEffects = useRef(false);
   const [showAnalyticsPrompt, setShowAnalyticsPrompt] = useState(false);
 
   const performUpdateCheck = useCallback(async () => {
@@ -75,22 +82,31 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!hasHydrated || !settingsHydrated || didInit.current) return;
-    didInit.current = true;
+    if (!hasHydrated || !settingsHydrated) return;
 
     // Signal the updater plugin that the current bundle loaded successfully.
     // Must run before provider session initialization to maximize the chance it fires within appReadyTimeout.
-    if (isCapacitor()) {
-      import("@capgo/capacitor-updater").then(({ CapacitorUpdater }) => {
-        CapacitorUpdater.notifyAppReady().catch(() => {});
-      });
+    if (!didNotifyAppReady.current) {
+      didNotifyAppReady.current = true;
+      if (isCapacitor()) {
+        import("@capgo/capacitor-updater").then(({ CapacitorUpdater }) => {
+          CapacitorUpdater.notifyAppReady().catch(() => {});
+        });
+      }
     }
 
+    let cancelled = false;
+    markProviderInitializing();
     setActiveProviderSchool(schoolId);
 
     initializeActiveProvider()
-      .then(() => {
+      .then((provider) => {
+        if (cancelled) return;
+        markProviderReady(provider);
         mutate((key) => Array.isArray(key) && key[0] === "provider");
+
+        if (didRunStartupSideEffects.current) return;
+        didRunStartupSideEffects.current = true;
 
         // Show analytics consent prompt if user hasn't made a choice yet
         const analyticsPromptVersion = useSettingsStore.getState().analyticsPromptVersion;
@@ -116,7 +132,6 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
         // Background: verify auth + warm up WEU tokens after the UI is
         // already visible so the user sees cached data immediately.
         (async () => {
-          const provider = getActiveProvider();
           let status = await provider.checkAuthStatus();
           if (!status.authenticated) {
             // Cookie restoration may not be immediately effective on
@@ -141,6 +156,8 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
         });
       })
       .catch((err) => {
+        if (cancelled) return;
+        markProviderError(err);
         const e = err as Error & { code?: string; status?: number };
         if (e.code === "AUTH_REQUIRED" || e.status === 401) {
           toast.error(t("app.sessionExpired"));
@@ -148,7 +165,20 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
         // Silently ignore non-auth errors during startup to avoid
         // false alarms caused by transient network issues.
       });
-  }, [hasHydrated, settingsHydrated, schoolId, setUpdateStatus, t, updateMirror, updateChannel, checkAnnouncementsThenUpdates]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hasHydrated,
+    settingsHydrated,
+    schoolId,
+    t,
+    checkAnnouncementsThenUpdates,
+    markProviderInitializing,
+    markProviderReady,
+    markProviderError,
+  ]);
 
   if (!hasHydrated || !settingsHydrated) {
     return (

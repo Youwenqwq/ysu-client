@@ -24,6 +24,7 @@ import {
   getCasCookieDomain,
   getSchoolConfig,
 } from "@/lib/server-config";
+import type { YSUMfaMethod } from "../types";
 
 // ─── Constants ────────────────────────────────────────────────────────── //
 
@@ -49,7 +50,7 @@ const DESKTOP_UA =
 
 // ─── Types ────────────────────────────────────────────────────────────── //
 
-export type MFAMethod = 'sms' | 'cpdaily' | 'weixin';
+type MFAMethod = YSUMfaMethod;
 
 export interface WechatMFAContext {
   uuid: string;

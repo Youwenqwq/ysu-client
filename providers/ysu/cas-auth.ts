@@ -33,6 +33,7 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { casUrls } from "@/lib/server-config";
 import { ProviderError, ProviderErrorCode, wrapError } from "../errors";
 import type { WechatQrPollResult } from "../types";
+import { getYSUMfaMethods, isYSUMfaMethod } from "./types";
 
 export interface LoginStep1Result {
   authenticated: boolean;
@@ -54,7 +55,13 @@ function mapCASError(e: unknown): ProviderError {
     return new ProviderError(ProviderErrorCode.AUTH_INVALID_CREDENTIAL, e.message, e, 401);
   }
   if (e instanceof MFARequiredError) {
-    return new ProviderError(ProviderErrorCode.AUTH_MFA_REQUIRED, e.message, e, 403);
+    return new ProviderError(
+      ProviderErrorCode.AUTH_MFA_REQUIRED,
+      e.message,
+      e,
+      403,
+      { methods: [...getYSUMfaMethods()] },
+    );
   }
   if (e instanceof MFAFailedError) {
     return new ProviderError(ProviderErrorCode.AUTH_INVALID_CREDENTIAL, e.message, e, 401);
@@ -133,8 +140,18 @@ export async function loginStep1(
 
 export async function requestMFACode(
   username: string,
-  method: "sms" | "cpdaily" | "weixin",
+  method: string,
 ): Promise<MFAChallenge> {
+  if (!isYSUMfaMethod(method)) {
+    throw new ProviderError(
+      ProviderErrorCode.FEATURE_NOT_SUPPORTED,
+      `Unsupported YSU MFA method: ${method}`,
+      undefined,
+      501,
+      { methods: [...getYSUMfaMethods()] },
+    );
+  }
+
   try {
     return await _requestMFACode(username, method);
   } catch (e) {

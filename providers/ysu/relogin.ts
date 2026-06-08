@@ -14,6 +14,7 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { useMFAModalStore } from "@/lib/stores/mfa-modal";
 import { getText } from "@/lib/i18n/get-text";
 import { loadRememberedCredentials } from "@/lib/storage/secure";
+import { isYSUMfaMethod } from "./types";
 
 let inflightAutoLogin: Promise<boolean> | null = null;
 
@@ -55,6 +56,9 @@ export async function reloginYSU(): Promise<boolean> {
           if (result.type === "wechat") {
             await initializeSession();
             return true;
+          }
+          if (!isYSUMfaMethod(result.method)) {
+            return false;
           }
           const credential = await submitMFACode(
             {

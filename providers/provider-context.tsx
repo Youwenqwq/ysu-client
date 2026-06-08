@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useSettingsStore } from "@/lib/stores/settings";
 import type { AcademicProvider } from "./types";
 import { getActiveProvider, setActiveProviderSchool } from "./provider-service";
@@ -8,6 +8,10 @@ import { getActiveProvider, setActiveProviderSchool } from "./provider-service";
 export interface ProviderContextValue {
   provider: AcademicProvider;
   isReady: boolean;
+  error: Error | undefined;
+  markProviderInitializing(): void;
+  markProviderReady(provider: AcademicProvider): void;
+  markProviderError(error: unknown): void;
 }
 
 const ProviderContext = createContext<ProviderContextValue | null>(null);
@@ -23,21 +27,52 @@ export function ProviderProvider({ children, schoolId }: ProviderProviderProps) 
   const effectiveSchoolId = schoolId ?? (hasHydrated ? selectedSchoolId : "ysu");
   const [provider, setProvider] = useState<AcademicProvider>(() => getActiveProvider());
   const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState<Error | undefined>();
 
   useEffect(() => {
     if (!schoolId && !hasHydrated) {
       setIsReady(false);
+      setError(undefined);
       return;
     }
 
-    const nextProvider = setActiveProviderSchool(effectiveSchoolId);
-    setProvider(nextProvider);
-    setIsReady(true);
+    try {
+      const nextProvider = setActiveProviderSchool(effectiveSchoolId);
+      setProvider(nextProvider);
+      setIsReady(false);
+      setError(undefined);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+      setIsReady(false);
+    }
   }, [effectiveSchoolId, hasHydrated, schoolId]);
 
+  const markProviderInitializing = useCallback(() => {
+    setIsReady(false);
+    setError(undefined);
+  }, []);
+
+  const markProviderReady = useCallback((provider: AcademicProvider) => {
+    setProvider(provider);
+    setIsReady(true);
+    setError(undefined);
+  }, []);
+
+  const markProviderError = useCallback((error: unknown) => {
+    setError(error instanceof Error ? error : new Error(String(error)));
+    setIsReady(false);
+  }, []);
+
   const value = useMemo<ProviderContextValue>(
-    () => ({ provider, isReady }),
-    [provider, isReady],
+    () => ({
+      provider,
+      isReady,
+      error,
+      markProviderInitializing,
+      markProviderReady,
+      markProviderError,
+    }),
+    [provider, isReady, error, markProviderInitializing, markProviderReady, markProviderError],
   );
 
   return <ProviderContext.Provider value={value}>{children}</ProviderContext.Provider>;

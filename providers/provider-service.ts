@@ -12,6 +12,7 @@ function resolveSupportedSchoolId(schoolId: string): string {
 
 let activeSchoolId = resolveSupportedSchoolId(getSchoolId());
 let activeProvider: AcademicProvider = createProvider(activeSchoolId);
+let activeInitializePromise: Promise<AcademicProvider> | null = null;
 setSchoolConfig(activeSchoolId);
 
 export function getActiveProvider(): AcademicProvider {
@@ -23,6 +24,7 @@ export function getActiveProvider(): AcademicProvider {
   if (nextSchoolId !== activeSchoolId) {
     activeSchoolId = nextSchoolId;
     activeProvider = createProvider(activeSchoolId);
+    activeInitializePromise = null;
   }
   return activeProvider;
 }
@@ -35,22 +37,33 @@ export function setActiveProviderSchool(schoolId: string): AcademicProvider {
   if (nextSchoolId !== activeSchoolId) {
     activeSchoolId = nextSchoolId;
     activeProvider = createProvider(nextSchoolId);
+    activeInitializePromise = null;
   }
   return activeProvider;
 }
 
 export async function initializeActiveProvider(): Promise<AcademicProvider> {
   const provider = getActiveProvider();
-  await provider.initialize();
-  return provider;
+  if (!activeInitializePromise) {
+    activeInitializePromise = provider.initialize().then(
+      () => provider,
+      (error) => {
+        activeInitializePromise = null;
+        throw error;
+      },
+    );
+  }
+  return activeInitializePromise;
 }
 
 export async function resetActiveProvider(): Promise<void> {
   await getActiveProvider().reset();
+  activeInitializePromise = null;
 }
 
 export async function logoutActiveProvider(): Promise<void> {
   await getActiveProvider().logout();
+  activeInitializePromise = null;
 }
 
 export async function reloginActiveProvider(): Promise<boolean> {

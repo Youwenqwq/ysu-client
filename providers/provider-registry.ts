@@ -1,19 +1,31 @@
+import { registerSchoolConfig } from "@/lib/server-config";
+import type { SchoolConfig } from "@/lib/school-configs/types";
 import { ProviderError, ProviderErrorCode } from "./errors";
 import type { AcademicProvider } from "./types";
 import { YSUProvider } from "./ysu";
 
-type ProviderFactory = () => AcademicProvider;
+export type ProviderFactory = () => AcademicProvider;
 
 const registry: Record<string, ProviderFactory> = {
   ysu: () => new YSUProvider(),
 };
 
+export interface SchoolRegistration {
+  config: SchoolConfig;
+  providerFactory: ProviderFactory;
+}
+
 export function registerProvider(schoolId: string, factory: ProviderFactory): void {
   registry[schoolId] = factory;
 }
 
+export function registerSchool(registration: SchoolRegistration): void {
+  registerSchoolConfig(registration.config);
+  registerProvider(registration.config.id, registration.providerFactory);
+}
+
 export function hasProvider(schoolId: string): boolean {
-  return schoolId in registry;
+  return Object.prototype.hasOwnProperty.call(registry, schoolId);
 }
 
 export function getRegisteredProviderIds(): string[] {

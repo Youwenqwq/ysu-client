@@ -25,18 +25,21 @@ export class ProviderError extends Error {
   readonly code: ProviderErrorCode;
   readonly cause?: unknown;
   readonly status?: number;
+  readonly details?: unknown;
 
   constructor(
     code: ProviderErrorCode,
     message: string,
     cause?: unknown,
     status?: number,
+    details?: unknown,
   ) {
     super(message, { cause });
     this.name = "ProviderError";
     this.code = code;
     this.cause = cause;
     this.status = status;
+    this.details = details;
   }
 }
 

@@ -49,7 +49,13 @@ export interface LoginStep1Result {
   credential?: string;
 }
 
-export type MfaMethod = "sms" | "cpdaily" | "weixin";
+export type MfaMethod = string;
+
+export interface MfaRequiredDetails {
+  username?: string;
+  methods?: string[];
+  challenge?: Partial<MfaChallenge>;
+}
 
 export interface MfaChallenge {
   method: MfaMethod;

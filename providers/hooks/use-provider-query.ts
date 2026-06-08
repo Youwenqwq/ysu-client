@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR, { type KeyedMutator, type SWRConfiguration } from "swr";
 import { useAuthStore } from "@/lib/stores/auth";
+import { getSchoolConfigScope } from "@/lib/server-config";
 import { cacheGetStale, cacheKey, cacheSet, DEFAULT_TTL_MS, LONG_TTL_MS } from "@/lib/storage/cache";
 import { useRefreshStore } from "@/lib/stores/refresh";
-import { assertCapability } from "../capabilities";
-import { ProviderError } from "../errors";
+import { hasCapability } from "../capabilities";
+import { ProviderError, ProviderErrorCode } from "../errors";
 import { useProvider, useProviderReady } from "../use-provider";
 import type { AcademicCapabilities } from "../types";
 
@@ -60,20 +61,29 @@ function getCachePolicy(feature: string): ProviderCachePolicy {
 
 export function providerQueryKey(
   providerId: string,
+  schoolConfigScope: string,
   username: string | null,
   feature: string,
   params?: unknown,
 ): readonly unknown[] {
-  return ["provider", providerId, username ?? null, feature, params ?? null] as const;
+  return ["provider", providerId, schoolConfigScope, username ?? null, feature, params ?? null] as const;
 }
 
 export function providerCacheKey(
   providerId: string,
+  schoolConfigScope: string,
   username: string,
   feature: string,
   params?: unknown,
 ): string {
-  return cacheKey(["provider", providerId, username, feature, stableStringify(params ?? null)]);
+  return cacheKey([
+    "provider",
+    providerId,
+    schoolConfigScope,
+    username,
+    feature,
+    stableStringify(params ?? null),
+  ]);
 }
 
 export function useProviderQuery<T>(
@@ -86,14 +96,28 @@ export function useProviderQuery<T>(
   const provider = useProvider();
   const isReady = useProviderReady();
   const username = useAuthStore((state) => state.username);
-
-  assertCapability(provider, capability);
+  const schoolConfigScope = getSchoolConfigScope();
+  const capabilityError = useMemo(
+    () =>
+      hasCapability(provider.capabilities, capability)
+        ? undefined
+        : new ProviderError(
+            ProviderErrorCode.FEATURE_NOT_SUPPORTED,
+            `Provider "${provider.id}" does not support ${capability}`,
+            undefined,
+            501,
+          ),
+    [provider.capabilities, provider.id, capability],
+  );
 
   const policy = getCachePolicy(feature);
-  const canPersist = policy.persist && !!username;
+  const canPersist = !capabilityError && policy.persist && !!username;
   const persistentKey = useMemo(
-    () => (username ? providerCacheKey(provider.id, username, feature, params) : null),
-    [provider.id, username, feature, params],
+    () =>
+      username
+        ? providerCacheKey(provider.id, schoolConfigScope, username, feature, params)
+        : null,
+    [provider.id, schoolConfigScope, username, feature, params],
   );
   const cached = useMemo(
     () => (canPersist && persistentKey ? cacheGetStale<T>(persistentKey, policy.ttl) : null),
@@ -110,7 +134,9 @@ export function useProviderQuery<T>(
   }, [persistentKey]);
 
   const swr = useSWR<T, ProviderError>(
-    isReady ? providerQueryKey(provider.id, username, feature, params) : null,
+    isReady && !capabilityError
+      ? providerQueryKey(provider.id, schoolConfigScope, username, feature, params)
+      : null,
     async () => {
       try {
         const result = await fetcher();
@@ -186,10 +212,10 @@ export function useProviderQuery<T>(
 
   return {
     data,
-    isLoading: isInitialLoading,
+    isLoading: capabilityError ? false : isInitialLoading,
     isValidating,
-    isError: !!error,
-    error: error ?? undefined,
+    isError: !!capabilityError || !!error,
+    error: capabilityError ?? error ?? undefined,
     mutate,
     isStale,
   };

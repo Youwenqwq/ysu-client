@@ -9,16 +9,20 @@ const bundledSchoolConfigs = [
   nbuConfig as SchoolConfig,
 ] as const;
 
-const schoolConfigs: Readonly<Record<string, SchoolConfig>> = Object.freeze(
-  Object.fromEntries(bundledSchoolConfigs.map((config) => [config.id, config])),
+const schoolConfigs: Record<string, SchoolConfig> = Object.fromEntries(
+  bundledSchoolConfigs.map((config) => [config.id, config]),
 );
+
+export function registerSchoolConfig(config: SchoolConfig): void {
+  schoolConfigs[config.id] = config;
+}
 
 export function getSchoolConfigById(schoolId: string): SchoolConfig | undefined {
   return schoolConfigs[schoolId];
 }
 
 export function hasSchoolConfig(schoolId: string): boolean {
-  return schoolId in schoolConfigs;
+  return Object.prototype.hasOwnProperty.call(schoolConfigs, schoolId);
 }
 
 export function getAllSchoolConfigs(): readonly SchoolConfig[] {

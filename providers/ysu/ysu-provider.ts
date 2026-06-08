@@ -92,6 +92,7 @@ import { YSUMobileAdapter } from "./adapters/mobile-adapter";
 import { ysuDiagnostics } from "./diagnostics";
 import { ysuNativeNotification } from "./native-notification";
 import { reloginYSU } from "./relogin";
+import { getYSUMfaMethods, isYSUMfaMethod } from "./types";
 
 function ysuCapabilities(): AcademicCapabilities {
   return {
@@ -304,6 +305,10 @@ export class YSUProvider extends BaseProvider {
         "Multi-factor authentication required",
         result,
         403,
+        {
+          username: result.username,
+          methods: [...getYSUMfaMethods()],
+        },
       );
     }
 
@@ -331,6 +336,16 @@ export class YSUProvider extends BaseProvider {
   }
 
   async submitMfaCode(input: MfaSubmitInput): Promise<string> {
+    if (!isYSUMfaMethod(input.challenge.method)) {
+      throw new ProviderError(
+        ProviderErrorCode.FEATURE_NOT_SUPPORTED,
+        `Unsupported YSU MFA method: ${input.challenge.method}`,
+        undefined,
+        501,
+        { methods: [...getYSUMfaMethods()] },
+      );
+    }
+
     const credential = await submitMFACode(
       {
         method: input.challenge.method,
