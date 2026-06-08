@@ -526,8 +526,9 @@ export class YSUProvider extends BaseProvider {
     return rows.map((row) => ({
       name: row.name ?? "",
       examName: row.examName ?? undefined,
-      examDate: row.examDate ?? undefined,
-      examTime: row.examTime ?? undefined,
+      startAt: row.startAt ?? undefined,
+      endAt: row.endAt ?? undefined,
+      timeText: row.timeText ?? undefined,
       examLocation: row.examLocation ?? undefined,
       seatNumber: row.seatNumber ?? undefined,
       raw: row.raw ?? undefined,

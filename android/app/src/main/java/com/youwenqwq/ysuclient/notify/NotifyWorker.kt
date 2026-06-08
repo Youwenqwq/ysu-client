@@ -121,10 +121,9 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                         hasChanges = true
                         for (exam in diff) {
                             val name = exam.optString("name", ctx.getString(R.string.notify_fallback_exam_name))
-                            val date = exam.optString("exam_date", "")
-                            val time = exam.optString("exam_time", "")
+                            val time = exam.optString("time_text", "")
                             val location = exam.optString("exam_location", "")
-                            sendExamNotification(ctx, name, date, time, location)
+                            sendExamNotification(ctx, name, time, location)
                         }
                     }
 
@@ -243,7 +242,7 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         nm.notify(id, notification)
     }
 
-    private fun sendExamNotification(ctx: Context, name: String, date: String, time: String, location: String) {
+    private fun sendExamNotification(ctx: Context, name: String, time: String, location: String) {
         createNotificationChannel(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 

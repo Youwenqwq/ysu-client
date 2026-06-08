@@ -84,8 +84,9 @@ export interface CurrentWeek {
 export interface Exam {
   readonly name: string;
   readonly examName: string;
-  readonly examDate: string;
-  readonly examTime: string;
+  readonly startAt: string;
+  readonly endAt: string;
+  readonly timeText: string;
   readonly examLocation: string;
   readonly seatNumber: string;
   readonly raw: Record<string, unknown>;
@@ -474,6 +475,56 @@ function rawStr(raw: Record<string, unknown>, ...keys: readonly string[]): strin
     }
   }
   return '';
+}
+
+function cleanText(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function pad2(value: string): string {
+  return value.padStart(2, '0');
+}
+
+function normalizeDate(value: string): string {
+  const match = cleanText(value).match(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+  if (!match) return '';
+  return `${match[1]}-${pad2(match[2])}-${pad2(match[3])}`;
+}
+
+function normalizeTime(value: string): string {
+  const match = cleanText(value).match(/(\d{1,2}):(\d{2})/);
+  if (!match) return '';
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return '';
+  return `${pad2(match[1])}:${match[2]}`;
+}
+
+function combineLocalDateTime(date: string, time: string): string {
+  return date && time ? `${date}T${time}:00` : '';
+}
+
+function parseExamDateTimes(raw: Record<string, unknown>): {
+  startAt: string;
+  endAt: string;
+  timeText: string;
+} {
+  const date = normalizeDate(rawStr(raw, 'KSRQ'));
+  const displayText = cleanText(rawStr(raw, 'KSSJMS'));
+  const displayTimes = Array.from(displayText.matchAll(/\d{1,2}:\d{2}/g), (m) => normalizeTime(m[0])).filter(Boolean);
+  const startTime = normalizeTime(rawStr(raw, 'KSSJ')) || displayTimes[0] || '';
+  const endTime = normalizeTime(rawStr(raw, 'JSSJ')) || displayTimes[1] || '';
+  const timeText = displayText || (startTime && endTime ? `${startTime}-${endTime}` : startTime || endTime);
+
+  return {
+    startAt: combineLocalDateTime(date, startTime),
+    endAt: combineLocalDateTime(date, endTime),
+    timeText,
+  };
 }
 
 function rawNum(raw: Record<string, unknown>, ...keys: readonly string[]): number {
@@ -1551,11 +1602,13 @@ function parseCurrentWeek(raw: Record<string, unknown>): CurrentWeek {
 }
 
 function parseExam(raw: Record<string, unknown>): Exam {
+  const { startAt, endAt, timeText } = parseExamDateTimes(raw);
   return {
     name: rawStr(raw, 'KCM'),
     examName: rawStr(raw, 'KSMC'),
-    examDate: rawStr(raw, 'KSRQ'),
-    examTime: rawStr(raw, 'KSSJMS', 'KSSJ'),
+    startAt,
+    endAt,
+    timeText,
     examLocation: rawStr(raw, 'JASMC'),
     seatNumber: rawStr(raw, 'ZWH'),
     raw,

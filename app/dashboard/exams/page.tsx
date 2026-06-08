@@ -22,9 +22,9 @@ import {
 } from "@/components/ui/empty";
 import { useSettingsStore } from "@/lib/stores/settings";
 import { useTranslation } from "@/lib/i18n/use-translation";
+import { compareExamStartTime, formatExamTime, isExamCompleted } from "@/lib/academic/exam-utils";
 import { syncExamsToWidget } from "@/lib/native/widget-bridge";
 import { useExams } from "@/providers/hooks";
-import type { Exam } from "@/providers/types";
 import {
   CalendarOff,
   CheckCircle2,
@@ -32,33 +32,6 @@ import {
   MapPin,
   Search,
 } from "lucide-react";
-
-function getExamEndTime(exam: Exam): Date | null {
-  if (!exam.examDate) return null;
-  const base = new Date(exam.examDate.replace(/-/g, "/"));
-  if (Number.isNaN(base.getTime())) return null;
-
-  if (exam.examTime) {
-    const times = exam.examTime.match(/\d{1,2}:\d{2}/g);
-    if (times && times.length >= 2) {
-      const [h, m] = times[times.length - 1].split(":").map(Number);
-      base.setHours(h, m, 0, 0);
-      return base;
-    } else if (times && times.length === 1) {
-      const [h, m] = times[0].split(":").map(Number);
-      base.setHours(h, m, 0, 0);
-      return base;
-    }
-  }
-  base.setHours(23, 59, 59, 999);
-  return base;
-}
-
-function isExamCompleted(exam: Exam): boolean {
-  const end = getExamEndTime(exam);
-  if (!end) return false;
-  return end < new Date();
-}
 
 export default function ExamsPage() {
   const { t } = useTranslation();
@@ -88,14 +61,8 @@ export default function ExamsPage() {
     setQueriedTerm(nextTerm);
   }
 
-  function compareExamDate(a: Exam, b: Exam) {
-    const da = a.examDate ? new Date(a.examDate.replace(/-/g, "/")).getTime() : 0;
-    const db = b.examDate ? new Date(b.examDate.replace(/-/g, "/")).getTime() : 0;
-    return da - db;
-  }
-
-  const upcomingExams = exams.filter((e) => !isExamCompleted(e)).sort(compareExamDate);
-  const completedExams = exams.filter((e) => isExamCompleted(e)).sort(compareExamDate);
+  const upcomingExams = exams.filter((e) => !isExamCompleted(e)).sort(compareExamStartTime);
+  const completedExams = exams.filter((e) => isExamCompleted(e)).sort(compareExamStartTime);
 
   if (loading && exams.length === 0) {
     return (
@@ -166,7 +133,7 @@ export default function ExamsPage() {
                   <CardContent className="flex flex-col gap-2 text-sm">
                     <div className="flex items-center gap-2">
                       <Clock className="size-4 text-muted-foreground" />
-                      <span>{exam.examTime}</span>
+                      <span>{formatExamTime(exam)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <MapPin className="size-4 text-muted-foreground" />
@@ -200,7 +167,7 @@ export default function ExamsPage() {
                     <CardContent className="flex flex-col gap-2 text-sm">
                       <div className="flex items-center gap-2">
                         <Clock className="size-4 text-muted-foreground" />
-                        <span>{exam.examTime}</span>
+                        <span>{formatExamTime(exam)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <MapPin className="size-4 text-muted-foreground" />

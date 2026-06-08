@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { compareExamStartTime, formatExamTime, isExamCompleted } from "@/lib/academic/exam-utils";
 import { useSettingsStore } from "@/lib/stores/settings";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import {
@@ -29,33 +30,12 @@ import {
 } from "@/app/dashboard/schedule/schedule-utils";
 import { syncScheduleToWidget, syncExamsToWidget } from "@/lib/native/widget-bridge";
 import { syncClassAlarmsToNative } from "@/lib/native/notify";
-import type { Course, Exam } from "@/providers/types";
+import type { Course } from "@/providers/types";
 import { Calendar, GraduationCap, BarChart3, Clock, BookOpen, Eye, EyeOff } from "lucide-react";
 
 function isCourseActiveToday(course: Course, currentWeek: number, currentWeekday: number): boolean {
   if (courseWeekDay(course) !== currentWeekday) return false;
   return isCourseActiveInWeek(course, currentWeek);
-}
-
-function getExamEndTime(exam: Exam): Date | null {
-  if (!exam.examDate) return null;
-  const base = new Date(exam.examDate.replace(/-/g, "/"));
-  if (Number.isNaN(base.getTime())) return null;
-
-  if (exam.examTime) {
-    const times = exam.examTime.match(/\d{1,2}:\d{2}/g);
-    if (times && times.length >= 2) {
-      const [h, m] = times[times.length - 1].split(":").map(Number);
-      base.setHours(h, m, 0, 0);
-      return base;
-    } else if (times && times.length === 1) {
-      const [h, m] = times[0].split(":").map(Number);
-      base.setHours(h, m, 0, 0);
-      return base;
-    }
-  }
-  base.setHours(23, 59, 59, 999);
-  return base;
 }
 
 export default function DashboardPage() {
@@ -122,23 +102,9 @@ export default function DashboardPage() {
   }, [courses, currentWeek.data]);
 
   const upcomingExams = useMemo(() => {
-    const now = new Date();
     return examRows
-      .filter((e) => {
-        const end = getExamEndTime(e);
-        if (!end) return false;
-        return end >= now;
-      })
-      .sort((a, b) => {
-        const da = new Date((a.examDate || "").replace(/-/g, "/")).getTime();
-        const db = new Date((b.examDate || "").replace(/-/g, "/")).getTime();
-        if (da !== db) return da - db;
-        const ta = a.examTime?.match(/\d{1,2}:\d{2}/g);
-        const tb = b.examTime?.match(/\d{1,2}:\d{2}/g);
-        const ha = ta ? parseInt(ta[0], 10) : 0;
-        const hb = tb ? parseInt(tb[0], 10) : 0;
-        return ha - hb;
-      })
+      .filter((e) => !isExamCompleted(e))
+      .sort(compareExamStartTime)
       .slice(0, 3);
   }, [examRows]);
 
@@ -363,7 +329,7 @@ export default function DashboardPage() {
                   <div className="flex flex-col gap-0.5">
                     <span className="font-medium text-sm">{exam.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {exam.examTime} · {exam.examLocation}
+                      {[formatExamTime(exam), exam.examLocation].filter(Boolean).join(" · ")}
                     </span>
                   </div>
                   {exam.seatNumber && (

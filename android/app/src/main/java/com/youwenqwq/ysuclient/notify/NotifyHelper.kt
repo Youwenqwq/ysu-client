@@ -83,6 +83,58 @@ object NotifyHelper {
         return requestPath.startsWith(prefix)
     }
 
+    private fun cleanText(value: String): String {
+        return value
+            .replace(Regex("<[^>]*>"), "")
+            .replace(Regex("&nbsp;", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private fun normalizeDate(value: String): String {
+        val match = Regex("""(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})""").find(cleanText(value)) ?: return ""
+        return "%04d-%02d-%02d".format(
+            match.groupValues[1].toInt(),
+            match.groupValues[2].toInt(),
+            match.groupValues[3].toInt()
+        )
+    }
+
+    private fun normalizeTime(value: String): String {
+        val match = Regex("""(\d{1,2}):(\d{2})""").find(cleanText(value)) ?: return ""
+        val hour = match.groupValues[1].toIntOrNull() ?: return ""
+        val minute = match.groupValues[2].toIntOrNull() ?: return ""
+        if (hour !in 0..23 || minute !in 0..59) return ""
+        return "%02d:%02d".format(hour, minute)
+    }
+
+    private fun combineLocalDateTime(date: String, time: String): String {
+        return if (date.isNotEmpty() && time.isNotEmpty()) "${date}T${time}:00" else ""
+    }
+
+    private fun putExamDateTimes(standard: JSONObject, raw: JSONObject) {
+        val date = normalizeDate(raw.optString("KSRQ", ""))
+        val displayText = cleanText(raw.optString("KSSJMS", ""))
+        val displayTimes = Regex("""\d{1,2}:\d{2}""").findAll(displayText)
+            .map { normalizeTime(it.value) }
+            .filter { it.isNotEmpty() }
+            .toList()
+        val startTime = normalizeTime(raw.optString("KSSJ", "")).ifEmpty { displayTimes.getOrNull(0) ?: "" }
+        val endTime = normalizeTime(raw.optString("JSSJ", "")).ifEmpty { displayTimes.getOrNull(1) ?: "" }
+        val timeText = displayText.ifEmpty {
+            when {
+                startTime.isNotEmpty() && endTime.isNotEmpty() -> "$startTime-$endTime"
+                startTime.isNotEmpty() -> startTime
+                else -> endTime
+            }
+        }
+        val startAt = combineLocalDateTime(date, startTime)
+        val endAt = combineLocalDateTime(date, endTime)
+        if (startAt.isNotEmpty()) standard.put("start_at", startAt)
+        if (endAt.isNotEmpty()) standard.put("end_at", endAt)
+        if (timeText.isNotEmpty()) standard.put("time_text", timeText)
+    }
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -504,14 +556,7 @@ object NotifyHelper {
             val name = raw.optString("KCM", "")
             if (name.isNotEmpty()) standard.put("course_name", name)
         }
-        if (!standard.has("exam_date")) {
-            val date = raw.optString("KSRQ", "")
-            if (date.isNotEmpty()) standard.put("exam_date", date)
-        }
-        if (!standard.has("exam_time")) {
-            val time = raw.optString("KSSJMS", raw.optString("KSSJ", ""))
-            if (time.isNotEmpty()) standard.put("exam_time", time)
-        }
+        putExamDateTimes(standard, raw)
         if (!standard.has("exam_location")) {
             val loc = raw.optString("JASMC", "")
             if (loc.isNotEmpty()) standard.put("exam_location", loc)
@@ -631,17 +676,21 @@ object NotifyHelper {
     }
 
     fun diffExams(oldList: List<JSONObject>, newList: List<JSONObject>): List<JSONObject> {
-        val oldMap = oldList.associateBy {
-            "${it.optString("name", "")}|${it.optString("exam_date", "")}"
+        fun examKey(it: JSONObject): String {
+            return "${it.optString("name", "")}|${it.optString("start_at", "")}|${it.optString("time_text", "")}"
         }
 
+        val oldMap = oldList.associateBy { examKey(it) }
+
         return newList.filter {
-            val key = "${it.optString("name", "")}|${it.optString("exam_date", "")}"
+            val key = examKey(it)
             val old = oldMap[key]
             if (old == null) {
                 true
             } else {
-                old.optString("exam_time", "") != it.optString("exam_time", "") ||
+                old.optString("start_at", "") != it.optString("start_at", "") ||
+                        old.optString("end_at", "") != it.optString("end_at", "") ||
+                        old.optString("time_text", "") != it.optString("time_text", "") ||
                         old.optString("exam_location", "") != it.optString("exam_location", "") ||
                         old.optString("seat_number", "") != it.optString("seat_number", "")
             }

@@ -652,7 +652,7 @@ export async function submitMFACode(
       service: casUrls.defaultLoginService,
       reAuthType: challenge.methodCode,
       isMultifactor: 'true',
-      skipTmpReAuth: 'true',
+      skipTmpReAuth: 'false',
       dynamicCode: code,
       password: '',
       uuid: '',
@@ -734,7 +734,7 @@ export async function initiateWechatMFA(): Promise<WechatMFAContext> {
   // The `success` param matches handleGoCombined's logic when service is present.
   const resp = await _fetch({
     method: 'GET',
-    url: `${casUrls.combinedLogin}?type=weixin&reAuth=2&success=${success}&skipTmpReAuth=true`,
+    url: `${casUrls.combinedLogin}?type=weixin&reAuth=2&success=${success}&skipTmpReAuth=false`,
     headers: {
       'User-Agent': DESKTOP_UA,
       Referer: referer,

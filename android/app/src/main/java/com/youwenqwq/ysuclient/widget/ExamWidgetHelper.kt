@@ -7,7 +7,6 @@ import android.widget.RemoteViews
 import com.youwenqwq.ysuclient.R
 import com.youwenqwq.ysuclient.cache.UnifiedCache
 import org.json.JSONArray
-import org.json.JSONObject
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -16,8 +15,9 @@ class ExamWidgetHelper(private val context: Context) {
     data class WidgetExam(
         val name: String,
         val examName: String?,
-        val examDate: String?,
-        val examTime: String?,
+        val startAt: String?,
+        val endAt: String?,
+        val timeText: String?,
         val examLocation: String?,
         val seatNumber: String?
     )
@@ -55,8 +55,7 @@ class ExamWidgetHelper(private val context: Context) {
 
         val views = RemoteViews(context.packageName, R.layout.exam_widget)
 
-        // Header: show exam date (short format) instead of date range
-        val headerText = nearestExam?.examDate?.let { formatShortDate(it) } ?: ""
+        val headerText = nearestExam?.startAt?.let { formatShortDate(it) } ?: ""
         views.setTextViewText(R.id.exam_header_date, headerText)
 
         val headerCountText = if (nearestExam == null) {
@@ -88,7 +87,6 @@ class ExamWidgetHelper(private val context: Context) {
             val daysRemaining = computeDaysRemaining(nearestExam)
             val examDisplayName = nearestExam.name
 
-            // Show course name directly (bold, primary color)
             views.setTextViewText(R.id.exam_countdown_prefix, examDisplayName)
             val daysText = if (daysRemaining == 0L) {
                 context.getString(R.string.widget_exam_today)
@@ -96,13 +94,10 @@ class ExamWidgetHelper(private val context: Context) {
                 daysRemaining.toString()
             }
             views.setTextViewText(R.id.exam_countdown_days, daysText)
-            // Hide "天" label when showing "今天"
             views.setViewVisibility(R.id.exam_countdown_days_label,
                 if (daysRemaining == 0L) android.view.View.GONE else android.view.View.VISIBLE)
 
-            // Show time portion only (e.g. "18:10-19:45")
-            val timeOnly = extractTimeOnly(nearestExam.examTime)
-            views.setTextViewText(R.id.exam_countdown_date, timeOnly ?: "")
+            views.setTextViewText(R.id.exam_countdown_date, formatExamTime(nearestExam))
         }
 
         // Click to open exams page
@@ -123,8 +118,7 @@ class ExamWidgetHelper(private val context: Context) {
 
         val views = RemoteViews(context.packageName, R.layout.exam_widget_2x2)
 
-        // Header: show exam date (short format)
-        val headerText = nearestExam?.examDate?.let { formatShortDate(it) } ?: ""
+        val headerText = nearestExam?.startAt?.let { formatShortDate(it) } ?: ""
         views.setTextViewText(R.id.exam_header_date, headerText)
 
         val headerCountText = if (nearestExam == null) {
@@ -156,7 +150,6 @@ class ExamWidgetHelper(private val context: Context) {
             val daysRemaining = computeDaysRemaining(nearestExam)
             val examDisplayName = nearestExam.name
 
-            // Show course name directly (truncate for 2x2 widget)
             val shortName = if (examDisplayName.length > 9) examDisplayName.take(8) + "…" else examDisplayName
             views.setTextViewText(R.id.exam_countdown_prefix, shortName)
             val daysText2x2 = if (daysRemaining == 0L) {
@@ -168,9 +161,7 @@ class ExamWidgetHelper(private val context: Context) {
             views.setViewVisibility(R.id.exam_countdown_days_label,
                 if (daysRemaining == 0L) android.view.View.GONE else android.view.View.VISIBLE)
 
-            // Show time portion only
-            val timeOnly = extractTimeOnly(nearestExam.examTime)
-            views.setTextViewText(R.id.exam_countdown_date, timeOnly ?: "")
+            views.setTextViewText(R.id.exam_countdown_date, formatExamTime(nearestExam))
         }
 
         // Click to open exams page
@@ -183,7 +174,7 @@ class ExamWidgetHelper(private val context: Context) {
     }
 
     private fun computeDaysRemaining(exam: WidgetExam): Long {
-        val examDate = parseExamDate(exam) ?: return 0
+        val examDate = parseLocalDateTime(exam.startAt) ?: return 0
         val now = Calendar.getInstance()
         // Set both to midnight for accurate day count
         now.set(Calendar.HOUR_OF_DAY, 0)
@@ -214,8 +205,9 @@ class ExamWidgetHelper(private val context: Context) {
                 WidgetExam(
                     name = obj.optString("name", ""),
                     examName = obj.optString("exam_name").takeIf { it.isNotEmpty() },
-                    examDate = obj.optString("exam_date").takeIf { it.isNotEmpty() },
-                    examTime = obj.optString("exam_time").takeIf { it.isNotEmpty() },
+                    startAt = obj.optString("start_at").takeIf { it.isNotEmpty() },
+                    endAt = obj.optString("end_at").takeIf { it.isNotEmpty() },
+                    timeText = obj.optString("time_text").takeIf { it.isNotEmpty() },
                     examLocation = obj.optString("exam_location").takeIf { it.isNotEmpty() },
                     seatNumber = obj.optString("seat_number").takeIf { it.isNotEmpty() }
                 )
@@ -228,78 +220,58 @@ class ExamWidgetHelper(private val context: Context) {
     private fun filterUpcomingExams(exams: List<WidgetExam>): List<WidgetExam> {
         val now = Calendar.getInstance()
         return exams.filter { exam ->
-            val examDate = parseExamDate(exam)
-            if (examDate == null) return@filter false
-            // If end time is known, filter out exams that have already ended
-            val examEndTime = parseExamEndTime(exam)
-            if (examEndTime != null) {
-                examEndTime.after(now)
-            } else {
-                // Fallback: exam visible until end of exam day
-                examDate.after(now)
-            }
+            val end = parseLocalDateTime(exam.endAt) ?: parseLocalDateTime(exam.startAt)
+            end?.after(now) == true
         }.sortedBy { exam ->
-            parseExamDate(exam)?.timeInMillis ?: Long.MAX_VALUE
+            parseLocalDateTime(exam.startAt)?.timeInMillis ?: Long.MAX_VALUE
         }
     }
 
-    /**
-     * Parse exam date + end time into a Calendar.
-     * exam_time format: "18:10-19:45" or "2026-05-30 18:10-19:45(星期三)"
-     */
-    private fun parseExamEndTime(exam: WidgetExam): Calendar? {
-        val date = parseExamDate(exam) ?: return null
-        val timeRange = exam.examTime ?: return null
-        // Extract "19:45" from "18:10-19:45"
-        val match = Regex("""\d{1,2}:\d{2}[-~](\d{1,2}:\d{2})""").find(timeRange)
-        val endTime = match?.groupValues?.getOrNull(1) ?: return null
-        val timeParts = endTime.split(":")
-        val endHour = timeParts.getOrNull(0)?.toIntOrNull() ?: return null
-        val endMinute = timeParts.getOrNull(1)?.toIntOrNull() ?: return null
-        return (date.clone() as Calendar).apply {
-            set(Calendar.HOUR_OF_DAY, endHour)
-            set(Calendar.MINUTE, endMinute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-    }
-
-    private fun parseExamDate(exam: WidgetExam): Calendar? {
-        if (exam.examDate.isNullOrEmpty()) return null
-        val cal = Calendar.getInstance()
-        val parts = exam.examDate.split("-")
-        if (parts.size != 3) return null
+    private fun parseLocalDateTime(value: String?): Calendar? {
+        if (value.isNullOrEmpty()) return null
+        val match = Regex("""^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?""").find(value) ?: return null
         return try {
-            val year = parts[0].toInt()
-            val month = parts[1].toInt() - 1
-            val day = parts[2].toInt()
-            cal.set(year, month, day, 23, 59, 59)
-            cal
+            val year = match.groupValues[1].toInt()
+            val month = match.groupValues[2].toInt() - 1
+            val day = match.groupValues[3].toInt()
+            val hour = match.groupValues[4].toInt()
+            val minute = match.groupValues[5].toInt()
+            val second = match.groupValues.getOrNull(6)?.takeIf { it.isNotEmpty() }?.toInt() ?: 0
+            Calendar.getInstance().apply {
+                set(year, month, day, hour, minute, second)
+                set(Calendar.MILLISECOND, 0)
+            }
         } catch (_: Exception) {
             null
         }
     }
 
-    /**
-     * Extract time portion from exam_time string.
-     * e.g. "2026-05-30 18:10-19:45(星期三)" -> "18:10-19:45"
-     */
-    private fun extractTimeOnly(examTime: String?): String? {
-        if (examTime.isNullOrEmpty()) return null
-        val regex = """\d{1,2}:\d{2}[-~]\d{1,2}:\d{2}""".toRegex()
-        return regex.find(examTime)?.value
+    private fun formatExamTime(exam: WidgetExam): String {
+        if (!exam.timeText.isNullOrEmpty()) return exam.timeText
+        val start = extractTime(exam.startAt)
+        val end = extractTime(exam.endAt)
+        return when {
+            start != null && end != null -> "$start-$end"
+            start != null -> start
+            end != null -> end
+            else -> ""
+        }
+    }
+
+    private fun extractTime(value: String?): String? {
+        if (value.isNullOrEmpty()) return null
+        return Regex("""T(\d{2}:\d{2})""").find(value)?.groupValues?.getOrNull(1)
     }
 
     /**
      * Format exam date to short form without year.
-     * e.g. "2026-05-30" -> "5.30"
+     * e.g. "2026-05-30T18:10:00" -> "5.30"
      */
-    private fun formatShortDate(examDate: String): String? {
-        val parts = examDate.split("-")
-        if (parts.size != 3) return null
+    private fun formatShortDate(startAt: String): String? {
+        val match = Regex("""^(\d{4})-(\d{2})-(\d{2})""").find(startAt) ?: return null
         return try {
-            val month = parts[1].toInt()
-            val day = parts[2].toInt()
+            val month = match.groupValues[2].toInt()
+            val day = match.groupValues[3].toInt()
             "${month}.${day}"
         } catch (_: Exception) {
             null

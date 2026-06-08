@@ -56,8 +56,6 @@ export function buildNativeServerConfig(): NativeServerConfig {
       exam: {
         name: ["KCM"],
         exam_name: ["KSMC"],
-        exam_date: ["KSRQ"],
-        exam_time: ["KSSJMS", "KSSJ"],
         exam_location: ["JASMC"],
         seat_number: ["ZWH"],
       },
@@ -76,7 +74,7 @@ export function buildNativeServerConfig(): NativeServerConfig {
         path: config.jwxt.apiPaths.wdksap_dqxnxq,
       },
     },
-    configVersion: 1,
+    configVersion: 2,
   };
 }
 

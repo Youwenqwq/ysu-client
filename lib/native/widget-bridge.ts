@@ -54,8 +54,9 @@ export interface WidgetWeekInfo {
 export interface WidgetExam {
   name: string;
   exam_name?: string;
-  exam_date?: string;
-  exam_time?: string;
+  start_at?: string;
+  end_at?: string;
+  time_text?: string;
   exam_location?: string;
   seat_number?: string;
 }
@@ -126,8 +127,9 @@ export async function syncExamsToWidget(
     const widgetExams: WidgetExam[] = exams.map((e) => ({
       name: e.name,
       exam_name: e.examName,
-      exam_date: e.examDate,
-      exam_time: e.examTime,
+      start_at: e.startAt,
+      end_at: e.endAt,
+      time_text: e.timeText,
       exam_location: e.examLocation,
       seat_number: e.seatNumber,
     }));

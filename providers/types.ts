@@ -294,8 +294,12 @@ export interface CurrentWeek {
 export interface Exam {
   name: string;
   examName?: string;
-  examDate?: string;
-  examTime?: string;
+  /** Local academic-system datetime, formatted as YYYY-MM-DDTHH:mm:ss. */
+  startAt?: string;
+  /** Local academic-system datetime, formatted as YYYY-MM-DDTHH:mm:ss. */
+  endAt?: string;
+  /** Provider-normalized display text for non-logic UI surfaces. */
+  timeText?: string;
   examLocation?: string;
   seatNumber?: string;
   raw?: Record<string, unknown>;
