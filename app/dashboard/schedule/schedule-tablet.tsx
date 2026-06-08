@@ -17,6 +17,7 @@ import type { Course, ClassPeriod, CurrentWeek } from "@/providers/types";
 import {
   computeMergedBlocks,
   buildSectionTimeMap,
+  computeWeekDateLabels,
   courseEndSection,
   courseStartSection,
   isCourseCurrent,
@@ -41,23 +42,6 @@ const DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 const LUNCH_AFTER = 4;
 const DINNER_AFTER = 8;
 
-function computeWeekDates(currentWeek: CurrentWeek | null, selectedWeek: number): (string | null)[] {
-  if (!currentWeek?.date || !currentWeek.week || !currentWeek.weekday) {
-    return Array(7).fill(null);
-  }
-  const base = new Date(currentWeek.date);
-  if (Number.isNaN(base.getTime())) return Array(7).fill(null);
-  const mondayOffset = currentWeek.weekday - 1;
-  const weekDelta = selectedWeek - currentWeek.week;
-  const monday = new Date(base);
-  monday.setDate(base.getDate() - mondayOffset + weekDelta * 7);
-  return DAYS.map((d) => {
-    const dt = new Date(monday);
-    dt.setDate(monday.getDate() + (d - 1));
-    return `${dt.getMonth() + 1}/${dt.getDate()}`;
-  });
-}
-
 export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, selectedWeek, nowMinutes }: Props) {
   const { t } = useTranslation();
   const [overlapDialog, setOverlapDialog] = useState<{ day: number; section: number; courses: Course[] } | null>(null);
@@ -69,7 +53,7 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
 
   const isCurrentWeek = currentWeek?.week === selectedWeek;
   const timeMap = useMemo(() => buildSectionTimeMap(periods), [periods]);
-  const weekDates = useMemo(() => computeWeekDates(currentWeek, selectedWeek), [currentWeek, selectedWeek]);
+  const weekDates = useMemo(() => computeWeekDateLabels(currentWeek, selectedWeek), [currentWeek, selectedWeek]);
 
   const isBlockCurrent = (block: ScheduleBlock): boolean => {
     if (!isCurrentWeek || block.day !== currentWeek?.weekday) return false;

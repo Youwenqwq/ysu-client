@@ -22,6 +22,7 @@ import type { ClassPeriod, Course, CurrentWeek } from "@/providers/types";
 import {
   computeMergedBlocks,
   buildSectionTimeMap,
+  computeWeekDateLabels,
   isCourseCurrent,
   periodEndTime,
   periodStartTime,
@@ -48,23 +49,6 @@ const LUNCH_AFTER = 4;
 const DINNER_AFTER = 8;
 
 type OverlapState = { day: number; section: number; courses: Course[] } | null;
-
-function computeWeekDates(currentWeek: CurrentWeek | null, selectedWeek: number): (string | null)[] {
-  if (!currentWeek?.date || !currentWeek.week || !currentWeek.weekday) {
-    return Array(7).fill(null);
-  }
-  const base = new Date(currentWeek.date);
-  if (Number.isNaN(base.getTime())) return Array(7).fill(null);
-  const mondayOffset = currentWeek.weekday - 1;
-  const weekDelta = selectedWeek - currentWeek.week;
-  const monday = new Date(base);
-  monday.setDate(base.getDate() - mondayOffset + weekDelta * 7);
-  return DAYS.map((d) => {
-    const dt = new Date(monday);
-    dt.setDate(monday.getDate() + (d - 1));
-    return `${dt.getMonth() + 1}/${dt.getDate()}`;
-  });
-}
 
 export function ScheduleMobile({
   courses,
@@ -112,7 +96,7 @@ export function ScheduleMobile({
   }
 
   const weekDates = useMemo(
-    () => computeWeekDates(currentWeek, selectedWeek),
+    () => computeWeekDateLabels(currentWeek, selectedWeek),
     [currentWeek, selectedWeek],
   );
 

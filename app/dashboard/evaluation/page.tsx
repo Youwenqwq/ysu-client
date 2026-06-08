@@ -119,17 +119,33 @@ function getTeacherRelationId(task: EvaluationTask, detail: EvaluationDetail): s
   return (detail.teachers?.[0] as Record<string, unknown> | undefined)?.PJGXID as string | undefined || task.teacherId || "";
 }
 
+function parseTaskTimestamp(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const timestamp = new Date(value.replace(" ", "T")).getTime();
+  return Number.isFinite(timestamp) ? timestamp : undefined;
+}
+
 function getTaskStatus(task: EvaluationTask, t: ReturnType<typeof useTranslation>["t"]): { active: boolean; label: string; variant: "default" | "secondary" | "destructive" | "outline" } {
-  const now = new Date();
-  if (task.startTime) {
-    const start = new Date(task.startTime.replace(" ", "T"));
-    if (now < start) return { active: false, label: t("evaluation.statusNotStarted"), variant: "secondary" };
+  const now = Date.now();
+  const startTimestamp = task.startTimestamp ?? parseTaskTimestamp(task.startAt ?? task.startTime);
+  if (startTimestamp !== undefined && now < startTimestamp) {
+    return { active: false, label: t("evaluation.statusNotStarted"), variant: "secondary" };
   }
-  if (task.endTime) {
-    const end = new Date(task.endTime.replace(" ", "T"));
-    if (now > end) return { active: false, label: t("evaluation.statusEnded"), variant: "destructive" };
+  const endTimestamp = task.endTimestamp ?? parseTaskTimestamp(task.endAt ?? task.endTime);
+  if (endTimestamp !== undefined && now > endTimestamp) {
+    return { active: false, label: t("evaluation.statusEnded"), variant: "destructive" };
   }
-  return { active: true, label: t("evaluation.statusActive"), variant: "default" };
+
+  switch (task.status) {
+    case "not_started":
+      return { active: false, label: t("evaluation.statusNotStarted"), variant: "secondary" };
+    case "ended":
+      return { active: false, label: t("evaluation.statusEnded"), variant: "destructive" };
+    case "active":
+    case "unknown":
+    default:
+      return { active: true, label: t("evaluation.statusActive"), variant: "default" };
+  }
 }
 
 export default function EvaluationPage() {

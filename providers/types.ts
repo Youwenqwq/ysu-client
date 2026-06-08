@@ -235,17 +235,29 @@ export interface GPAStats {
   planName?: string;
   studyType?: string;
   requiredCreditEarned?: string;
+  numericRequiredCreditEarned?: number;
   electiveCreditEarned?: string;
+  numericElectiveCreditEarned?: number;
   degreeCreditEarned?: string;
+  numericDegreeCreditEarned?: number;
   requiredCreditFailed?: string;
+  numericRequiredCreditFailed?: number;
   gpaInitial?: string;
+  numericGpaInitial?: number;
   gpaHighest?: string;
+  numericGpaHighest?: number;
   requiredGpaHighest?: string;
+  numericRequiredGpaHighest?: number;
   degreeGpaInitial?: string;
+  numericDegreeGpaInitial?: number;
   degreeGpaHighest?: string;
+  numericDegreeGpaHighest?: number;
   weightedAvg?: string;
+  numericWeightedAvg?: number;
   arithmeticAvg?: string;
+  numericArithmeticAvg?: number;
   degreeWeightedAvg?: string;
+  numericDegreeWeightedAvg?: number;
 }
 
 /** A single scheduled course session (one time slot). */
@@ -273,6 +285,8 @@ export interface ClassPeriod {
   section: number;
   startTime?: string;
   endTime?: string;
+  startMinute?: number;
+  endMinute?: number;
   isInUse: boolean;
   raw?: Record<string, unknown>;
 }
@@ -291,10 +305,15 @@ export interface CurrentWeek {
   weekday: number;
   semester?: string;
   date?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  weekDates?: string[];
   raw?: Record<string, unknown>;
 }
 
 /** An exam arrangement entry. */
+export type ExamStatus = "upcoming" | "completed" | "unknown";
+
 export interface Exam {
   name: string;
   examName?: string;
@@ -302,6 +321,9 @@ export interface Exam {
   startAt?: string;
   /** Local academic-system datetime, formatted as YYYY-MM-DDTHH:mm:ss. */
   endAt?: string;
+  startTimestamp?: number;
+  endTimestamp?: number;
+  status?: ExamStatus;
   /** Provider-normalized display text for non-logic UI surfaces. */
   timeText?: string;
   examLocation?: string;
@@ -314,6 +336,8 @@ export interface EvaluationType {
   code?: string;
   count: number;
 }
+
+export type EvaluationTaskStatus = "not_started" | "active" | "ended" | "unknown";
 
 /** A teaching-evaluation task header. */
 export interface EvaluationTask {
@@ -331,6 +355,13 @@ export interface EvaluationTask {
   categoryName?: string;
   startTime?: string;
   endTime?: string;
+  /** Local academic-system datetime, formatted as YYYY-MM-DDTHH:mm:ss. */
+  startAt?: string;
+  /** Local academic-system datetime, formatted as YYYY-MM-DDTHH:mm:ss. */
+  endAt?: string;
+  startTimestamp?: number;
+  endTimestamp?: number;
+  status?: EvaluationTaskStatus;
   sequence: number;
   className?: string;
   groupNo?: string;
@@ -416,8 +447,11 @@ export interface AcademicWarning {
 export interface AcademicCompletion {
   planName?: string;
   totalRequired?: string;
+  numericTotalRequired?: number;
   completed?: string;
+  numericCompleted?: number;
   elective?: string;
+  numericElective?: number;
   passed: boolean;
 }
 
@@ -432,6 +466,9 @@ export interface LessonActivity {
   isEnd: boolean;
   isCreator: boolean;
   createTime: string | null;
+  /** Local mobile-system datetime, formatted as YYYY-MM-DDTHH:mm:ss when parseable. */
+  createAt?: string;
+  createTimestamp?: number;
   raw?: Record<string, unknown>;
 }
 
@@ -460,9 +497,15 @@ export interface SigninActivityDetail {
   activityId: string;
   duration: number;
   endTime: string;
+  /** Local mobile-system datetime, formatted as YYYY-MM-DDTHH:mm:ss when parseable. */
+  endAt?: string;
+  endTimestamp?: number;
   leftSeconds: number;
   signinType: number;
   startTime: string;
+  /** Local mobile-system datetime, formatted as YYYY-MM-DDTHH:mm:ss when parseable. */
+  startAt?: string;
+  startTimestamp?: number;
   raw?: Record<string, unknown>;
 }
 

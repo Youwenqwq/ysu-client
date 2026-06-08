@@ -39,6 +39,8 @@ export interface LessonActivity {
   readonly isEnd: boolean;
   readonly isCreator: boolean;
   readonly createTime: string | null;
+  readonly createAt?: string;
+  readonly createTimestamp?: number;
   readonly raw: Record<string, unknown>;
 }
 
@@ -52,9 +54,13 @@ export interface SigninActivityDetail {
   readonly activityId: string;
   readonly duration: number;
   readonly endTime: string;
+  readonly endAt?: string;
+  readonly endTimestamp?: number;
   readonly leftSeconds: number;
   readonly signinType: number;
   readonly startTime: string;
+  readonly startAt?: string;
+  readonly startTimestamp?: number;
   readonly raw: Record<string, unknown>;
 }
 
@@ -522,6 +528,21 @@ function rawInt(
   return Math.trunc(rawNum(raw, ...keys));
 }
 
+function normalizeLocalDateTime(value: string | null): string | undefined {
+  if (!value) return undefined;
+  const text = value.trim();
+  const match = text.match(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2}).*?(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return undefined;
+  const [, year, month, day, hour, minute, second = '00'] = match;
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute}:${second}`;
+}
+
+function localDateTimeTimestamp(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : undefined;
+}
+
 function parseCurrentLesson(raw: Record<string, unknown>): CurrentLesson {
   const list = Array.isArray(raw['activityList'])
     ? (raw['activityList'] as unknown[])
@@ -542,6 +563,8 @@ function parseLessonActivity(
   const statusRaw = raw['status'];
   const titleRaw = raw['title'];
   const iconRaw = raw['icon'];
+  const createTime = raw['createTime'] == null ? null : rawStr(raw, 'createTime');
+  const createAt = normalizeLocalDateTime(createTime);
   return {
     activityId: rawStr(raw, 'activityId'),
     type: typeRaw == null ? null : rawInt(raw, 'type'),
@@ -552,7 +575,9 @@ function parseLessonActivity(
     signClazz: rawStr(raw, 'signClazz'),
     isEnd: Boolean(raw['isEnd']),
     isCreator: Boolean(raw['isCreator']),
-    createTime: raw['createTime'] == null ? null : rawStr(raw, 'createTime'),
+    createTime,
+    createAt,
+    createTimestamp: localDateTimeTimestamp(createAt),
     raw,
   };
 }
@@ -560,13 +585,21 @@ function parseLessonActivity(
 function parseSigninActivityDetail(
   raw: Record<string, unknown>,
 ): SigninActivityDetail {
+  const endTime = rawStr(raw, 'endTime');
+  const startTime = rawStr(raw, 'startTime');
+  const endAt = normalizeLocalDateTime(endTime);
+  const startAt = normalizeLocalDateTime(startTime);
   return {
     activityId: rawStr(raw, 'activityId'),
     duration: rawInt(raw, 'duration'),
-    endTime: rawStr(raw, 'endTime'),
+    endTime,
+    endAt,
+    endTimestamp: localDateTimeTimestamp(endAt),
     leftSeconds: rawInt(raw, 'leftSeconds'),
     signinType: rawInt(raw, 'signinType'),
-    startTime: rawStr(raw, 'startTime'),
+    startTime,
+    startAt,
+    startTimestamp: localDateTimeTimestamp(startAt),
     raw,
   };
 }

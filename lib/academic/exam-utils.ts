@@ -6,6 +6,12 @@ function parseLocalDateTime(value: string | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function dateFromTimestamp(value: number | undefined): Date | null {
+  if (value === undefined) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function formatTimeFromDateTime(value: string | undefined): string | null {
   if (!value) return null;
   const match = value.match(/T(\d{2}:\d{2})/);
@@ -13,17 +19,19 @@ function formatTimeFromDateTime(value: string | undefined): string | null {
 }
 
 export function getExamStartTime(exam: Exam): Date | null {
-  return parseLocalDateTime(exam.startAt);
+  return dateFromTimestamp(exam.startTimestamp) ?? parseLocalDateTime(exam.startAt);
 }
 
 export function getExamEndTime(exam: Exam): Date | null {
-  return parseLocalDateTime(exam.endAt) ?? parseLocalDateTime(exam.startAt);
+  return dateFromTimestamp(exam.endTimestamp) ?? parseLocalDateTime(exam.endAt) ?? getExamStartTime(exam);
 }
 
 export function isExamCompleted(exam: Exam, now: Date = new Date()): boolean {
   const end = getExamEndTime(exam);
-  if (!end) return false;
-  return end < now;
+  if (end) return end < now;
+  if (exam.status === "completed") return true;
+  if (exam.status === "upcoming") return false;
+  return false;
 }
 
 export function compareExamStartTime(a: Exam, b: Exam): number {

@@ -61,6 +61,8 @@ export interface ClassPeriod {
   readonly section: number;
   readonly startTime: string;
   readonly endTime: string;
+  readonly startMinute?: number;
+  readonly endMinute?: number;
   readonly isInUse: boolean;
   readonly raw: Record<string, unknown>;
 }
@@ -79,14 +81,22 @@ export interface CurrentWeek {
   readonly weekday: number;
   readonly term: string;
   readonly date: string;
+  readonly weekStartDate?: string;
+  readonly weekEndDate?: string;
+  readonly weekDates?: readonly string[];
   readonly raw: Record<string, unknown>;
 }
+
+export type ExamStatus = 'upcoming' | 'completed' | 'unknown';
 
 export interface Exam {
   readonly name: string;
   readonly examName: string;
   readonly startAt: string;
   readonly endAt: string;
+  readonly startTimestamp?: number;
+  readonly endTimestamp?: number;
+  readonly status?: ExamStatus;
   readonly timeText: string;
   readonly examLocation: string;
   readonly seatNumber: string;
@@ -161,17 +171,29 @@ export interface GPAStats {
   readonly planName: string;
   readonly studyType: string;
   readonly requiredCreditEarned: string;
+  readonly numericRequiredCreditEarned?: number;
   readonly electiveCreditEarned: string;
+  readonly numericElectiveCreditEarned?: number;
   readonly degreeCreditEarned: string;
+  readonly numericDegreeCreditEarned?: number;
   readonly requiredCreditFailed: string;
+  readonly numericRequiredCreditFailed?: number;
   readonly gpaInitial: string;
+  readonly numericGpaInitial?: number;
   readonly gpaHighest: string;
+  readonly numericGpaHighest?: number;
   readonly requiredGpaHighest: string;
+  readonly numericRequiredGpaHighest?: number;
   readonly degreeGpaInitial: string;
+  readonly numericDegreeGpaInitial?: number;
   readonly degreeGpaHighest: string;
+  readonly numericDegreeGpaHighest?: number;
   readonly weightedAvg: string;
+  readonly numericWeightedAvg?: number;
   readonly arithmeticAvg: string;
+  readonly numericArithmeticAvg?: number;
   readonly degreeWeightedAvg: string;
+  readonly numericDegreeWeightedAvg?: number;
   readonly raw: Record<string, unknown>;
 }
 
@@ -219,8 +241,11 @@ export interface AcademicWarning {
 export interface AcademicCompletion {
   readonly planName: string;
   readonly totalRequired: string;
+  readonly numericTotalRequired?: number;
   readonly completed: string;
+  readonly numericCompleted?: number;
   readonly elective: string;
+  readonly numericElective?: number;
   readonly passed: boolean;
   readonly raw: Record<string, unknown>;
 }
@@ -231,6 +256,8 @@ export interface EvaluationType {
   readonly count: number;
   readonly raw: Record<string, unknown>;
 }
+
+export type EvaluationTaskStatus = 'not_started' | 'active' | 'ended' | 'unknown';
 
 export interface EvaluationTask {
   readonly wid: string;
@@ -247,6 +274,11 @@ export interface EvaluationTask {
   readonly categoryName: string;
   readonly startTime: string;
   readonly endTime: string;
+  readonly startAt?: string;
+  readonly endAt?: string;
+  readonly startTimestamp?: number;
+  readonly endTimestamp?: number;
+  readonly status?: EvaluationTaskStatus;
   readonly sequence: number;
   readonly className: string;
   readonly groupNo: string;
@@ -512,9 +544,76 @@ function combineLocalDateTime(date: string, time: string): string {
   return date && time ? `${date}T${time}:00` : '';
 }
 
+function normalizeLocalDateTime(value: string): string {
+  const text = cleanText(value);
+  const date = normalizeDate(text);
+  if (!date) return '';
+  const time = normalizeTime(text) || '00:00';
+  const secondsMatch = text.match(/\d{1,2}:\d{2}:(\d{2})/);
+  const seconds = secondsMatch ? secondsMatch[1] : '00';
+  return `${date}T${time}:${seconds}`;
+}
+
+function localDateTimeTimestamp(value: string): number | undefined {
+  if (!value) return undefined;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : undefined;
+}
+
+function timeToMinute(value: string): number | undefined {
+  const time = normalizeTime(value);
+  if (!time) return undefined;
+  const [hour, minute] = time.split(':').map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return undefined;
+  return hour * 60 + minute;
+}
+
+function formatDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function calculateWeekDates(date: string, weekday: number): { weekStartDate?: string; weekEndDate?: string; weekDates?: string[] } {
+  if (!date || weekday < 1 || weekday > 7) return {};
+  const base = new Date(date);
+  if (Number.isNaN(base.getTime())) return {};
+  const monday = new Date(base);
+  monday.setDate(base.getDate() - (weekday - 1));
+  const weekDates = Array.from({ length: 7 }, (_, idx) => {
+    const dt = new Date(monday);
+    dt.setDate(monday.getDate() + idx);
+    return formatDate(dt);
+  });
+  return {
+    weekStartDate: weekDates[0],
+    weekEndDate: weekDates[6],
+    weekDates,
+  };
+}
+
+function evaluationTaskStatus(startTimestamp?: number, endTimestamp?: number): EvaluationTaskStatus {
+  const now = Date.now();
+  if (startTimestamp !== undefined && now < startTimestamp) return 'not_started';
+  if (endTimestamp !== undefined && now > endTimestamp) return 'ended';
+  if (startTimestamp !== undefined || endTimestamp !== undefined) return 'active';
+  return 'unknown';
+}
+
+function examStatus(startTimestamp?: number, endTimestamp?: number): ExamStatus {
+  const now = Date.now();
+  const effectiveEnd = endTimestamp ?? startTimestamp;
+  if (effectiveEnd === undefined) return 'unknown';
+  return effectiveEnd < now ? 'completed' : 'upcoming';
+}
+
 function parseExamDateTimes(raw: Record<string, unknown>): {
   startAt: string;
   endAt: string;
+  startTimestamp?: number;
+  endTimestamp?: number;
+  status?: ExamStatus;
   timeText: string;
 } {
   const date = normalizeDate(rawStr(raw, 'KSRQ'));
@@ -524,9 +623,17 @@ function parseExamDateTimes(raw: Record<string, unknown>): {
   const endTime = normalizeTime(rawStr(raw, 'JSSJ')) || displayTimes[1] || '';
   const timeText = displayText || (startTime && endTime ? `${startTime}-${endTime}` : startTime || endTime);
 
+  const startAt = combineLocalDateTime(date, startTime);
+  const endAt = combineLocalDateTime(date, endTime);
+  const startTimestamp = localDateTimeTimestamp(startAt);
+  const endTimestamp = localDateTimeTimestamp(endAt);
+
   return {
-    startAt: combineLocalDateTime(date, startTime),
-    endAt: combineLocalDateTime(date, endTime),
+    startAt,
+    endAt,
+    startTimestamp,
+    endTimestamp,
+    status: examStatus(startTimestamp, endTimestamp),
     timeText,
   };
 }
@@ -1482,17 +1589,29 @@ function parseGpaStats(raw: Record<string, unknown>): GPAStats {
     planName: rawStr(raw, 'PYFAMC'),
     studyType: rawStr(raw, 'FAXDLX_DISPLAY'),
     requiredCreditEarned: rawStr(raw, 'BXKHDXF'),
+    numericRequiredCreditEarned: rawOptionalNum(raw, 'BXKHDXF'),
     electiveCreditEarned: rawStr(raw, 'XXKHDXF'),
+    numericElectiveCreditEarned: rawOptionalNum(raw, 'XXKHDXF'),
     degreeCreditEarned: rawStr(raw, 'XWKHDXF'),
+    numericDegreeCreditEarned: rawOptionalNum(raw, 'XWKHDXF'),
     requiredCreditFailed: rawStr(raw, 'BXKBJGXF'),
+    numericRequiredCreditFailed: rawOptionalNum(raw, 'BXKBJGXF'),
     gpaInitial: rawStr(raw, 'PPJDCX'),
+    numericGpaInitial: rawOptionalNum(raw, 'PPJDCX'),
     gpaHighest: rawStr(raw, 'PPJDZG'),
+    numericGpaHighest: rawOptionalNum(raw, 'PPJDZG'),
     requiredGpaHighest: rawStr(raw, 'BXKPPJD'),
+    numericRequiredGpaHighest: rawOptionalNum(raw, 'BXKPPJD'),
     degreeGpaInitial: rawStr(raw, 'XWKPJJDCX'),
+    numericDegreeGpaInitial: rawOptionalNum(raw, 'XWKPJJDCX'),
     degreeGpaHighest: rawStr(raw, 'XWKPJJDZG'),
+    numericDegreeGpaHighest: rawOptionalNum(raw, 'XWKPJJDZG'),
     weightedAvg: rawStr(raw, 'JQPJF'),
+    numericWeightedAvg: rawOptionalNum(raw, 'JQPJF'),
     arithmeticAvg: rawStr(raw, 'SSPJF'),
+    numericArithmeticAvg: rawOptionalNum(raw, 'SSPJF'),
     degreeWeightedAvg: rawStr(raw, 'XWKJQPJF'),
+    numericDegreeWeightedAvg: rawOptionalNum(raw, 'XWKJQPJF'),
     raw,
   };
 }
@@ -1606,11 +1725,15 @@ function parseCourse(raw: Record<string, unknown>): Course {
 }
 
 function parseClassPeriod(raw: Record<string, unknown>): ClassPeriod {
+  const startTime = rawStr(raw, 'KSSJ');
+  const endTime = rawStr(raw, 'JSSJ');
   return {
     name: rawStr(raw, 'MC'),
     section: rawInt(raw, 'DM', 'PX'),
-    startTime: rawStr(raw, 'KSSJ'),
-    endTime: rawStr(raw, 'JSSJ'),
+    startTime,
+    endTime,
+    startMinute: timeToMinute(startTime),
+    endMinute: timeToMinute(endTime),
     isInUse: toBool(raw['SFSY']),
     raw,
   };
@@ -1630,22 +1753,29 @@ function parseTermCalendar(raw: Record<string, unknown>): TermCalendar {
 
 function parseCurrentWeek(raw: Record<string, unknown>): CurrentWeek {
   const rq = rawStr(raw, 'RQ');
+  const date = rq ? (rq.split(' ')[0] ?? '') : '';
+  const weekday = rawInt(raw, 'XQJ');
+  const weekRange = calculateWeekDates(date, weekday);
   return {
     week: rawInt(raw, 'ZC'),
-    weekday: rawInt(raw, 'XQJ'),
+    weekday,
     term: combineTerm(raw),
-    date: rq ? (rq.split(' ')[0] ?? '') : '',
+    date,
+    ...weekRange,
     raw,
   };
 }
 
 function parseExam(raw: Record<string, unknown>): Exam {
-  const { startAt, endAt, timeText } = parseExamDateTimes(raw);
+  const { startAt, endAt, startTimestamp, endTimestamp, status, timeText } = parseExamDateTimes(raw);
   return {
     name: rawStr(raw, 'KCM'),
     examName: rawStr(raw, 'KSMC'),
     startAt,
     endAt,
+    startTimestamp,
+    endTimestamp,
+    status,
     timeText,
     examLocation: rawStr(raw, 'JASMC'),
     seatNumber: rawStr(raw, 'ZWH'),
@@ -1677,8 +1807,11 @@ function parseAcademicCompletion(raw: Record<string, unknown>): AcademicCompleti
   return {
     planName: rawStr(raw, 'PYFAMC'),
     totalRequired: rawStr(raw, 'YQXF'),
+    numericTotalRequired: rawOptionalNum(raw, 'YQXF'),
     completed: rawStr(raw, 'WCXF'),
+    numericCompleted: rawOptionalNum(raw, 'WCXF'),
     elective: rawStr(raw, 'XKXF'),
+    numericElective: rawOptionalNum(raw, 'XKXF'),
     passed: toBool(raw['JSSFTG']),
     raw,
   };
@@ -1709,6 +1842,12 @@ function parseEvaluationTask(raw: Record<string, unknown>): EvaluationTask {
     seq === undefined || seq === null || seq === '' || seq === 0
       ? 1
       : rawInt(raw, 'XUH');
+  const startTime = rawStr(raw, 'KSSJ');
+  const endTime = rawStr(raw, 'JSSJ');
+  const startAt = normalizeLocalDateTime(startTime) || undefined;
+  const endAt = normalizeLocalDateTime(endTime) || undefined;
+  const startTimestamp = localDateTimeTimestamp(startAt ?? '');
+  const endTimestamp = localDateTimeTimestamp(endAt ?? '');
   return {
     wid: rawStr(raw, 'WID'),
     wjid: rawStr(raw, 'WJID'),
@@ -1722,8 +1861,13 @@ function parseEvaluationTask(raw: Record<string, unknown>): EvaluationTask {
     evalTypeName: rawStr(raw, 'PJLXMC'),
     category: rawStr(raw, 'PJLBDM'),
     categoryName: rawStr(raw, 'PJLBMC'),
-    startTime: rawStr(raw, 'KSSJ'),
-    endTime: rawStr(raw, 'JSSJ'),
+    startTime,
+    endTime,
+    startAt,
+    endAt,
+    startTimestamp,
+    endTimestamp,
+    status: evaluationTaskStatus(startTimestamp, endTimestamp),
     sequence,
     className: rawStr(raw, 'BJMC'),
     groupNo: rawStr(raw, 'GROUPNO'),

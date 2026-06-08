@@ -1,4 +1,4 @@
-import type { Course, ClassPeriod } from "@/providers/types";
+import type { Course, ClassPeriod, CurrentWeek } from "@/providers/types";
 
 export type ScheduleCourse = Course;
 export type ScheduleClassPeriod = ClassPeriod;
@@ -37,13 +37,59 @@ export function parseTimeToMinutes(timeStr: string | undefined): number | null {
 export function buildSectionTimeMap(periods: ScheduleClassPeriod[]): Record<number, [number, number]> {
   const map: Record<number, [number, number]> = {};
   for (const p of periods) {
-    const start = parseTimeToMinutes(periodStartTime(p));
-    const end = parseTimeToMinutes(periodEndTime(p));
-    if (start !== null && end !== null) {
+    const start = Number.isFinite(p.startMinute) ? p.startMinute : parseTimeToMinutes(periodStartTime(p));
+    const end = Number.isFinite(p.endMinute) ? p.endMinute : parseTimeToMinutes(periodEndTime(p));
+    if (start !== null && start !== undefined && end !== null && end !== undefined) {
       map[p.section] = [start, end];
     }
   }
   return map;
+}
+
+function formatShortDate(value: string | undefined): string | null {
+  if (!value) return null;
+  const parts = value.split("-").map(Number);
+  if (parts.length === 3 && parts.every(Number.isFinite)) {
+    return `${parts[1]}/${parts[2]}`;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+export function computeWeekDateLabels(currentWeek: CurrentWeek | null, selectedWeek: number): (string | null)[] {
+  if (!currentWeek?.week) return Array(7).fill(null);
+
+  if (Array.isArray(currentWeek.weekDates) && currentWeek.weekDates.length === 7) {
+    if (selectedWeek === currentWeek.week) {
+      return currentWeek.weekDates.map(formatShortDate);
+    }
+    const start = currentWeek.weekStartDate ?? currentWeek.weekDates[0];
+    if (start) {
+      const base = new Date(start);
+      if (!Number.isNaN(base.getTime())) {
+        base.setDate(base.getDate() + (selectedWeek - currentWeek.week) * 7);
+        return Array.from({ length: 7 }, (_, idx) => {
+          const dt = new Date(base);
+          dt.setDate(base.getDate() + idx);
+          return `${dt.getMonth() + 1}/${dt.getDate()}`;
+        });
+      }
+    }
+  }
+
+  if (!currentWeek.date || !currentWeek.weekday) return Array(7).fill(null);
+  const base = new Date(currentWeek.date);
+  if (Number.isNaN(base.getTime())) return Array(7).fill(null);
+  const mondayOffset = currentWeek.weekday - 1;
+  const weekDelta = selectedWeek - currentWeek.week;
+  const monday = new Date(base);
+  monday.setDate(base.getDate() - mondayOffset + weekDelta * 7);
+  return Array.from({ length: 7 }, (_, idx) => {
+    const dt = new Date(monday);
+    dt.setDate(monday.getDate() + idx);
+    return `${dt.getMonth() + 1}/${dt.getDate()}`;
+  });
 }
 
 export function isCoursePast(

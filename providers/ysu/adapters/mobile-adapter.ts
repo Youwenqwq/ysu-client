@@ -80,6 +80,8 @@ export class YSUMobileAdapter {
           isEnd: activity.isEnd,
           isCreator: activity.isCreator,
           createTime: activity.createTime,
+          createAt: activity.createAt,
+          createTimestamp: activity.createTimestamp,
           raw: activity.raw,
         })),
         raw: result.raw,
@@ -94,9 +96,13 @@ export class YSUMobileAdapter {
         activityId: result.activityId,
         duration: result.duration,
         endTime: result.endTime,
+        endAt: result.endAt,
+        endTimestamp: result.endTimestamp,
         leftSeconds: result.leftSeconds,
         signinType: result.signinType,
         startTime: result.startTime,
+        startAt: result.startAt,
+        startTimestamp: result.startTimestamp,
         raw: result.raw,
       };
     });
