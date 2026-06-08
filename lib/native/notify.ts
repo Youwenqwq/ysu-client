@@ -10,6 +10,7 @@ import { useSettingsStore } from "../stores/settings";
 import { useAuthStore } from "../stores/auth";
 import { isCapacitor } from "./platform";
 import { NotifyPlugin } from "./notify-plugin";
+import { isCourseActiveInWeek } from "@/app/dashboard/schedule/schedule-utils";
 import type { Course, CurrentWeek, ClassPeriod, ProviderNativeNotification } from "@/providers/types";
 
 // ─── Config Sync ────────────────────────────────────────────────────────── //
@@ -182,22 +183,6 @@ function parseTimeToMinutes(timeStr: string): number {
   const parts = timeStr.split(":");
   if (parts.length < 2) return 0;
   return parseInt(parts[0]!, 10) * 60 + parseInt(parts[1]!, 10);
-}
-
-function isCourseActiveInWeek(course: Course, week: number): boolean {
-  const weeksStr = course.weeks;
-  if (!weeksStr) return true;
-  const weeks = new Set<number>();
-  for (const part of weeksStr.replace(/[周第\s]/g, "").split(/[,，]/)) {
-    if (part.includes("-")) {
-      const [start, end] = part.split("-").map((s) => parseInt(s, 10));
-      if (!isNaN(start) && !isNaN(end)) for (let w = start; w <= end; w++) weeks.add(w);
-    } else {
-      const n = parseInt(part, 10);
-      if (!isNaN(n)) weeks.add(n);
-    }
-  }
-  return weeks.size === 0 || weeks.has(week);
 }
 
 export function computeClassAlarms(

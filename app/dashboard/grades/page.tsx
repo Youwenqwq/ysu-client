@@ -54,6 +54,12 @@ import { Search, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown } from 
 
 const ALL_TERM = "__all__";
 
+function numericValue(value: number | undefined, fallback?: string): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const parsed = Number(fallback);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 export default function GradesPage() {
   const provider = useProvider();
   const { t } = useTranslation();
@@ -210,10 +216,10 @@ export default function GradesPage() {
   const sorted = useMemo(() => {
     if (sortMode === "default") return filtered;
     return [...filtered].sort((a, b) => {
-      const scoreA = parseFloat(a.score || "");
-      const scoreB = parseFloat(b.score || "");
-      const validA = Number.isFinite(scoreA);
-      const validB = Number.isFinite(scoreB);
+      const scoreA = numericValue(a.numericScore, a.score);
+      const scoreB = numericValue(b.numericScore, b.score);
+      const validA = scoreA !== undefined;
+      const validB = scoreB !== undefined;
       if (!validA && !validB) return 0;
       if (!validA) return 1;
       if (!validB) return -1;
@@ -226,9 +232,9 @@ export default function GradesPage() {
     let totalWeightedPoints = 0;
     let totalCredits = 0;
     for (const g of filtered) {
-      const gp = parseFloat(g.gradePoint ?? "");
-      const cr = parseFloat(g.credit ?? "");
-      if (Number.isFinite(gp) && Number.isFinite(cr) && cr > 0) {
+      const gp = numericValue(g.numericGradePoint, g.gradePoint);
+      const cr = numericValue(g.numericCredit, g.credit);
+      if (gp !== undefined && cr !== undefined && cr > 0) {
         totalWeightedPoints += gp * cr;
         totalCredits += cr;
       }

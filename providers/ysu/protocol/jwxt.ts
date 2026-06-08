@@ -46,6 +46,7 @@ export interface Course {
   readonly startSection: number;
   readonly endSection: number;
   readonly weeks: string;
+  readonly weekList: number[];
   readonly credit: string;
   readonly courseType: string;
   readonly classId: string;
@@ -97,9 +98,12 @@ export interface Grade {
   readonly courseCode: string;
   readonly classId: string;
   readonly score: string;
+  readonly numericScore?: number;
   readonly gradeLevel: string;
   readonly gradePoint: string;
+  readonly numericGradePoint?: number;
   readonly credit: string;
+  readonly numericCredit?: number;
   readonly hours: string;
   readonly term: string;
   readonly courseType: string;
@@ -543,8 +547,37 @@ function rawNum(raw: Record<string, unknown>, ...keys: readonly string[]): numbe
   return 0;
 }
 
+function rawOptionalNum(raw: Record<string, unknown>, ...keys: readonly string[]): number | undefined {
+  for (const k of keys) {
+    const v = raw[k];
+    if (v === undefined || v === null || v === '') continue;
+    const n = typeof v === 'number' ? v : Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
 function rawInt(raw: Record<string, unknown>, ...keys: readonly string[]): number {
   return Math.trunc(rawNum(raw, ...keys));
+}
+
+function parseWeekList(weeksStr: string): number[] {
+  const result = new Set<number>();
+  if (!weeksStr) return [];
+  const cleaned = weeksStr.replace(/[周第\s]/g, '');
+  const parts = cleaned.split(/[,，]/);
+  for (const part of parts) {
+    if (part.includes('-')) {
+      const [start, end] = part.split('-').map((s) => parseInt(s, 10));
+      if (!isNaN(start) && !isNaN(end)) {
+        for (let w = start; w <= end; w++) result.add(w);
+      }
+    } else {
+      const n = parseInt(part, 10);
+      if (!isNaN(n)) result.add(n);
+    }
+  }
+  return Array.from(result).sort((a, b) => a - b);
 }
 
 const TJLX_TO_SCOPE: Readonly<Record<string, string>> = {
@@ -1419,9 +1452,12 @@ function parseGrade(raw: Record<string, unknown>): Grade {
     courseCode: rawStr(raw, 'XSKCH', 'KCH'),
     classId: rawStr(raw, 'JXBID'),
     score,
+    numericScore: rawOptionalNum(raw, 'ZCJ'),
     gradeLevel: rawStr(raw, 'XSZCJMC'),
     gradePoint: rawStr(raw, 'XFJD'),
+    numericGradePoint: rawOptionalNum(raw, 'XFJD'),
     credit: rawStr(raw, 'XF'),
+    numericCredit: rawOptionalNum(raw, 'XF'),
     hours: rawStr(raw, 'XS'),
     term: rawStr(raw, 'XNXQDM'),
     courseType: rawStr(raw, 'KCXZDM_DISPLAY', 'KCXZDM'),
@@ -1548,6 +1584,7 @@ function combineTerm(raw: Record<string, unknown>): string {
 }
 
 function parseCourse(raw: Record<string, unknown>): Course {
+  const weeks = rawStr(raw, 'ZCMC');
   return {
     name: rawStr(raw, 'KCM'),
     code: rawStr(raw, 'KCH'),
@@ -1556,7 +1593,8 @@ function parseCourse(raw: Record<string, unknown>): Course {
     weekDay: rawInt(raw, 'SKXQ', 'XQ'),
     startSection: rawInt(raw, 'KSJC'),
     endSection: rawInt(raw, 'JSJC'),
-    weeks: rawStr(raw, 'ZCMC'),
+    weeks,
+    weekList: parseWeekList(weeks),
     credit: rawStr(raw, 'XF'),
     courseType: rawStr(raw, 'KCXZDM'),
     classId: rawStr(raw, 'JXBID'),

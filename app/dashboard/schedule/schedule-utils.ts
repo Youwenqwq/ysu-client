@@ -89,7 +89,7 @@ export function parseWeeks(weeksStr: string): number[] {
 }
 
 export function isCourseActiveInWeek(course: ScheduleCourse, week: number): boolean {
-  const weeks = parseWeeks(course.weeks || "");
+  const weeks = course.weekList ?? parseWeeks(course.weeks || "");
   if (weeks.length === 0) return true;
   return weeks.includes(week);
 }

@@ -171,9 +171,12 @@ export interface Grade {
   courseCode?: string;
   classId?: string;
   score?: string;
+  numericScore?: number;
   gradeLevel?: string;
   gradePoint?: string;
+  numericGradePoint?: number;
   credit?: string;
+  numericCredit?: number;
   hours?: string;
   semester?: string;
   courseType?: string;
@@ -255,6 +258,7 @@ export interface Course {
   startSection: number;
   endSection: number;
   weeks?: string;
+  weekList?: number[];
   credit?: string;
   courseType?: string;
   classId?: string;
