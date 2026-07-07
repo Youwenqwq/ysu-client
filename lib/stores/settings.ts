@@ -35,6 +35,7 @@ interface SettingsState {
   widgetShowNextDaySchedule: boolean;
   avatarImage: string;
   customUserAgent: string;
+  customUserAgentEnabled: boolean;
   customCerBaseUrl: string;
   customJwxtBaseUrl: string;
   schoolId: string;
@@ -66,6 +67,7 @@ interface SettingsState {
   setWidgetShowNextDaySchedule: (v: boolean) => void;
   setAvatarImage: (image: string) => void;
   setCustomUserAgent: (ua: string) => void;
+  setCustomUserAgentEnabled: (v: boolean) => void;
   setCustomCerBaseUrl: (url: string) => void;
   setCustomJwxtBaseUrl: (url: string) => void;
   setSchoolId: (id: string) => void;
@@ -102,6 +104,7 @@ export const useSettingsStore = create<SettingsState>()(
       widgetShowNextDaySchedule: false,
       avatarImage: "",
       customUserAgent: "",
+      customUserAgentEnabled: false,
       customCerBaseUrl: "",
       customJwxtBaseUrl: "",
       schoolId: "ysu",
@@ -133,6 +136,7 @@ export const useSettingsStore = create<SettingsState>()(
       setWidgetShowNextDaySchedule: (widgetShowNextDaySchedule) => set({ widgetShowNextDaySchedule }),
       setAvatarImage: (avatarImage) => set({ avatarImage }),
       setCustomUserAgent: (customUserAgent) => set({ customUserAgent }),
+      setCustomUserAgentEnabled: (customUserAgentEnabled) => set({ customUserAgentEnabled }),
       setCustomCerBaseUrl: (customCerBaseUrl) => set({ customCerBaseUrl }),
       setCustomJwxtBaseUrl: (customJwxtBaseUrl) => set({ customJwxtBaseUrl }),
       setSchoolId: (schoolId) => set({ schoolId }),

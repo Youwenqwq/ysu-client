@@ -3,6 +3,7 @@
  *
  * 纯函数 + 模块级状态(cookie jar)。
  */
+import { APP_VERSION } from "@/lib/version";
 import {
   SimpleCookieJar,
   CookieEntry,
@@ -23,7 +24,6 @@ import {
   getCasCookieDomain,
   getSchoolConfig,
 } from "@/lib/server-config";
-import { getCustomUserAgent } from "@/lib/custom-user-agent";
 import type { YSUMfaMethod } from "../types";
 
 // ─── Constants ────────────────────────────────────────────────────────── //
@@ -44,10 +44,9 @@ const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308]
 
 // CAS serves different reAuth pages based on User-Agent.
 // The mobile version lacks WeChat MFA (only SMS/Cpdaily/WeChat Work).
-// Use a desktop UA by default to get the PC reAuth flow with reAuthType=8 (WeChat).
-function casUserAgent(): string {
-  return getCustomUserAgent();
-}
+// Use a desktop UA to get the PC reAuth flow with reAuthType=8 (WeChat).
+const DESKTOP_UA =
+  `Mozilla/5.0 (X11; Linux x86_64) ysu-client/${APP_VERSION}`;
 
 // ─── Types ────────────────────────────────────────────────────────────── //
 
@@ -739,7 +738,7 @@ export async function initiateWechatMFA(): Promise<WechatMFAContext> {
     method: 'GET',
     url: `${casUrls.combinedLogin}?type=weixin&reAuth=2&success=${success}&skipTmpReAuth=false`,
     headers: {
-      'User-Agent': casUserAgent(),
+      'User-Agent': DESKTOP_UA,
       Referer: referer,
     },
     redirect: 'manual',
@@ -793,7 +792,7 @@ export async function initiateWechatMFA(): Promise<WechatMFAContext> {
   const wxResp = await fetch(wxOAuthUrl, {
     method: 'GET',
     headers: {
-      'User-Agent': casUserAgent(),
+      'User-Agent': DESKTOP_UA,
       Accept: 'text/html',
     },
     signal: AbortSignal.timeout(8_000),
@@ -826,7 +825,7 @@ export async function pollWechatQR(
     headers: {
       Referer: 'https://open.weixin.qq.com/',
       'User-Agent':
-        casUserAgent(),
+        DESKTOP_UA,
     },
     signal: AbortSignal.timeout(Math.min(timeoutMs, 30_000)),
   });
@@ -1022,7 +1021,7 @@ async function classifyStep1Response(
         url: absoluteLocation,
         headers: {
           'User-Agent':
-            casUserAgent(),
+            DESKTOP_UA,
         },
         redirect: 'manual',
         timeoutMs,
