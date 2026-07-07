@@ -1,3 +1,5 @@
+## 应学校合规要求，本 App 不再维护，Release 已全部失效，请不要下载。
+
 <p align="center">
   <img src="public/icon.svg" width="128" height="128" alt="燕大终端图标" />
 </p>
