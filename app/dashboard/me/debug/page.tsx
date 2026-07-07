@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { isCapacitor } from "@/lib/native/platform";
@@ -13,9 +21,14 @@ import { getSchoolConfig, getSchoolId, serverConfig } from "@/lib/server-config"
 import { loadRememberedCredentials } from "@/lib/storage/secure";
 import { useProvider } from "@/providers/use-provider";
 import { useSettingsStore } from "@/lib/stores/settings";
+import {
+  getCustomUserAgent,
+  normalizeCustomUserAgent,
+  USER_AGENT_PRESETS,
+} from "@/lib/custom-user-agent";
 import { startNativePolling, stopNativePolling } from "@/lib/native/notify";
 import { NotifyPlugin } from "@/lib/native/notify-plugin";
-import { RefreshCw, Trash2, Bug, Bell, Play, Send, Smartphone, Shield, Power } from "lucide-react";
+import { RefreshCw, Trash2, Bug, Bell, Play, Send, Smartphone, Shield, Power, Save, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { clearAllCache } from "@/lib/storage/cache";
 
@@ -33,6 +46,7 @@ interface DiagnosticResult {
   platform: {
     name: string;
     userAgent: string;
+    requestUserAgent: string;
     screen: string;
     viewport: string;
     capacitorPlatform?: string;
@@ -81,6 +95,8 @@ export default function DebugPage() {
   const [cachedGradeCount, setCachedGradeCount] = useState<number | null>(null);
   const [cachedExamCount, setCachedExamCount] = useState<number | null>(null);
 
+  const customUserAgent = useSettingsStore((s) => s.customUserAgent);
+  const setCustomUserAgent = useSettingsStore((s) => s.setCustomUserAgent);
   const notifyEnabled = useSettingsStore((s) => s.notifyEnabled);
   const notifyCheckInterval = useSettingsStore((s) => s.notifyCheckInterval);
   const notifyGrades = useSettingsStore((s) => s.notifyGrades);
@@ -95,6 +111,11 @@ export default function DebugPage() {
     academicSession: t("debug.academicSession"),
     mobileAuth: t("debug.mobileAuth"),
   };
+  const [uaDraft, setUaDraft] = useState(customUserAgent);
+
+  useEffect(() => {
+    setUaDraft(customUserAgent);
+  }, [customUserAgent]);
 
   function logNative(msg: string) {
     setNativeTestLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
@@ -154,6 +175,7 @@ export default function DebugPage() {
         platform: {
           name: platformName,
           userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "N/A",
+          requestUserAgent: getCustomUserAgent(),
           screen: screenInfo,
           viewport: viewportInfo,
           capacitorPlatform,
@@ -380,6 +402,22 @@ export default function DebugPage() {
     setNativeTestLog([]);
   }
 
+  function handlePresetUserAgent(value: string) {
+    setUaDraft(value);
+  }
+
+  function handleSaveUserAgent() {
+    setCustomUserAgent(normalizeCustomUserAgent(uaDraft));
+    toast.success(t("debug.userAgentSaved"));
+    runDiagnostics();
+  }
+
+  function handleResetUserAgent() {
+    setCustomUserAgent("");
+    setUaDraft("");
+    toast.success(t("debug.userAgentReset"));
+    runDiagnostics();
+  }
 
   function statusBadge(value: boolean | null | { ok: boolean | null; error?: string }) {
     if (typeof value === "boolean") {
@@ -441,6 +479,47 @@ export default function DebugPage() {
               <div className="flex flex-col gap-0.5">
                 <span className="text-muted-foreground">{t("debug.platformUserAgent")}</span>
                 <span className="break-all text-[10px] font-mono text-muted-foreground">{diag.platform.userAgent}</span>
+              </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{t("debug.requestUserAgent")}</span>
+                  {customUserAgent ? (
+                    <Badge variant="secondary" className="text-[10px]">{t("debug.customUserAgent")}</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px]">{t("debug.defaultUserAgent")}</Badge>
+                  )}
+                </div>
+                <span className="break-all text-[10px] font-mono text-muted-foreground">
+                  {diag.platform.requestUserAgent}
+                </span>
+                <Select onValueChange={handlePresetUserAgent}>
+                  <SelectTrigger className="w-full" size="sm">
+                    <SelectValue placeholder={t("debug.selectUserAgentPreset")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {USER_AGENT_PRESETS.map((preset) => (
+                      <SelectItem key={preset.id} value={preset.value}>
+                        {preset.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Textarea
+                  value={uaDraft}
+                  onChange={(event) => setUaDraft(event.target.value)}
+                  placeholder={t("debug.emptyUserAgentPlaceholder")}
+                  className="min-h-20 text-[11px] font-mono"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" size="sm" onClick={handleResetUserAgent}>
+                    <RotateCcw className="size-3.5 mr-1" />
+                    {t("debug.resetUserAgent")}
+                  </Button>
+                  <Button size="sm" onClick={handleSaveUserAgent}>
+                    <Save className="size-3.5 mr-1" />
+                    {t("debug.saveUserAgent")}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

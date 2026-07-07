@@ -34,6 +34,7 @@ interface SettingsState {
   widgetSyncReminderHours: number;
   widgetShowNextDaySchedule: boolean;
   avatarImage: string;
+  customUserAgent: string;
   customCerBaseUrl: string;
   customJwxtBaseUrl: string;
   schoolId: string;
@@ -64,6 +65,7 @@ interface SettingsState {
   setWidgetSyncReminderHours: (hours: number) => void;
   setWidgetShowNextDaySchedule: (v: boolean) => void;
   setAvatarImage: (image: string) => void;
+  setCustomUserAgent: (ua: string) => void;
   setCustomCerBaseUrl: (url: string) => void;
   setCustomJwxtBaseUrl: (url: string) => void;
   setSchoolId: (id: string) => void;
@@ -99,6 +101,7 @@ export const useSettingsStore = create<SettingsState>()(
       widgetSyncReminderHours: 24,
       widgetShowNextDaySchedule: false,
       avatarImage: "",
+      customUserAgent: "",
       customCerBaseUrl: "",
       customJwxtBaseUrl: "",
       schoolId: "ysu",
@@ -129,6 +132,7 @@ export const useSettingsStore = create<SettingsState>()(
       setWidgetSyncReminderHours: (widgetSyncReminderHours) => set({ widgetSyncReminderHours }),
       setWidgetShowNextDaySchedule: (widgetShowNextDaySchedule) => set({ widgetShowNextDaySchedule }),
       setAvatarImage: (avatarImage) => set({ avatarImage }),
+      setCustomUserAgent: (customUserAgent) => set({ customUserAgent }),
       setCustomCerBaseUrl: (customCerBaseUrl) => set({ customCerBaseUrl }),
       setCustomJwxtBaseUrl: (customJwxtBaseUrl) => set({ customJwxtBaseUrl }),
       setSchoolId: (schoolId) => set({ schoolId }),
