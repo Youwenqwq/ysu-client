@@ -2,4 +2,13 @@
 import HomePage from '../components/HomePage.astro';
 ---
 
+<script is:inline>
+  (async () => {
+    try {
+      const r = await fetch('/api/site-status');
+      const s = await r.json();
+      if (!s.enabled) location.replace('/404');
+    } catch { /* offline — show as normal */ }
+  })();
+</script>
 <HomePage />

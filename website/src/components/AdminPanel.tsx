@@ -51,6 +51,8 @@ export default function AdminPanel() {
   const [data, setData] = useState<StatsData | FeedbackData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [siteEnabled, setSiteEnabled] = useState<boolean | null>(null);
+  const [siteToggling, setSiteToggling] = useState(false);
 
   useEffect(() => {
     const saved = sessionStorage.getItem('admin_password');
@@ -80,6 +82,38 @@ export default function AdminPanel() {
     setSavedPassword('');
     setPassword('');
     setData(null);
+  };
+
+  useEffect(() => {
+    if (!savedPassword) return;
+    fetch('/api/site-status')
+      .then(r => r.json())
+      .then(s => setSiteEnabled(s.enabled))
+      .catch(() => setSiteEnabled(true));
+  }, [savedPassword]);
+
+  const handleToggleSite = async () => {
+    setSiteToggling(true);
+    try {
+      const next = !siteEnabled;
+      const res = await fetch('/api/site-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${savedPassword}`,
+        },
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      setSiteEnabled(next);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '操作失败');
+    } finally {
+      setSiteToggling(false);
+    }
   };
 
   const fetchData = async () => {
@@ -178,6 +212,24 @@ export default function AdminPanel() {
           className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 cursor-pointer"
         >
           {loading ? '加载中...' : '查询'}
+        </button>
+      </div>
+
+      <div className="flex items-center gap-3 mb-6 p-3 rounded-xl border border-border bg-card">
+        <span className="text-sm text-muted-foreground">服务状态：</span>
+        <span className={`text-sm font-semibold ${siteEnabled ? 'text-green-600' : 'text-red-500'}`}>
+          {siteEnabled === null ? '检测中...' : siteEnabled ? '运行中' : '已停止'}
+        </span>
+        <button
+          onClick={handleToggleSite}
+          disabled={siteToggling || siteEnabled === null}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer disabled:opacity-50 ${
+            siteEnabled
+              ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20 border border-red-500/30'
+              : 'bg-green-500/10 text-green-600 hover:bg-green-500/20 border border-green-500/30'
+          }`}
+        >
+          {siteToggling ? '处理中...' : siteEnabled ? '停止服务' : '恢复服务'}
         </button>
       </div>
 

@@ -1,10 +1,40 @@
 const KV_KEY = 'announcement:current';
+const STATUS_KEY = 'site:status';
 
 function getKV(env) {
   return env?.STATS_KV ?? globalThis?.STATS_KV;
 }
 
+async function isSiteActive(env) {
+  const flag = env?.ANNOUNCEMENT_ENABLED ?? globalThis?.ANNOUNCEMENT_ENABLED;
+  // Env var override: explicitly disabled at deployment level
+  if (flag === false || flag === '0' || flag === 'false') return false;
+
+  const kv = getKV(env);
+  if (!kv) return false;
+
+  try {
+    const status = await kv.get(STATUS_KEY, 'json');
+    return status?.enabled !== false;
+  } catch {
+    return true;
+  }
+}
+
+const DISABLED_RESPONSE = JSON.stringify({ message: 'Announcement system disabled' });
+const DISABLED_HEADERS = {
+  'content-type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+};
+
 export async function onRequestGet({ env }) {
+  if (!(await isSiteActive(env))) {
+    return new Response(DISABLED_RESPONSE, {
+      status: 404,
+      headers: DISABLED_HEADERS,
+    });
+  }
+
   try {
     const kv = getKV(env);
     if (!kv) {
