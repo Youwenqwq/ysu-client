@@ -150,7 +150,15 @@ export function GpaSummary({
       <CardHeader className="pb-0">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-sm md:text-base">{t("grades.gpaTitle")}</CardTitle>
-          <Button variant="ghost" size="sm" onClick={() => setExpanded((v) => !v)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              // 展开即要看详单，自动取消隐藏；收缩不改显隐，交还用户手动控制
+              if (!expanded) setGpaVisible(true);
+              setExpanded((v) => !v);
+            }}
+          >
             {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
           </Button>
         </div>
