@@ -24,6 +24,7 @@ import {
   getJar as getMobileJar,
 } from "./protocol/jwmobile";
 import { resetLdxt } from "./protocol/ldxt";
+import { resetScxt } from "./protocol/scxt";
 import { useAuthStore } from "@/lib/stores/auth";
 import { initServerConfig } from "@/lib/server-config";
 import { STORAGE_KEYS } from "@/lib/storage/keys";
@@ -151,6 +152,7 @@ export function resetSession(): void {
   resetCAS();
   resetJWXT();
   resetLdxt();
+  resetScxt();
   resetMobileAuth();
   clearAllCache();
   useRefreshStore.setState({ count: 0, stale: 0 });

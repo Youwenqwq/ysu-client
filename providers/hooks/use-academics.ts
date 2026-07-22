@@ -5,7 +5,15 @@ import type {
   AcademicCompletion,
   AcademicWarning,
   ClassPeriod,
+  CatalogPage,
+  CatalogQueryOptions,
+  Competition,
   Course,
+  CreditBatch,
+  CreditDeclaration,
+  CreditQueryOptions,
+  CreditRecord,
+  CreditSummary,
   CurrentWeek,
   CurrentWeekQueryOptions,
   Exam,
@@ -21,6 +29,7 @@ import type {
   GradeStatistics,
   LaborRecord,
   LaborSummary,
+  LibraryActivity,
   EnrollableActivity,
   MakeupExamBatch,
   MakeupExamCourse,
@@ -158,6 +167,68 @@ export function useLaborActivities(): ProviderQueryResult<EnrollableActivity[]> 
   const provider = useProvider();
   return useProviderQuery("laborEducation", "labor-activities", () =>
     provider.getLaborActivities(),
+  );
+}
+
+export function useCreditBatches(): ProviderQueryResult<CreditBatch[]> {
+  const provider = useProvider();
+  return useProviderQuery("innovationCredits", "credit-batches", () =>
+    provider.getCreditBatches(),
+  );
+}
+
+export function useCreditDeclarations(
+  options?: CreditQueryOptions,
+): ProviderQueryResult<CreditDeclaration[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "innovationCredits",
+    "credit-declarations",
+    () => provider.getCreditDeclarations(options),
+    options,
+  );
+}
+
+export function useCreditRecords(
+  options?: CreditQueryOptions & { all?: boolean },
+): ProviderQueryResult<CreditRecord[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "innovationCredits",
+    "credit-records",
+    () => (options?.all ? provider.getAllCreditRecords() : provider.getCreditRecords(options)),
+    options,
+  );
+}
+
+export function useCreditSummary(): ProviderQueryResult<CreditSummary> {
+  const provider = useProvider();
+  return useProviderQuery("innovationCredits", "credit-summary", () =>
+    provider.getCreditSummary(),
+  );
+}
+
+export function useCreditCompetitions(
+  options?: CatalogQueryOptions,
+): ProviderQueryResult<CatalogPage<Competition>> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "innovationCredits",
+    "credit-competitions",
+    () => provider.getCreditCompetitions(options),
+    options,
+  );
+}
+
+export function useCreditLibraryActivities(
+  options?: CatalogQueryOptions,
+): ProviderQueryResult<CatalogPage<LibraryActivity>> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "innovationCredits",
+    "credit-library-activities",
+    () => provider.getCreditLibraryActivities(options),
+    options,
   );
 }
 

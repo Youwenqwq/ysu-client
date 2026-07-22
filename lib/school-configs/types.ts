@@ -20,6 +20,10 @@ export interface SchoolConfig {
   readonly ldxt?: {
     readonly baseUrl: string;
   };
+  readonly scxt?: {
+    readonly baseUrl: string;
+    readonly ptBaseUrl: string;
+  };
   readonly features: {
     readonly hasMobile: boolean;
     readonly hasLabSchedule: boolean;

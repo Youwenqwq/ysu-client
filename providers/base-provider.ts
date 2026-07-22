@@ -5,7 +5,15 @@ import type {
   AcademicWarning,
   AuthStatus,
   ClassPeriod,
+  CatalogPage,
+  CatalogQueryOptions,
+  Competition,
   Course,
+  CreditBatch,
+  CreditDeclaration,
+  CreditQueryOptions,
+  CreditRecord,
+  CreditSummary,
   Credential,
   CurrentWeek,
   CurrentWeekQueryOptions,
@@ -30,6 +38,7 @@ import type {
   LoginStep1Result,
   LaborRecord,
   LaborSummary,
+  LibraryActivity,
   EnrollableActivity,
   MakeupExamBatch,
   MakeupExamCourse,
@@ -112,6 +121,17 @@ export abstract class BaseProvider implements AcademicProvider {
   abstract getLaborRecords(): Promise<LaborRecord[]>;
   abstract getLaborSummary(): Promise<LaborSummary>;
   abstract getLaborActivities(): Promise<EnrollableActivity[]>;
+  abstract getCreditBatches(): Promise<CreditBatch[]>;
+  abstract getCreditDeclarations(options?: CreditQueryOptions): Promise<CreditDeclaration[]>;
+  abstract getCreditRecords(options?: CreditQueryOptions): Promise<CreditRecord[]>;
+  abstract getAllCreditRecords(): Promise<CreditRecord[]>;
+  abstract getCreditSummary(): Promise<CreditSummary>;
+  abstract getCreditCompetitions(
+    options?: CatalogQueryOptions,
+  ): Promise<CatalogPage<Competition>>;
+  abstract getCreditLibraryActivities(
+    options?: CatalogQueryOptions,
+  ): Promise<CatalogPage<LibraryActivity>>;
   abstract getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>;
   abstract getAcademicCompletion(): Promise<AcademicCompletion>;
   abstract getAcademicWarnings(): Promise<AcademicWarning[]>;

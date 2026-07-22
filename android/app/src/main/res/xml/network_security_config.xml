@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  网络安全配置：默认禁止明文流量，仅放行双创平台所在的裸 IP 主机
+  （202.206.247.49，无独立域名、无 HTTPS，ysu_pt / ysu_xf 部署其下）。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">202.206.247.49</domain>
+    </domain-config>
+</network-security-config>

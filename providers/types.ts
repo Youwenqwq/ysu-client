@@ -19,6 +19,7 @@ export interface AcademicCapabilities {
   exams: boolean;
   makeupExams: boolean;
   laborEducation: boolean;
+  innovationCredits: boolean;
   gpa: boolean;
   evaluation: boolean;
   evaluationScorePreview: boolean;
@@ -427,6 +428,93 @@ export interface EnrollableActivity {
   raw?: Record<string, unknown>;
 }
 
+/** A paged catalog result (双创竞赛库/活动库). */
+export interface CatalogPage<T> {
+  items: T[];
+  pageIndex: number;
+  totalPages: number;
+  totalRecords: number;
+}
+
+/** An innovation-credit batch (学分认定批次). */
+export interface CreditBatch {
+  batchId: string;
+  name: string;
+}
+
+/** An innovation-credit declaration (学分申报记录). */
+export interface CreditDeclaration {
+  itemName: string;
+  categoryMajor?: string;
+  categoryMinor?: string;
+  awardLevel?: string;
+  score?: number;
+  batch?: string;
+  status?: string;
+  operation?: string;
+  raw?: Record<string, unknown>;
+}
+
+/** A recognized innovation-credit record (认定记录). */
+export interface CreditRecord {
+  itemName: string;
+  year?: string;
+  categoryMajor?: string;
+  categoryMinor?: string;
+  awardLevel?: string;
+  referenceScore?: number;
+  actualScore?: number;
+  grade?: string;
+  batch?: string;
+  status?: string;
+  raw?: Record<string, unknown>;
+}
+
+/** Innovation-credit summary (双创学分汇总). */
+export interface CreditSummary {
+  studentId?: string;
+  name?: string;
+  department?: string;
+  major?: string;
+  className?: string;
+  gradeYear?: string;
+  grade?: string;
+  totalCredits?: number;
+  raw?: Record<string, unknown>;
+}
+
+/** A competition catalog entry (竞赛库). */
+export interface Competition {
+  code: string;
+  name: string;
+  categoryMajor?: string;
+  categoryMinor?: string;
+  isEnabled?: boolean;
+  status?: string;
+  raw?: Record<string, unknown>;
+}
+
+/** A library-activity catalog entry (活动库). */
+export interface LibraryActivity {
+  name: string;
+  organizer?: string;
+  category?: string;
+  detail?: string;
+  raw?: Record<string, unknown>;
+}
+
+/** Options for querying credit declarations/records. */
+export interface CreditQueryOptions {
+  batchId?: string;
+  itemName?: string;
+}
+
+/** Options for querying paged catalogs. */
+export interface CatalogQueryOptions {
+  keyword?: string;
+  pageIndex?: number;
+}
+
 export interface EvaluationType {
   name: string;
   code?: string;
@@ -671,6 +759,13 @@ export interface ProviderAcademics {
   getLaborRecords(): Promise<LaborRecord[]>;
   getLaborSummary(): Promise<LaborSummary>;
   getLaborActivities(): Promise<EnrollableActivity[]>;
+  getCreditBatches(): Promise<CreditBatch[]>;
+  getCreditDeclarations(options?: CreditQueryOptions): Promise<CreditDeclaration[]>;
+  getCreditRecords(options?: CreditQueryOptions): Promise<CreditRecord[]>;
+  getAllCreditRecords(): Promise<CreditRecord[]>;
+  getCreditSummary(): Promise<CreditSummary>;
+  getCreditCompetitions(options?: CatalogQueryOptions): Promise<CatalogPage<Competition>>;
+  getCreditLibraryActivities(options?: CatalogQueryOptions): Promise<CatalogPage<LibraryActivity>>;
   getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>;
   getAcademicCompletion(): Promise<AcademicCompletion>;
   getAcademicWarnings(): Promise<AcademicWarning[]>;

@@ -69,6 +69,10 @@
   "ldxt": {
     "baseUrl": "https://ldxt.ysu.edu.cn"
   },
+  "scxt": {
+    "baseUrl": "http://202.206.247.49/ysu_xf",
+    "ptBaseUrl": "http://202.206.247.49/ysu_pt"
+  },
   "features": {
     "hasMobile": true,
     "hasLabSchedule": true,

@@ -9,6 +9,14 @@ import type {
   AuthStatus,
   ClassPeriod,
   Course,
+  CatalogPage,
+  CatalogQueryOptions,
+  Competition,
+  CreditBatch,
+  CreditDeclaration,
+  CreditQueryOptions,
+  CreditRecord,
+  CreditSummary,
   Credential,
   CurrentWeek,
   EvaluationAnswer,
@@ -31,6 +39,7 @@ import type {
   GradeStatistics,
   LaborRecord,
   LaborSummary,
+  LibraryActivity,
   EnrollableActivity,
   LoginStep1Input,
   LoginStep1Result,
@@ -97,6 +106,16 @@ import {
   queryLaborSummary,
 } from "./ldxt-fetcher";
 import {
+  queryAllCreditRecords,
+  queryCompetitions,
+  queryCreditBatches,
+  queryCreditDeclarations,
+  queryCreditRecords,
+  queryCreditSummary,
+  queryLibraryActivities,
+} from "./scxt-fetcher";
+import type { CreditRecord as ScxtCreditRecord } from "./protocol/scxt";
+import {
   initializeSession,
   resetSession,
   warmupSession,
@@ -120,6 +139,7 @@ function ysuCapabilities(): AcademicCapabilities {
     exams: true,
     makeupExams: true,
     laborEducation: getSchoolConfig().ldxt !== undefined,
+    innovationCredits: getSchoolConfig().scxt !== undefined,
     gpa: true,
     evaluation: true,
     evaluationScorePreview: true,
@@ -246,6 +266,22 @@ function mapEvaluationAnswer(answer: EvaluationAnswer) {
     questionType: answer.questionType ?? "",
     optionIds: answer.optionIds ?? [],
     text: answer.text ?? "",
+  };
+}
+
+function mapCreditRecord(row: ScxtCreditRecord): CreditRecord {
+  return {
+    itemName: row.itemName,
+    year: row.year || undefined,
+    categoryMajor: row.categoryMajor || undefined,
+    categoryMinor: row.categoryMinor || undefined,
+    awardLevel: row.awardLevel || undefined,
+    referenceScore: row.referenceScore ?? undefined,
+    actualScore: row.actualScore ?? undefined,
+    grade: row.grade || undefined,
+    batch: row.batch || undefined,
+    status: row.status || undefined,
+    raw: row.raw,
   };
 }
 
@@ -684,6 +720,101 @@ export class YSUProvider extends BaseProvider {
       operation: row.operation || undefined,
       raw: row.raw,
     }));
+  }
+
+  async getCreditBatches(): Promise<CreditBatch[]> {
+    const rows = await queryCreditBatches();
+    return rows.map((row) => ({ batchId: row.batchId, name: row.name }));
+  }
+
+  async getCreditDeclarations(options?: CreditQueryOptions): Promise<CreditDeclaration[]> {
+    const rows = await queryCreditDeclarations({
+      batchId: options?.batchId,
+      itemName: options?.itemName,
+    });
+    return rows.map((row) => ({
+      itemName: row.itemName,
+      categoryMajor: row.categoryMajor || undefined,
+      categoryMinor: row.categoryMinor || undefined,
+      awardLevel: row.awardLevel || undefined,
+      score: row.score ?? undefined,
+      batch: row.batch || undefined,
+      status: row.status || undefined,
+      operation: row.operation || undefined,
+      raw: row.raw,
+    }));
+  }
+
+  async getCreditRecords(options?: CreditQueryOptions): Promise<CreditRecord[]> {
+    const rows = await queryCreditRecords({
+      batchId: options?.batchId,
+      itemName: options?.itemName,
+    });
+    return rows.map(mapCreditRecord);
+  }
+
+  async getAllCreditRecords(): Promise<CreditRecord[]> {
+    const rows = await queryAllCreditRecords();
+    return rows.map(mapCreditRecord);
+  }
+
+  async getCreditSummary(): Promise<CreditSummary> {
+    const row = await queryCreditSummary();
+    return {
+      studentId: row.studentId || undefined,
+      name: row.name || undefined,
+      department: row.department || undefined,
+      major: row.major || undefined,
+      className: row.className || undefined,
+      gradeYear: row.gradeYear || undefined,
+      grade: row.grade || undefined,
+      totalCredits: row.totalCredits ?? undefined,
+      raw: row.raw,
+    };
+  }
+
+  async getCreditCompetitions(
+    options?: CatalogQueryOptions,
+  ): Promise<CatalogPage<Competition>> {
+    const page = await queryCompetitions({
+      itemName: options?.keyword,
+      pageIndex: options?.pageIndex,
+    });
+    return {
+      items: page.items.map((row) => ({
+        code: row.code,
+        name: row.name,
+        categoryMajor: row.categoryMajor || undefined,
+        categoryMinor: row.categoryMinor || undefined,
+        isEnabled: row.isEnabled,
+        status: row.status || undefined,
+        raw: row.raw,
+      })),
+      pageIndex: page.pageIndex,
+      totalPages: page.totalPages,
+      totalRecords: page.totalRecords,
+    };
+  }
+
+  async getCreditLibraryActivities(
+    options?: CatalogQueryOptions,
+  ): Promise<CatalogPage<LibraryActivity>> {
+    const page = await queryLibraryActivities({
+      name: options?.keyword,
+      pageIndex: options?.pageIndex,
+    });
+    return {
+      items: page.items.map((row) => ({
+        name: row.name,
+        organizer: row.organizer || undefined,
+        category: row.category || undefined,
+        detail: row.detail || undefined,
+        raw: row.raw,
+      })),
+      pageIndex: page.pageIndex,
+      totalPages: page.totalPages,
+      totalRecords: page.totalRecords,
+    };
   }
 
   async getEvaluationTypes(options?: TermQueryOptions): Promise<EvaluationType[]> {

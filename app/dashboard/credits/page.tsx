@@ -1,0 +1,396 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { useTranslation } from "@/lib/i18n/use-translation";
+import {
+  useCreditBatches,
+  useCreditCompetitions,
+  useCreditDeclarations,
+  useCreditLibraryActivities,
+  useCreditRecords,
+  useCreditSummary,
+} from "@/providers/hooks";
+import type {
+  CatalogPage,
+  CatalogQueryOptions,
+  Competition,
+  LibraryActivity,
+} from "@/providers/types";
+import type { ProviderQueryResult } from "@/providers/hooks";
+import { CalendarOff, ChevronLeft, ChevronRight, Search } from "lucide-react";
+
+function useErrorToast(error: { message: string } | undefined) {
+  const { t } = useTranslation();
+  useEffect(() => {
+    if (!error) return;
+    toast.error(error.message || t("app.updating"));
+  }, [error, t]);
+}
+
+function LoadingCards() {
+  return (
+    <div className="flex flex-col gap-4">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Skeleton key={i} className="h-28" />
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({ titleKey }: { titleKey: string }) {
+  const { t } = useTranslation();
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <CalendarOff />
+        </EmptyMedia>
+        <EmptyTitle>{t(titleKey)}</EmptyTitle>
+        <EmptyDescription>{t("credits.description")}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
+function DeclarationsPanel() {
+  const { t } = useTranslation();
+  const query = useCreditDeclarations();
+  const declarations = query.data ?? [];
+  useErrorToast(query.error);
+
+  if (query.isLoading && declarations.length === 0) return <LoadingCards />;
+  if (declarations.length === 0) return <EmptyState titleKey="credits.noDeclarations" />;
+
+  return (
+    <div className="flex flex-col gap-4">
+      {declarations.map((decl, idx) => (
+        <Card key={`${decl.itemName}-${idx}`}>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-2">
+              <CardTitle className="text-base">{decl.itemName}</CardTitle>
+              {decl.status && <Badge variant="secondary">{decl.status}</Badge>}
+            </div>
+            <CardDescription>
+              {[decl.categoryMajor, decl.categoryMinor].filter(Boolean).join(" · ")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            {decl.score !== undefined && (
+              <span>
+                {t("credits.score")}: {decl.score}
+              </span>
+            )}
+            {decl.awardLevel && (
+              <span>
+                {t("credits.awardLevel")}: {decl.awardLevel}
+              </span>
+            )}
+            {decl.batch && (
+              <span>
+                {t("credits.batch")}: {decl.batch}
+              </span>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function RecordsPanel() {
+  const { t } = useTranslation();
+  /** undefined = 服务端当前批次；"all" = 遍历全部批次；否则为 batchId */
+  const [batch, setBatch] = useState<string | undefined>(undefined);
+
+  const batchesQuery = useCreditBatches();
+  const batches = batchesQuery.data ?? [];
+
+  const recordsQuery = useCreditRecords(
+    batch === "all" ? { all: true } : batch ? { batchId: batch } : undefined,
+  );
+  const records = recordsQuery.data ?? [];
+
+  useErrorToast(batchesQuery.error);
+  useErrorToast(recordsQuery.error);
+
+  const chips: Array<{ key: string | undefined; label: string }> = [
+    { key: undefined, label: batches[0]?.name ?? t("credits.batch") },
+    { key: "all", label: t("credits.allBatches") },
+    ...batches.slice(1).map((b) => ({ key: b.batchId as string | undefined, label: b.name })),
+  ];
+
+  return (
+    <div className="flex flex-col gap-4">
+      {batches.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {chips.map((chip) => (
+            <button
+              key={chip.key ?? "__current"}
+              type="button"
+              onClick={() => setBatch(chip.key)}
+              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                batch === chip.key
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-foreground active:bg-muted/60"
+              }`}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {(recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0 ? (
+        <LoadingCards />
+      ) : records.length === 0 ? (
+        <EmptyState titleKey="credits.noRecords" />
+      ) : (
+        <div className="flex flex-col gap-4">
+          {records.map((record, idx) => (
+            <Card key={`${record.itemName}-${record.batch ?? ""}-${idx}`}>
+              <CardHeader>
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="text-base">{record.itemName}</CardTitle>
+                  <div className="flex shrink-0 gap-1">
+                    {record.grade && <Badge variant="default">{record.grade}</Badge>}
+                    {record.status && <Badge variant="secondary">{record.status}</Badge>}
+                  </div>
+                </div>
+                <CardDescription>
+                  {[record.categoryMajor, record.categoryMinor].filter(Boolean).join(" · ")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                {record.actualScore !== undefined && (
+                  <span>
+                    {t("credits.actualScore")}: {record.actualScore}
+                  </span>
+                )}
+                {record.year && (
+                  <span>
+                    {t("credits.year")}: {record.year}
+                  </span>
+                )}
+                {record.batch && (
+                  <span>
+                    {t("credits.batch")}: {record.batch}
+                  </span>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface CatalogItem {
+  key: string;
+  title: string;
+  subtitle: string;
+  badge?: string;
+}
+
+function CatalogPanel<T>({
+  useCatalogQuery,
+  noDataKey,
+  mapItems,
+}: {
+  useCatalogQuery: (
+    opts?: CatalogQueryOptions,
+  ) => ProviderQueryResult<CatalogPage<T>>;
+  noDataKey: string;
+  mapItems: (items: T[]) => CatalogItem[];
+}) {
+  const { t } = useTranslation();
+  const [keyword, setKeyword] = useState("");
+  const [search, setSearch] = useState("");
+  const [pageIndex, setPageIndex] = useState(1);
+
+  const query = useCatalogQuery({ keyword: search, pageIndex });
+  useErrorToast(query.error);
+
+  const items = query.data ? mapItems(query.data.items) : [];
+  const totalPages = query.data?.totalPages ?? 1;
+  const current = query.data?.pageIndex ?? pageIndex;
+  const loading = query.isLoading || query.isValidating;
+
+  function handleSearch() {
+    setPageIndex(1);
+    setSearch(keyword.trim());
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-2">
+        <Input
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder={t("credits.searchPlaceholder")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSearch();
+          }}
+        />
+        <Button onClick={handleSearch} disabled={loading}>
+          {loading ? <Spinner data-icon="inline-start" /> : <Search data-icon="inline-start" />}
+          {t("credits.search")}
+        </Button>
+      </div>
+
+      {loading && items.length === 0 ? (
+        <LoadingCards />
+      ) : items.length === 0 ? (
+        <EmptyState titleKey={noDataKey} />
+      ) : (
+        <>
+          <div className="flex flex-col gap-4">
+            {items.map((item) => (
+              <Card key={item.key}>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-base">{item.title}</CardTitle>
+                    {item.badge && <Badge variant="secondary">{item.badge}</Badge>}
+                  </div>
+                  <CardDescription>{item.subtitle}</CardDescription>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={current <= 1 || loading}
+                onClick={() => setPageIndex((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft data-icon="inline-start" />
+                {t("credits.prevPage")}
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {t("credits.pageInfo", { current, total: totalPages })}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={current >= totalPages || loading}
+                onClick={() => setPageIndex((p) => p + 1)}
+              >
+                {t("credits.nextPage")}
+                <ChevronRight data-icon="inline-end" />
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function CreditsPage() {
+  const { t } = useTranslation();
+  const [tab, setTab] = useState("records");
+
+  const summaryQuery = useCreditSummary();
+  const summary = summaryQuery.data;
+  useErrorToast(summaryQuery.error);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("credits.title")}</CardTitle>
+          <CardDescription>{t("credits.description")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {summaryQuery.isLoading && !summary ? (
+            <div className="flex gap-8">
+              <Skeleton className="h-12 w-24" />
+              <Skeleton className="h-12 w-24" />
+            </div>
+          ) : summary ? (
+            <div className="flex gap-8">
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground">
+                  {t("credits.totalCredits")}
+                </span>
+                <span className="text-2xl font-semibold">{summary.totalCredits ?? "-"}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground">{t("credits.grade")}</span>
+                <span className="text-2xl font-semibold">{summary.grade || "-"}</span>
+              </div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="w-full">
+          <TabsTrigger value="records">{t("credits.recordsTab")}</TabsTrigger>
+          <TabsTrigger value="declarations">{t("credits.declarationsTab")}</TabsTrigger>
+          <TabsTrigger value="competitions">{t("credits.competitionsTab")}</TabsTrigger>
+          <TabsTrigger value="activities">{t("credits.activitiesTab")}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="records" className="mt-4">
+          <RecordsPanel />
+        </TabsContent>
+        <TabsContent value="declarations" className="mt-4">
+          <DeclarationsPanel />
+        </TabsContent>
+        <TabsContent value="competitions" className="mt-4">
+          <CatalogPanel
+            useCatalogQuery={useCreditCompetitions}
+            noDataKey="credits.noCompetitions"
+            mapItems={(items: Competition[]) =>
+              items.map((c) => ({
+                key: c.code || c.name,
+                title: c.name,
+                subtitle: [c.code, c.categoryMajor, c.categoryMinor]
+                  .filter(Boolean)
+                  .join(" · "),
+                badge: c.isEnabled === false ? t("credits.disabled") : undefined,
+              }))
+            }
+          />
+        </TabsContent>
+        <TabsContent value="activities" className="mt-4">
+          <CatalogPanel
+            useCatalogQuery={useCreditLibraryActivities}
+            noDataKey="credits.noActivities"
+            mapItems={(items: LibraryActivity[]) =>
+              items.map((a, idx) => ({
+                key: `${a.name}-${idx}`,
+                title: a.name,
+                subtitle: [a.organizer, a.category].filter(Boolean).join(" · "),
+              }))
+            }
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
