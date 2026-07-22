@@ -96,26 +96,28 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
             return (
             <Card key={`${ind.name}-${idx}`}>
               <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-base">{ind.name}</CardTitle>
-                  <div className="flex shrink-0 gap-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <CardTitle className="text-base">{ind.name}</CardTitle>
+                    <CardDescription>
+                      {[
+                        rank ? `${t("comprehensive.rank")}: ${rank}` : "",
+                        ind.maxScore ? `${t("comprehensive.maxScore")}: ${ind.maxScore}` : "",
+                        ind.proportion ? `${t("comprehensive.proportion")}: ${ind.proportion}` : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </CardDescription>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="text-lg font-semibold tabular-nums">
+                      {ind.score || "-"}
+                    </span>
                     {ind.categoryDisplay && (
                       <Badge variant="outline">{ind.categoryDisplay}</Badge>
                     )}
-                    <Badge variant="secondary">
-                      {t("comprehensive.score")}: {ind.score}
-                    </Badge>
                   </div>
                 </div>
-                <CardDescription>
-                  {[
-                    rank ? `${t("comprehensive.rank")}: ${rank}` : "",
-                    ind.maxScore ? `${t("comprehensive.maxScore")}: ${ind.maxScore}` : "",
-                    ind.proportion ? `${t("comprehensive.proportion")}: ${ind.proportion}` : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </CardDescription>
               </CardHeader>
               {ind.description && (
                 <CardContent className="text-sm text-muted-foreground">

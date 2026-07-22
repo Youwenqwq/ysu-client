@@ -27,7 +27,6 @@ import {
 import { cn } from "@/lib/utils";
 import {
   Clock,
-  Hourglass,
   MapPin,
   ScrollText,
   User,
@@ -50,29 +49,35 @@ function RecordsPanel() {
       {records.map((record, idx) => (
         <Card key={`${record.name}-${record.timeStart ?? idx}`}>
           <CardHeader>
-            <div className="flex items-start justify-between gap-2">
-              <CardTitle className="text-base">
-                {record.name}
-                {record.enrollType && (
-                  <Badge variant="outline" className="ml-2 align-middle">
-                    {record.enrollType}
-                  </Badge>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle className="text-base">
+                  {record.name}
+                  {record.enrollType && (
+                    <Badge variant="outline" className="ml-2 align-middle">
+                      {record.enrollType}
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {[record.term, record.category].filter(Boolean).join(" · ")}
+                </CardDescription>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                {record.hours !== undefined && (
+                  <span className="text-lg font-semibold tabular-nums">
+                    {record.hours}
+                    <span className="ml-0.5 text-xs font-normal text-muted-foreground">
+                      {t("labor.hoursUnit")}
+                    </span>
+                  </span>
                 )}
-              </CardTitle>
-              {record.status && <Badge variant="secondary">{record.status}</Badge>}
+                {record.status && <Badge variant="secondary">{record.status}</Badge>}
+              </div>
             </div>
-            <CardDescription>
-              {[record.term, record.category].filter(Boolean).join(" · ")}
-            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
-              {record.hours !== undefined && (
-                <span className="flex items-center gap-1">
-                  <Hourglass className="size-4" />
-                  {t("labor.hours")}: {record.hours}
-                </span>
-              )}
               {record.teacher && (
                 <span className="flex items-center gap-1">
                   <User className="size-4" />
@@ -116,24 +121,30 @@ function ActivitiesPanel() {
       {activities.map((activity, idx) => (
         <Card key={`${activity.name}-${activity.timeStart ?? idx}`}>
           <CardHeader>
-            <div className="flex items-start justify-between gap-2">
-              <CardTitle className="text-base">{activity.name}</CardTitle>
-              {activity.isEnrolled && (
-                <Badge variant="default">{t("labor.enrolled")}</Badge>
-              )}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle className="text-base">{activity.name}</CardTitle>
+                <CardDescription>
+                  {[activity.category, activity.department].filter(Boolean).join(" · ")}
+                </CardDescription>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                {activity.hours !== undefined && (
+                  <span className="text-lg font-semibold tabular-nums">
+                    {activity.hours}
+                    <span className="ml-0.5 text-xs font-normal text-muted-foreground">
+                      {t("labor.hoursUnit")}
+                    </span>
+                  </span>
+                )}
+                {activity.isEnrolled && (
+                  <Badge variant="default">{t("labor.enrolled")}</Badge>
+                )}
+              </div>
             </div>
-            <CardDescription>
-              {[activity.category, activity.department].filter(Boolean).join(" · ")}
-            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
-              {activity.hours !== undefined && (
-                <span className="flex items-center gap-1">
-                  <Hourglass className="size-4" />
-                  {t("labor.hours")}: {activity.hours}
-                </span>
-              )}
               {activity.location && (
                 <span className="flex items-center gap-1">
                   <MapPin className="size-4" />

@@ -38,6 +38,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useTranslation } from "@/lib/i18n/use-translation";
+import type { AcademicCompletion } from "@/providers/types";
 import {
   useAcademicCompletion,
   useAcademicWarnings,
@@ -53,6 +54,67 @@ import {
 const ALL = "__all__";
 const REQUIRED_YES = "__required__";
 const REQUIRED_NO = "__elective__";
+
+/** 学业完成 hero：巨型完成度百分比 + 细进度轨，安静的学分数据行。 */
+function CompletionHero({ data }: { data: AcademicCompletion }) {
+  const { t } = useTranslation();
+  const total = data.numericTotalRequired ?? 0;
+  const done = data.numericCompleted ?? 0;
+  const pct = total > 0 ? Math.min(100, (done / total) * 100) : null;
+
+  const stats = [
+    { label: t("academic.completed"), value: data.completed },
+    { label: t("academic.totalRequired"), value: data.totalRequired },
+    { label: t("academic.elective"), value: data.elective },
+  ];
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-end justify-between gap-2">
+        {pct !== null ? (
+          <span className="text-5xl font-semibold tabular-nums leading-none">
+            {pct.toFixed(1)}
+            <span className="text-xl font-normal text-muted-foreground">%</span>
+          </span>
+        ) : (
+          <span className="text-5xl font-semibold tabular-nums leading-none">
+            {data.completed || "-"}
+          </span>
+        )}
+        {data.passed && (
+          <Badge variant="default" className="mb-1 gap-1">
+            <CheckCircle2 className="size-3" />
+            {t("academic.passed")}
+          </Badge>
+        )}
+      </div>
+
+      {pct !== null && (
+        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+        {stats.map((s) => (
+          <span key={s.label}>
+            {s.label}{" "}
+            <span className="font-semibold text-foreground tabular-nums">
+              {s.value || "-"}
+            </span>
+          </span>
+        ))}
+      </div>
+
+      {data.planName && (
+        <p className="text-xs text-muted-foreground">{data.planName}</p>
+      )}
+    </div>
+  );
+}
 
 export default function TrainingPlanPage() {
   const { t } = useTranslation();
@@ -124,49 +186,18 @@ export default function TrainingPlanPage() {
     );
   }
 
-  const completionItems = [
-    { label: t("academic.planName"), value: completion.data?.planName },
-    { label: t("academic.totalRequired"), value: completion.data?.totalRequired },
-    { label: t("academic.completed"), value: completion.data?.completed },
-    { label: t("academic.elective"), value: completion.data?.elective },
-  ];
-
   return (
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle>{t("academic.completionTitle")}</CardTitle>
-              <CardDescription>
-                {t("academic.completionDescription")}
-              </CardDescription>
-            </div>
-            {completion.data?.passed ? (
-              <Badge variant="default" className="gap-1">
-                <CheckCircle2 className="size-3" />
-                {t("academic.passed")}
-              </Badge>
-            ) : null}
-          </div>
+          <CardTitle>{t("academic.completionTitle")}</CardTitle>
+          <CardDescription>
+            {t("academic.completionDescription")}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {completion.data ? (
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
-              {completionItems.map((item) => (
-                <div
-                  key={item.label}
-                  className="flex flex-col gap-1 rounded-lg border p-4"
-                >
-                  <span className="text-xs text-muted-foreground">
-                    {item.label}
-                  </span>
-                  <span className="text-xl font-semibold">
-                    {item.value || "-"}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <CompletionHero data={completion.data} />
           ) : (
             <p className="text-muted-foreground">
               {t("academic.noCompletionData")}
