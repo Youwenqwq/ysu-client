@@ -19,6 +19,9 @@ import type {
   GradeRanking,
   GradeRankingQueryOptions,
   GradeStatistics,
+  LaborRecord,
+  LaborSummary,
+  EnrollableActivity,
   MakeupExamBatch,
   MakeupExamCourse,
   MakeupExamCourseQueryOptions,
@@ -134,6 +137,27 @@ export function useMakeupExamCourses(
     "makeup-exam-courses",
     () => provider.getMakeupExamCourses(options),
     options,
+  );
+}
+
+export function useLaborRecords(): ProviderQueryResult<LaborRecord[]> {
+  const provider = useProvider();
+  return useProviderQuery("laborEducation", "labor-records", () =>
+    provider.getLaborRecords(),
+  );
+}
+
+export function useLaborSummary(): ProviderQueryResult<LaborSummary> {
+  const provider = useProvider();
+  return useProviderQuery("laborEducation", "labor-summary", () =>
+    provider.getLaborSummary(),
+  );
+}
+
+export function useLaborActivities(): ProviderQueryResult<EnrollableActivity[]> {
+  const provider = useProvider();
+  return useProviderQuery("laborEducation", "labor-activities", () =>
+    provider.getLaborActivities(),
   );
 }
 

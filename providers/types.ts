@@ -18,6 +18,7 @@ export interface AcademicCapabilities {
   labSchedule: boolean;
   exams: boolean;
   makeupExams: boolean;
+  laborEducation: boolean;
   gpa: boolean;
   evaluation: boolean;
   evaluationScorePreview: boolean;
@@ -380,6 +381,52 @@ export interface MakeupExamCourse {
   raw?: Record<string, unknown>;
 }
 
+/** A labor-education record (劳动记录). */
+export interface LaborRecord {
+  term: string;
+  name: string;
+  enrollType?: string;
+  category?: string;
+  department?: string;
+  timeStart?: string;
+  timeEnd?: string;
+  teacher?: string;
+  hours?: number;
+  status?: string;
+  raw?: Record<string, unknown>;
+}
+
+/** Labor-education credit summary (劳动学分汇总). */
+export interface LaborSummary {
+  studentId?: string;
+  name?: string;
+  department?: string;
+  major?: string;
+  className?: string;
+  grade?: string;
+  schooling?: string;
+  totalHours?: number;
+  totalCredits?: number;
+  raw?: Record<string, unknown>;
+}
+
+/** An enrollable labor-education activity (可报名活动). */
+export interface EnrollableActivity {
+  name: string;
+  category?: string;
+  timeStart?: string;
+  timeEnd?: string;
+  location?: string;
+  hours?: number;
+  description?: string;
+  department?: string;
+  enrollStart?: string;
+  enrollEnd?: string;
+  isEnrolled?: boolean;
+  operation?: string;
+  raw?: Record<string, unknown>;
+}
+
 export interface EvaluationType {
   name: string;
   code?: string;
@@ -621,6 +668,9 @@ export interface ProviderAcademics {
   getExams(options?: ExamQueryOptions): Promise<Exam[]>;
   getMakeupExamBatches(options?: ExamQueryOptions): Promise<MakeupExamBatch[]>;
   getMakeupExamCourses(options?: MakeupExamCourseQueryOptions): Promise<MakeupExamCourse[]>;
+  getLaborRecords(): Promise<LaborRecord[]>;
+  getLaborSummary(): Promise<LaborSummary>;
+  getLaborActivities(): Promise<EnrollableActivity[]>;
   getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>;
   getAcademicCompletion(): Promise<AcademicCompletion>;
   getAcademicWarnings(): Promise<AcademicWarning[]>;

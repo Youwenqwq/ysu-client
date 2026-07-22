@@ -1,5 +1,5 @@
 import { useAuthStore } from "@/lib/stores/auth";
-import { isFeatureAvailable } from "@/lib/server-config";
+import { getSchoolConfig, isFeatureAvailable } from "@/lib/server-config";
 import { BaseProvider } from "../base-provider";
 import { ProviderError, ProviderErrorCode } from "../errors";
 import type {
@@ -29,6 +29,9 @@ import type {
   GradeRanking,
   GradeRankingQueryOptions,
   GradeStatistics,
+  LaborRecord,
+  LaborSummary,
+  EnrollableActivity,
   LoginStep1Input,
   LoginStep1Result,
   MfaChallenge,
@@ -89,6 +92,11 @@ import {
   submitEvaluation as _submitEvaluation,
 } from "./emap-fetcher";
 import {
+  queryEnrollableActivities,
+  queryLaborRecords,
+  queryLaborSummary,
+} from "./ldxt-fetcher";
+import {
   initializeSession,
   resetSession,
   warmupSession,
@@ -111,6 +119,7 @@ function ysuCapabilities(): AcademicCapabilities {
     labSchedule: isFeatureAvailable("hasLabSchedule"),
     exams: true,
     makeupExams: true,
+    laborEducation: getSchoolConfig().ldxt !== undefined,
     gpa: true,
     evaluation: true,
     evaluationScorePreview: true,
@@ -621,6 +630,58 @@ export class YSUProvider extends BaseProvider {
       batchId: row.batchId || undefined,
       taskId: row.taskId || undefined,
       note: row.note || undefined,
+      raw: row.raw,
+    }));
+  }
+
+  async getLaborRecords(): Promise<LaborRecord[]> {
+    const rows = await queryLaborRecords();
+    return rows.map((row) => ({
+      term: row.term,
+      name: row.name,
+      enrollType: row.enrollType || undefined,
+      category: row.category || undefined,
+      department: row.department || undefined,
+      timeStart: row.timeStart || undefined,
+      timeEnd: row.timeEnd || undefined,
+      teacher: row.teacher || undefined,
+      hours: row.hours ?? undefined,
+      status: row.status || undefined,
+      raw: row.raw,
+    }));
+  }
+
+  async getLaborSummary(): Promise<LaborSummary> {
+    const row = await queryLaborSummary();
+    return {
+      studentId: row.studentId || undefined,
+      name: row.name || undefined,
+      department: row.department || undefined,
+      major: row.major || undefined,
+      className: row.className || undefined,
+      grade: row.grade || undefined,
+      schooling: row.schooling || undefined,
+      totalHours: row.totalHours ?? undefined,
+      totalCredits: row.totalCredits ?? undefined,
+      raw: row.raw,
+    };
+  }
+
+  async getLaborActivities(): Promise<EnrollableActivity[]> {
+    const rows = await queryEnrollableActivities();
+    return rows.map((row) => ({
+      name: row.name,
+      category: row.category || undefined,
+      timeStart: row.timeStart || undefined,
+      timeEnd: row.timeEnd || undefined,
+      location: row.location || undefined,
+      hours: row.hours ?? undefined,
+      description: row.description || undefined,
+      department: row.department || undefined,
+      enrollStart: row.enrollStart || undefined,
+      enrollEnd: row.enrollEnd || undefined,
+      isEnrolled: row.isEnrolled,
+      operation: row.operation || undefined,
       raw: row.raw,
     }));
   }

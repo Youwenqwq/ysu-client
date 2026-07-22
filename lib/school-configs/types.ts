@@ -17,6 +17,9 @@ export interface SchoolConfig {
     /** Workaround: some backends return 404 for pjapp; retry with this route. */
     readonly pjappGoodRoute?: string;
   };
+  readonly ldxt?: {
+    readonly baseUrl: string;
+  };
   readonly features: {
     readonly hasMobile: boolean;
     readonly hasLabSchedule: boolean;

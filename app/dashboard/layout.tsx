@@ -82,6 +82,7 @@ export default function DashboardLayout({
     "/dashboard/schedule": t("app.schedule"),
     "/dashboard/exams": t("app.exams"),
     "/dashboard/makeup-exams": t("app.makeupExams"),
+    "/dashboard/labor": t("app.labor"),
     "/dashboard/training-plan": t("app.trainingPlan"),
     "/dashboard/evaluation": t("app.evaluation"),
     "/dashboard/me": t("app.me"),

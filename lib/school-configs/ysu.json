@@ -66,6 +66,9 @@
       "bkbmmx": "bkbl/modules/bkbm/cxbkbmmx.do"
     }
   },
+  "ldxt": {
+    "baseUrl": "https://ldxt.ysu.edu.cn"
+  },
   "features": {
     "hasMobile": true,
     "hasLabSchedule": true,

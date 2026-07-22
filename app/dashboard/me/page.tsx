@@ -15,6 +15,7 @@ import {
   FileText,
   FilePenLine,
   GraduationCap,
+  Hammer,
   LogIn,
   Settings,
   Sun,
@@ -112,6 +113,10 @@ export default function MePage() {
 
   const avatarImage = useSettingsStore((s) => s.avatarImage);
 
+  const platformLinks = [
+    { href: "/dashboard/labor", label: t("app.labor"), icon: Hammer },
+  ];
+
   const displayName = student.data?.name || username || t("me.profileFallback");
   const initials = (student.data?.name || username || "U").slice(-2);
 
@@ -163,6 +168,27 @@ export default function MePage() {
                 className={cn(
                   "flex items-center gap-3 py-3 transition-colors active:bg-muted/60",
                   item.mobileOnly && "md:hidden",
+                  idx > 0 && "border-t border-border",
+                )}
+              >
+                <item.icon className="size-5 shrink-0 text-muted-foreground" />
+                <span className="flex-1 text-sm">{item.label}</span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      </Section>
+
+      <Section title={t("me.sectionPlatforms")}>
+        <Card>
+          <CardContent className="flex flex-col py-1">
+            {platformLinks.map((item, idx) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 py-3 transition-colors active:bg-muted/60",
                   idx > 0 && "border-t border-border",
                 )}
               >

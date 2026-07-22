@@ -28,6 +28,9 @@ import type {
   GradeStatistics,
   LoginStep1Input,
   LoginStep1Result,
+  LaborRecord,
+  LaborSummary,
+  EnrollableActivity,
   MakeupExamBatch,
   MakeupExamCourse,
   MakeupExamCourseQueryOptions,
@@ -106,6 +109,9 @@ export abstract class BaseProvider implements AcademicProvider {
   abstract getMakeupExamCourses(
     options?: MakeupExamCourseQueryOptions,
   ): Promise<MakeupExamCourse[]>;
+  abstract getLaborRecords(): Promise<LaborRecord[]>;
+  abstract getLaborSummary(): Promise<LaborSummary>;
+  abstract getLaborActivities(): Promise<EnrollableActivity[]>;
   abstract getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>;
   abstract getAcademicCompletion(): Promise<AcademicCompletion>;
   abstract getAcademicWarnings(): Promise<AcademicWarning[]>;
