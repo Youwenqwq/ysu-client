@@ -6,12 +6,12 @@
     <string name="custom_url_scheme">com.youwenqwq.ysuclient</string>
 
     <!-- Widget -->
-    <string name="widget_name">今日日程</string>
+    <string name="widget_name">今日课表</string>
     <string name="widget_description">显示今日课程安排</string>
     <string name="widget_remaining_courses">还有%d节课</string>
     <string name="widget_week_number">第%d周</string>
     <string name="widget_section_format">第%1$d-%2$d节</string>
-    <string name="widget_empty_sync">打开 App 同步日程</string>
+    <string name="widget_empty_sync">打开 App 同步课表</string>
     <string name="widget_empty_no_courses">今天没有课哦</string>
     <string name="widget_empty_all_done">今天没有课啦</string>
     <string name="widget_exam_name">考试提醒</string>

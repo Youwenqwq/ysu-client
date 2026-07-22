@@ -77,7 +77,7 @@ export const zh = {
     widgetSyncReminderDesc: "超过此时间未同步，桌面小组件显示上次更新时间",
     widgetSyncReminderUnit: "小时",
     widgetShowNextDay: "小组件无课显示下一有课日",
-    widgetShowNextDayDesc: "当天无课时自动显示下一有课日的日程",
+    widgetShowNextDayDesc: "当天无课时自动显示下一有课日的课表",
     toggleOn: "开",
     toggleOff: "关",
     notifyTitle: "通知设置",
