@@ -544,6 +544,9 @@ export function resetJWXT(): void {
   jwxtJar = new SimpleCookieJar();
   hydrationDone = Promise.resolve();
   authorized = false;
+  inflightAuth = null;
+  inflightReauth = null;
+  sessionGeneration += 1;
   ensuredWeuApps.clear();
   inflightWeu.clear();
   weuStore.clear();
@@ -902,7 +905,9 @@ async function emapPost(
 }
 
 let inflightAuth: Promise<unknown> | null = null;
+let inflightReauth: Promise<void> | null = null;
 let authorized = false;
+let sessionGeneration = 0;
 
 async function ensureAuthorized(): Promise<void> {
   if (authorized) return;
@@ -928,17 +933,37 @@ async function ensureAuthorized(): Promise<void> {
   }
 }
 
-async function reauthorize(): Promise<void> {
-  authorized = false;
-  const all = await jwxtJar.getAllCookies();
-  for (const c of all) {
-    if (c.domain && c.domain.includes(getJwxtCookieDomain())) {
-      await jwxtJar.removeCookie(c.domain, c.path ?? '/', c.name);
-    }
+async function reauthorize(failedGeneration: number): Promise<void> {
+  if (sessionGeneration !== failedGeneration) return;
+  if (inflightReauth) {
+    await inflightReauth;
+    return;
   }
-  await authorize(jwxtUrls.portal, jwxtJar);
-  ensuredWeuApps.clear();
-  weuStore.clear();
+
+  const targetJar = jwxtJar;
+  const promise = (async () => {
+    authorized = false;
+    const all = await targetJar.getAllCookies();
+    for (const c of all) {
+      if (c.domain && c.domain.includes(getJwxtCookieDomain())) {
+        await targetJar.removeCookie(c.domain, c.path ?? '/', c.name);
+      }
+    }
+    await authorize(jwxtUrls.portal, targetJar);
+    if (sessionGeneration !== failedGeneration || jwxtJar !== targetJar) return;
+
+    sessionGeneration += 1;
+    authorized = true;
+    ensuredWeuApps.clear();
+    inflightWeu.clear();
+    weuStore.clear();
+  })();
+  inflightReauth = promise;
+  try {
+    await promise;
+  } finally {
+    if (inflightReauth === promise) inflightReauth = null;
+  }
 }
 
 const ensuredWeuApps = new Set<string>();
@@ -952,13 +977,15 @@ async function ensureWeu(appId: string): Promise<void> {
     return;
   }
 
+  const requestGeneration = sessionGeneration;
+  const requestJar = jwxtJar;
   const promise = (async () => {
     const url = `${jwxtUrls.appShow}?id=${encodeURIComponent(appId)}`;
     try {
       // Use a temporary jar to avoid clobbering other apps' _WEU in the shared jar.
       const tempJar = new SimpleCookieJar();
       const sessionCookies = await collectCookies(
-        jwxtJar,
+        requestJar,
         (e) => e.name !== '_WEU',
       );
       await installCookies(tempJar, sessionCookies);
@@ -978,7 +1005,11 @@ async function ensureWeu(appId: string): Promise<void> {
         tempJar,
         (e) => e.name === '_WEU',
       );
-      if (tempCookies.length > 0) {
+      if (
+        tempCookies.length > 0 &&
+        sessionGeneration === requestGeneration &&
+        jwxtJar === requestJar
+      ) {
         weuStore.set(appId, tempCookies[0]!);
         ensuredWeuApps.add(appId);
       }
@@ -991,7 +1022,7 @@ async function ensureWeu(appId: string): Promise<void> {
   try {
     await promise;
   } finally {
-    inflightWeu.delete(appId);
+    if (inflightWeu.get(appId) === promise) inflightWeu.delete(appId);
   }
 }
 
@@ -1065,11 +1096,12 @@ async function getCurrentTerm(
 
 async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
   await ensureAuthorized();
+  const requestGeneration = sessionGeneration;
   try {
     return await fn();
   } catch (e) {
     if (e instanceof NotLoggedInError) {
-      await reauthorize();
+      await reauthorize(requestGeneration);
       return await fn();
     }
     throw e;
@@ -2565,4 +2597,3 @@ function evaluationFormData(args: {
   };
   return { requestParamStr: JSON.stringify([payload]) };
 }
-
