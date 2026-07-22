@@ -743,7 +743,6 @@ export const zh = {
   academic: {
     completionTitle: "学业完成",
     completionDescription: "培养方案完成情况",
-    planName: "培养方案",
     totalRequired: "要求学分",
     completed: "已完成",
     elective: "选修已完成",
@@ -1518,7 +1517,6 @@ export const en = {
   academic: {
     completionTitle: "Completion",
     completionDescription: "Training plan completion",
-    planName: "Plan",
     totalRequired: "Required",
     completed: "Completed",
     elective: "Elective Done",
