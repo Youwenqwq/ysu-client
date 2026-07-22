@@ -19,6 +19,9 @@ import type {
   GradeRanking,
   GradeRankingQueryOptions,
   GradeStatistics,
+  MakeupExamBatch,
+  MakeupExamCourse,
+  MakeupExamCourseQueryOptions,
   PageQueryOptions,
   ScheduleQueryOptions,
   TermCalendar,
@@ -110,6 +113,28 @@ export function useCurrentWeek(
 export function useExams(options?: ExamQueryOptions): ProviderQueryResult<Exam[]> {
   const provider = useProvider();
   return useProviderQuery("exams", "exams", () => provider.getExams(options), options);
+}
+
+export function useMakeupExamBatches(
+  options?: ExamQueryOptions,
+): ProviderQueryResult<MakeupExamBatch[]> {
+  const provider = useProvider();
+  return useProviderQuery("makeupExams", "makeup-exam-batches", () =>
+    provider.getMakeupExamBatches(options),
+    options,
+  );
+}
+
+export function useMakeupExamCourses(
+  options?: MakeupExamCourseQueryOptions,
+): ProviderQueryResult<MakeupExamCourse[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "makeupExams",
+    "makeup-exam-courses",
+    () => provider.getMakeupExamCourses(options),
+    options,
+  );
 }
 
 export function useTrainingPlan(

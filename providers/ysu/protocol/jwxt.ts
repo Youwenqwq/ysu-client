@@ -321,6 +321,35 @@ export interface EvaluationAnswer {
   readonly text: string;
 }
 
+export interface MakeupExamBatch {
+  readonly name: string;
+  readonly batchId: string;
+  readonly term: string;
+  /** 本地教务时间，ISO 格式 YYYY-MM-DDTHH:mm:ss。 */
+  readonly signupStart: string;
+  readonly signupEnd: string;
+  readonly availableCount: number;
+  readonly registeredCount: number;
+  readonly raw: Record<string, unknown>;
+}
+
+export interface MakeupExamCourse {
+  readonly name: string;
+  readonly code: string;
+  readonly credit: string;
+  readonly hours: string;
+  readonly examSeq: string;
+  readonly department: string;
+  readonly status: string;
+  readonly isAvailable: boolean;
+  readonly signupStart: string;
+  readonly signupEnd: string;
+  readonly batchId: string;
+  readonly taskId: string;
+  readonly note: string;
+  readonly raw: Record<string, unknown>;
+}
+
 // ─── Exceptions ───────────────────────────────────────────────────────── //
 
 export class JWXTError extends Error {
@@ -470,6 +499,8 @@ export function resetJWXT(): void {
   inflightWeu.clear();
   weuStore.clear();
   cachedCurrentTerm = null;
+  cachedMakeupTerm = null;
+  inflightMakeupTerm = null;
   cachedStudentInfo = null;
   inflightStudentInfo = null;
   inflightCurrentTerm = null;
@@ -917,6 +948,7 @@ export async function warmupWEU(): Promise<void> {
     _appIds.studentWdksapApp,
     _appIds.cjcx,
     _appIds.pjapp,
+    _appIds.bkbl,
   ];
   if (_appIds.wdkb_sy) apps.push(_appIds.wdkb_sy);
   await Promise.all(apps.map((id) => ensureWeu(id).catch(() => {})));
@@ -1356,6 +1388,94 @@ export async function queryExams(opts?: { term?: string }): Promise<Exam[]> {
   });
 }
 
+// ─── Public: Makeup Exams (bkbl, 只读) ──────────────────────────────── //
+
+let cachedMakeupTerm: string | null = null;
+let inflightMakeupTerm: Promise<string> | null = null;
+
+/** 查询补考报名的学年学期（系统参数 BKBMXNXQ，与当前学期可能不同）。 */
+async function getMakeupTerm(): Promise<string> {
+  if (cachedMakeupTerm) return cachedMakeupTerm;
+  if (inflightMakeupTerm) return inflightMakeupTerm;
+
+  inflightMakeupTerm = (async () => {
+    try {
+      await ensureWeu(_appIds.bkbl);
+      const datas = await post(_apiPaths.bkxtcs, { CSDM: 'KW', ZCSDM: 'BKBMXNXQ' }, _appIds.bkbl);
+      const rows = extractRows(datas, 'cxxtcs');
+      if (rows.length === 0) {
+        throw new JWXTProtocolError('makeup term query returned empty result');
+      }
+      const term = rawStr(rows[0] as Record<string, unknown>, 'CSZA');
+      if (!term) {
+        throw new JWXTProtocolError('makeup term query returned empty CSZA');
+      }
+      cachedMakeupTerm = term;
+      return term;
+    } finally {
+      inflightMakeupTerm = null;
+    }
+  })();
+
+  return inflightMakeupTerm;
+}
+
+/** 查询补考考试批次（cxbkkspc）。term 缺省时使用系统参数配置的补考报名学期。 */
+export async function queryMakeupExamBatches(opts?: {
+  term?: string;
+}): Promise<MakeupExamBatch[]> {
+  return runWithReauth(async () => {
+    const term = opts?.term ?? await getMakeupTerm();
+    await ensureWeu(_appIds.bkbl);
+    const datas = await post(_apiPaths.bkkspc, { XNXQDM: term }, _appIds.bkbl);
+    const rows = extractRows(datas, 'cxbkkspc');
+    return rows.map((r) => parseMakeupBatch(r as Record<string, unknown>));
+  });
+}
+
+/**
+ * 查询补考报名明细（cxbkbmmx）。
+ * 默认列出可报名课程；registered=true 时列出已报名课程。
+ * batchId 缺省时取当前批次的第一个。
+ */
+export async function queryMakeupExamCourses(opts?: {
+  term?: string;
+  batchId?: string;
+  registered?: boolean;
+  pageSize?: number;
+}): Promise<MakeupExamCourse[]> {
+  return runWithReauth(async () => {
+    const term = opts?.term ?? await getMakeupTerm();
+    let batchId = opts?.batchId;
+    if (!batchId) {
+      const batches = await queryMakeupExamBatches({ term });
+      batchId = batches[0]?.batchId ?? '';
+    }
+    await ensureWeu(_appIds.bkbl);
+
+    const query: Array<Record<string, string>> = [
+      { name: 'XNXQDM', value: term, builder: 'equal', linkOpt: 'and' },
+    ];
+    if (batchId) {
+      query.push({ name: 'KSDM', value: batchId, builder: 'equal', linkOpt: 'and' });
+    }
+    if (opts?.registered) {
+      query.push({ name: 'KSBMZTDM', value: '02', builder: 'm_value_equal', linkOpt: 'and' });
+    } else {
+      query.push({ name: 'SFKBM', value: '1', builder: 'equal', linkOpt: 'and' });
+      query.push({ name: 'KSBMZTDM', value: '02', builder: 'notEqual', linkOpt: 'and' });
+    }
+
+    const datas = await post(_apiPaths.bkbmmx, {
+      querySetting: JSON.stringify(query),
+      pageSize: String(opts?.pageSize ?? 100),
+      pageNumber: '1',
+    }, _appIds.bkbl);
+    const rows = extractRows(datas, 'cxbkbmmx');
+    return rows.map((r) => parseMakeupCourse(r as Record<string, unknown>));
+  });
+}
+
 // ─── Public: Training Plan / Academic ─────────────────────────────────── //
 
 export async function queryTrainingPlan(opts?: {
@@ -1779,6 +1899,38 @@ function parseExam(raw: Record<string, unknown>): Exam {
     timeText,
     examLocation: rawStr(raw, 'JASMC'),
     seatNumber: rawStr(raw, 'ZWH'),
+    raw,
+  };
+}
+
+function parseMakeupBatch(raw: Record<string, unknown>): MakeupExamBatch {
+  return {
+    name: rawStr(raw, 'KSMC'),
+    batchId: rawStr(raw, 'KSDM'),
+    term: rawStr(raw, 'XNXQDM'),
+    signupStart: normalizeLocalDateTime(rawStr(raw, 'BMKSSJ')),
+    signupEnd: normalizeLocalDateTime(rawStr(raw, 'BMJSSJ')),
+    availableCount: rawInt(raw, 'KBMCOUNT'),
+    registeredCount: rawInt(raw, 'YBMCOUNT'),
+    raw,
+  };
+}
+
+function parseMakeupCourse(raw: Record<string, unknown>): MakeupExamCourse {
+  return {
+    name: rawStr(raw, 'KCM'),
+    code: rawStr(raw, 'KCH'),
+    credit: rawStr(raw, 'XF'),
+    hours: rawStr(raw, 'XS'),
+    examSeq: rawStr(raw, 'KSXH'),
+    department: rawStr(raw, 'KKDWDM_DISPLAY'),
+    status: rawStr(raw, 'KSBMZTDM_DISPLAY'),
+    isAvailable: toBool(raw['SFKBM']),
+    signupStart: normalizeLocalDateTime(rawStr(raw, 'BMKSSJ')),
+    signupEnd: normalizeLocalDateTime(rawStr(raw, 'BMJSSJ')),
+    batchId: rawStr(raw, 'KSDM'),
+    taskId: rawStr(raw, 'KSRWID'),
+    note: rawStr(raw, 'BZ'),
     raw,
   };
 }

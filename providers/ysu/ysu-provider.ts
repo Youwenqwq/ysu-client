@@ -34,6 +34,9 @@ import type {
   MfaChallenge,
   MfaRequestInput,
   MfaSubmitInput,
+  MakeupExamBatch,
+  MakeupExamCourse,
+  MakeupExamCourseQueryOptions,
   PageQueryOptions,
   ProviderMobile,
   ScheduleQueryOptions,
@@ -69,6 +72,8 @@ import {
   queryEvaluationDetail,
   queryEvaluationTypes,
   queryExams,
+  queryMakeupExamBatches,
+  queryMakeupExamCourses,
   queryExperimentalSchedule,
   queryGpaStats,
   queryGradeDistribution,
@@ -105,6 +110,7 @@ function ysuCapabilities(): AcademicCapabilities {
     schedule: true,
     labSchedule: isFeatureAvailable("hasLabSchedule"),
     exams: true,
+    makeupExams: true,
     gpa: true,
     evaluation: true,
     evaluationScorePreview: true,
@@ -576,6 +582,46 @@ export class YSUProvider extends BaseProvider {
       examLocation: row.examLocation ?? undefined,
       seatNumber: row.seatNumber ?? undefined,
       raw: row.raw ?? undefined,
+    }));
+  }
+
+  async getMakeupExamBatches(options?: ExamQueryOptions): Promise<MakeupExamBatch[]> {
+    const rows = await queryMakeupExamBatches({ term: options?.semester });
+    return rows.map((row) => ({
+      name: row.name,
+      batchId: row.batchId,
+      term: row.term,
+      signupStart: row.signupStart || undefined,
+      signupEnd: row.signupEnd || undefined,
+      availableCount: row.availableCount,
+      registeredCount: row.registeredCount,
+      raw: row.raw,
+    }));
+  }
+
+  async getMakeupExamCourses(
+    options?: MakeupExamCourseQueryOptions,
+  ): Promise<MakeupExamCourse[]> {
+    const rows = await queryMakeupExamCourses({
+      term: options?.semester,
+      batchId: options?.batchId,
+      registered: options?.registered,
+    });
+    return rows.map((row) => ({
+      name: row.name,
+      code: row.code || undefined,
+      credit: row.credit || undefined,
+      hours: row.hours || undefined,
+      examSeq: row.examSeq || undefined,
+      department: row.department || undefined,
+      status: row.status || undefined,
+      isAvailable: row.isAvailable,
+      signupStart: row.signupStart || undefined,
+      signupEnd: row.signupEnd || undefined,
+      batchId: row.batchId || undefined,
+      taskId: row.taskId || undefined,
+      note: row.note || undefined,
+      raw: row.raw,
     }));
   }
 

@@ -17,6 +17,7 @@ export interface AcademicCapabilities {
   schedule: boolean;
   labSchedule: boolean;
   exams: boolean;
+  makeupExams: boolean;
   gpa: boolean;
   evaluation: boolean;
   evaluationScorePreview: boolean;
@@ -138,6 +139,14 @@ export interface CurrentWeekQueryOptions {
 /** Options for querying exam arrangements. */
 export interface ExamQueryOptions {
   semester?: string;
+}
+
+/** Options for querying makeup exam courses. */
+export interface MakeupExamCourseQueryOptions {
+  semester?: string;
+  batchId?: string;
+  /** true 查已报名课程，false/缺省查可报名课程。 */
+  registered?: boolean;
 }
 
 export interface PageQueryOptions {
@@ -334,6 +343,40 @@ export interface Exam {
   timeText?: string;
   examLocation?: string;
   seatNumber?: string;
+  raw?: Record<string, unknown>;
+}
+
+/** A makeup-exam batch (补考考试批次). */
+export interface MakeupExamBatch {
+  name: string;
+  batchId: string;
+  term: string;
+  /** Local academic-system datetime, formatted as YYYY-MM-DDTHH:mm:ss. */
+  signupStart?: string;
+  /** Local academic-system datetime, formatted as YYYY-MM-DDTHH:mm:ss. */
+  signupEnd?: string;
+  availableCount: number;
+  registeredCount: number;
+  raw?: Record<string, unknown>;
+}
+
+/** A makeup-exam course entry (补考报名明细). */
+export interface MakeupExamCourse {
+  name: string;
+  code?: string;
+  credit?: string;
+  hours?: string;
+  examSeq?: string;
+  department?: string;
+  status?: string;
+  isAvailable?: boolean;
+  /** Local academic-system datetime, formatted as YYYY-MM-DDTHH:mm:ss. */
+  signupStart?: string;
+  /** Local academic-system datetime, formatted as YYYY-MM-DDTHH:mm:ss. */
+  signupEnd?: string;
+  batchId?: string;
+  taskId?: string;
+  note?: string;
   raw?: Record<string, unknown>;
 }
 
@@ -576,6 +619,8 @@ export interface ProviderAcademics {
   getCurrentWeek(options?: CurrentWeekQueryOptions): Promise<CurrentWeek>;
   getCurrentWeekNumber(options?: CurrentWeekQueryOptions): Promise<number>;
   getExams(options?: ExamQueryOptions): Promise<Exam[]>;
+  getMakeupExamBatches(options?: ExamQueryOptions): Promise<MakeupExamBatch[]>;
+  getMakeupExamCourses(options?: MakeupExamCourseQueryOptions): Promise<MakeupExamCourse[]>;
   getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>;
   getAcademicCompletion(): Promise<AcademicCompletion>;
   getAcademicWarnings(): Promise<AcademicWarning[]>;

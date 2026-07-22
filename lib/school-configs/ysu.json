@@ -31,7 +31,8 @@
       "studentWdksapApp": "b5f84a8ed330481ca1efd1753d95a504",
       "xyyj": "4855b7a54e50498580017c61a1dc94c8",
       "kcbcx": "74506a67ea1c4bf3bb54eefa6e196779",
-      "pjapp": "5db54fd366204007af34267396897b24"
+      "pjapp": "5db54fd366204007af34267396897b24",
+      "bkbl": "d4145d3276744d9da8bf609da4702ae8"
     },
     "apiPaths": {
       "cjcx": "cjcx/modules/cjcx/xscjcx.do",
@@ -59,7 +60,10 @@
       "dpwj": "pjapp/api/wdpj/getDpwj.do",
       "wjtxxx": "pjapp/api/wdpj/getWjtxxx.do",
       "calculate_score": "pjapp/api/wdpj/calculateQuestionnaireAnswerScore.do",
-      "commit_answer": "pjapp/api/wdpj/commitQuestionnaireAnswer.do"
+      "commit_answer": "pjapp/api/wdpj/commitQuestionnaireAnswer.do",
+      "bkxtcs": "bkbl/modules/bkbm/cxxtcs.do",
+      "bkkspc": "bkbl/modules/bkbm/cxbkkspc.do",
+      "bkbmmx": "bkbl/modules/bkbm/cxbkbmmx.do"
     }
   },
   "features": {

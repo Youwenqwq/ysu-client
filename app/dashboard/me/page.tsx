@@ -12,6 +12,7 @@ import {
   BookOpen,
   ChevronRight,
   FileText,
+  FilePenLine,
   GraduationCap,
   LogIn,
   Settings,
@@ -104,6 +105,7 @@ export default function MePage() {
     { href: "/dashboard/me/student", label: t("app.studentInfo"), icon: User },
     { href: "/dashboard/me/gpa", label: t("app.gpa"), icon: GraduationCap },
     { href: "/dashboard/exams", label: t("app.exams"), icon: FileText, mobileOnly: true },
+    { href: "/dashboard/makeup-exams", label: t("app.makeupExams"), icon: FilePenLine },
     { href: "/dashboard/training-plan", label: t("app.trainingPlan"), icon: BookOpen, mobileOnly: true },
   ];
 

@@ -24,6 +24,8 @@ import type {
   TermCalendar as JWXTTermCalendar,
   CurrentWeek as JWXTCurrentWeek,
   Exam as JWXTExam,
+  MakeupExamBatch as JWXTMakeupExamBatch,
+  MakeupExamCourse as JWXTMakeupExamCourse,
   TrainingPlan as JWXTTrainingPlan,
   AcademicCompletion as JWXTAcademicCompletion,
   AcademicWarning as JWXTAcademicWarning,
@@ -46,6 +48,8 @@ import {
   queryTermCalendar as _queryTermCalendar,
   queryCurrentWeek as _queryCurrentWeek,
   queryExams as _queryExams,
+  queryMakeupExamBatches as _queryMakeupExamBatches,
+  queryMakeupExamCourses as _queryMakeupExamCourses,
   queryTrainingPlan as _queryTrainingPlan,
   queryAcademicCompletion as _queryAcademicCompletion,
   queryAcademicWarnings as _queryAcademicWarnings,
@@ -168,6 +172,21 @@ export async function queryCurrentWeek(opts?: {
 
 export async function queryExams(opts?: { term?: string }): Promise<JWXTExam[]> {
   return withJWXT(() => _queryExams(opts));
+}
+
+export async function queryMakeupExamBatches(opts?: {
+  term?: string;
+}): Promise<JWXTMakeupExamBatch[]> {
+  return withJWXT(() => _queryMakeupExamBatches(opts));
+}
+
+export async function queryMakeupExamCourses(opts?: {
+  term?: string;
+  batchId?: string;
+  registered?: boolean;
+  pageSize?: number;
+}): Promise<JWXTMakeupExamCourse[]> {
+  return withJWXT(() => _queryMakeupExamCourses(opts));
 }
 
 export async function queryTrainingPlan(opts?: {

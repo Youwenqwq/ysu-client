@@ -9,6 +9,8 @@ export {
   useCurrentWeek,
   useExams,
   useGPAStats,
+  useMakeupExamBatches,
+  useMakeupExamCourses,
   useGradeDistribution,
   useGradeRanking,
   useGradeStatistics,

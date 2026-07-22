@@ -28,6 +28,9 @@ import type {
   GradeStatistics,
   LoginStep1Input,
   LoginStep1Result,
+  MakeupExamBatch,
+  MakeupExamCourse,
+  MakeupExamCourseQueryOptions,
   MfaChallenge,
   MfaRequestInput,
   MfaSubmitInput,
@@ -99,6 +102,10 @@ export abstract class BaseProvider implements AcademicProvider {
   abstract getCurrentWeek(options?: CurrentWeekQueryOptions): Promise<CurrentWeek>;
   abstract getCurrentWeekNumber(options?: CurrentWeekQueryOptions): Promise<number>;
   abstract getExams(options?: ExamQueryOptions): Promise<Exam[]>;
+  abstract getMakeupExamBatches(options?: ExamQueryOptions): Promise<MakeupExamBatch[]>;
+  abstract getMakeupExamCourses(
+    options?: MakeupExamCourseQueryOptions,
+  ): Promise<MakeupExamCourse[]>;
   abstract getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>;
   abstract getAcademicCompletion(): Promise<AcademicCompletion>;
   abstract getAcademicWarnings(): Promise<AcademicWarning[]>;
