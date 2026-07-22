@@ -1,0 +1,85 @@
+name: Build APK
+
+on:
+  # 手动触发（GitHub 网页上点 "Run workflow"）
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag to build (留空则用当前 commit)'
+        required: false
+        type: string
+  # push tag 时自动触发，比如 git tag v1.4.2 && git push origin v1.4.2
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # 防止多 tag 同时 push 时重复跑同一个 commit
+    concurrency:
+      group: build-apk-${{ github.sha }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # 如果用 tag 触发，checkout 到那个 tag
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
+
+      - name: Install pnpm dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Step 1 — build web app (pnpm run build)
+        run: pnpm run build
+
+      - name: Step 2 — sync to Capacitor (npx cap sync)
+        run: npx cap sync
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/release.keystore
+          else
+            echo "::warning::KEYSTORE_BASE64 secret not set — APK will fail signing"
+          fi
+
+      - name: Step 3 — build release APK (./gradlew assembleRelease)
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease \
+            -PKEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}' \
+            -PKEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
