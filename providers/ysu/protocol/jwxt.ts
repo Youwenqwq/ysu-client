@@ -493,32 +493,58 @@ let hydrationDone: Promise<void> = Promise.resolve();
 /** Per-app WEU cookie entries, keyed by appId value. */
 const weuStore = new Map<string, CookieEntry>();
 
-/** FIFO mutex to serialize WEU swap + HTTP request cycles. */
-class AsyncMutex {
-  private _queue: Array<() => void> = [];
-  private _locked = false;
+/**
+ * Keeps the process-wide native _WEU cookie pinned to one app while allowing
+ * requests for that app to run concurrently. Queued apps are served in order.
+ */
+class WeuRequestGate {
+  private activeKey: string | null = null;
+  private activeCount = 0;
+  private queue: Array<{ key: string; resolve: () => void }> = [];
 
-  async acquire(): Promise<void> {
-    if (!this._locked) {
-      this._locked = true;
+  async acquire(key: string): Promise<void> {
+    if (this.activeKey === null) {
+      this.activeKey = key;
+      this.activeCount = 1;
       return;
     }
+
+    // Once another app is waiting, queue all arrivals to prevent starvation.
+    if (this.activeKey === key && this.queue.length === 0) {
+      this.activeCount += 1;
+      return;
+    }
+
     return new Promise<void>((resolve) => {
-      this._queue.push(resolve);
+      this.queue.push({ key, resolve });
     });
   }
 
-  release(): void {
-    if (this._queue.length > 0) {
-      const next = this._queue.shift()!;
-      next();
-    } else {
-      this._locked = false;
+  release(key: string): void {
+    if (this.activeKey !== key || this.activeCount === 0) {
+      throw new Error(`cannot release inactive WEU request gate key: ${key}`);
     }
+
+    this.activeCount -= 1;
+    if (this.activeCount > 0) return;
+
+    const first = this.queue.shift();
+    if (!first) {
+      this.activeKey = null;
+      return;
+    }
+
+    const nextBatch = [first];
+    while (this.queue[0]?.key === first.key) {
+      nextBatch.push(this.queue.shift()!);
+    }
+    this.activeKey = first.key;
+    this.activeCount = nextBatch.length;
+    for (const waiter of nextBatch) waiter.resolve();
   }
 }
 
-const weuMutex = new AsyncMutex();
+const weuRequestGate = new WeuRequestGate();
 
 export function getJar(): SimpleCookieJar {
   return jwxtJar;
@@ -830,8 +856,8 @@ async function emapPost(
   let resp: Awaited<ReturnType<typeof fetchWithJar>>;
 
   if (appId) {
-    // Swap the correct per-app _WEU into the shared jar under mutex.
-    await weuMutex.acquire();
+    // Pin the shared native _WEU cookie to this app for the full request cycle.
+    await weuRequestGate.acquire(appId);
     try {
       const entry = weuStore.get(appId);
       if (entry) {
@@ -865,7 +891,7 @@ async function emapPost(
         }
       }
     } finally {
-      weuMutex.release();
+      weuRequestGate.release(appId);
     }
   } else {
     resp = await doRequest();
