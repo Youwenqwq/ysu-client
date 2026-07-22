@@ -163,7 +163,10 @@ function GachaCard({
               transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
             />
           )}
-          <div className="relative flex h-full w-full flex-col items-center justify-center gap-1.5 bg-card px-3 text-center">
+          <div className={cn(
+            "relative flex h-full w-full flex-col items-center justify-center gap-1.5 bg-card px-3 text-center",
+            tier === "aplus" && "rounded-[12px]",
+          )}>
             <span
               className={cn(
                 "flex items-center gap-0.5 text-sm font-bold tracking-[0.2em]",
