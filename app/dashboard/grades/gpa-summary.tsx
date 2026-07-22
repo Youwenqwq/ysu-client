@@ -159,13 +159,28 @@ export function GpaSummary({
               </>
             );
           })()}
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            <StatRow label={t("dashboard.weightedAvg")} value={gpa?.weightedAvg} />
-            <StatRow label={t("dashboard.arithmeticAvg")} value={gpa?.arithmeticAvg} />
+          {/* 安静行：只留真正会被用到的平均分（选学期时追加学期加权） */}
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+            <span>
+              {t("dashboard.weightedAvg")}{" "}
+              <span className="font-semibold text-foreground tabular-nums">
+                {gpa?.weightedAvg || "-"}
+              </span>
+            </span>
+            <span>
+              {t("dashboard.arithmeticAvg")}{" "}
+              <span className="font-semibold text-foreground tabular-nums">
+                {gpa?.arithmeticAvg || "-"}
+              </span>
+            </span>
             {termWeightedGpa !== null && (
-              <StatRow label={t("grades.termWeightedGpa")} value={termWeightedGpa} />
+              <span>
+                {t("grades.termWeightedGpa")}{" "}
+                <span className="font-semibold text-foreground tabular-nums">
+                  {termWeightedGpa}
+                </span>
+              </span>
             )}
-            <StatRow label={t("grades.gpaHighest")} value={gpa?.gpaHighest} />
           </div>
         </div>
 
@@ -181,12 +196,12 @@ export function GpaSummary({
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              {credits.map((s) => (
-                <span key={s.label} className="flex items-center gap-1.5">
-                  <span className={`size-2 rounded-full ${s.className}`} />
-                  {s.label} <span className="font-semibold text-foreground">{s.value}</span>
+              <span>
+                {t("gpa.totalEarned")}{" "}
+                <span className="font-semibold text-foreground tabular-nums">
+                  {totalCredits.toFixed(1)}
                 </span>
-              ))}
+              </span>
               {failedCredits > 0 && (
                 <span className="text-destructive">
                   {t("gpa.requiredFailed")} {failedCredits}
@@ -198,10 +213,20 @@ export function GpaSummary({
 
         {expanded && (
           <div className="flex flex-col divide-y divide-border border-t pt-1">
+            <div className="py-1.5"><StatRow label={t("grades.gpaHighest")} value={gpa?.gpaHighest} /></div>
             <div className="py-1.5"><StatRow label={t("grades.requiredGpaHighest")} value={gpa?.requiredGpaHighest} /></div>
             <div className="py-1.5"><StatRow label={t("grades.degreeGpaInitial")} value={gpa?.degreeGpaInitial} /></div>
             <div className="py-1.5"><StatRow label={t("gpa.degreeGpaHighest")} value={gpa?.degreeGpaHighest} /></div>
             <div className="py-1.5"><StatRow label={t("grades.degreeWeightedAvg")} value={gpa?.degreeWeightedAvg} /></div>
+            {credits.map((s) => (
+              <div key={s.label} className="flex items-baseline justify-between gap-2 py-1.5">
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className={`size-2 rounded-full ${s.className}`} />
+                  {s.label}
+                </span>
+                <span className="text-base font-semibold tabular-nums">{s.value}</span>
+              </div>
+            ))}
           </div>
         )}
 
