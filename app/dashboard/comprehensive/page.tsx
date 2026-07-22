@@ -17,7 +17,13 @@ import {
   useErrorToast,
 } from "@/components/academic/list-state";
 import { FilterChips } from "@/components/academic/filter-chips";
+import {
+  FilterDrawer,
+  FilterOptionList,
+  FilterTrigger,
+} from "@/components/academic/filter-drawer";
 import { useTranslation } from "@/lib/i18n/use-translation";
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
 import {
   useComprehensiveIndicators,
   useComprehensiveRadar,
@@ -289,6 +295,7 @@ export default function ComprehensivePage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState("result");
   const [selected, setSelected] = useState<{ year: string; term: string }>();
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   const termsQuery = useComprehensiveTerms();
   const terms = useMemo(() => termsQuery.data ?? [], [termsQuery.data]);
@@ -300,6 +307,28 @@ export default function ComprehensivePage() {
   }, [terms, selected]);
 
   useErrorToast(termsQuery.error);
+
+  const termLabel = (item: (typeof terms)[number]) =>
+    [item.yearDisplay, item.termDisplay].filter(Boolean).join(" ") ||
+    `${item.year}-${item.term}`;
+  const selectedItem = terms.find(
+    (x) => selected && x.year === selected.year && x.term === selected.term,
+  );
+  const termItems = terms.map((item) => ({
+    value: `${item.year}-${item.term}`,
+    label: termLabel(item),
+  }));
+
+  // 年学期筛选只作用于成绩/指标对比两个面板
+  useMobileHeaderRight(
+    tab === "result" || tab === "radar" ? (
+      <FilterTrigger
+        label={selectedItem ? termLabel(selectedItem) : t("comprehensive.title")}
+        onClick={() => setFilterDrawerOpen(true)}
+      />
+    ) : null,
+    [tab, selectedItem, terms, t],
+  );
 
   if (termsQuery.isLoading && terms.length === 0) {
     return (
@@ -315,20 +344,33 @@ export default function ComprehensivePage() {
       {terms.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("comprehensive.noTerms")}</p>
       ) : (
-        <FilterChips
-          items={terms.map((item) => ({
-            value: `${item.year}-${item.term}`,
-            label:
-              [item.yearDisplay, item.termDisplay].filter(Boolean).join(" ") ||
-              `${item.year}-${item.term}`,
-          }))}
+        <div className="hidden md:block">
+          <FilterChips
+            items={termItems}
+            value={selected ? `${selected.year}-${selected.term}` : undefined}
+            onChange={(v) => {
+              const item = terms.find((x) => `${x.year}-${x.term}` === v);
+              if (item) setSelected({ year: item.year, term: item.term });
+            }}
+          />
+        </div>
+      )}
+
+      <FilterDrawer
+        open={filterDrawerOpen}
+        onOpenChange={setFilterDrawerOpen}
+        title={t("comprehensive.title")}
+      >
+        <FilterOptionList
+          items={termItems}
           value={selected ? `${selected.year}-${selected.term}` : undefined}
           onChange={(v) => {
             const item = terms.find((x) => `${x.year}-${x.term}` === v);
             if (item) setSelected({ year: item.year, term: item.term });
+            setFilterDrawerOpen(false);
           }}
         />
-      )}
+      </FilterDrawer>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full">

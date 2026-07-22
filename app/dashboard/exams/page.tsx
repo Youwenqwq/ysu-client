@@ -20,7 +20,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import {
+  FilterDrawer,
+  FilterTrigger,
+} from "@/components/academic/filter-drawer";
 import { useSettingsStore } from "@/lib/stores/settings";
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { compareExamStartTime, formatExamTime, isExamCompleted } from "@/lib/academic/exam-utils";
 import { syncExamsToWidget } from "@/lib/native/widget-bridge";
@@ -37,6 +42,7 @@ export default function ExamsPage() {
   const { t } = useTranslation();
   const [term, setTerm] = useState("");
   const [queriedTerm, setQueriedTerm] = useState("");
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours);
   const examsQuery = useExams({ semester: queriedTerm || undefined });
   const exams = examsQuery.data ?? [];
@@ -54,12 +60,43 @@ export default function ExamsPage() {
 
   async function handleQuery() {
     const nextTerm = term.trim();
+    setFilterDrawerOpen(false);
     if (nextTerm === queriedTerm) {
       await examsQuery.mutate();
       return;
     }
     setQueriedTerm(nextTerm);
   }
+
+  useMobileHeaderRight(
+    <FilterTrigger
+      label={queriedTerm || t("exams.termLabel")}
+      onClick={() => setFilterDrawerOpen(true)}
+    />,
+    [queriedTerm, t],
+  );
+
+  const filterControls = (
+    <FieldGroup className="flex flex-row flex-wrap items-end gap-3">
+      <Field className="w-48">
+        <FieldLabel htmlFor="exams-term">{t("exams.termLabel")}</FieldLabel>
+        <Input
+          id="exams-term"
+          value={term}
+          onChange={(e) => setTerm(e.target.value)}
+          placeholder={t("exams.termPlaceholder")}
+        />
+      </Field>
+      <Button onClick={handleQuery} disabled={loading}>
+        {loading ? (
+          <Spinner data-icon="inline-start" />
+        ) : (
+          <Search data-icon="inline-start" />
+        )}
+        {t("exams.query")}
+      </Button>
+    </FieldGroup>
+  );
 
   const upcomingExams = exams.filter((e) => !isExamCompleted(e)).sort(compareExamStartTime);
   const completedExams = exams.filter((e) => isExamCompleted(e)).sort(compareExamStartTime);
@@ -79,33 +116,22 @@ export default function ExamsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
+      <Card className="hidden md:block">
         <CardHeader>
           <CardTitle>{t("exams.title")}</CardTitle>
           <CardDescription>{t("exams.description")}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <FieldGroup className="flex flex-row flex-wrap items-end gap-3">
-            <Field className="w-48">
-              <FieldLabel htmlFor="exams-term">{t("exams.termLabel")}</FieldLabel>
-              <Input
-                id="exams-term"
-                value={term}
-                onChange={(e) => setTerm(e.target.value)}
-                placeholder={t("exams.termPlaceholder")}
-              />
-            </Field>
-            <Button onClick={handleQuery} disabled={loading}>
-              {loading ? (
-                <Spinner data-icon="inline-start" />
-              ) : (
-                <Search data-icon="inline-start" />
-              )}
-              {t("exams.query")}
-            </Button>
-          </FieldGroup>
-        </CardContent>
+        <CardContent>{filterControls}</CardContent>
       </Card>
+
+      <FilterDrawer
+        open={filterDrawerOpen}
+        onOpenChange={setFilterDrawerOpen}
+        title={t("exams.title")}
+        description={t("exams.description")}
+      >
+        {filterControls}
+      </FilterDrawer>
 
       {exams.length === 0 ? (
         <Empty>

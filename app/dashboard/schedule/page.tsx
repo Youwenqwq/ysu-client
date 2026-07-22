@@ -14,17 +14,14 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+  FilterDrawer,
+  FilterTrigger,
+} from "@/components/academic/filter-drawer";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
 import { useClassPeriods, useCurrentWeek, useExams, useSchedule } from "@/providers/hooks";
-import { ChevronDown, ChevronLeft, ChevronRight, Search, Grid3x2, Grid3x3 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Grid3x2, Grid3x3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isCourseActiveInWeek, periodIsInUse } from "./schedule-utils";
 import { computeExamBlocks } from "./exam-blocks";
@@ -162,15 +159,10 @@ export default function SchedulePage() {
       >
         {compactMode ? <Grid3x3 className="size-4" /> : <Grid3x2 className="size-4" />}
       </Button>
-      <Button
-        variant="ghost"
-        size="sm"
+      <FilterTrigger
+        label={selectedWeek ? t("schedule.weekShort", { week: selectedWeek }) : t("schedule.weekLabel")}
         onClick={() => setFilterDrawerOpen(true)}
-        className="h-8 px-2 text-sm"
-      >
-        {selectedWeek ? t("schedule.weekShort", { week: selectedWeek }) : t("schedule.weekLabel")}
-        <ChevronDown className="ml-0.5 size-3.5" />
-      </Button>
+      />
     </div>,
     [selectedWeek, t, compactMode, setCompactMode],
   );
@@ -300,15 +292,14 @@ export default function SchedulePage() {
         </Card>
       )}
 
-      <Drawer open={filterDrawerOpen} onOpenChange={setFilterDrawerOpen}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>{t("schedule.title")}</DrawerTitle>
-            <DrawerDescription>{t("schedule.description")}</DrawerDescription>
-          </DrawerHeader>
-          <div className="px-4 pb-6">{filterControls}</div>
-        </DrawerContent>
-      </Drawer>
+      <FilterDrawer
+        open={filterDrawerOpen}
+        onOpenChange={setFilterDrawerOpen}
+        title={t("schedule.title")}
+        description={t("schedule.description")}
+      >
+        {filterControls}
+      </FilterDrawer>
     </div>
   );
 }

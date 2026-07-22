@@ -20,7 +20,13 @@ import {
   useErrorToast,
 } from "@/components/academic/list-state";
 import { FilterChips } from "@/components/academic/filter-chips";
+import {
+  FilterDrawer,
+  FilterOptionList,
+  FilterTrigger,
+} from "@/components/academic/filter-drawer";
 import { useTranslation } from "@/lib/i18n/use-translation";
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
 import {
   useCreditBatches,
   useCreditCompetitions,
@@ -87,6 +93,7 @@ function RecordsPanel() {
   const { t } = useTranslation();
   /** undefined = 服务端当前批次；"all" = 遍历全部批次；否则为 batchId */
   const [batch, setBatch] = useState<string | undefined>(undefined);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   const batchesQuery = useCreditBatches();
   const batches = batchesQuery.data ?? [];
@@ -105,16 +112,42 @@ function RecordsPanel() {
     { value: "all", label: t("credits.allBatches") },
     ...batches.slice(1).map((b) => ({ value: b.batchId, label: b.name })),
   ];
+  const activeValue = batch ?? CURRENT;
+  const activeLabel = chips.find((c) => c.value === activeValue)?.label ?? t("credits.batch");
+
+  useMobileHeaderRight(
+    batches.length > 0 ? (
+      <FilterTrigger label={activeLabel} onClick={() => setFilterDrawerOpen(true)} />
+    ) : null,
+    [activeLabel, batches.length],
+  );
 
   return (
     <div className="flex flex-col gap-4">
       {batches.length > 0 && (
-        <FilterChips
-          items={chips}
-          value={batch ?? CURRENT}
-          onChange={(v) => setBatch(v === CURRENT ? undefined : v)}
-        />
+        <div className="hidden md:block">
+          <FilterChips
+            items={chips}
+            value={activeValue}
+            onChange={(v) => setBatch(v === CURRENT ? undefined : v)}
+          />
+        </div>
       )}
+
+      <FilterDrawer
+        open={filterDrawerOpen}
+        onOpenChange={setFilterDrawerOpen}
+        title={t("credits.recordsTab")}
+      >
+        <FilterOptionList
+          items={chips}
+          value={activeValue}
+          onChange={(v) => {
+            setBatch(v === CURRENT ? undefined : v);
+            setFilterDrawerOpen(false);
+          }}
+        />
+      </FilterDrawer>
 
       {(recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0 ? (
         <LoadingCards />

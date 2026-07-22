@@ -21,12 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+  FilterDrawer,
+  FilterTrigger,
+} from "@/components/academic/filter-drawer";
 import {
   ToggleGroup,
   ToggleGroupItem,
@@ -51,7 +48,7 @@ import type {
   GradeDistribution,
   GradeRanking,
 } from "@/providers/types";
-import { Search, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 const ALL_TERM = "__all__";
 
@@ -193,15 +190,10 @@ export default function GradesPage() {
       >
         <SortIcon className="size-4" />
       </Button>
-      <Button
-        variant="ghost"
-        size="sm"
+      <FilterTrigger
+        label={term === ALL_TERM ? t("grades.allTerms") : term}
         onClick={() => setFilterDrawerOpen(true)}
-        className="h-8 px-2 text-sm"
-      >
-        {term === ALL_TERM ? t("grades.allTerms") : term}
-        <ChevronDown className="ml-0.5 size-3.5" />
-      </Button>
+      />
     </div>,
     [term, sortMode, t],
   );
@@ -402,15 +394,14 @@ export default function GradesPage() {
         )}
       </div>
 
-      <Drawer open={filterDrawerOpen} onOpenChange={setFilterDrawerOpen}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>{t("grades.title")}</DrawerTitle>
-            <DrawerDescription>{t("grades.description")}</DrawerDescription>
-          </DrawerHeader>
-          <div className="px-4 pb-6">{filterControls}</div>
-        </DrawerContent>
-      </Drawer>
+      <FilterDrawer
+        open={filterDrawerOpen}
+        onOpenChange={setFilterDrawerOpen}
+        title={t("grades.title")}
+        description={t("grades.description")}
+      >
+        {filterControls}
+      </FilterDrawer>
 
       <ResponsiveModal open={statsOpen} onOpenChange={setStatsOpen}>
         <ResponsiveModalContent className="sm:max-w-lg">
