@@ -42,7 +42,14 @@ import type {
   GradeDistribution,
   GradeRanking,
 } from "@/providers/types";
-import { Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Dices } from "lucide-react";
+import { useSettingsStore } from "@/lib/stores/settings";
+import {
+  useGradeGachaStore,
+  gradeKey,
+  type PendingGrade,
+} from "@/lib/stores/grade-gacha";
+import { GradeGachaModal } from "@/components/grade-gacha";
 
 const ALL_TERM = "__all__";
 
@@ -76,9 +83,76 @@ export default function GradesPage() {
   const grades = useMemo(() => gradesQuery.data ?? [], [gradesQuery.data]);
   const loading = gradesQuery.isLoading || gradesQuery.isValidating;
 
+  // --- 新成绩抽卡:diff 基线维护 + 未收下前隐藏新成绩 ---
+  const gachaEnabled = useSettingsStore((s) => s.gradeGachaEnabled);
+  const gachaHydrated = useGradeGachaStore((s) => s.hasHydrated);
+  const gachaPending = useGradeGachaStore((s) => s.pending);
+  const [gachaOpen, setGachaOpen] = useState(false);
+
+  useEffect(() => {
+    if (!gachaHydrated || gradesQuery.data === undefined) return;
+    const store = useGradeGachaStore.getState();
+    if (!gachaEnabled) {
+      // 开关关闭时静默跟随基线,避免重新打开后一次性涌出全部历史
+      if (store.pending.length === 0) store.setBaseline(gradesQuery.data);
+      return;
+    }
+    if (Object.keys(store.seenSignatures).length === 0 && store.pending.length === 0) {
+      store.setBaseline(gradesQuery.data); // 首次运行只建基线
+      return;
+    }
+    store.stagePending(gradesQuery.data);
+  }, [gradesQuery.data, gachaHydrated, gachaEnabled]);
+
+  useEffect(() => {
+    if (gachaEnabled && gachaPending.length > 0) setGachaOpen(true);
+  }, [gachaEnabled, gachaPending.length]);
+
+  const pendingKeys = useMemo(
+    () => new Set(gachaPending.map((p) => p.key)),
+    [gachaPending],
+  );
+  // 待抽取期间按旧数据展示:新成绩暂不出现在列表与学期选项中
+  const displayGrades = useMemo(
+    () =>
+      gachaPending.length > 0
+        ? grades.filter((g) => !pendingKeys.has(gradeKey(g)))
+        : grades,
+    [grades, gachaPending.length, pendingKeys],
+  );
+
+  // --- 玩耍模式:随机抽已有成绩播放动画(不动基线、不隐藏数据) ---
+  const [playItems, setPlayItems] = useState<PendingGrade[] | null>(null);
+  const scoredGrades = useMemo(
+    () => displayGrades.filter((g) => g.score || g.gradeLevel),
+    [displayGrades],
+  );
+
+  function handlePlayDraw() {
+    setFilterDrawerOpen(false);
+    // 1~3 张,张数概率递减
+    const count = 1 + (Math.random() < 0.35 ? 1 : 0) + (Math.random() < 0.15 ? 1 : 0);
+    const pool = [...scoredGrades];
+    const picks: PendingGrade[] = [];
+    while (picks.length < count && pool.length > 0) {
+      const [g] = pool.splice(Math.floor(Math.random() * pool.length), 1);
+      picks.push({
+        key: gradeKey(g),
+        courseName: g.courseName,
+        semester: g.semester,
+        score: g.score,
+        numericScore: g.numericScore,
+        gradeLevel: g.gradeLevel,
+        credit: g.credit,
+        isPass: g.isPass,
+      });
+    }
+    if (picks.length > 0) setPlayItems(picks);
+  }
+
   const terms = useMemo(
-    () => Array.from(new Set(grades.map((g) => g.semester).filter(Boolean) as string[])).sort(),
-    [grades],
+    () => Array.from(new Set(displayGrades.map((g) => g.semester).filter(Boolean) as string[])).sort(),
+    [displayGrades],
   );
 
   useEffect(() => {
@@ -193,11 +267,11 @@ export default function GradesPage() {
   );
 
   const filtered = useMemo(() => {
-    return grades.filter((g) => {
+    return displayGrades.filter((g) => {
       if (term !== ALL_TERM && g.semester !== term) return false;
       return true;
     });
-  }, [grades, term]);
+  }, [displayGrades, term]);
 
   const sorted = useMemo(() => {
     if (sortMode === "default") return filtered;
@@ -394,6 +468,17 @@ export default function GradesPage() {
         description={t("grades.description")}
       >
         {filterControls}
+        {gachaEnabled && scoredGrades.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2 self-center text-muted-foreground"
+            onClick={handlePlayDraw}
+          >
+            <Dices data-icon="inline-start" />
+            {t("gacha.play")}
+          </Button>
+        )}
       </FilterDrawer>
 
       <ResponsiveModal open={statsOpen} onOpenChange={setStatsOpen}>
@@ -563,6 +648,13 @@ export default function GradesPage() {
           </ResponsiveModalBody>
         </ResponsiveModalContent>
       </ResponsiveModal>
+
+      <GradeGachaModal open={gachaOpen} onClose={() => setGachaOpen(false)} />
+      <GradeGachaModal
+        open={playItems !== null}
+        playItems={playItems ?? []}
+        onClose={() => setPlayItems(null)}
+      />
     </div>
   );
 }

@@ -78,6 +78,8 @@ export const zh = {
     widgetSyncReminderUnit: "小时",
     widgetShowNextDay: "小组件无课显示下一有课日",
     widgetShowNextDayDesc: "当天无课时自动显示下一有课日的课表",
+    gradeGacha: "新成绩抽卡",
+    gradeGachaDesc: "检测到新发布的成绩时,以抽卡形式逐个揭晓",
     toggleOn: "开",
     toggleOff: "关",
     notifyTitle: "通知设置",
@@ -782,6 +784,18 @@ export const zh = {
     toNextBand: "距 {letter} 还差 {delta}",
     topBand: "已是最高档",
   },
+  gacha: {
+    title: "新成绩出炉!",
+    subtitle: "{count} 门课程发布了成绩",
+    tapToReveal: "点击翻开",
+    revealAll: "全部翻开",
+    collect: "收下成绩",
+    skip: "跳过",
+    credit: "{credit} 学分",
+    play: "抽一张玩玩",
+    playTitle: "试试手气",
+    playSubtitle: "随机抽取 {count} 张成绩卡",
+  },
 } as const;
 
 export const en = {
@@ -864,6 +878,8 @@ export const en = {
     widgetSyncReminderUnit: "hours",
     widgetShowNextDay: "Show Next Day When Empty",
     widgetShowNextDayDesc: "Show next day's schedule when today has no classes",
+    gradeGacha: "Grade Gacha",
+    gradeGachaDesc: "Reveal newly published grades one by one, gacha-style",
     toggleOn: "ON",
     toggleOff: "OFF",
     notifyTitle: "Notification Settings",
@@ -1567,6 +1583,18 @@ export const en = {
     bandEquivalent: "≈ {letter} band",
     toNextBand: "{delta} to {letter}",
     topBand: "Top band",
+  },
+  gacha: {
+    title: "New Grades!",
+    subtitle: "{count} course(s) published grades",
+    tapToReveal: "Tap to reveal",
+    revealAll: "Reveal All",
+    collect: "Collect",
+    skip: "Skip",
+    credit: "{credit} credits",
+    play: "Draw for fun",
+    playTitle: "Feeling Lucky?",
+    playSubtitle: "{count} random grade card(s)",
   },
 };
 

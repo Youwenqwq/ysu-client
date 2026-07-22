@@ -41,6 +41,7 @@ interface SettingsState {
   schoolId: string;
   scheduleCompactMode: boolean;
   gpaVisible: boolean;
+  gradeGachaEnabled: boolean;
   notifyEnabled: boolean;
   notifyCheckInterval: number;
   notifyGrades: boolean;
@@ -74,6 +75,7 @@ interface SettingsState {
   setSchoolId: (id: string) => void;
   setScheduleCompactMode: (v: boolean) => void;
   setGpaVisible: (v: boolean) => void;
+  setGradeGachaEnabled: (v: boolean) => void;
   setNotifyEnabled: (v: boolean) => void;
   setNotifyCheckInterval: (v: number) => void;
   setNotifyGrades: (v: boolean) => void;
@@ -112,6 +114,7 @@ export const useSettingsStore = create<SettingsState>()(
       schoolId: "ysu",
       scheduleCompactMode: false,
       gpaVisible: false,
+      gradeGachaEnabled: true,
       notifyEnabled: false,
       notifyCheckInterval: 60,
       notifyGrades: true,
@@ -145,6 +148,7 @@ export const useSettingsStore = create<SettingsState>()(
       setSchoolId: (schoolId) => set({ schoolId }),
       setScheduleCompactMode: (scheduleCompactMode) => set({ scheduleCompactMode }),
       setGpaVisible: (gpaVisible) => set({ gpaVisible }),
+      setGradeGachaEnabled: (gradeGachaEnabled) => set({ gradeGachaEnabled }),
       setNotifyEnabled: (notifyEnabled) => set({ notifyEnabled }),
       setNotifyCheckInterval: (notifyCheckInterval) => set({ notifyCheckInterval }),
       setNotifyGrades: (notifyGrades) => set({ notifyGrades }),

@@ -20,6 +20,7 @@ export const STORAGE_KEYS = {
   legacyOtaCleanup: `${LEGACY_PREFIX}-ota-cleanup`,
   lastDismissedAnnouncementId: `${APP_PREFIX}-last-dismissed-announcement-id`,
   legacyLastDismissedAnnouncementId: `${LEGACY_PREFIX}-last-dismissed-announcement-id`,
+  gradeGacha: `${APP_PREFIX}-grade-gacha`,
   secureAuthToken: `${APP_PREFIX}-auth-token`,
   legacySecureAuthToken: `${LEGACY_PREFIX}-castgc`,
   secureRememberedCredentials: `${APP_PREFIX}-remember-me`,

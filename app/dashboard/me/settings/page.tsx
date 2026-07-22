@@ -44,6 +44,7 @@ import {
   Globe,
   Clock,
   CalendarClock,
+  Sparkles,
   UserCircle,
   Bell,
   Timer,
@@ -88,6 +89,8 @@ export default function SettingsPage() {
   const setClassReminderDays = useSettingsStore((s) => s.setClassReminderDays);
   const analyticsConsent = useSettingsStore((s) => s.analyticsConsent);
   const setAnalyticsConsent = useSettingsStore((s) => s.setAnalyticsConsent);
+  const gradeGachaEnabled = useSettingsStore((s) => s.gradeGachaEnabled);
+  const setGradeGachaEnabled = useSettingsStore((s) => s.setGradeGachaEnabled);
   const [batteryIgnored, setBatteryIgnored] = useState<boolean | null>(null);
   const [autoStartDialogOpen, setAutoStartDialogOpen] = useState(false);
 
@@ -271,6 +274,18 @@ export default function SettingsPage() {
                   syncWidgetSettingsToWidget(widgetSyncReminderHours, v).catch(() => {});
                 }}
               />
+            </div>
+
+            {/* 新成绩抽卡 */}
+            <div className="flex items-center gap-3 border-t border-border py-3">
+              <Sparkles className="size-5 shrink-0 text-muted-foreground" />
+              <div className="flex flex-1 flex-col">
+                <span className="text-sm">{t("settings.gradeGacha")}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t("settings.gradeGachaDesc")}
+                </span>
+              </div>
+              <Switch checked={gradeGachaEnabled} onCheckedChange={setGradeGachaEnabled} />
             </div>
           </CardContent>
         </Card>
