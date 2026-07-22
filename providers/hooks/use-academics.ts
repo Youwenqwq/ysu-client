@@ -153,6 +153,7 @@ export function useMakeupExamBatches(
 
 export function useMakeupExamCourses(
   options?: MakeupExamCourseQueryOptions,
+  enabled = true,
 ): ProviderQueryResult<MakeupExamCourse[]> {
   const provider = useProvider();
   return useProviderQuery(
@@ -160,6 +161,8 @@ export function useMakeupExamCourses(
     "makeup-exam-courses",
     () => provider.getMakeupExamCourses(options),
     options,
+    undefined,
+    enabled,
   );
 }
 

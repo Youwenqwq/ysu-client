@@ -53,10 +53,13 @@ export default function MakeupExamsPage() {
     }
   }, [batches, selectedBatchId]);
 
-  const coursesQuery = useMakeupExamCourses({
-    batchId: selectedBatchId,
-    registered: tab === "registered",
-  });
+  const coursesQuery = useMakeupExamCourses(
+    {
+      batchId: selectedBatchId,
+      registered: tab === "registered",
+    },
+    selectedBatchId !== undefined,
+  );
   const courses = coursesQuery.data ?? [];
 
   useErrorToast(batchesQuery.error);

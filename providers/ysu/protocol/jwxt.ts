@@ -554,6 +554,7 @@ export function resetJWXT(): void {
   inflightCurrentTerm.clear();
   cachedMakeupTerm = null;
   inflightMakeupTerm = null;
+  inflightMakeupBatches.clear();
   cachedStudentInfo = null;
   inflightStudentInfo = null;
   cachedCurrentWeek = null;
@@ -1493,6 +1494,10 @@ export async function queryExams(opts?: { term?: string }): Promise<Exam[]> {
 
 let cachedMakeupTerm: string | null = null;
 let inflightMakeupTerm: Promise<string> | null = null;
+const inflightMakeupBatches = new Map<
+  string,
+  { marker: symbol; promise: Promise<MakeupExamBatch[]> }
+>();
 
 /** 查询补考报名的学年学期（系统参数 BKBMXNXQ，与当前学期可能不同）。 */
 async function getMakeupTerm(): Promise<string> {
@@ -1527,10 +1532,25 @@ export async function queryMakeupExamBatches(opts?: {
 }): Promise<MakeupExamBatch[]> {
   return runWithReauth(async () => {
     const term = opts?.term ?? await getMakeupTerm();
-    await ensureWeu(_appIds.bkbl);
-    const datas = await post(_apiPaths.bkkspc, { XNXQDM: term }, _appIds.bkbl);
-    const rows = extractRows(datas, 'cxbkkspc');
-    return rows.map((r) => parseMakeupBatch(r as Record<string, unknown>));
+    const inflight = inflightMakeupBatches.get(term);
+    if (inflight) return inflight.promise;
+
+    const marker = Symbol(term);
+    const promise = (async () => {
+      try {
+        await ensureWeu(_appIds.bkbl);
+        const datas = await post(_apiPaths.bkkspc, { XNXQDM: term }, _appIds.bkbl);
+        const rows = extractRows(datas, 'cxbkkspc');
+        return rows.map((r) => parseMakeupBatch(r as Record<string, unknown>));
+      } finally {
+        if (inflightMakeupBatches.get(term)?.marker === marker) {
+          inflightMakeupBatches.delete(term);
+        }
+      }
+    })();
+
+    inflightMakeupBatches.set(term, { marker, promise });
+    return promise;
   });
 }
 
