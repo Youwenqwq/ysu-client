@@ -39,6 +39,7 @@ const COMPETITION_PATH = '/JingSai/Declare/Index';
 const ACTIVITY_PATH = '/HuoDongKu/Declare/Index';
 
 const DEFAULT_PAGE_SIZE = 200;
+const ALL_BATCHES_CONCURRENCY = 4;
 
 const PAGER_RE = /共(\d+)页(\d+)条记录，当前显示：第\s*(\d+)\s*页/;
 const BATCH_SELECT_RE = /<select[^>]*name="BatchID"[^>]*>([\s\S]*?)<\/select>/i;
@@ -151,6 +152,8 @@ let scxtJar = new SimpleCookieJar();
 let timeoutMs = 30_000;
 let authorized = false;
 let inflightAuth: Promise<void> | null = null;
+let cachedCreditBatches: CreditBatch[] | null = null;
+let inflightCreditBatches: Promise<CreditBatch[]> | null = null;
 
 export function getJar(): SimpleCookieJar {
   return scxtJar;
@@ -164,6 +167,8 @@ export function resetScxt(): void {
   scxtJar = new SimpleCookieJar();
   authorized = false;
   inflightAuth = null;
+  cachedCreditBatches = null;
+  inflightCreditBatches = null;
 }
 
 function scxtConfig(): { baseUrl: string; ptBaseUrl: string } {
@@ -381,7 +386,10 @@ function parsePager(html: string): { totalPages: number; totalRecords: number; c
  * 学分汇总页服务端默认只给当前批次，要查全部记录需按批次遍历。
  */
 export async function queryCreditBatches(): Promise<CreditBatch[]> {
-  return runWithReauth(async () => {
+  if (cachedCreditBatches) return cachedCreditBatches;
+  if (inflightCreditBatches) return inflightCreditBatches;
+
+  inflightCreditBatches = runWithReauth(async () => {
     const html = await getPage(DECLARE_PATH);
     const m = BATCH_SELECT_RE.exec(html);
     if (!m) {
@@ -397,8 +405,14 @@ export async function queryCreditBatches(): Promise<CreditBatch[]> {
         batches.push({ batchId: value, name, raw: { value, text: name } });
       }
     }
+    cachedCreditBatches = batches;
     return batches;
   });
+  try {
+    return await inflightCreditBatches;
+  } finally {
+    inflightCreditBatches = null;
+  }
 }
 
 // ─── Public: 申报记录 ─────────────────────────────────────────────────── //
@@ -478,13 +492,21 @@ export async function queryCreditRecords(opts?: {
   });
 }
 
-/** 遍历全部批次查询认定记录（每批次一次请求，顺序发出）。 */
+/** 遍历全部批次查询认定记录（每批次一次请求，限制并发以保护服务端会话）。 */
 export async function queryAllCreditRecords(): Promise<CreditRecord[]> {
-  const records: CreditRecord[] = [];
-  for (const batch of await queryCreditBatches()) {
-    records.push(...(await queryCreditRecords({ batchId: batch.batchId })));
-  }
-  return records;
+  const batches = await queryCreditBatches();
+  const pages = new Array<CreditRecord[]>(batches.length);
+  let nextIndex = 0;
+
+  const worker = async (): Promise<void> => {
+    while (nextIndex < batches.length) {
+      const index = nextIndex++;
+      pages[index] = await queryCreditRecords({ batchId: batches[index]!.batchId });
+    }
+  };
+  const workerCount = Math.min(ALL_BATCHES_CONCURRENCY, batches.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return pages.flat();
 }
 
 // ─── Public: 学生学分汇总 ─────────────────────────────────────────────── //

@@ -27,6 +27,8 @@ interface ProviderCachePolicy {
 }
 
 const SHORT_TTL_MS = 1000 * 60 * 60 * 12;
+const SIX_HOUR_TTL_MS = 1000 * 60 * 60 * 6;
+const ONE_HOUR_TTL_MS = 1000 * 60 * 60;
 
 const CACHE_POLICIES: Record<string, ProviderCachePolicy> = {
   "student-info": { ttl: LONG_TTL_MS, persist: true },
@@ -43,6 +45,22 @@ const CACHE_POLICIES: Record<string, ProviderCachePolicy> = {
   exams: { ttl: DEFAULT_TTL_MS, persist: true },
   "academic-completion": { ttl: DEFAULT_TTL_MS, persist: true },
   "academic-warnings": { ttl: DEFAULT_TTL_MS, persist: true },
+  "labor-records": { ttl: SIX_HOUR_TTL_MS, persist: true },
+  "labor-summary": { ttl: SIX_HOUR_TTL_MS, persist: true },
+  "labor-activities": { ttl: ONE_HOUR_TTL_MS, persist: true },
+  "credit-batches": { ttl: DEFAULT_TTL_MS, persist: true },
+  "credit-declarations": { ttl: ONE_HOUR_TTL_MS, persist: true },
+  "credit-records": { ttl: SIX_HOUR_TTL_MS, persist: true },
+  "credit-summary": { ttl: SIX_HOUR_TTL_MS, persist: true },
+  "credit-competitions": { ttl: DEFAULT_TTL_MS, persist: true },
+  "credit-library-activities": { ttl: DEFAULT_TTL_MS, persist: true },
+  "comprehensive-terms": { ttl: DEFAULT_TTL_MS, persist: true },
+  "comprehensive-result": { ttl: SIX_HOUR_TTL_MS, persist: true },
+  "comprehensive-indicators": { ttl: SIX_HOUR_TTL_MS, persist: true },
+  "comprehensive-radar": { ttl: SIX_HOUR_TTL_MS, persist: true },
+  "comprehensive-year-scores": { ttl: SIX_HOUR_TTL_MS, persist: true },
+  "comprehensive-report-years": { ttl: DEFAULT_TTL_MS, persist: true },
+  "comprehensive-report": { ttl: SIX_HOUR_TTL_MS, persist: true },
 };
 
 function stableStringify(value: unknown): string {
@@ -92,6 +110,7 @@ export function useProviderQuery<T>(
   fetcher: () => Promise<T>,
   params?: unknown,
   config?: SWRConfiguration<T, ProviderError>,
+  enabled = true,
 ): ProviderQueryResult<T> {
   const provider = useProvider();
   const isReady = useProviderReady();
@@ -111,7 +130,7 @@ export function useProviderQuery<T>(
   );
 
   const policy = getCachePolicy(feature);
-  const canPersist = !capabilityError && policy.persist && !!username;
+  const canPersist = enabled && !capabilityError && policy.persist && !!username;
   const persistentKey = useMemo(
     () =>
       username
@@ -134,7 +153,7 @@ export function useProviderQuery<T>(
   }, [persistentKey]);
 
   const swr = useSWR<T, ProviderError>(
-    isReady && !capabilityError
+    isReady && enabled && !capabilityError
       ? providerQueryKey(provider.id, schoolConfigScope, username, feature, params)
       : null,
     async () => {

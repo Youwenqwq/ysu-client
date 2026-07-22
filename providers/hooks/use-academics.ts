@@ -305,13 +305,15 @@ export function useComprehensiveReportYears(): ProviderQueryResult<Comprehensive
 
 export function useComprehensiveReport(options?: {
   year?: string;
-}): ProviderQueryResult<ComprehensiveReportPage> {
+}, enabled = true): ProviderQueryResult<ComprehensiveReportPage> {
   const provider = useProvider();
   return useProviderQuery(
     "comprehensiveEval",
     "comprehensive-report",
     () => provider.getComprehensiveReport(options),
     options,
+    undefined,
+    enabled,
   );
 }
 

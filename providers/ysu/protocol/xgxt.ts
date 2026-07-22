@@ -185,8 +185,10 @@ export class XgxtBusinessError extends XgxtError {
 let xgxtJar = new SimpleCookieJar();
 let timeoutMs = 30_000;
 let inflightAuth: Promise<unknown> | null = null;
+let inflightReauth: Promise<void> | null = null;
 let appRoleReady = false;
 let inflightRole: Promise<void> | null = null;
+let sessionGeneration = 0;
 
 export function getJar(): SimpleCookieJar {
   return xgxtJar;
@@ -199,8 +201,10 @@ export function setTimeoutMs(ms: number): void {
 export function resetXgxt(): void {
   xgxtJar = new SimpleCookieJar();
   inflightAuth = null;
+  inflightReauth = null;
   appRoleReady = false;
   inflightRole = null;
+  sessionGeneration = 0;
 }
 
 function baseUrl(): string {
@@ -366,17 +370,32 @@ async function rawPost(
   }
 }
 
-/** 显式作废当前会话，重新走 CAS 拿 ST。 */
-async function reauthorize(): Promise<void> {
-  const domain = cookieDomain();
-  const cookies = await xgxtJar.getAllCookies();
-  for (const c of cookies) {
-    if (c.domain && c.domain.includes(domain)) {
-      await xgxtJar.removeCookie(c.domain, c.path ?? '/', c.name);
-    }
+/** 显式作废当前会话，重新走 CAS 拿 ST，并恢复应用角色上下文。 */
+async function reauthorize(failedGeneration: number): Promise<void> {
+  if (sessionGeneration !== failedGeneration) return;
+  if (inflightReauth) {
+    await inflightReauth;
+    return;
   }
-  appRoleReady = false;
-  await authorize(zhcpServiceUrl(), xgxtJar);
+
+  inflightReauth = (async () => {
+    const domain = cookieDomain();
+    const cookies = await xgxtJar.getAllCookies();
+    for (const c of cookies) {
+      if (c.domain && c.domain.includes(domain)) {
+        await xgxtJar.removeCookie(c.domain, c.path ?? '/', c.name);
+      }
+    }
+    appRoleReady = false;
+    await authorize(zhcpServiceUrl(), xgxtJar);
+    await ensureAppRole();
+    sessionGeneration += 1;
+  })();
+  try {
+    await inflightReauth;
+  } finally {
+    inflightReauth = null;
+  }
 }
 
 /** 所有业务 API 调用的收口：POST、登录过期检测、envelope 解析、异常分层。 */
@@ -471,11 +490,12 @@ async function postRows(
 /** 会话过期时重新认证一次并重试（只重试一次）。 */
 async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
   await ensureAuthorized();
+  const requestGeneration = sessionGeneration;
   try {
     return await fn();
   } catch (e) {
     if (e instanceof XgxtNotLoggedInError) {
-      await reauthorize();
+      await reauthorize(requestGeneration);
       return await fn();
     }
     throw e;
@@ -700,8 +720,10 @@ export async function queryYearScoreStatics(): Promise<YearScoreStatic[]> {
 /** 查询学业成绩报告的可选学年与默认学年。 */
 export async function queryAcademicReportYears(): Promise<AcademicReportYears> {
   return runWithReauth(async () => {
-    const yearsRaw = await postController(API_PATHS.fiveYears, {});
-    const defaultRaw = await postController(API_PATHS.mrXn, {});
+    const [yearsRaw, defaultRaw] = await Promise.all([
+      postController(API_PATHS.fiveYears, {}),
+      postController(API_PATHS.mrXn, {}),
+    ]);
     return {
       years: Array.isArray(yearsRaw)
         ? yearsRaw

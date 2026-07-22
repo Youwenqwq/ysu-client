@@ -245,7 +245,7 @@ function ReportPanel() {
     }
   }, [yearsQuery.data, years, year]);
 
-  const reportQuery = useComprehensiveReport(year ? { year } : undefined);
+  const reportQuery = useComprehensiveReport(year ? { year } : undefined, year !== undefined);
   const entries = reportQuery.data?.entries ?? [];
 
   useErrorToast(yearsQuery.error);
