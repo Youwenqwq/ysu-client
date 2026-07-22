@@ -567,6 +567,11 @@ export const zh = {
     note: "备注",
     availableCount: "可报名 {count} 门",
     registeredCount: "已报名 {count} 门",
+    signup: "报名",
+    signupTitle: "确认报名",
+    signupDesc: "确定要报名《{name}》的补考吗？报名后可在「已报名」中查看。",
+    signupSuccess: "报名成功",
+    cancel: "取消",
   },
   labor: {
     title: "劳动教育",
@@ -1274,6 +1279,11 @@ export const en = {
     note: "Note",
     availableCount: "{count} available",
     registeredCount: "{count} registered",
+    signup: "Sign up",
+    signupTitle: "Confirm signup",
+    signupDesc: "Sign up for the makeup exam of {name}? You can find it under Registered afterwards.",
+    signupSuccess: "Signed up",
+    cancel: "Cancel",
   },
   labor: {
     title: "Labor Education",

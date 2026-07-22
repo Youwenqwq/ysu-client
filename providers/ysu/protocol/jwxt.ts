@@ -1392,7 +1392,7 @@ export async function queryExams(opts?: { term?: string }): Promise<Exam[]> {
   });
 }
 
-// ─── Public: Makeup Exams (bkbl, 只读) ──────────────────────────────── //
+// ─── Public: Makeup Exams (bkbl) ────────────────────────────────────── //
 
 let cachedMakeupTerm: string | null = null;
 let inflightMakeupTerm: Promise<string> | null = null;
@@ -1477,6 +1477,46 @@ export async function queryMakeupExamCourses(opts?: {
     }, _appIds.bkbl);
     const rows = extractRows(datas, 'cxbkbmmx');
     return rows.map((r) => parseMakeupCourse(r as Record<string, unknown>));
+  });
+}
+
+/**
+ * 报名补考（xgksrwxs，写操作）。
+ *
+ * taskId 与 batchId 取自 queryMakeupExamCourses 返回的同名字段。
+ * 注意本接口外层信封恒为 code=0，真实结果在 datas.xgksrwxs.extParams：
+ * code === '1' 为成功，其余为拒绝（msg 含原因）。
+ */
+export async function signupMakeupExam(args: {
+  taskId: string;
+  batchId: string;
+  studentId?: string;
+}): Promise<void> {
+  return runWithReauth(async () => {
+    const studentId = args.studentId ?? (await queryStudentInfo()).studentId;
+    await ensureWeu(_appIds.bkbl);
+
+    const param = JSON.stringify([
+      { XH: studentId, KSRWID: args.taskId, KSBMZTDM: '02', KSDM: args.batchId },
+    ]);
+    const datas = await post(_apiPaths.xgksrwxs, { param }, _appIds.bkbl);
+
+    const node = datas['xgksrwxs'];
+    const ext =
+      node !== null && typeof node === 'object'
+        ? (node as Record<string, unknown>)['extParams']
+        : null;
+    if (ext === null || typeof ext !== 'object') {
+      throw new JWXTProtocolError('missing xgksrwxs.extParams in response');
+    }
+    const extParams = ext as Record<string, unknown>;
+    if (String(extParams['code'] ?? '') !== '1') {
+      throw new JWXTBusinessError(
+        extParams['code'] as string | number | null,
+        (extParams['msg'] as string | null) ?? null,
+        buildApiUrl(_apiPaths.xgksrwxs),
+      );
+    }
   });
 }
 

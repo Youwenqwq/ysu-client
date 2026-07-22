@@ -50,6 +50,7 @@ import {
   queryExams as _queryExams,
   queryMakeupExamBatches as _queryMakeupExamBatches,
   queryMakeupExamCourses as _queryMakeupExamCourses,
+  signupMakeupExam as _signupMakeupExam,
   queryTrainingPlan as _queryTrainingPlan,
   queryAcademicCompletion as _queryAcademicCompletion,
   queryAcademicWarnings as _queryAcademicWarnings,
@@ -187,6 +188,14 @@ export async function queryMakeupExamCourses(opts?: {
   pageSize?: number;
 }): Promise<JWXTMakeupExamCourse[]> {
   return withJWXT(() => _queryMakeupExamCourses(opts));
+}
+
+export async function signupMakeupExam(args: {
+  taskId: string;
+  batchId: string;
+  studentId?: string;
+}): Promise<void> {
+  return withJWXT(() => _signupMakeupExam(args));
 }
 
 export async function queryTrainingPlan(opts?: {

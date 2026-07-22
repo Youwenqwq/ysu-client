@@ -49,6 +49,7 @@ import type {
   MakeupExamBatch,
   MakeupExamCourse,
   MakeupExamCourseQueryOptions,
+  MakeupExamSignupInput,
   PageQueryOptions,
   ProviderMobile,
   ScheduleQueryOptions,
@@ -86,6 +87,7 @@ import {
   queryExams,
   queryMakeupExamBatches,
   queryMakeupExamCourses,
+  signupMakeupExam,
   queryExperimentalSchedule,
   queryGpaStats,
   queryGradeDistribution,
@@ -668,6 +670,10 @@ export class YSUProvider extends BaseProvider {
       note: row.note || undefined,
       raw: row.raw,
     }));
+  }
+
+  async signupMakeupExam(input: MakeupExamSignupInput): Promise<void> {
+    await signupMakeupExam({ taskId: input.taskId, batchId: input.batchId });
   }
 
   async getLaborRecords(): Promise<LaborRecord[]> {

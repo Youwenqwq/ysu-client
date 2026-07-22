@@ -63,7 +63,8 @@
       "commit_answer": "pjapp/api/wdpj/commitQuestionnaireAnswer.do",
       "bkxtcs": "bkbl/modules/bkbm/cxxtcs.do",
       "bkkspc": "bkbl/modules/bkbm/cxbkkspc.do",
-      "bkbmmx": "bkbl/modules/bkbm/cxbkbmmx.do"
+      "bkbmmx": "bkbl/modules/bkbm/cxbkbmmx.do",
+      "xgksrwxs": "bkbl/modules/bkbm/xgksrwxs.do"
     }
   },
   "ldxt": {

@@ -43,6 +43,7 @@ import type {
   MakeupExamBatch,
   MakeupExamCourse,
   MakeupExamCourseQueryOptions,
+  MakeupExamSignupInput,
   MfaChallenge,
   MfaRequestInput,
   MfaSubmitInput,
@@ -118,6 +119,7 @@ export abstract class BaseProvider implements AcademicProvider {
   abstract getMakeupExamCourses(
     options?: MakeupExamCourseQueryOptions,
   ): Promise<MakeupExamCourse[]>;
+  abstract signupMakeupExam(input: MakeupExamSignupInput): Promise<void>;
   abstract getLaborRecords(): Promise<LaborRecord[]>;
   abstract getLaborSummary(): Promise<LaborSummary>;
   abstract getLaborActivities(): Promise<EnrollableActivity[]>;

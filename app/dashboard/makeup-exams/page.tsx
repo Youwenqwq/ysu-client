@@ -21,6 +21,18 @@ import {
 } from "@/components/ui/empty";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useMakeupExamBatches, useMakeupExamCourses } from "@/providers/hooks";
+import { useProvider } from "@/providers/use-provider";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { MakeupExamCourse } from "@/providers/types";
 import { CalendarOff, Clock, FilePenLine, School } from "lucide-react";
 
 function formatSignupTime(value?: string): string {
@@ -29,8 +41,11 @@ function formatSignupTime(value?: string): string {
 
 export default function MakeupExamsPage() {
   const { t } = useTranslation();
+  const provider = useProvider();
   const [selectedBatchId, setSelectedBatchId] = useState<string>();
   const [tab, setTab] = useState<"available" | "registered">("available");
+  const [signupTarget, setSignupTarget] = useState<MakeupExamCourse | null>(null);
+  const [signingUp, setSigningUp] = useState(false);
 
   const batchesQuery = useMakeupExamBatches();
   const batches = useMemo(() => batchesQuery.data ?? [], [batchesQuery.data]);
@@ -56,6 +71,24 @@ export default function MakeupExamsPage() {
     if (!coursesQuery.error) return;
     toast.error(coursesQuery.error.message || t("app.updating"));
   }, [coursesQuery.error, t]);
+
+  async function handleSignupConfirm() {
+    if (!signupTarget?.taskId || !signupTarget?.batchId) return;
+    setSigningUp(true);
+    try {
+      await provider.signupMakeupExam({
+        taskId: signupTarget.taskId,
+        batchId: signupTarget.batchId,
+      });
+      toast.success(t("makeupExams.signupSuccess"));
+      setSignupTarget(null);
+      await Promise.all([coursesQuery.mutate(), batchesQuery.mutate()]);
+    } catch (e) {
+      toast.error((e as Error).message || t("app.updating"));
+    } finally {
+      setSigningUp(false);
+    }
+  }
 
   const selectedBatch = batches.find((b) => b.batchId === selectedBatchId);
   const loading =
@@ -220,11 +253,49 @@ export default function MakeupExamsPage() {
                       <span>{course.note}</span>
                     </div>
                   )}
+                  {tab === "available" && course.taskId && course.batchId && (
+                    <Button
+                      size="sm"
+                      className="mt-1 self-start"
+                      onClick={() => setSignupTarget(course)}
+                    >
+                      {t("makeupExams.signup")}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ))}
           </div>
         ))}
+
+      <Dialog
+        open={signupTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !signingUp) setSignupTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("makeupExams.signupTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("makeupExams.signupDesc", { name: signupTarget?.name ?? "" })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={signingUp}
+              onClick={() => setSignupTarget(null)}
+            >
+              {t("makeupExams.cancel")}
+            </Button>
+            <Button onClick={handleSignupConfirm} disabled={signingUp}>
+              {signingUp && <Spinner data-icon="inline-start" />}
+              {t("makeupExams.signup")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

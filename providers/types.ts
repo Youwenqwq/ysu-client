@@ -143,6 +143,12 @@ export interface ExamQueryOptions {
   semester?: string;
 }
 
+/** Input for makeup exam signup. */
+export interface MakeupExamSignupInput {
+  taskId: string;
+  batchId: string;
+}
+
 /** Options for querying makeup exam courses. */
 export interface MakeupExamCourseQueryOptions {
   semester?: string;
@@ -756,6 +762,7 @@ export interface ProviderAcademics {
   getExams(options?: ExamQueryOptions): Promise<Exam[]>;
   getMakeupExamBatches(options?: ExamQueryOptions): Promise<MakeupExamBatch[]>;
   getMakeupExamCourses(options?: MakeupExamCourseQueryOptions): Promise<MakeupExamCourse[]>;
+  signupMakeupExam(input: MakeupExamSignupInput): Promise<void>;
   getLaborRecords(): Promise<LaborRecord[]>;
   getLaborSummary(): Promise<LaborSummary>;
   getLaborActivities(): Promise<EnrollableActivity[]>;
