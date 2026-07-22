@@ -47,6 +47,31 @@ export default function DashboardPage() {
   const { t } = useTranslation();
   const [showGPA, setShowGPA] = useState(false);
 
+  /** HH:mm（分钟数 → 时钟文本） */
+  const clockText = (minutes: number): string =>
+    `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
+
+  /** 倒计时文本：>=60 分钟用「X 小时 Y 分」，否则「Y 分钟」。 */
+  const countdownText = (minutes: number): string => {
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60);
+      const rest = minutes % 60;
+      return rest > 0
+        ? t("dashboard.hoursMinutes", { hours, minutes: rest })
+        : t("dashboard.hoursOnly", { hours });
+    }
+    return t("dashboard.minutesOnly", { minutes: Math.max(1, minutes) });
+  };
+
+  /** 考试的日历天数差（0=今天，1=明天）。 */
+  const examDayDiff = (timestamp: number): number => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const exam = new Date(timestamp);
+    const day = new Date(exam.getFullYear(), exam.getMonth(), exam.getDate()).getTime();
+    return Math.round((day - today) / 86_400_000);
+  };
+
   const student = useStudentInfo();
   const currentWeek = useCurrentWeek();
   const gpa = useGPAStats();
@@ -142,6 +167,27 @@ export default function DashboardPage() {
     }
     return null;
   }, [todayCourses, nowMinutes, timeMap]);
+
+  /** 课程的首节开始/末节结束时刻（分钟）。 */
+  const courseTimeRange = (c: Course): [number, number] | null => {
+    const start = timeMap[courseStartSection(c)];
+    const end = timeMap[courseEndSection(c)];
+    return start && end ? [start[0], end[1]] : null;
+  };
+
+  const currentRange = currentCourse ? courseTimeRange(currentCourse) : null;
+
+  let nextCourseInfo: { course: Course; range: [number, number] } | null = null;
+  if (!currentCourse) {
+    for (const c of todayCourses) {
+      const start = timeMap[courseStartSection(c)];
+      const end = timeMap[courseEndSection(c)];
+      if (start && end && start[0] > nowMinutes) {
+        nextCourseInfo = { course: c, range: [start[0], end[1]] };
+        break;
+      }
+    }
+  }
 
   if (anyLoading && !hasAnyData) {
     return (
@@ -285,6 +331,64 @@ export default function DashboardPage() {
         </button>
       )}
 
+      {currentCourse && currentRange ? (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="flex flex-col gap-2 py-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-primary">
+                {t("dashboard.ongoingNow")}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {t("dashboard.remaining", { time: countdownText(currentRange[1] - nowMinutes) })}
+              </span>
+            </div>
+            <span className="text-lg font-semibold">{currentCourse.name}</span>
+            <span className="text-sm text-muted-foreground">
+              {[currentCourse.teacher, currentCourse.classroom].filter(Boolean).join(" · ")}
+            </span>
+            <div className="h-1.5 rounded-full bg-primary/15">
+              <div
+                className="h-full rounded-full bg-primary transition-[width]"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.max(
+                      0,
+                      ((nowMinutes - currentRange[0]) / (currentRange[1] - currentRange[0])) * 100,
+                    ),
+                  )}%`,
+                }}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {clockText(currentRange[0])} - {clockText(currentRange[1])}
+            </span>
+          </CardContent>
+        </Card>
+      ) : nextCourseInfo ? (
+        <Card>
+          <CardContent className="flex flex-col gap-2 py-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t("dashboard.nextCourse")}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {t("dashboard.startsIn", { time: countdownText(nextCourseInfo.range[0] - nowMinutes) })}
+              </span>
+            </div>
+            <span className="text-lg font-semibold">{nextCourseInfo.course.name}</span>
+            <span className="text-sm text-muted-foreground">
+              {[nextCourseInfo.course.teacher, nextCourseInfo.course.classroom]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {clockText(nextCourseInfo.range[0])} - {clockText(nextCourseInfo.range[1])}
+            </span>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <div className="flex items-center gap-2">
@@ -306,24 +410,37 @@ export default function DashboardPage() {
               {todayCourses.map((c, idx) => {
                 const isCurrent = currentCourse === c;
                 const isPast = !isCurrent && isCoursePast(c, nowMinutes, timeMap);
+                const range = courseTimeRange(c);
                 return (
                   <div
                     key={idx}
                     className={cn(
-                      "flex items-center justify-between rounded-lg border p-3",
+                      "flex items-center gap-3 rounded-lg border p-3",
                       isCurrent && "border-primary bg-primary/5",
                       isPast && "opacity-50",
                     )}
                   >
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-medium text-sm">{c.name}</span>
-                      <span className="text-xs text-muted-foreground">
+                    {range && (
+                      <div className="flex w-11 shrink-0 flex-col text-xs leading-tight text-muted-foreground">
+                        <span>{clockText(range[0])}</span>
+                        <span>{clockText(range[1])}</span>
+                      </div>
+                    )}
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate font-medium text-sm">{c.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">
                         {c.teacher} · {c.classroom}
                       </span>
                     </div>
-                    <Badge variant="outline" className="shrink-0">
-                      {t("dashboard.sectionRange", { start: courseStartSection(c), end: courseEndSection(c) })}
-                    </Badge>
+                    {isCurrent ? (
+                      <Badge variant="default" className="shrink-0">
+                        {t("dashboard.ongoingNow")}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="shrink-0">
+                        {t("dashboard.sectionRange", { start: courseStartSection(c), end: courseEndSection(c) })}
+                      </Badge>
+                    )}
                   </div>
                 );
               })}
@@ -345,19 +462,28 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground">{t("dashboard.noExams")}</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {upcomingExams.map((exam, idx) => (
-                <div key={idx} className="flex items-center justify-between rounded-lg border p-3">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-medium text-sm">{exam.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {[formatExamTime(exam), exam.examLocation].filter(Boolean).join(" · ")}
-                    </span>
+              {upcomingExams.map((exam, idx) => {
+                const dayDiff = exam.startTimestamp ? examDayDiff(exam.startTimestamp) : null;
+                return (
+                  <div key={idx} className="flex items-center justify-between gap-2 rounded-lg border p-3">
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate font-medium text-sm">{exam.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {[formatExamTime(exam), exam.examLocation, exam.seatNumber ? t("dashboard.seatNumber", { num: exam.seatNumber }) : ""].filter(Boolean).join(" · ")}
+                      </span>
+                    </div>
+                    {dayDiff !== null && dayDiff >= 0 && (
+                      <Badge variant={dayDiff <= 1 ? "default" : "secondary"} className="shrink-0">
+                        {dayDiff === 0
+                          ? t("dashboard.examToday")
+                          : dayDiff === 1
+                            ? t("dashboard.examTomorrow")
+                            : t("dashboard.examInDays", { count: dayDiff })}
+                      </Badge>
+                    )}
                   </div>
-                  {exam.seatNumber && (
-                    <Badge variant="outline" className="shrink-0">{t("dashboard.seatNumber", { num: exam.seatNumber })}</Badge>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
