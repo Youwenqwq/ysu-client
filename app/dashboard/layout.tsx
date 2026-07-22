@@ -87,7 +87,6 @@ export default function DashboardLayout({
         { title: t("app.makeupExams"), url: "/dashboard/makeup-exams", icon: FilePenLine },
         { title: t("app.trainingPlan"), url: "/dashboard/training-plan", icon: BookOpen },
         { title: t("app.evaluation"), url: "/dashboard/evaluation", icon: ClipboardCheck },
-        { title: t("app.studentInfo"), url: "/dashboard/me/student", icon: User },
       ],
     },
     {
@@ -104,7 +103,6 @@ export default function DashboardLayout({
   const titleByPath: Record<string, string> = {
     "/dashboard": t("app.overview"),
     "/dashboard/grades": t("app.grades"),
-    "/dashboard/gpa": t("app.gpa"),
     "/dashboard/schedule": t("app.schedule"),
     "/dashboard/exams": t("app.exams"),
     "/dashboard/makeup-exams": t("app.makeupExams"),
@@ -114,7 +112,6 @@ export default function DashboardLayout({
     "/dashboard/school-schedule": t("app.schoolSchedule"),
     "/dashboard/training-plan": t("app.trainingPlan"),
     "/dashboard/evaluation": t("app.evaluation"),
-    "/dashboard/services": t("app.services"),
     "/dashboard/me": t("app.me"),
     "/dashboard/me/student": t("app.studentInfo"),
     "/dashboard/me/background": t("app.backgroundSettings"),
@@ -124,7 +121,7 @@ export default function DashboardLayout({
   };
   const pageTitle = titleByPath[pathname] ?? t("app.name");
 
-  const primaryPaths = new Set(["/dashboard", "/dashboard/schedule", "/dashboard/grades", "/dashboard/services", "/dashboard/me"]);
+  const primaryPaths = new Set(["/dashboard", "/dashboard/schedule", "/dashboard/grades", "/dashboard/me"]);
   const showBack = !primaryPaths.has(pathname);
 
   useEffect(() => {

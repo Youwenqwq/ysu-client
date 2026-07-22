@@ -9,7 +9,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  BookOpen,
+  CalendarDays,
   ChevronRight,
+  ClipboardCheck,
+  FilePenLine,
+  FileText,
+  Gauge,
+  Hammer,
+  Lightbulb,
   LogIn,
   Settings,
   Sun,
@@ -100,10 +108,25 @@ export default function MePage() {
   const displayName = student.data?.name || username || t("me.profileFallback");
   const initials = (student.data?.name || username || "U").slice(-2);
 
+  const academicItems = [
+    { href: "/dashboard/exams", label: t("app.exams"), icon: FileText },
+    { href: "/dashboard/makeup-exams", label: t("app.makeupExams"), icon: FilePenLine },
+    { href: "/dashboard/training-plan", label: t("app.trainingPlan"), icon: BookOpen },
+    { href: "/dashboard/evaluation", label: t("app.evaluation"), icon: ClipboardCheck },
+  ];
+
+  const platformItems = [
+    { href: "/dashboard/labor", label: t("app.labor"), icon: Hammer },
+    { href: "/dashboard/credits", label: t("app.credits"), icon: Lightbulb },
+    { href: "/dashboard/comprehensive", label: t("app.comprehensive"), icon: Gauge },
+    { href: "/dashboard/school-schedule", label: t("app.schoolSchedule"), icon: CalendarDays },
+  ];
+
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardContent className="flex items-center gap-4 py-5">
+      <Link href="/dashboard/me/student" className="block">
+        <Card className="transition-colors hover:bg-muted/40 active:bg-muted/60">
+          <CardContent className="flex items-center gap-4 py-5">
           <Avatar className="size-14">
             {avatarImage && <AvatarImage src={avatarImage} alt="avatar" />}
             <AvatarFallback className="text-lg">{initials}</AvatarFallback>
@@ -135,8 +158,48 @@ export default function MePage() {
               </>
             )}
           </div>
+          <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
         </CardContent>
       </Card>
+      </Link>
+
+      <Section title={t("me.sectionAcademic")}>
+        <Card>
+          <CardContent className="grid grid-cols-4 gap-y-4 py-4">
+            {academicItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex flex-col items-center gap-1.5 rounded-lg py-1 transition-colors active:bg-muted/60"
+              >
+                <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10">
+                  <item.icon className="size-5 text-primary" />
+                </span>
+                <span className="text-center text-xs leading-tight">{item.label}</span>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      </Section>
+
+      <Section title={t("me.sectionPlatforms")}>
+        <Card>
+          <CardContent className="grid grid-cols-4 gap-y-4 py-4">
+            {platformItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex flex-col items-center gap-1.5 rounded-lg py-1 transition-colors active:bg-muted/60"
+              >
+                <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10">
+                  <item.icon className="size-5 text-primary" />
+                </span>
+                <span className="text-center text-xs leading-tight">{item.label}</span>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      </Section>
 
       <Section title={t("me.sectionPreferences")}>
         <Card>
