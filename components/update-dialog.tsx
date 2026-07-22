@@ -85,8 +85,8 @@ export function UpdateDialog() {
   }, [handleClose, t]);
 
   const title = isApk
-    ? t("update.apkNewVersionTitle").replace("{version}", updateInfo?.version ?? "")
-    : t("update.newVersionTitle").replace("{version}", updateInfo?.version ?? "");
+    ? t("update.apkNewVersionTitle", { version: updateInfo?.version ?? "" })
+    : t("update.newVersionTitle", { version: updateInfo?.version ?? "" });
 
   const primaryLabel =
     state === "downloaded"

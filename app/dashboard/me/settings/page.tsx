@@ -27,7 +27,7 @@ import { useProvider } from "@/providers/use-provider";
 import { isCapacitor } from "@/lib/native/platform";
 
 import { syncWidgetSettingsToWidget } from "@/lib/native/widget-bridge";
-import { checkRateLimit, recordLoginAttempt } from "@/lib/rate-limit";
+import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit";
 import { useUpdateStore } from "@/lib/stores/update";
 import { useTheme } from "next-themes";
 import { startNotifyIfNeeded, stopNativePolling, triggerNotifyCheck } from "@/lib/native/notify";
@@ -123,16 +123,14 @@ export default function SettingsPage() {
   async function handleRelogin() {
     const limit = checkRateLimit();
     if (!limit.allowed) {
-      const totalSeconds = Math.ceil(limit.retryAfterMs / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      const message =
-        limit.reason === "window"
-          ? t("autoLogin.errorRateLimitWindow")
-              .replace("{minutes}", String(minutes))
-              .replace("{seconds}", seconds.toString().padStart(2, "0"))
-          : t("autoLogin.errorRateLimitInterval").replace("{seconds}", String(seconds));
-      toast.error(message);
+      toast.error(
+        rateLimitMessage(
+          limit,
+          t,
+          "autoLogin.errorRateLimitWindow",
+          "autoLogin.errorRateLimitInterval",
+        ),
+      );
       return;
     }
     recordLoginAttempt();

@@ -150,16 +150,14 @@ export default function MakeupExamsPage() {
                   )}
                   <div className="flex gap-2">
                     <Badge variant="outline">
-                      {t("makeupExams.availableCount").replace(
-                        "{count}",
-                        String(selectedBatch.availableCount),
-                      )}
+                      {t("makeupExams.availableCount", {
+                        count: selectedBatch.availableCount,
+                      })}
                     </Badge>
                     <Badge variant="outline">
-                      {t("makeupExams.registeredCount").replace(
-                        "{count}",
-                        String(selectedBatch.registeredCount),
-                      )}
+                      {t("makeupExams.registeredCount", {
+                        count: selectedBatch.registeredCount,
+                      })}
                     </Badge>
                   </div>
                 </div>

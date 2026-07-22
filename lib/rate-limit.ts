@@ -107,3 +107,20 @@ export function formatRetryDuration(ms: number): {
   const seconds = totalSeconds % 60;
   return { minutes, seconds };
 }
+
+/**
+ * 格式化限流错误消息（登录与重新登录共用）。
+ * window 档的秒数补零对齐 mm:ss 展示，interval 档不补零——保持既有文案行为。
+ */
+export function rateLimitMessage(
+  limit: RateLimitResult,
+  t: (key: string, params?: Record<string, string | number>) => string,
+  windowKey: string,
+  intervalKey: string,
+): string {
+  const { minutes, seconds } = formatRetryDuration(limit.retryAfterMs);
+  if (limit.reason === "window") {
+    return t(windowKey, { minutes, seconds: seconds.toString().padStart(2, "0") });
+  }
+  return t(intervalKey, { seconds });
+}

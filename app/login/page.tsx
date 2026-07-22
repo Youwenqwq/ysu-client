@@ -36,7 +36,7 @@ import {
   saveRememberedCredentials,
   clearRememberedCredentials,
 } from "@/lib/storage/secure";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, rateLimitMessage } from "@/lib/rate-limit";
 import { useMFAModalStore } from "@/lib/stores/mfa-modal";
 import { getActiveProvider, setActiveProviderSchool } from "@/providers/provider-service";
 
@@ -207,23 +207,21 @@ export default function LoginPage() {
 
     const limit = checkRateLimit();
     if (!limit.allowed) {
-      const totalSeconds = Math.ceil(limit.retryAfterMs / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      const message =
-        limit.reason === "window"
-          ? t("login.errorRateLimitWindow")
-              .replace("{minutes}", String(minutes))
-              .replace("{seconds}", seconds.toString().padStart(2, "0"))
-          : t("login.errorRateLimitInterval").replace("{seconds}", String(seconds));
-
-      toast.error(message, {
-        action: {
-          label: t("login.skipRateLimit"),
-          onClick: () => doLogin(true),
+      toast.error(
+        rateLimitMessage(
+          limit,
+          t,
+          "login.errorRateLimitWindow",
+          "login.errorRateLimitInterval",
+        ),
+        {
+          action: {
+            label: t("login.skipRateLimit"),
+            onClick: () => doLogin(true),
+          },
         },
-      });
-      setCountdown(totalSeconds);
+      );
+      setCountdown(Math.ceil(limit.retryAfterMs / 1000));
       return;
     }
 
@@ -313,7 +311,7 @@ export default function LoginPage() {
                 {loading
                   ? t("login.loggingIn")
                   : countdown > 0
-                    ? t("login.retryAfter").replace("{seconds}", String(countdown))
+                    ? t("login.retryAfter", { seconds: countdown })
                     : t("login.submit")}
               </Button>
             </FieldGroup>
