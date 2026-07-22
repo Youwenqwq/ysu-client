@@ -111,7 +111,7 @@ function GachaCard({
       type="button"
       disabled={flipped}
       aria-label={flipped ? item.courseName : t("gacha.tapToReveal")}
-      className="w-40 [perspective:1200px]"
+      className="w-36 [perspective:1200px] sm:w-40"
       initial={{ opacity: 0, y: 28, scale: 0.9 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 16, scale: 0.94 }}
@@ -122,7 +122,7 @@ function GachaCard({
       data-card-key={item.key}
     >
       <motion.div
-        className="relative h-56 [transform-style:preserve-3d]"
+        className="relative h-52 [transform-style:preserve-3d] sm:h-56"
         animate={{ rotateY: flipped ? 180 : 0 }}
         transition={FLIP_SPRING}
       >
@@ -276,16 +276,20 @@ export function GradeGachaModal({
             </Button>
           </motion.header>
 
-          <div className="flex flex-1 flex-wrap content-center items-center justify-center gap-4 overflow-y-auto px-4 py-6">
-            {pending.map((item, i) => (
-              <GachaCard
-                key={item.key}
-                item={item}
-                index={i}
-                flipped={flipped.has(item.key)}
-                onFlip={(el) => flip(item.key, el)}
-              />
-            ))}
+          {/* 安全居中:内层 m-auto 在小内容时居中、溢出时从头可滚,
+              避免滚动容器 content-center 导致两端裁切且无法滚动。 */}
+          <div className="flex flex-1 flex-col overflow-y-auto px-4 py-6">
+            <div className="m-auto flex w-full max-w-2xl flex-wrap items-center justify-center gap-4">
+              {pending.map((item, i) => (
+                <GachaCard
+                  key={item.key}
+                  item={item}
+                  index={i}
+                  flipped={flipped.has(item.key)}
+                  onFlip={(el) => flip(item.key, el)}
+                />
+              ))}
+            </div>
           </div>
 
           <motion.footer
