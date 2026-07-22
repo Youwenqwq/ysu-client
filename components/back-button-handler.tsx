@@ -10,7 +10,6 @@ const PRIMARY_ROUTES = [
   "/dashboard",
   "/dashboard/schedule",
   "/dashboard/grades",
-  "/dashboard/evaluation",
   "/dashboard/me",
 ];
 

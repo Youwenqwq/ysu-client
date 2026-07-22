@@ -98,7 +98,7 @@ export default function DashboardLayout({
   };
   const pageTitle = titleByPath[pathname] ?? t("app.name");
 
-  const primaryPaths = new Set(["/dashboard", "/dashboard/schedule", "/dashboard/grades", "/dashboard/evaluation", "/dashboard/me"]);
+  const primaryPaths = new Set(["/dashboard", "/dashboard/schedule", "/dashboard/grades", "/dashboard/me"]);
   const showBack = !primaryPaths.has(pathname);
 
   useEffect(() => {

@@ -13,6 +13,7 @@ import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   useClassPeriods,
   useCurrentWeek,
+  useEvaluationTypes,
   useExams,
   useGPAStats,
   useSchedule,
@@ -31,7 +32,7 @@ import {
 import { syncScheduleToWidget, syncExamsToWidget } from "@/lib/native/widget-bridge";
 import { syncClassAlarmsToNative } from "@/lib/native/notify";
 import type { Course } from "@/providers/types";
-import { Calendar, GraduationCap, BarChart3, Clock, BookOpen, Eye, EyeOff } from "lucide-react";
+import { Calendar, ChevronRight, ClipboardCheck, GraduationCap, BarChart3, Clock, BookOpen, Eye, EyeOff } from "lucide-react";
 
 function isCourseActiveToday(course: Course, currentWeek: number, currentWeekday: number): boolean {
   if (courseWeekDay(course) !== currentWeekday) return false;
@@ -52,6 +53,12 @@ export default function DashboardPage() {
   const schedule = useSchedule({ courseCategory: "all", includeLabSchedule: true });
   const exams = useExams();
   const periodsRaw = useClassPeriods();
+  const evaluationTypes = useEvaluationTypes();
+
+  const pendingEvaluationCount = useMemo(
+    () => (evaluationTypes.data ?? []).reduce((sum, type) => sum + (type.count || 0), 0),
+    [evaluationTypes.data],
+  );
 
   const courses = useMemo(() => schedule.data ?? [], [schedule.data]);
   const examRows = useMemo(() => exams.data ?? [], [exams.data]);
@@ -262,6 +269,20 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {pendingEvaluationCount > 0 && (
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard/evaluation")}
+          className="flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 text-left transition-colors active:bg-primary/10"
+        >
+          <ClipboardCheck className="size-5 shrink-0 text-primary" />
+          <span className="flex-1 text-sm font-medium">
+            {t("dashboard.pendingEvaluation", { count: pendingEvaluationCount })}
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </button>
+      )}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">

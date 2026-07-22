@@ -13,6 +13,7 @@ import {
   BookOpen,
   CalendarDays,
   ChevronRight,
+  ClipboardCheck,
   FileText,
   FilePenLine,
   GraduationCap,
@@ -108,6 +109,7 @@ export default function MePage() {
     { href: "/dashboard/me/student", label: t("app.studentInfo"), icon: User },
     { href: "/dashboard/me/gpa", label: t("app.gpa"), icon: GraduationCap },
     { href: "/dashboard/makeup-exams", label: t("app.makeupExams"), icon: FilePenLine },
+    { href: "/dashboard/evaluation", label: t("app.evaluation"), icon: ClipboardCheck, mobileOnly: true },
     { href: "/dashboard/exams", label: t("app.exams"), icon: FileText, mobileOnly: true },
     { href: "/dashboard/training-plan", label: t("app.trainingPlan"), icon: BookOpen, mobileOnly: true },
   ];
