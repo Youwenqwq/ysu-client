@@ -172,9 +172,7 @@ export default function MePage() {
                 href={item.href}
                 className="flex flex-col items-center gap-1.5 rounded-lg py-1 transition-colors active:bg-muted/60"
               >
-                <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10">
-                  <item.icon className="size-5 text-primary" />
-                </span>
+                <item.icon className="size-6 text-foreground" />
                 <span className="text-center text-xs leading-tight">{item.label}</span>
               </Link>
             ))}
@@ -191,9 +189,7 @@ export default function MePage() {
                 href={item.href}
                 className="flex flex-col items-center gap-1.5 rounded-lg py-1 transition-colors active:bg-muted/60"
               >
-                <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10">
-                  <item.icon className="size-5 text-primary" />
-                </span>
+                <item.icon className="size-6 text-foreground" />
                 <span className="text-center text-xs leading-tight">{item.label}</span>
               </Link>
             ))}
