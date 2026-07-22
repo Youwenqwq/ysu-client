@@ -557,7 +557,7 @@ export function resetJWXT(): void {
   cachedStudentInfo = null;
   inflightStudentInfo = null;
   cachedCurrentWeek = null;
-  inflightCurrentWeek = null;
+  inflightCurrentWeek.clear();
 }
 
 /** 将当前 JWXT jar 中的会话持久化到 auth-store（包含 mobile auth token）。 */
@@ -1055,7 +1055,10 @@ const currentTermCache = new Map<string, string>();
 const inflightCurrentTerm = new Map<string, Promise<string>>();
 
 let cachedCurrentWeek: { key: string; value: CurrentWeek } | null = null;
-let inflightCurrentWeek: Promise<CurrentWeek> | null = null;
+const inflightCurrentWeek = new Map<
+  string,
+  { marker: symbol; promise: Promise<CurrentWeek> }
+>();
 
 async function getCurrentTerm(
   appId: string,
@@ -1438,9 +1441,11 @@ export async function queryCurrentWeek(opts?: {
     const date = opts?.date ?? todayDate();
     const cacheKey = `${term}|${date}`;
     if (cachedCurrentWeek?.key === cacheKey) return cachedCurrentWeek.value;
-    if (inflightCurrentWeek) return inflightCurrentWeek;
+    const inflight = inflightCurrentWeek.get(cacheKey);
+    if (inflight) return inflight.promise;
 
-    inflightCurrentWeek = (async () => {
+    const marker = Symbol(cacheKey);
+    const promise = (async () => {
       try {
         const { xn, xq } = splitTerm(term!);
         const datas = await post(_apiPaths.dqzc, { XN: xn, XQ: xq, RQ: date }, _appIds.wdkb);
@@ -1452,11 +1457,14 @@ export async function queryCurrentWeek(opts?: {
         cachedCurrentWeek = { key: cacheKey, value: result };
         return result;
       } finally {
-        inflightCurrentWeek = null;
+        if (inflightCurrentWeek.get(cacheKey)?.marker === marker) {
+          inflightCurrentWeek.delete(cacheKey);
+        }
       }
     })();
 
-    return inflightCurrentWeek;
+    inflightCurrentWeek.set(cacheKey, { marker, promise });
+    return promise;
   });
 }
 
