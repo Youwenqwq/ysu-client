@@ -120,7 +120,9 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
           <h3 className="text-sm font-medium text-muted-foreground">
             {t("comprehensive.indicatorsTitle")}
           </h3>
-          {indicators.map((ind, idx) => (
+          {indicators.map((ind, idx) => {
+            const rank = result.indicators.find((i) => i.name === ind.name)?.rank;
+            return (
             <Card key={`${ind.name}-${idx}`}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
@@ -136,7 +138,7 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
                 </div>
                 <CardDescription>
                   {[
-                    ind.rank ? `${t("comprehensive.rank")}: ${ind.rank}` : "",
+                    rank ? `${t("comprehensive.rank")}: ${rank}` : "",
                     ind.maxScore ? `${t("comprehensive.maxScore")}: ${ind.maxScore}` : "",
                     ind.proportion ? `${t("comprehensive.proportion")}: ${ind.proportion}` : "",
                   ]
@@ -150,7 +152,8 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
                 </CardContent>
               )}
             </Card>
-          ))}
+            );
+          })}
         </>
       )}
     </div>

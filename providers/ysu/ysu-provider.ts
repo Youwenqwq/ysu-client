@@ -879,7 +879,6 @@ export class YSUProvider extends BaseProvider {
     return rows.map((row) => ({
       name: row.name,
       score: row.score,
-      rank: row.rank,
       maxScore: row.maxScore || undefined,
       rangeText: row.rangeText || undefined,
       proportion: row.proportion || undefined,

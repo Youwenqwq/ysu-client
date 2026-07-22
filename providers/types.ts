@@ -556,7 +556,6 @@ export interface ComprehensiveResult {
 export interface ComprehensiveIndicatorDetail {
   name: string;
   score: string;
-  rank: number;
   maxScore?: string;
   rangeText?: string;
   proportion?: string;

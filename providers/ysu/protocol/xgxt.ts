@@ -84,7 +84,6 @@ export interface EvaluationResult {
 export interface EvaluationIndicatorDetail {
   readonly name: string;
   readonly score: string;
-  readonly rank: number;
   readonly maxScore: string;
   readonly rangeText: string;
   readonly proportion: string;
@@ -560,7 +559,6 @@ function parseIndicatorDetail(r: Record<string, unknown>): EvaluationIndicatorDe
   return {
     name: toStr(r['ZBMC']),
     score: toStr(r['FS']),
-    rank: toInt(r['PX']),
     maxScore: toStr(r['ZDZ']),
     rangeText: toStr(r['FZFW']),
     proportion: toStr(r['BL']),
