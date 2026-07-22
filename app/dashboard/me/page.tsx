@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useSettingsStore } from "@/lib/stores/settings";
+import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service";
@@ -164,52 +165,17 @@ export default function MePage() {
       </Link>
 
       <Section title={t("me.sectionAcademic")}>
-        <Card>
-          <CardContent className="grid grid-cols-4 gap-y-4 py-4">
-            {academicItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex flex-col items-center gap-1.5 rounded-lg py-1 transition-colors active:bg-muted/60"
-              >
-                <item.icon className="size-6 text-foreground" />
-                <span className="text-center text-xs leading-tight">{item.label}</span>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
+        <LinkCard items={academicItems} />
       </Section>
 
       <Section title={t("me.sectionPlatforms")}>
-        <Card>
-          <CardContent className="grid grid-cols-4 gap-y-4 py-4">
-            {platformItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex flex-col items-center gap-1.5 rounded-lg py-1 transition-colors active:bg-muted/60"
-              >
-                <item.icon className="size-6 text-foreground" />
-                <span className="text-center text-xs leading-tight">{item.label}</span>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
+        <LinkCard items={platformItems} />
       </Section>
 
       <Section title={t("me.sectionPreferences")}>
-        <Card>
-          <CardContent className="flex flex-col py-1">
-            <Link
-              href="/dashboard/me/settings"
-              className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
-            >
-              <Settings className="size-5 shrink-0 text-muted-foreground" />
-              <span className="flex-1 text-sm">{t("me.settings")}</span>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </Link>
-          </CardContent>
-        </Card>
+        <LinkCard
+          items={[{ href: "/dashboard/me/settings", label: t("me.settings"), icon: Settings }]}
+        />
       </Section>
 
       <Section title={t("me.sectionAccount")}>
@@ -253,5 +219,35 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </h2>
       {children}
     </section>
+  );
+}
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+/** 分隔线列表行卡片：muted 图标 + 标签 + ChevronRight。 */
+function LinkCard({ items }: { items: ReadonlyArray<NavItem> }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col py-1">
+        {items.map((item, idx) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-3 py-3 transition-colors active:bg-muted/60",
+              idx > 0 && "border-t border-border",
+            )}
+          >
+            <item.icon className="size-5 shrink-0 text-muted-foreground" />
+            <span className="flex-1 text-sm">{item.label}</span>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </Link>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
