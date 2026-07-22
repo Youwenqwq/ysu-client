@@ -788,6 +788,8 @@ export interface AcademicCompletion {
   elective?: string;
   numericElective?: number;
   passed: boolean;
+  /** 数据上次计算时间（本地 ISO，YYYY-MM-DDTHH:mm:ss） */
+  lastCalculatedAt?: string;
 }
 
 export interface LessonActivity {
@@ -938,6 +940,8 @@ export interface ProviderAcademics {
   getSchoolClassroomSchedule(code: string, options?: ExamQueryOptions): Promise<Course[]>;
   getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>;
   getAcademicCompletion(): Promise<AcademicCompletion>;
+  /** 请求服务端重新计算学业完成度（写操作），完成后返回最新结果。 */
+  recalculateAcademicCompletion?(): Promise<AcademicCompletion>;
   getAcademicWarnings(): Promise<AcademicWarning[]>;
 }
 

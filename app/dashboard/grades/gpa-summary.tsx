@@ -120,11 +120,12 @@ export function GpaSummary({
   const gpaVisible = useSettingsStore((s) => s.gpaVisible);
   const setGpaVisible = useSettingsStore((s) => s.setGpaVisible);
 
+  // 学位课学分是必修/选修的子集（学位课同时属于计划必修或选修），
+  // 不计入已修总量与构成条，仅在展开明细中单独展示。
   const credits: CreditSegment[] = (
     [
       { label: t("gpa.requiredEarned"), raw: gpa?.requiredCreditEarned, className: "bg-chart-4" },
       { label: t("gpa.electiveEarned"), raw: gpa?.electiveCreditEarned, className: "bg-chart-3" },
-      { label: t("gpa.degreeEarned"), raw: gpa?.degreeCreditEarned, className: "bg-chart-2" },
     ] as Array<{ label: string; raw?: string; className: string }>
   )
     .map((s) => ({ label: s.label, value: toNum(s.raw) ?? 0, className: s.className }))
@@ -249,6 +250,7 @@ export function GpaSummary({
               <div className="py-1.5"><StatRow label={t("grades.degreeGpaInitial")} value={gpa?.degreeGpaInitial} /></div>
               <div className="py-1.5"><StatRow label={t("gpa.degreeGpaHighest")} value={gpa?.degreeGpaHighest} /></div>
               <div className="py-1.5"><StatRow label={t("grades.degreeWeightedAvg")} value={gpa?.degreeWeightedAvg} /></div>
+            <div className="py-1.5"><StatRow label={t("gpa.degreeEarned")} value={gpa?.degreeCreditEarned} /></div>
               {credits.map((s) => (
                 <div key={s.label} className="flex items-baseline justify-between gap-2 py-1.5">
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">

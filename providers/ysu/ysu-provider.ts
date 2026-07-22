@@ -1,3 +1,4 @@
+import type { AcademicCompletion as ProtocolAcademicCompletion } from "./protocol/jwxt";
 import { useAuthStore } from "@/lib/stores/auth";
 import { getSchoolConfig, isFeatureAvailable } from "@/lib/server-config";
 import { BaseProvider } from "../base-provider";
@@ -93,6 +94,7 @@ import {
 import {
   calculateEvaluationScore as _calculateEvaluationScore,
   queryAcademicCompletion,
+  recalculateAcademicCompletion as recalculateAcademicCompletionImpl,
   queryAcademicWarnings,
   queryClassPeriods,
   queryCurrentWeek,
@@ -318,6 +320,20 @@ function mapCreditRecord(row: ScxtCreditRecord): CreditRecord {
     batch: row.batch || undefined,
     status: row.status || undefined,
     raw: row.raw,
+  };
+}
+
+function mapCompletion(completion: ProtocolAcademicCompletion): AcademicCompletion {
+  return {
+    planName: completion.planName ?? undefined,
+    totalRequired: completion.totalRequired ?? undefined,
+    numericTotalRequired: completion.numericTotalRequired,
+    completed: completion.completed ?? undefined,
+    numericCompleted: completion.numericCompleted,
+    elective: completion.elective ?? undefined,
+    numericElective: completion.numericElective,
+    passed: completion.passed ?? false,
+    lastCalculatedAt: completion.lastCalculatedAt || undefined,
   };
 }
 
@@ -1137,16 +1153,12 @@ export class YSUProvider extends BaseProvider {
 
   async getAcademicCompletion(): Promise<AcademicCompletion> {
     const completion = await queryAcademicCompletion();
-    return {
-      planName: completion.planName ?? undefined,
-      totalRequired: completion.totalRequired ?? undefined,
-      numericTotalRequired: completion.numericTotalRequired,
-      completed: completion.completed ?? undefined,
-      numericCompleted: completion.numericCompleted,
-      elective: completion.elective ?? undefined,
-      numericElective: completion.numericElective,
-      passed: completion.passed ?? false,
-    };
+    return mapCompletion(completion);
+  }
+
+  async recalculateAcademicCompletion(): Promise<AcademicCompletion> {
+    const completion = await recalculateAcademicCompletionImpl();
+    return mapCompletion(completion);
   }
 
   async getAcademicWarnings(): Promise<AcademicWarning[]> {

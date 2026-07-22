@@ -38,6 +38,8 @@
       "kcbcx": "kcbcx/KbcxController/querybjkb.do",
       "xsjbxx": "xsjbxxgl/modules/xsjbxx/cxxsjbxxlb.do",
       "xywc": "xywccx/modules/xywccx/cxxsscfa.do",
+      "xywc_recalc": "xywccx/modules/xywccx/bysc.do",
+      "xywc_recalc_progress": "xywccx/modules/xywccx/byscjd.do",
       "pyfa": "xsfacx/modules/pyfacxepg/grpyfacx.do",
       "pyfa_courses": "jwpubapp/modules/pyfa/kzkccx.do",
       "xyyj": "xyyj/modules/xsxyyjjg/cxxsyjpcjg.do",

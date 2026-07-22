@@ -66,6 +66,7 @@ import {
   signupMakeupExam as _signupMakeupExam,
   queryTrainingPlan as _queryTrainingPlan,
   queryAcademicCompletion as _queryAcademicCompletion,
+  recalculateAcademicCompletion as _recalculateAcademicCompletion,
   queryAcademicWarnings as _queryAcademicWarnings,
   queryEvaluationTypes as _queryEvaluationTypes,
   queryPendingEvaluations as _queryPendingEvaluations,
@@ -272,6 +273,10 @@ export async function queryTrainingPlan(opts?: {
 
 export async function queryAcademicCompletion(): Promise<JWXTAcademicCompletion> {
   return withJWXT(() => _queryAcademicCompletion());
+}
+
+export async function recalculateAcademicCompletion(): Promise<JWXTAcademicCompletion> {
+  return withJWXT(() => _recalculateAcademicCompletion());
 }
 
 export async function queryAcademicWarnings(): Promise<JWXTAcademicWarning[]> {

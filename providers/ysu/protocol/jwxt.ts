@@ -247,6 +247,8 @@ export interface AcademicCompletion {
   readonly elective: string;
   readonly numericElective?: number;
   readonly passed: boolean;
+  /** 数据上次计算时间（CZSJ，本地 ISO） */
+  readonly lastCalculatedAt: string;
   readonly raw: Record<string, unknown>;
 }
 
@@ -1800,18 +1802,85 @@ export async function queryTrainingPlan(opts?: {
   });
 }
 
+async function queryCompletionRow(): Promise<Record<string, unknown>> {
+  const datas = await post(_apiPaths.xywc, {
+    SCLBDM: '04',
+    '*order': '-CZSJ',
+  }, _appIds.xywccx);
+  const rows = extractRows(datas, 'cxxsscfa');
+  if (rows.length === 0) {
+    throw new JWXTProtocolError('queryAcademicCompletion returned empty result');
+  }
+  return rows[0] as Record<string, unknown>;
+}
+
 export async function queryAcademicCompletion(): Promise<AcademicCompletion> {
   return runWithReauth(async () => {
     await ensureWeu(_appIds.xywccx);
-    const datas = await post(_apiPaths.xywc, {
-      SCLBDM: '04',
-      '*order': '-CZSJ',
-    }, _appIds.xywccx);
-    const rows = extractRows(datas, 'cxxsscfa');
-    if (rows.length === 0) {
-      throw new JWXTProtocolError('queryAcademicCompletion returned empty result');
+    return parseAcademicCompletion(await queryCompletionRow());
+  });
+}
+
+/**
+ * 请求重新计算学业完成度（对应 bysc.do，写操作）。
+ * 触发后以前端同款 byscjd.do 轮询进度（YWCS>=ZS 为完成），
+ * 完成后重新查询并返回最新结果。
+ */
+export async function recalculateAcademicCompletion(options?: {
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}): Promise<AcademicCompletion> {
+  return runWithReauth(async () => {
+    await ensureWeu(_appIds.xywccx);
+
+    const row = await queryCompletionRow();
+    const pyfadm = rawStr(row, 'PYFADM');
+    const studentId = rawStr(row, 'XH');
+    if (!pyfadm || !studentId) {
+      throw new JWXTProtocolError('recalculateAcademicCompletion: PYFADM/XH missing in completion row');
     }
-    return parseAcademicCompletion(rows[0] as Record<string, unknown>);
+
+    const datas = await post(_apiPaths.xywc_recalc, {
+      PYFADM: pyfadm,
+      BYNJDM: rawStr(row, 'BYNJDM') || '-',
+      SCLBDM: rawStr(row, 'SCLBDM') || '04',
+    }, _appIds.xywccx);
+    const result = datas['bysc'] as Record<string, unknown> | undefined;
+    if (!result || !('code' in result)) {
+      throw new JWXTProtocolError('recalculateAcademicCompletion: malformed bysc response');
+    }
+    if (String(result['code']) !== '0') {
+      throw new JWXTBusinessError(
+        result['code'] as string | number | null,
+        (result['msg'] as string | null) ?? null,
+        _apiPaths.xywc_recalc,
+      );
+    }
+
+    const timeoutMs = options?.timeoutMs ?? 60_000;
+    const pollIntervalMs = options?.pollIntervalMs ?? 2_000;
+    const deadline = Date.now() + timeoutMs;
+    const progressKey = `BYSC_${studentId}`;
+    for (;;) {
+      const progress = await post(_apiPaths.xywc_recalc_progress, {
+        ZXJDKEY: progressKey,
+      }, _appIds.xywccx);
+      const rows = extractRows(progress, 'byscjd');
+      if (rows.length > 0) {
+        const progressRow = rows[0] as Record<string, unknown>;
+        const total = Number(progressRow['ZS'] ?? 0);
+        const done = Number(progressRow['YWCS'] ?? 0);
+        if (total > 0 && done >= total) break;
+      }
+      if (Date.now() >= deadline) {
+        throw new JWXTProtocolError('recalculateAcademicCompletion: timed out waiting for recalculation');
+      }
+      const { promise: tick, resolve: tickDone } = Promise.withResolvers<void>();
+      setTimeout(tickDone, pollIntervalMs);
+      await tick;
+    }
+
+    return parseAcademicCompletion(await queryCompletionRow());
   });
 }
 
@@ -2311,6 +2380,7 @@ function parseAcademicCompletion(raw: Record<string, unknown>): AcademicCompleti
     elective: rawStr(raw, 'XKXF'),
     numericElective: rawOptionalNum(raw, 'XKXF'),
     passed: toBool(raw['JSSFTG']),
+    lastCalculatedAt: normalizeLocalDateTime(rawStr(raw, 'CZSJ')),
     raw,
   };
 }

@@ -32,6 +32,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useTranslation } from "@/lib/i18n/use-translation";
+import { toast } from "sonner";
+import { useProvider } from "@/providers/use-provider";
+import { Spinner } from "@/components/ui/spinner";
 import type { AcademicCompletion } from "@/providers/types";
 import {
   useAcademicCompletion,
@@ -41,6 +44,7 @@ import {
 import {
   AlertTriangle,
   CheckCircle2,
+  RefreshCw,
   RotateCcw,
   Search,
 } from "lucide-react";
@@ -106,6 +110,13 @@ function CompletionHero({ data }: { data: AcademicCompletion }) {
       {data.planName && (
         <p className="text-xs text-muted-foreground">{data.planName}</p>
       )}
+      {data.lastCalculatedAt && (
+        <p className="text-xs text-muted-foreground">
+          {t("academic.lastCalculated", {
+            time: data.lastCalculatedAt.replace("T", " ").slice(0, 16),
+          })}
+        </p>
+      )}
     </div>
   );
 }
@@ -117,6 +128,9 @@ export default function TrainingPlanPage() {
   const [requiredFilter, setRequiredFilter] = useState(ALL);
   const [termFilter, setTermFilter] = useState(ALL);
   const [groupFilter, setGroupFilter] = useState(ALL);
+  const [recalculating, setRecalculating] = useState(false);
+
+  const provider = useProvider();
 
   const plans = useTrainingPlan();
   const completion = useAcademicCompletion();
@@ -170,6 +184,20 @@ export default function TrainingPlanPage() {
     setGroupFilter(ALL);
   }
 
+  async function handleRecalculate() {
+    if (!provider.recalculateAcademicCompletion) return;
+    setRecalculating(true);
+    try {
+      await provider.recalculateAcademicCompletion();
+      await completion.mutate();
+      toast.success(t("academic.recalcSuccess"));
+    } catch (e) {
+      toast.error((e as Error).message || t("app.updating"));
+    } finally {
+      setRecalculating(false);
+    }
+  }
+
   if (plans.isLoading && !plans.data && !completion.data) {
     return (
       <div className="flex flex-col gap-6">
@@ -184,10 +212,29 @@ export default function TrainingPlanPage() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>{t("academic.completionTitle")}</CardTitle>
-          <CardDescription>
-            {t("academic.completionDescription")}
-          </CardDescription>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <CardTitle>{t("academic.completionTitle")}</CardTitle>
+              <CardDescription>
+                {t("academic.completionDescription")}
+              </CardDescription>
+            </div>
+            {completion.data && provider.recalculateAcademicCompletion && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRecalculate}
+                disabled={recalculating}
+              >
+                {recalculating ? (
+                  <Spinner data-icon="inline-start" />
+                ) : (
+                  <RefreshCw data-icon="inline-start" />
+                )}
+                {t("academic.recalculate")}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {completion.data ? (
