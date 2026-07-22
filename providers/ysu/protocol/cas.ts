@@ -972,17 +972,20 @@ async function getLoginPage(): Promise<{ html: string; finalUrl: string }> {
 
   if (resp.url.includes('/authserver/login')) {
     // TGC was stale — CAS bounced us back to login.
-    // Clear the stale TGC and retry to get a clean login page.
+    // Only retry when a TGC actually existed; a normal unauthenticated request
+    // already returned a clean login page and should not pay for a second chain.
     const staleTgc = await collectCookies(casJar, (e) => e.name === 'CASTGC');
-    for (const c of staleTgc) {
-      await casJar.removeCookie(c.domain, c.path, c.name);
+    if (staleTgc.length > 0) {
+      for (const c of staleTgc) {
+        await casJar.removeCookie(c.domain, c.path, c.name);
+      }
+      resp = await _fetch({
+        method: 'GET',
+        url,
+        redirect: 'follow',
+        timeoutMs,
+      });
     }
-    resp = await _fetch({
-      method: 'GET',
-      url,
-      redirect: 'follow',
-      timeoutMs,
-    });
     if (resp.url.includes('/authserver/login')) {
       const body = await resp.text();
       if (resp.status !== 200) {
