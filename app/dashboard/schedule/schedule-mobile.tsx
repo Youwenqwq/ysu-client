@@ -148,7 +148,8 @@ export function ScheduleMobile({
 
   const blocks = useMemo(() => computeMergedBlocks(courses, periods), [courses, periods]);
 
-  if (courses.length === 0) {
+  // 课程为空但本周有考试时仍渲染网格，避免考试块被空态吞掉
+  if (courses.length === 0 && examBlocks.length === 0) {
     return (
       <div
         onTouchStart={handleTouchStart}
