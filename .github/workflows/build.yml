@@ -30,8 +30,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -65,7 +63,7 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > android/release.keystore
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
           else
             echo "::warning::KEYSTORE_BASE64 secret not set — APK will fail signing"
           fi
