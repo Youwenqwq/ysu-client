@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -13,12 +12,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+  EmptyState,
+  LoadingCards,
+  useErrorToast,
+} from "@/components/academic/list-state";
+import { formatTimeRange } from "@/lib/academic/time";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   useLaborActivities,
@@ -26,24 +24,12 @@ import {
   useLaborSummary,
 } from "@/providers/hooks";
 import {
-  CalendarOff,
   Clock,
   Hourglass,
   MapPin,
   ScrollText,
   User,
 } from "lucide-react";
-
-function formatTime(value?: string): string {
-  return value ? value.slice(0, 16).replace("T", " ") : "";
-}
-
-function formatRange(start?: string, end?: string): string {
-  const s = formatTime(start);
-  const e = formatTime(end);
-  if (s && e) return `${s} ~ ${e}`;
-  return s || e;
-}
 
 export default function LaborPage() {
   const { t } = useTranslation();
@@ -57,11 +43,7 @@ export default function LaborPage() {
   const records = recordsQuery.data ?? [];
   const activities = activitiesQuery.data ?? [];
 
-  useEffect(() => {
-    const error = summaryQuery.error ?? recordsQuery.error ?? activitiesQuery.error;
-    if (!error) return;
-    toast.error(error.message || t("app.updating"));
-  }, [summaryQuery.error, recordsQuery.error, activitiesQuery.error, t]);
+  useErrorToast(summaryQuery.error ?? recordsQuery.error ?? activitiesQuery.error);
 
   const recordsLoading =
     (recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0;
@@ -72,11 +54,7 @@ export default function LaborPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardHeader>
-          <CardTitle>{t("labor.title")}</CardTitle>
-          <CardDescription>{t("labor.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="py-4">
           {summaryQuery.isLoading && !summary ? (
             <div className="flex gap-8">
               <Skeleton className="h-12 w-24" />
@@ -116,21 +94,9 @@ export default function LaborPage() {
 
         <TabsContent value="records" className="mt-4">
           {recordsLoading ? (
-            <div className="flex flex-col gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-28" />
-              ))}
-            </div>
+            <LoadingCards className="h-28" />
           ) : records.length === 0 ? (
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <CalendarOff />
-                </EmptyMedia>
-                <EmptyTitle>{t("labor.noRecords")}</EmptyTitle>
-                <EmptyDescription>{t("labor.description")}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
+            <EmptyState title={t("labor.noRecords")} description={t("labor.description")} />
           ) : (
             <div className="flex flex-col gap-4">
               {records.map((record, idx) => (
@@ -166,10 +132,10 @@ export default function LaborPage() {
                         </span>
                       )}
                     </div>
-                    {formatRange(record.timeStart, record.timeEnd) && (
+                    {formatTimeRange(record.timeStart, record.timeEnd) && (
                       <div className="flex items-center gap-2">
                         <Clock className="size-4 shrink-0 text-muted-foreground" />
-                        <span>{formatRange(record.timeStart, record.timeEnd)}</span>
+                        <span>{formatTimeRange(record.timeStart, record.timeEnd)}</span>
                       </div>
                     )}
                   </CardContent>
@@ -181,21 +147,9 @@ export default function LaborPage() {
 
         <TabsContent value="activities" className="mt-4">
           {activitiesLoading ? (
-            <div className="flex flex-col gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-28" />
-              ))}
-            </div>
+            <LoadingCards className="h-28" />
           ) : activities.length === 0 ? (
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <CalendarOff />
-                </EmptyMedia>
-                <EmptyTitle>{t("labor.noActivities")}</EmptyTitle>
-                <EmptyDescription>{t("labor.description")}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
+            <EmptyState title={t("labor.noActivities")} description={t("labor.description")} />
           ) : (
             <div className="flex flex-col gap-4">
               {activities.map((activity, idx) => (
@@ -228,21 +182,21 @@ export default function LaborPage() {
                         </span>
                       )}
                     </div>
-                    {formatRange(activity.timeStart, activity.timeEnd) && (
+                    {formatTimeRange(activity.timeStart, activity.timeEnd) && (
                       <div className="flex items-center gap-2">
                         <Clock className="size-4 shrink-0 text-muted-foreground" />
                         <span>
                           {t("labor.activityTime")}:{" "}
-                          {formatRange(activity.timeStart, activity.timeEnd)}
+                          {formatTimeRange(activity.timeStart, activity.timeEnd)}
                         </span>
                       </div>
                     )}
-                    {formatRange(activity.enrollStart, activity.enrollEnd) && (
+                    {formatTimeRange(activity.enrollStart, activity.enrollEnd) && (
                       <div className="flex items-center gap-2">
                         <ScrollText className="size-4 shrink-0 text-muted-foreground" />
                         <span>
                           {t("labor.enrollWindow")}:{" "}
-                          {formatRange(activity.enrollStart, activity.enrollEnd)}
+                          {formatTimeRange(activity.enrollStart, activity.enrollEnd)}
                         </span>
                       </div>
                     )}

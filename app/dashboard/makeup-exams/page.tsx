@@ -13,12 +13,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+  EmptyState,
+  LoadingCards,
+  useErrorToast,
+} from "@/components/academic/list-state";
+import { FilterChips } from "@/components/academic/filter-chips";
+import { formatTimeRange } from "@/lib/academic/time";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useMakeupExamBatches, useMakeupExamCourses } from "@/providers/hooks";
 import { useProvider } from "@/providers/use-provider";
@@ -33,11 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { MakeupExamCourse } from "@/providers/types";
-import { CalendarOff, Clock, FilePenLine, School } from "lucide-react";
-
-function formatSignupTime(value?: string): string {
-  return value ? value.slice(0, 16).replace("T", " ") : "";
-}
+import { Clock, FilePenLine, School } from "lucide-react";
 
 export default function MakeupExamsPage() {
   const { t } = useTranslation();
@@ -62,15 +58,8 @@ export default function MakeupExamsPage() {
   });
   const courses = coursesQuery.data ?? [];
 
-  useEffect(() => {
-    if (!batchesQuery.error) return;
-    toast.error(batchesQuery.error.message || t("app.updating"));
-  }, [batchesQuery.error, t]);
-
-  useEffect(() => {
-    if (!coursesQuery.error) return;
-    toast.error(coursesQuery.error.message || t("app.updating"));
-  }, [coursesQuery.error, t]);
+  useErrorToast(batchesQuery.error);
+  useErrorToast(coursesQuery.error);
 
   async function handleSignupConfirm() {
     if (!signupTarget?.taskId || !signupTarget?.batchId) return;
@@ -101,71 +90,49 @@ export default function MakeupExamsPage() {
       <div className="flex flex-col gap-4">
         <Skeleton className="h-24" />
         <Skeleton className="h-10" />
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-28" />
-        ))}
+        <LoadingCards className="h-28" />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("makeupExams.title")}</CardTitle>
-          <CardDescription>{t("makeupExams.description")}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {batches.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("makeupExams.noBatch")}</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {batches.map((batch) => (
-                  <button
-                    key={batch.batchId}
-                    type="button"
-                    onClick={() => setSelectedBatchId(batch.batchId)}
-                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                      batch.batchId === selectedBatchId
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-background text-foreground active:bg-muted/60"
-                    }`}
-                  >
-                    {batch.name}
-                  </button>
-                ))}
-              </div>
-              {selectedBatch && (
-                <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
-                  {(selectedBatch.signupStart || selectedBatch.signupEnd) && (
-                    <div className="flex items-center gap-2">
-                      <Clock className="size-4 shrink-0" />
-                      <span>
-                        {t("makeupExams.signupWindow")}:{" "}
-                        {formatSignupTime(selectedBatch.signupStart)} ~{" "}
-                        {formatSignupTime(selectedBatch.signupEnd)}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <Badge variant="outline">
-                      {t("makeupExams.availableCount", {
-                        count: selectedBatch.availableCount,
-                      })}
-                    </Badge>
-                    <Badge variant="outline">
-                      {t("makeupExams.registeredCount", {
-                        count: selectedBatch.registeredCount,
-                      })}
-                    </Badge>
-                  </div>
+      {batches.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("makeupExams.noBatch")}</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <FilterChips
+            items={batches.map((b) => ({ value: b.batchId, label: b.name }))}
+            value={selectedBatchId}
+            onChange={setSelectedBatchId}
+          />
+          {selectedBatch && (
+            <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+              {(selectedBatch.signupStart || selectedBatch.signupEnd) && (
+                <div className="flex items-center gap-2">
+                  <Clock className="size-4 shrink-0" />
+                  <span>
+                    {t("makeupExams.signupWindow")}:{" "}
+                    {formatTimeRange(selectedBatch.signupStart, selectedBatch.signupEnd)}
+                  </span>
                 </div>
               )}
-            </>
+              <div className="flex gap-2">
+                <Badge variant="outline">
+                  {t("makeupExams.availableCount", {
+                    count: selectedBatch.availableCount,
+                  })}
+                </Badge>
+                <Badge variant="outline">
+                  {t("makeupExams.registeredCount", {
+                    count: selectedBatch.registeredCount,
+                  })}
+                </Badge>
+              </div>
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
       {batches.length > 0 && (
         <Tabs
@@ -181,25 +148,16 @@ export default function MakeupExamsPage() {
 
       {batches.length > 0 &&
         (loading && courses.length === 0 ? (
-          <div className="flex flex-col gap-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-28" />
-            ))}
-          </div>
+          <LoadingCards className="h-28" />
         ) : courses.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <CalendarOff />
-              </EmptyMedia>
-              <EmptyTitle>
-                {tab === "available"
-                  ? t("makeupExams.noAvailable")
-                  : t("makeupExams.noRegistered")}
-              </EmptyTitle>
-              <EmptyDescription>{t("makeupExams.description")}</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          <EmptyState
+            title={
+              tab === "available"
+                ? t("makeupExams.noAvailable")
+                : t("makeupExams.noRegistered")
+            }
+            description={t("makeupExams.description")}
+          />
         ) : (
           <div className="flex flex-col gap-4">
             {courses.map((course, idx) => (
@@ -239,10 +197,7 @@ export default function MakeupExamsPage() {
                   {(course.signupStart || course.signupEnd) && (
                     <div className="flex items-center gap-2">
                       <Clock className="size-4 shrink-0 text-muted-foreground" />
-                      <span>
-                        {formatSignupTime(course.signupStart)} ~{" "}
-                        {formatSignupTime(course.signupEnd)}
-                      </span>
+                      <span>{formatTimeRange(course.signupStart, course.signupEnd)}</span>
                     </div>
                   )}
                   {course.note && (

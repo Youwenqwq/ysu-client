@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -16,12 +15,11 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+  EmptyState as SharedEmptyState,
+  LoadingCards,
+  useErrorToast,
+} from "@/components/academic/list-state";
+import { FilterChips } from "@/components/academic/filter-chips";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   useCreditBatches,
@@ -38,40 +36,7 @@ import type {
   LibraryActivity,
 } from "@/providers/types";
 import type { ProviderQueryResult } from "@/providers/hooks";
-import { CalendarOff, ChevronLeft, ChevronRight, Search } from "lucide-react";
-
-function useErrorToast(error: { message: string } | undefined) {
-  const { t } = useTranslation();
-  useEffect(() => {
-    if (!error) return;
-    toast.error(error.message || t("app.updating"));
-  }, [error, t]);
-}
-
-function LoadingCards() {
-  return (
-    <div className="flex flex-col gap-4">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <Skeleton key={i} className="h-28" />
-      ))}
-    </div>
-  );
-}
-
-function EmptyState({ titleKey }: { titleKey: string }) {
-  const { t } = useTranslation();
-  return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <CalendarOff />
-        </EmptyMedia>
-        <EmptyTitle>{t(titleKey)}</EmptyTitle>
-        <EmptyDescription>{t("credits.description")}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
-}
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 function DeclarationsPanel() {
   const { t } = useTranslation();
@@ -80,7 +45,7 @@ function DeclarationsPanel() {
   useErrorToast(query.error);
 
   if (query.isLoading && declarations.length === 0) return <LoadingCards />;
-  if (declarations.length === 0) return <EmptyState titleKey="credits.noDeclarations" />;
+  if (declarations.length === 0) return <SharedEmptyState title={t("credits.noDeclarations")} description={t("credits.description")} />;
 
   return (
     <div className="flex flex-col gap-4">
@@ -134,37 +99,27 @@ function RecordsPanel() {
   useErrorToast(batchesQuery.error);
   useErrorToast(recordsQuery.error);
 
-  const chips: Array<{ key: string | undefined; label: string }> = [
-    { key: undefined, label: batches[0]?.name ?? t("credits.batch") },
-    { key: "all", label: t("credits.allBatches") },
-    ...batches.slice(1).map((b) => ({ key: b.batchId as string | undefined, label: b.name })),
+  const CURRENT = "__current";
+  const chips = [
+    { value: CURRENT, label: batches[0]?.name ?? t("credits.batch") },
+    { value: "all", label: t("credits.allBatches") },
+    ...batches.slice(1).map((b) => ({ value: b.batchId, label: b.name })),
   ];
 
   return (
     <div className="flex flex-col gap-4">
       {batches.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {chips.map((chip) => (
-            <button
-              key={chip.key ?? "__current"}
-              type="button"
-              onClick={() => setBatch(chip.key)}
-              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                batch === chip.key
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground active:bg-muted/60"
-              }`}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
+        <FilterChips
+          items={chips}
+          value={batch ?? CURRENT}
+          onChange={(v) => setBatch(v === CURRENT ? undefined : v)}
+        />
       )}
 
       {(recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0 ? (
         <LoadingCards />
       ) : records.length === 0 ? (
-        <EmptyState titleKey="credits.noRecords" />
+        <SharedEmptyState title={t("credits.noRecords")} description={t("credits.description")} />
       ) : (
         <div className="flex flex-col gap-4">
           {records.map((record, idx) => (
@@ -262,7 +217,7 @@ function CatalogPanel<T>({
       {loading && items.length === 0 ? (
         <LoadingCards />
       ) : items.length === 0 ? (
-        <EmptyState titleKey={noDataKey} />
+        <SharedEmptyState title={t(noDataKey)} description={t("credits.description")} />
       ) : (
         <>
           <div className="flex flex-col gap-4">
@@ -320,11 +275,7 @@ export default function CreditsPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardHeader>
-          <CardTitle>{t("credits.title")}</CardTitle>
-          <CardDescription>{t("credits.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="py-4">
           {summaryQuery.isLoading && !summary ? (
             <div className="flex gap-8">
               <Skeleton className="h-12 w-24" />

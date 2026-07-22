@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -13,12 +12,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+  EmptyState,
+  LoadingCards,
+  useErrorToast,
+} from "@/components/academic/list-state";
+import { FilterChips } from "@/components/academic/filter-chips";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   useComprehensiveIndicators,
@@ -29,40 +27,6 @@ import {
   useComprehensiveTerms,
   useComprehensiveYearScores,
 } from "@/providers/hooks";
-import { CalendarOff } from "lucide-react";
-
-function useErrorToast(error: { message: string } | undefined) {
-  const { t } = useTranslation();
-  useEffect(() => {
-    if (!error) return;
-    toast.error(error.message || t("app.updating"));
-  }, [error, t]);
-}
-
-function LoadingCards() {
-  return (
-    <div className="flex flex-col gap-4">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <Skeleton key={i} className="h-24" />
-      ))}
-    </div>
-  );
-}
-
-function EmptyState({ titleKey }: { titleKey: string }) {
-  const { t } = useTranslation();
-  return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <CalendarOff />
-        </EmptyMedia>
-        <EmptyTitle>{t(titleKey)}</EmptyTitle>
-        <EmptyDescription>{t("comprehensive.description")}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
-}
 
 function ResultPanel({ year, term }: { year: string; term: string }) {
   const { t } = useTranslation();
@@ -76,7 +40,7 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
   useErrorToast(indicatorsQuery.error);
 
   if (resultQuery.isLoading && !result) return <LoadingCards />;
-  if (!result) return <EmptyState titleKey="comprehensive.noResult" />;
+  if (!result) return <EmptyState title={t("comprehensive.noResult")} description={t("comprehensive.description")} />;
 
   return (
     <div className="flex flex-col gap-4">
@@ -168,7 +132,7 @@ function RadarPanel({ year, term }: { year: string; term: string }) {
   useErrorToast(radarQuery.error);
 
   if (radarQuery.isLoading && items.length === 0) return <LoadingCards />;
-  if (items.length === 0) return <EmptyState titleKey="comprehensive.noRadar" />;
+  if (items.length === 0) return <EmptyState title={t("comprehensive.noRadar")} description={t("comprehensive.description")} />;
 
   return (
     <div className="flex flex-col gap-4">
@@ -219,12 +183,13 @@ function RadarPanel({ year, term }: { year: string; term: string }) {
 }
 
 function YearsPanel() {
+  const { t } = useTranslation();
   const query = useComprehensiveYearScores();
   const items = query.data ?? [];
   useErrorToast(query.error);
 
   if (query.isLoading && items.length === 0) return <LoadingCards />;
-  if (items.length === 0) return <EmptyState titleKey="comprehensive.noYearScores" />;
+  if (items.length === 0) return <EmptyState title={t("comprehensive.noYearScores")} description={t("comprehensive.description")} />;
 
   return (
     <Card>
@@ -291,7 +256,7 @@ function ReportPanel() {
       {(reportQuery.isLoading || reportQuery.isValidating) && entries.length === 0 ? (
         <LoadingCards />
       ) : entries.length === 0 ? (
-        <EmptyState titleKey="comprehensive.noReport" />
+        <EmptyState title={t("comprehensive.noReport")} description={t("comprehensive.description")} />
       ) : (
         <Card>
           <CardContent className="flex flex-col py-1">
@@ -347,38 +312,23 @@ export default function ComprehensivePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("comprehensive.title")}</CardTitle>
-          <CardDescription>{t("comprehensive.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {terms.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("comprehensive.noTerms")}</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {terms.map((item) => {
-                const isActive = selected?.year === item.year && selected?.term === item.term;
-                return (
-                  <button
-                    key={`${item.year}-${item.term}`}
-                    type="button"
-                    onClick={() => setSelected({ year: item.year, term: item.term })}
-                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                      isActive
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-background text-foreground active:bg-muted/60"
-                    }`}
-                  >
-                    {[item.yearDisplay, item.termDisplay].filter(Boolean).join(" ") ||
-                      `${item.year}-${item.term}`}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {terms.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("comprehensive.noTerms")}</p>
+      ) : (
+        <FilterChips
+          items={terms.map((item) => ({
+            value: `${item.year}-${item.term}`,
+            label:
+              [item.yearDisplay, item.termDisplay].filter(Boolean).join(" ") ||
+              `${item.year}-${item.term}`,
+          }))}
+          value={selected ? `${selected.year}-${selected.term}` : undefined}
+          onChange={(v) => {
+            const item = terms.find((x) => `${x.year}-${x.term}` === v);
+            if (item) setSelected({ year: item.year, term: item.term });
+          }}
+        />
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full">

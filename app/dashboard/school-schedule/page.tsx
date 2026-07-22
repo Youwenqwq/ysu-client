@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -9,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,12 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+  EmptyState,
+  LoadingCards,
+  useErrorToast,
+} from "@/components/academic/list-state";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   useSchoolBuildings,
@@ -42,42 +38,9 @@ import {
   useSchoolMajors,
 } from "@/providers/hooks";
 import type { Course } from "@/providers/types";
-import { ArrowLeft, CalendarOff, Search } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 
 const ALL = "__all__";
-
-function useErrorToast(error: { message: string } | undefined) {
-  const { t } = useTranslation();
-  useEffect(() => {
-    if (!error) return;
-    toast.error(error.message || t("app.updating"));
-  }, [error, t]);
-}
-
-function LoadingCards() {
-  return (
-    <div className="flex flex-col gap-4">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <Skeleton key={i} className="h-24" />
-      ))}
-    </div>
-  );
-}
-
-function EmptyState({ titleKey }: { titleKey: string }) {
-  const { t } = useTranslation();
-  return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <CalendarOff />
-        </EmptyMedia>
-        <EmptyTitle>{t(titleKey)}</EmptyTitle>
-        <EmptyDescription>{t("schoolSchedule.description")}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
-}
 
 /** 课程列表按星期几分组展示（与个人课表同构的 Course）。 */
 function CourseScheduleView({
@@ -125,7 +88,7 @@ function CourseScheduleView({
       {isLoading ? (
         <LoadingCards />
       ) : courses.length === 0 ? (
-        <EmptyState titleKey="schoolSchedule.noCourses" />
+        <EmptyState title={t("schoolSchedule.noCourses")} description={t("schoolSchedule.description")} />
       ) : (
         byWeekDay.map(([weekDay, dayCourses]) => (
           <div key={weekDay} className="flex flex-col gap-2">
@@ -299,7 +262,7 @@ function ClassSchedulePanel() {
       {(classesQuery.isLoading || classesQuery.isValidating) && classes.length === 0 ? (
         <LoadingCards />
       ) : classes.length === 0 ? (
-        <EmptyState titleKey="schoolSchedule.noClasses" />
+        <EmptyState title={t("schoolSchedule.noClasses")} description={t("schoolSchedule.description")} />
       ) : (
         <div className="flex flex-col gap-2">
           {classes.map((cls) => (
@@ -429,7 +392,7 @@ function RoomSchedulePanel() {
       {(roomsQuery.isLoading || roomsQuery.isValidating) && rooms.length === 0 ? (
         <LoadingCards />
       ) : rooms.length === 0 ? (
-        <EmptyState titleKey="schoolSchedule.noRooms" />
+        <EmptyState title={t("schoolSchedule.noRooms")} description={t("schoolSchedule.description")} />
       ) : (
         <div className="flex flex-col gap-2">
           {rooms.map((room) => (
@@ -466,13 +429,6 @@ export default function SchoolSchedulePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("schoolSchedule.title")}</CardTitle>
-          <CardDescription>{t("schoolSchedule.description")}</CardDescription>
-        </CardHeader>
-      </Card>
-
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full">
           <TabsTrigger value="class">{t("schoolSchedule.classTab")}</TabsTrigger>
