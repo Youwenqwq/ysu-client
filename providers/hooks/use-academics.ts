@@ -5,6 +5,9 @@ import type {
   AcademicCompletion,
   AcademicWarning,
   ClassPeriod,
+  ClassroomInfo,
+  ClassroomQueryOptions,
+  CodeItem,
   ComprehensiveIndicatorDetail,
   ComprehensiveQueryOptions,
   ComprehensiveRadarItem,
@@ -39,11 +42,14 @@ import type {
   LaborSummary,
   LibraryActivity,
   EnrollableActivity,
+  MajorInfo,
   MakeupExamBatch,
   MakeupExamCourse,
   MakeupExamCourseQueryOptions,
   PageQueryOptions,
   ScheduleQueryOptions,
+  SchoolClassInfo,
+  SchoolClassQueryOptions,
   TermCalendar,
   TermCalendarQueryOptions,
   TrainingPlan,
@@ -306,6 +312,97 @@ export function useComprehensiveReport(options?: {
     "comprehensive-report",
     () => provider.getComprehensiveReport(options),
     options,
+  );
+}
+
+export function useSchoolGradeYears(): ProviderQueryResult<CodeItem[]> {
+  const provider = useProvider();
+  return useProviderQuery("schoolSchedule", "school-grade-years", () =>
+    provider.getSchoolGradeYears(),
+  );
+}
+
+export function useSchoolDepartments(): ProviderQueryResult<CodeItem[]> {
+  const provider = useProvider();
+  return useProviderQuery("schoolSchedule", "school-departments", () =>
+    provider.getSchoolDepartments(),
+  );
+}
+
+export function useSchoolMajors(department?: string): ProviderQueryResult<MajorInfo[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "schoolSchedule",
+    "school-majors",
+    () => provider.getSchoolMajors(department),
+    department,
+  );
+}
+
+export function useSchoolClasses(
+  options?: SchoolClassQueryOptions,
+): ProviderQueryResult<SchoolClassInfo[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "schoolSchedule",
+    "school-classes",
+    () => provider.getSchoolClasses(options),
+    options,
+  );
+}
+
+export function useSchoolClassSchedule(
+  classId: string,
+  options?: ExamQueryOptions,
+): ProviderQueryResult<Course[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "schoolSchedule",
+    "school-class-schedule",
+    () => provider.getSchoolClassSchedule(classId, options),
+    [classId, options],
+  );
+}
+
+export function useSchoolCampuses(): ProviderQueryResult<CodeItem[]> {
+  const provider = useProvider();
+  return useProviderQuery("schoolSchedule", "school-campuses", () =>
+    provider.getSchoolCampuses(),
+  );
+}
+
+export function useSchoolBuildings(campus?: string): ProviderQueryResult<CodeItem[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "schoolSchedule",
+    "school-buildings",
+    () => provider.getSchoolBuildings(campus),
+    campus,
+  );
+}
+
+export function useSchoolClassrooms(
+  options?: ClassroomQueryOptions,
+): ProviderQueryResult<ClassroomInfo[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "schoolSchedule",
+    "school-classrooms",
+    () => provider.getSchoolClassrooms(options),
+    options,
+  );
+}
+
+export function useSchoolClassroomSchedule(
+  code: string,
+  options?: ExamQueryOptions,
+): ProviderQueryResult<Course[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "schoolSchedule",
+    "school-classroom-schedule",
+    () => provider.getSchoolClassroomSchedule(code, options),
+    [code, options],
   );
 }
 

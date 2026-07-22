@@ -64,7 +64,15 @@
       "bkxtcs": "bkbl/modules/bkbm/cxxtcs.do",
       "bkkspc": "bkbl/modules/bkbm/cxbkkspc.do",
       "bkbmmx": "bkbl/modules/bkbm/cxbkbmmx.do",
-      "xgksrwxs": "bkbl/modules/bkbm/xgksrwxs.do"
+      "xgksrwxs": "bkbl/modules/bkbm/xgksrwxs.do",
+      "bjcx": "kcbcx/modules/bjkcb/bjcx.do",
+      "jscx": "kcbcx/modules/jskcb/jscx.do",
+      "jaskb": "kcbcx/KbcxController/queryjaskb.do",
+      "code_nj": "/jwapp/code/c1e19f4d-94e0-464f-bb7b-d70d0517150c.do",
+      "code_yxdm": "/jwapp/code/49a86828-aef9-4a48-b26f-01149dac72d7.do",
+      "code_zydm": "/jwapp/code/87a9226a-6e44-44cc-9743-c081a8f9cb9b.do",
+      "code_xxxq": "/jwapp/code/83a986fc-e677-400e-99a4-c7bb39c2ca35.do",
+      "code_jxldm": "/jwapp/code/82101c45-a7d3-414d-988b-24744db9f5ea.do"
     }
   },
   "ldxt": {

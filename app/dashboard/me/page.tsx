@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
   BookOpen,
+  CalendarDays,
   ChevronRight,
   FileText,
   FilePenLine,
@@ -119,6 +120,7 @@ export default function MePage() {
     { href: "/dashboard/labor", label: t("app.labor"), icon: Hammer },
     { href: "/dashboard/credits", label: t("app.credits"), icon: Lightbulb },
     { href: "/dashboard/comprehensive", label: t("app.comprehensive"), icon: Gauge },
+    { href: "/dashboard/school-schedule", label: t("app.schoolSchedule"), icon: CalendarDays },
   ];
 
   const displayName = student.data?.name || username || t("me.profileFallback");

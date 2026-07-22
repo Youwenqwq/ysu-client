@@ -26,6 +26,10 @@ import type {
   Exam as JWXTExam,
   MakeupExamBatch as JWXTMakeupExamBatch,
   MakeupExamCourse as JWXTMakeupExamCourse,
+  CodeItem as JWXTCodeItem,
+  MajorInfo as JWXTMajorInfo,
+  SchoolClassInfo as JWXTSchoolClassInfo,
+  ClassroomInfo as JWXTClassroomInfo,
   TrainingPlan as JWXTTrainingPlan,
   AcademicCompletion as JWXTAcademicCompletion,
   AcademicWarning as JWXTAcademicWarning,
@@ -50,6 +54,15 @@ import {
   queryExams as _queryExams,
   queryMakeupExamBatches as _queryMakeupExamBatches,
   queryMakeupExamCourses as _queryMakeupExamCourses,
+  queryGradeYears as _queryGradeYears,
+  queryDepartments as _queryDepartments,
+  queryMajors as _queryMajors,
+  querySchoolClasses as _querySchoolClasses,
+  queryClassSchedule as _queryClassSchedule,
+  queryCampuses as _queryCampuses,
+  queryTeachingBuildings as _queryTeachingBuildings,
+  queryClassrooms as _queryClassrooms,
+  queryClassroomSchedule as _queryClassroomSchedule,
   signupMakeupExam as _signupMakeupExam,
   queryTrainingPlan as _queryTrainingPlan,
   queryAcademicCompletion as _queryAcademicCompletion,
@@ -196,6 +209,58 @@ export async function signupMakeupExam(args: {
   studentId?: string;
 }): Promise<void> {
   return withJWXT(() => _signupMakeupExam(args));
+}
+
+export async function queryGradeYears(): Promise<JWXTCodeItem[]> {
+  return withJWXT(() => _queryGradeYears());
+}
+
+export async function queryDepartments(): Promise<JWXTCodeItem[]> {
+  return withJWXT(() => _queryDepartments());
+}
+
+export async function queryMajors(department?: string): Promise<JWXTMajorInfo[]> {
+  return withJWXT(() => _queryMajors(department));
+}
+
+export async function querySchoolClasses(opts?: {
+  term?: string;
+  grade?: string;
+  department?: string;
+  major?: string;
+}): Promise<JWXTSchoolClassInfo[]> {
+  return withJWXT(() => _querySchoolClasses(opts));
+}
+
+export async function queryClassSchedule(
+  classId: string,
+  opts?: { term?: string },
+): Promise<JWXTCourse[]> {
+  return withJWXT(() => _queryClassSchedule(classId, opts));
+}
+
+export async function queryCampuses(): Promise<JWXTCodeItem[]> {
+  return withJWXT(() => _queryCampuses());
+}
+
+export async function queryTeachingBuildings(campus?: string): Promise<JWXTCodeItem[]> {
+  return withJWXT(() => _queryTeachingBuildings(campus));
+}
+
+export async function queryClassrooms(opts?: {
+  term?: string;
+  name?: string;
+  campus?: string;
+  building?: string;
+}): Promise<JWXTClassroomInfo[]> {
+  return withJWXT(() => _queryClassrooms(opts));
+}
+
+export async function queryClassroomSchedule(
+  code: string,
+  opts?: { term?: string },
+): Promise<JWXTCourse[]> {
+  return withJWXT(() => _queryClassroomSchedule(code, opts));
 }
 
 export async function queryTrainingPlan(opts?: {

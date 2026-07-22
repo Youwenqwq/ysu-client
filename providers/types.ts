@@ -21,6 +21,7 @@ export interface AcademicCapabilities {
   laborEducation: boolean;
   innovationCredits: boolean;
   comprehensiveEval: boolean;
+  schoolSchedule: boolean;
   gpa: boolean;
   evaluation: boolean;
   evaluationScorePreview: boolean;
@@ -608,6 +609,63 @@ export interface ComprehensiveQueryOptions {
   term?: string;
 }
 
+/** A school-wide class (行政班) entry. */
+export interface SchoolClassInfo {
+  classId: string;
+  className: string;
+  grade?: string;
+  gradeDisplay?: string;
+  department?: string;
+  departmentDisplay?: string;
+  major?: string;
+  majorDisplay?: string;
+  isScheduled?: boolean;
+  studentCount?: number;
+}
+
+/** A classroom entry (教室). */
+export interface ClassroomInfo {
+  name: string;
+  code: string;
+  campusDisplay?: string;
+  building?: string;
+  buildingDisplay?: string;
+  examSeats?: number;
+  classSeats?: number;
+  typeDisplay?: string;
+  floor?: number;
+  isScheduled?: boolean;
+}
+
+/** A code-table entry (年级/院系/校区/教学楼). */
+export interface CodeItem {
+  id: string;
+  name: string;
+}
+
+/** A major code-table entry. */
+export interface MajorInfo {
+  id: string;
+  name: string;
+  department?: string;
+}
+
+/** Options for school-wide class list queries. */
+export interface SchoolClassQueryOptions {
+  semester?: string;
+  grade?: string;
+  department?: string;
+  major?: string;
+}
+
+/** Options for classroom list queries. */
+export interface ClassroomQueryOptions {
+  semester?: string;
+  name?: string;
+  campus?: string;
+  building?: string;
+}
+
 export interface EvaluationType {
   name: string;
   code?: string;
@@ -869,6 +927,15 @@ export interface ProviderAcademics {
   getComprehensiveYearScores(): Promise<ComprehensiveYearScore[]>;
   getComprehensiveReportYears(): Promise<ComprehensiveReportYears>;
   getComprehensiveReport(options?: { year?: string }): Promise<ComprehensiveReportPage>;
+  getSchoolGradeYears(): Promise<CodeItem[]>;
+  getSchoolDepartments(): Promise<CodeItem[]>;
+  getSchoolMajors(department?: string): Promise<MajorInfo[]>;
+  getSchoolClasses(options?: SchoolClassQueryOptions): Promise<SchoolClassInfo[]>;
+  getSchoolClassSchedule(classId: string, options?: ExamQueryOptions): Promise<Course[]>;
+  getSchoolCampuses(): Promise<CodeItem[]>;
+  getSchoolBuildings(campus?: string): Promise<CodeItem[]>;
+  getSchoolClassrooms(options?: ClassroomQueryOptions): Promise<ClassroomInfo[]>;
+  getSchoolClassroomSchedule(code: string, options?: ExamQueryOptions): Promise<Course[]>;
   getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>;
   getAcademicCompletion(): Promise<AcademicCompletion>;
   getAcademicWarnings(): Promise<AcademicWarning[]>;

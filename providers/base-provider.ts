@@ -5,6 +5,9 @@ import type {
   AcademicWarning,
   AuthStatus,
   ClassPeriod,
+  ClassroomInfo,
+  ClassroomQueryOptions,
+  CodeItem,
   ComprehensiveIndicatorDetail,
   ComprehensiveQueryOptions,
   ComprehensiveRadarItem,
@@ -48,6 +51,7 @@ import type {
   LaborSummary,
   LibraryActivity,
   EnrollableActivity,
+  MajorInfo,
   MakeupExamBatch,
   MakeupExamCourse,
   MakeupExamCourseQueryOptions,
@@ -60,6 +64,8 @@ import type {
   ProviderMobile,
   ProviderNativeNotification,
   ScheduleQueryOptions,
+  SchoolClassInfo,
+  SchoolClassQueryOptions,
   StudentInfo,
   TermCalendar,
   TermCalendarQueryOptions,
@@ -153,6 +159,18 @@ export abstract class BaseProvider implements AcademicProvider {
   abstract getComprehensiveYearScores(): Promise<ComprehensiveYearScore[]>;
   abstract getComprehensiveReportYears(): Promise<ComprehensiveReportYears>;
   abstract getComprehensiveReport(options?: { year?: string }): Promise<ComprehensiveReportPage>;
+  abstract getSchoolGradeYears(): Promise<CodeItem[]>;
+  abstract getSchoolDepartments(): Promise<CodeItem[]>;
+  abstract getSchoolMajors(department?: string): Promise<MajorInfo[]>;
+  abstract getSchoolClasses(options?: SchoolClassQueryOptions): Promise<SchoolClassInfo[]>;
+  abstract getSchoolClassSchedule(classId: string, options?: ExamQueryOptions): Promise<Course[]>;
+  abstract getSchoolCampuses(): Promise<CodeItem[]>;
+  abstract getSchoolBuildings(campus?: string): Promise<CodeItem[]>;
+  abstract getSchoolClassrooms(options?: ClassroomQueryOptions): Promise<ClassroomInfo[]>;
+  abstract getSchoolClassroomSchedule(
+    code: string,
+    options?: ExamQueryOptions,
+  ): Promise<Course[]>;
   abstract getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>;
   abstract getAcademicCompletion(): Promise<AcademicCompletion>;
   abstract getAcademicWarnings(): Promise<AcademicWarning[]>;

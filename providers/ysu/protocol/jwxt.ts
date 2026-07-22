@@ -350,6 +350,53 @@ export interface MakeupExamCourse {
   readonly raw: Record<string, unknown>;
 }
 
+/** 代码表条目（年级、院系等字典数据）。 */
+export interface CodeItem {
+  readonly id: string;
+  readonly name: string;
+  readonly raw: Record<string, unknown>;
+}
+
+/** 专业代码表条目。 */
+export interface MajorInfo {
+  readonly id: string;
+  readonly name: string;
+  /** 所属院系代码（otherFields.YXDM）。 */
+  readonly department: string;
+  readonly raw: Record<string, unknown>;
+}
+
+/** 全校班级列表条目（bjcx）。 */
+export interface SchoolClassInfo {
+  readonly classId: string;
+  readonly className: string;
+  readonly grade: string;
+  readonly gradeDisplay: string;
+  readonly department: string;
+  readonly departmentDisplay: string;
+  readonly major: string;
+  readonly majorDisplay: string;
+  readonly isScheduled: boolean;
+  readonly studentCount: number;
+  readonly raw: Record<string, unknown>;
+}
+
+/** 全校教室列表条目（jscx）。 */
+export interface ClassroomInfo {
+  readonly name: string;
+  readonly code: string;
+  readonly campus: string;
+  readonly campusDisplay: string;
+  readonly building: string;
+  readonly buildingDisplay: string;
+  readonly examSeats: number;
+  readonly classSeats: number;
+  readonly typeDisplay: string;
+  readonly floor: number;
+  readonly isScheduled: boolean;
+  readonly raw: Record<string, unknown>;
+}
+
 // ─── Exceptions ───────────────────────────────────────────────────────── //
 
 export class JWXTError extends Error {
@@ -519,6 +566,10 @@ function toBool(val: unknown): boolean {
 }
 
 function buildApiUrl(path: string): string {
+  // 以 / 开头的路径视为站内绝对路径（如代码表 /jwapp/code/...）
+  if (path.startsWith('/')) {
+    return `${jwxtUrls.jwxtBase}${path}`;
+  }
   return `${jwxtUrls.appBase}/${path}`;
 }
 
@@ -748,6 +799,7 @@ async function emapPost(
   url: string,
   data: Record<string, string>,
   appId?: string,
+  referer?: string,
 ): Promise<Record<string, unknown>> {
   const doRequest = async (): Promise<Awaited<ReturnType<typeof fetchWithJar>>> => {
     try {
@@ -759,6 +811,7 @@ async function emapPost(
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
           'X-Requested-With': 'XMLHttpRequest',
           Accept: 'application/json, text/javascript, */*; q=0.01',
+          ...(referer ? { Referer: referer } : {}),
         },
         redirect: 'follow',
         timeoutMs,
@@ -949,6 +1002,7 @@ export async function warmupWEU(): Promise<void> {
     _appIds.cjcx,
     _appIds.pjapp,
     _appIds.bkbl,
+    _appIds.kcbcx,
   ];
   if (_appIds.wdkb_sy) apps.push(_appIds.wdkb_sy);
   await Promise.all(apps.map((id) => ensureWeu(id).catch(() => {})));
@@ -958,9 +1012,10 @@ async function post(
   path: string,
   data: Record<string, string> = {},
   appId?: string,
+  referer?: string,
 ): Promise<Record<string, unknown>> {
   const url = buildApiUrl(path);
-  return emapPost(url, data, appId);
+  return emapPost(url, data, appId, referer);
 }
 
 const currentTermCache = new Map<string, string>();
@@ -1520,6 +1575,199 @@ export async function signupMakeupExam(args: {
   });
 }
 
+// ─── Public: School-wide Schedules (kcbcx) ──────────────────────────── //
+
+/** kcbcx 应用首页，代码表与列表接口需要它作为 Referer。 */
+function kcbcxIndexUrl(): string {
+  return `${jwxtUrls.appBase}/kcbcx/*default/index.do`;
+}
+
+/** 查询年级代码表。 */
+export async function queryGradeYears(): Promise<CodeItem[]> {
+  return runWithReauth(async () => {
+    await ensureWeu(_appIds.kcbcx);
+    const datas = await post(_apiPaths.code_nj, {}, _appIds.kcbcx, kcbcxIndexUrl());
+    return extractRows(datas, 'code').map((r) => parseCodeItem(r as Record<string, unknown>));
+  });
+}
+
+/** 查询院系代码表。 */
+export async function queryDepartments(): Promise<CodeItem[]> {
+  return runWithReauth(async () => {
+    await ensureWeu(_appIds.kcbcx);
+    const datas = await post(_apiPaths.code_yxdm, {}, _appIds.kcbcx, kcbcxIndexUrl());
+    return extractRows(datas, 'code').map((r) => parseCodeItem(r as Record<string, unknown>));
+  });
+}
+
+/** 查询专业代码表（服务端不过滤，院系级联在客户端完成）。 */
+export async function queryMajors(department?: string): Promise<MajorInfo[]> {
+  return runWithReauth(async () => {
+    await ensureWeu(_appIds.kcbcx);
+    const datas = await post(_apiPaths.code_zydm, {}, _appIds.kcbcx, kcbcxIndexUrl());
+    const majors = extractRows(datas, 'code').map((r) =>
+      parseMajor(r as Record<string, unknown>),
+    );
+    if (department === undefined) return majors;
+    return majors.filter((m) => m.department === department);
+  });
+}
+
+/** 查询全校班级列表（bjcx），可按年级/院系/专业级联筛选。 */
+export async function querySchoolClasses(opts?: {
+  term?: string;
+  grade?: string;
+  department?: string;
+  major?: string;
+  pageSize?: number;
+}): Promise<SchoolClassInfo[]> {
+  return runWithReauth(async () => {
+    const term =
+      opts?.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq'));
+    await ensureWeu(_appIds.kcbcx);
+    const form: Record<string, string> = {
+      XNXQDM: term,
+      SFSY: '1',
+      '*order': '-NJ,+YXPX,+ZYPX,+PX',
+      pageSize: String(opts?.pageSize ?? 1000),
+      pageNumber: '1',
+    };
+    if (opts?.grade !== undefined) form['NJ'] = opts.grade;
+    if (opts?.department !== undefined) form['YXDM'] = opts.department;
+    if (opts?.major !== undefined) form['ZYDM'] = opts.major;
+    const datas = await post(_apiPaths.bjcx, form, _appIds.kcbcx, kcbcxIndexUrl());
+    return extractRows(datas, 'bjcx').map((r) =>
+      parseSchoolClassInfo(r as Record<string, unknown>),
+    );
+  });
+}
+
+/** 班级/教室课表系列接口的共用实现（requestParamStr 风格）。 */
+async function queryBjkbRows(args: {
+  pathKey: string;
+  rowKey: string;
+  idParam: string;
+  idValue: string;
+  term?: string;
+}): Promise<Record<string, unknown>[]> {
+  const term =
+    args.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq'));
+  await ensureWeu(_appIds.kcbcx);
+  const payload: Record<string, string> = { XNXQDM: term };
+  payload[args.idParam] = args.idValue;
+  const datas = await post(
+    _apiPaths[args.pathKey]!,
+    { requestParamStr: JSON.stringify(payload) },
+    _appIds.kcbcx,
+    kcbcxIndexUrl(),
+  );
+  return extractRows(datas, args.rowKey) as Record<string, unknown>[];
+}
+
+/** 查询指定行政班的课表（querybjkb），与个人课表同构。 */
+export async function queryClassSchedule(
+  classId: string,
+  opts?: { term?: string },
+): Promise<Course[]> {
+  return runWithReauth(async () => {
+    const rows = await queryBjkbRows({
+      pathKey: 'kcbcx',
+      rowKey: 'querybjkb',
+      idParam: 'BJDM',
+      idValue: classId,
+      term: opts?.term,
+    });
+    return rows.map(parseCourse);
+  });
+}
+
+/** 查询校区代码表。 */
+export async function queryCampuses(): Promise<CodeItem[]> {
+  return runWithReauth(async () => {
+    await ensureWeu(_appIds.kcbcx);
+    const datas = await post(_apiPaths.code_xxxq, {}, _appIds.kcbcx, kcbcxIndexUrl());
+    return extractRows(datas, 'code').map((r) => parseCodeItem(r as Record<string, unknown>));
+  });
+}
+
+/** 查询教学楼代码表（按校区代码客户端过滤）。 */
+export async function queryTeachingBuildings(campus?: string): Promise<CodeItem[]> {
+  return runWithReauth(async () => {
+    await ensureWeu(_appIds.kcbcx);
+    const datas = await post(_apiPaths.code_jxldm, {}, _appIds.kcbcx, kcbcxIndexUrl());
+    const items = extractRows(datas, 'code').map((r) =>
+      parseCodeItem(r as Record<string, unknown>),
+    );
+    if (campus === undefined) return items;
+    return items.filter((item) => {
+      const other = item.raw['otherFields'];
+      const xxxqdm =
+        other !== null && typeof other === 'object'
+          ? (other as Record<string, unknown>)['XXXQDM']
+          : null;
+      return String(xxxqdm ?? '') === campus;
+    });
+  });
+}
+
+/** 查询全校教室列表（jscx），可按名称/校区/教学楼筛选。 */
+export async function queryClassrooms(opts?: {
+  term?: string;
+  name?: string;
+  campus?: string;
+  building?: string;
+  pageSize?: number;
+  pageNumber?: number;
+}): Promise<ClassroomInfo[]> {
+  return runWithReauth(async () => {
+    const term =
+      opts?.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq'));
+    await ensureWeu(_appIds.kcbcx);
+
+    const query: Array<Record<string, string>> = [];
+    if (opts?.name) {
+      query.push({ name: 'JASMC', builder: 'include', linkOpt: 'AND', value: opts.name });
+    }
+    if (opts?.campus !== undefined) {
+      query.push({ name: 'XXXQDM', builder: 'equal', linkOpt: 'AND', value: opts.campus });
+    }
+    if (opts?.building !== undefined) {
+      query.push({ name: 'JXLDM', builder: 'equal', linkOpt: 'AND', value: opts.building });
+    }
+
+    const form: Record<string, string> = {
+      XNXQDM: term,
+      '*order': '+JXLDM,+JASMC',
+      pageSize: String(opts?.pageSize ?? 500),
+      pageNumber: String(opts?.pageNumber ?? 1),
+    };
+    if (query.length > 0) {
+      form['querySetting'] = JSON.stringify(query);
+    }
+    const datas = await post(_apiPaths.jscx, form, _appIds.kcbcx, kcbcxIndexUrl());
+    return extractRows(datas, 'jscx').map((r) =>
+      parseClassroomInfo(r as Record<string, unknown>),
+    );
+  });
+}
+
+/** 查询指定教室的课表（queryjaskb）。 */
+export async function queryClassroomSchedule(
+  classroomCode: string,
+  opts?: { term?: string },
+): Promise<Course[]> {
+  return runWithReauth(async () => {
+    const rows = await queryBjkbRows({
+      pathKey: 'jaskb',
+      rowKey: 'queryjaskb',
+      idParam: 'JASDM',
+      idValue: classroomCode,
+      term: opts?.term,
+    });
+    return rows.map(parseCourse);
+  });
+}
+
 // ─── Public: Training Plan / Academic ─────────────────────────────────── //
 
 export async function queryTrainingPlan(opts?: {
@@ -1975,6 +2223,60 @@ function parseMakeupCourse(raw: Record<string, unknown>): MakeupExamCourse {
     batchId: rawStr(raw, 'KSDM'),
     taskId: rawStr(raw, 'KSRWID'),
     note: rawStr(raw, 'BZ'),
+    raw,
+  };
+}
+
+function parseCodeItem(raw: Record<string, unknown>): CodeItem {
+  return {
+    id: rawStr(raw, 'id'),
+    name: rawStr(raw, 'name'),
+    raw,
+  };
+}
+
+function parseMajor(raw: Record<string, unknown>): MajorInfo {
+  const other = raw['otherFields'];
+  return {
+    id: rawStr(raw, 'id'),
+    name: rawStr(raw, 'name'),
+    department:
+      other !== null && typeof other === 'object'
+        ? rawStr(other as Record<string, unknown>, 'YXDM')
+        : '',
+    raw,
+  };
+}
+
+function parseSchoolClassInfo(raw: Record<string, unknown>): SchoolClassInfo {
+  return {
+    classId: rawStr(raw, 'BJDM'),
+    className: rawStr(raw, 'BJMC'),
+    grade: rawStr(raw, 'NJ'),
+    gradeDisplay: rawStr(raw, 'NJ_DISPLAY'),
+    department: rawStr(raw, 'YXDM'),
+    departmentDisplay: rawStr(raw, 'YXDM_DISPLAY'),
+    major: rawStr(raw, 'ZYDM'),
+    majorDisplay: rawStr(raw, 'ZYDM_DISPLAY'),
+    isScheduled: toBool(raw['SFYPK']),
+    studentCount: rawInt(raw, 'SJRS'),
+    raw,
+  };
+}
+
+function parseClassroomInfo(raw: Record<string, unknown>): ClassroomInfo {
+  return {
+    name: rawStr(raw, 'JASMC'),
+    code: rawStr(raw, 'JASDM'),
+    campus: rawStr(raw, 'XXXQDM'),
+    campusDisplay: rawStr(raw, 'XXXQDM_DISPLAY'),
+    building: rawStr(raw, 'JXLDM'),
+    buildingDisplay: rawStr(raw, 'JXLDM_DISPLAY'),
+    examSeats: rawInt(raw, 'KSZWS'),
+    classSeats: rawInt(raw, 'SKZWS'),
+    typeDisplay: rawStr(raw, 'JASLXDM_DISPLAY'),
+    floor: rawInt(raw, 'LC'),
+    isScheduled: toBool(raw['SFYPK']),
     raw,
   };
 }

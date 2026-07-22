@@ -8,6 +8,9 @@ import type {
   AcademicWarning,
   AuthStatus,
   ClassPeriod,
+  ClassroomInfo,
+  ClassroomQueryOptions,
+  CodeItem,
   ComprehensiveIndicatorDetail,
   ComprehensiveQueryOptions,
   ComprehensiveRadarItem,
@@ -54,6 +57,7 @@ import type {
   MfaChallenge,
   MfaRequestInput,
   MfaSubmitInput,
+  MajorInfo,
   MakeupExamBatch,
   MakeupExamCourse,
   MakeupExamCourseQueryOptions,
@@ -61,6 +65,8 @@ import type {
   PageQueryOptions,
   ProviderMobile,
   ScheduleQueryOptions,
+  SchoolClassInfo,
+  SchoolClassQueryOptions,
   StudentInfo,
   TermCalendar,
   TermCalendarQueryOptions,
@@ -95,6 +101,15 @@ import {
   queryExams,
   queryMakeupExamBatches,
   queryMakeupExamCourses,
+  queryGradeYears,
+  queryDepartments,
+  queryMajors,
+  querySchoolClasses,
+  queryClassSchedule,
+  queryCampuses,
+  queryTeachingBuildings,
+  queryClassrooms,
+  queryClassroomSchedule,
   signupMakeupExam,
   queryExperimentalSchedule,
   queryGpaStats,
@@ -160,6 +175,7 @@ function ysuCapabilities(): AcademicCapabilities {
     laborEducation: getSchoolConfig().ldxt !== undefined,
     innovationCredits: getSchoolConfig().scxt !== undefined,
     comprehensiveEval: getSchoolConfig().xgxt !== undefined,
+    schoolSchedule: true,
     gpa: true,
     evaluation: true,
     evaluationScorePreview: true,
@@ -692,6 +708,90 @@ export class YSUProvider extends BaseProvider {
 
   async signupMakeupExam(input: MakeupExamSignupInput): Promise<void> {
     await signupMakeupExam({ taskId: input.taskId, batchId: input.batchId });
+  }
+
+  async getSchoolGradeYears(): Promise<CodeItem[]> {
+    const rows = await queryGradeYears();
+    return rows.map((row) => ({ id: row.id, name: row.name }));
+  }
+
+  async getSchoolDepartments(): Promise<CodeItem[]> {
+    const rows = await queryDepartments();
+    return rows.map((row) => ({ id: row.id, name: row.name }));
+  }
+
+  async getSchoolMajors(department?: string): Promise<MajorInfo[]> {
+    const rows = await queryMajors(department);
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      department: row.department || undefined,
+    }));
+  }
+
+  async getSchoolClasses(options?: SchoolClassQueryOptions): Promise<SchoolClassInfo[]> {
+    const rows = await querySchoolClasses({
+      term: options?.semester,
+      grade: options?.grade,
+      department: options?.department,
+      major: options?.major,
+    });
+    return rows.map((row) => ({
+      classId: row.classId,
+      className: row.className,
+      grade: row.grade || undefined,
+      gradeDisplay: row.gradeDisplay || undefined,
+      department: row.department || undefined,
+      departmentDisplay: row.departmentDisplay || undefined,
+      major: row.major || undefined,
+      majorDisplay: row.majorDisplay || undefined,
+      isScheduled: row.isScheduled,
+      studentCount: row.studentCount,
+    }));
+  }
+
+  async getSchoolClassSchedule(classId: string, options?: ExamQueryOptions): Promise<Course[]> {
+    const rows = await queryClassSchedule(classId, { term: options?.semester });
+    return rows.map(mapCourse);
+  }
+
+  async getSchoolCampuses(): Promise<CodeItem[]> {
+    const rows = await queryCampuses();
+    return rows.map((row) => ({ id: row.id, name: row.name }));
+  }
+
+  async getSchoolBuildings(campus?: string): Promise<CodeItem[]> {
+    const rows = await queryTeachingBuildings(campus);
+    return rows.map((row) => ({ id: row.id, name: row.name }));
+  }
+
+  async getSchoolClassrooms(options?: ClassroomQueryOptions): Promise<ClassroomInfo[]> {
+    const rows = await queryClassrooms({
+      term: options?.semester,
+      name: options?.name,
+      campus: options?.campus,
+      building: options?.building,
+    });
+    return rows.map((row) => ({
+      name: row.name,
+      code: row.code,
+      campusDisplay: row.campusDisplay || undefined,
+      building: row.building || undefined,
+      buildingDisplay: row.buildingDisplay || undefined,
+      examSeats: row.examSeats,
+      classSeats: row.classSeats,
+      typeDisplay: row.typeDisplay || undefined,
+      floor: row.floor,
+      isScheduled: row.isScheduled,
+    }));
+  }
+
+  async getSchoolClassroomSchedule(
+    code: string,
+    options?: ExamQueryOptions,
+  ): Promise<Course[]> {
+    const rows = await queryClassroomSchedule(code, { term: options?.semester });
+    return rows.map(mapCourse);
   }
 
   async getLaborRecords(): Promise<LaborRecord[]> {
