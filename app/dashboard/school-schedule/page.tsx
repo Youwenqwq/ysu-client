@@ -130,7 +130,7 @@ function CourseScheduleView({
         byWeekDay.map(([weekDay, dayCourses]) => (
           <div key={weekDay} className="flex flex-col gap-2">
             <h3 className="text-sm font-medium text-muted-foreground">
-              {t(`schedule.weekdayNames.${weekDay}`)}
+              {t(`dashboard.weekdayNames.${weekDay}`)}
             </h3>
             {dayCourses.map((course, idx) => (
               <Card key={`${course.name}-${course.startSection}-${idx}`}>
