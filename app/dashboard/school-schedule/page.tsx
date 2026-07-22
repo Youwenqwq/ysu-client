@@ -11,7 +11,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
@@ -21,11 +20,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import {
   EmptyState,
   LoadingCards,
   useErrorToast,
 } from "@/components/academic/list-state";
+import {
+  FilterDrawer,
+  FilterTrigger,
+} from "@/components/academic/filter-drawer";
 import { useTranslation } from "@/lib/i18n/use-translation";
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
+import { cn } from "@/lib/utils";
 import {
   useSchoolBuildings,
   useSchoolCampuses,
@@ -37,7 +47,7 @@ import {
   useSchoolGradeYears,
   useSchoolMajors,
 } from "@/providers/hooks";
-import type { Course } from "@/providers/types";
+import type { Course, SchoolClassInfo, ClassroomInfo } from "@/providers/types";
 import { ArrowLeft, Search } from "lucide-react";
 
 const ALL = "__all__";
@@ -88,15 +98,17 @@ function CourseScheduleView({
       {isLoading ? (
         <LoadingCards />
       ) : courses.length === 0 ? (
-        <EmptyState title={t("schoolSchedule.noCourses")} description={t("schoolSchedule.description")} />
+        <EmptyState title={t("schoolSchedule.noCourses")} />
       ) : (
         byWeekDay.map(([weekDay, dayCourses]) => (
           <div key={weekDay} className="flex flex-col gap-2">
             <h3 className="text-sm font-medium text-muted-foreground">
               {t(`dashboard.weekdayNames.${weekDay}`)}
             </h3>
-            {dayCourses.map((course, idx) => (
-              <Card key={`${course.name}-${course.startSection}-${idx}`}>
+            {dayCourses.map((course) => (
+              <Card
+                key={`${course.name}-${weekDay}-${course.startSection}-${course.endSection}-${course.classroom ?? ""}`}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base">{course.name}</CardTitle>
@@ -167,6 +179,80 @@ function RoomScheduleLoader({
   );
 }
 
+/** 班级条目行：未排课的班级置灰并标示，避免白点一次。 */
+function ClassRow({
+  cls,
+  onSelect,
+}: {
+  cls: SchoolClassInfo;
+  onSelect: (v: { classId: string; className: string }) => void;
+}) {
+  const { t } = useTranslation();
+  const unscheduled = cls.isScheduled === false;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect({ classId: cls.classId, className: cls.className })}
+      className={cn(
+        "flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5 text-left transition-colors active:bg-muted/60",
+        unscheduled && "opacity-60",
+      )}
+    >
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-medium">{cls.className}</span>
+        <span className="truncate text-xs text-muted-foreground">
+          {[cls.gradeDisplay, cls.departmentDisplay, cls.majorDisplay]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      </div>
+      <div className="flex shrink-0 gap-1">
+        {unscheduled && (
+          <Badge variant="secondary">{t("schoolSchedule.unscheduled")}</Badge>
+        )}
+        {cls.studentCount !== undefined && (
+          <Badge variant="outline">
+            {t("schoolSchedule.studentCount", { count: cls.studentCount })}
+          </Badge>
+        )}
+      </div>
+    </button>
+  );
+}
+
+/** 班级查询结果（仅在选定筛选条件后挂载，避免全量请求）。 */
+function ClassListResults({
+  filter,
+  onSelect,
+}: {
+  filter: { grade?: string; department?: string; major?: string };
+  onSelect: (v: { classId: string; className: string }) => void;
+}) {
+  const { t } = useTranslation();
+  const classesQuery = useSchoolClasses(filter);
+  const classes = classesQuery.data ?? [];
+  useErrorToast(classesQuery.error);
+
+  if ((classesQuery.isLoading || classesQuery.isValidating) && classes.length === 0) {
+    return <LoadingCards />;
+  }
+  if (classes.length === 0) {
+    return <EmptyState title={t("schoolSchedule.noClasses")} />;
+  }
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-2 transition-opacity",
+        classesQuery.isValidating && "opacity-50",
+      )}
+    >
+      {classes.map((cls) => (
+        <ClassRow key={cls.classId} cls={cls} onSelect={onSelect} />
+      ))}
+    </div>
+  );
+}
+
 function ClassSchedulePanel() {
   const { t } = useTranslation();
   const [grade, setGrade] = useState(ALL);
@@ -176,23 +262,95 @@ function ClassSchedulePanel() {
     classId: string;
     className: string;
   } | null>(null);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   const gradeYearsQuery = useSchoolGradeYears();
   const departmentsQuery = useSchoolDepartments();
   const majorsQuery = useSchoolMajors(department === ALL ? undefined : department);
-  const classesQuery = useSchoolClasses({
-    grade: grade === ALL ? undefined : grade,
-    department: department === ALL ? undefined : department,
-    major: major === ALL ? undefined : major,
-  });
 
   const gradeYears = gradeYearsQuery.data ?? [];
   const departments = departmentsQuery.data ?? [];
   const majors = majorsQuery.data ?? [];
-  const classes = classesQuery.data ?? [];
 
   useErrorToast(gradeYearsQuery.error ?? departmentsQuery.error ?? majorsQuery.error);
-  useErrorToast(classesQuery.error);
+
+  const hasFilter = grade !== ALL || department !== ALL || major !== ALL;
+  const summary = [
+    gradeYears.find((g) => g.id === grade)?.name,
+    departments.find((d) => d.id === department)?.name,
+    majors.find((m) => m.id === major)?.name,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  useMobileHeaderRight(
+    selectedClass ? null : (
+      <FilterTrigger
+        label={summary || t("schoolSchedule.selectHint")}
+        onClick={() => setFilterDrawerOpen(true)}
+      />
+    ),
+    [selectedClass, summary, t],
+  );
+
+  const filterControls = (
+    <FieldGroup className="flex flex-col gap-3 md:flex-row">
+      <Field className="flex-1">
+        <FieldLabel>{t("schoolSchedule.grade")}</FieldLabel>
+        <Select value={grade} onValueChange={setGrade}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
+            {gradeYears.map((g) => (
+              <SelectItem key={g.id} value={g.id}>
+                {g.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field className="flex-1">
+        <FieldLabel>{t("schoolSchedule.department")}</FieldLabel>
+        <Select
+          value={department}
+          onValueChange={(v) => {
+            setDepartment(v);
+            setMajor(ALL);
+          }}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
+            {departments.map((d) => (
+              <SelectItem key={d.id} value={d.id}>
+                {d.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field className="flex-1">
+        <FieldLabel>{t("schoolSchedule.major")}</FieldLabel>
+        <Select value={major} onValueChange={setMajor}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
+            {majors.map((m) => (
+              <SelectItem key={m.id} value={m.id}>
+                {m.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+    </FieldGroup>
+  );
 
   if (selectedClass) {
     return (
@@ -206,91 +364,101 @@ function ClassSchedulePanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-3 gap-2">
-        <Select
-          value={grade}
-          onValueChange={(v) => {
-            setGrade(v);
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={t("schoolSchedule.grade")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
-            {gradeYears.map((g) => (
-              <SelectItem key={g.id} value={g.id}>
-                {g.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={department}
-          onValueChange={(v) => {
-            setDepartment(v);
-            setMajor(ALL);
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={t("schoolSchedule.department")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
-            {departments.map((d) => (
-              <SelectItem key={d.id} value={d.id}>
-                {d.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={major} onValueChange={setMajor}>
-          <SelectTrigger>
-            <SelectValue placeholder={t("schoolSchedule.major")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
-            {majors.map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <div className="hidden md:block">{filterControls}</div>
+      <FilterDrawer
+        open={filterDrawerOpen}
+        onOpenChange={setFilterDrawerOpen}
+        title={t("schoolSchedule.classTab")}
+      >
+        {filterControls}
+      </FilterDrawer>
 
-      {(classesQuery.isLoading || classesQuery.isValidating) && classes.length === 0 ? (
-        <LoadingCards />
-      ) : classes.length === 0 ? (
-        <EmptyState title={t("schoolSchedule.noClasses")} description={t("schoolSchedule.description")} />
+      {!hasFilter ? (
+        <EmptyState title={t("schoolSchedule.selectHint")} />
       ) : (
-        <div className="flex flex-col gap-2">
-          {classes.map((cls) => (
-            <button
-              key={cls.classId}
-              type="button"
-              onClick={() =>
-                setSelectedClass({ classId: cls.classId, className: cls.className })
-              }
-              className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5 text-left transition-colors active:bg-muted/60"
-            >
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-medium">{cls.className}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {[cls.gradeDisplay, cls.departmentDisplay, cls.majorDisplay]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              </div>
-              {cls.studentCount !== undefined && (
-                <Badge variant="outline" className="shrink-0">
-                  {t("schoolSchedule.studentCount", { count: cls.studentCount })}
-                </Badge>
-              )}
-            </button>
-          ))}
-        </div>
+        <ClassListResults
+          filter={{
+            grade: grade === ALL ? undefined : grade,
+            department: department === ALL ? undefined : department,
+            major: major === ALL ? undefined : major,
+          }}
+          onSelect={setSelectedClass}
+        />
       )}
+    </div>
+  );
+}
+
+/** 教室条目行：未排课的教室置灰并标示。 */
+function RoomRow({
+  room,
+  onSelect,
+}: {
+  room: ClassroomInfo;
+  onSelect: (v: { code: string; name: string }) => void;
+}) {
+  const { t } = useTranslation();
+  const unscheduled = room.isScheduled === false;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect({ code: room.code, name: room.name })}
+      className={cn(
+        "flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5 text-left transition-colors active:bg-muted/60",
+        unscheduled && "opacity-60",
+      )}
+    >
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-medium">{room.name}</span>
+        <span className="truncate text-xs text-muted-foreground">
+          {[room.campusDisplay, room.buildingDisplay, room.typeDisplay]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      </div>
+      <div className="flex shrink-0 gap-1">
+        {unscheduled && (
+          <Badge variant="secondary">{t("schoolSchedule.unscheduled")}</Badge>
+        )}
+        {room.classSeats !== undefined && (
+          <Badge variant="outline">
+            {t("schoolSchedule.seats", { count: room.classSeats })}
+          </Badge>
+        )}
+      </div>
+    </button>
+  );
+}
+
+/** 教室查询结果（仅在搜索或选定筛选条件后挂载，避免全量请求）。 */
+function RoomListResults({
+  filter,
+  onSelect,
+}: {
+  filter: { name?: string; campus?: string; building?: string };
+  onSelect: (v: { code: string; name: string }) => void;
+}) {
+  const { t } = useTranslation();
+  const roomsQuery = useSchoolClassrooms(filter);
+  const rooms = roomsQuery.data ?? [];
+  useErrorToast(roomsQuery.error);
+
+  if ((roomsQuery.isLoading || roomsQuery.isValidating) && rooms.length === 0) {
+    return <LoadingCards />;
+  }
+  if (rooms.length === 0) {
+    return <EmptyState title={t("schoolSchedule.noRooms")} />;
+  }
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-2 transition-opacity",
+        roomsQuery.isValidating && "opacity-50",
+      )}
+    >
+      {rooms.map((room) => (
+        <RoomRow key={room.code} room={room} onSelect={onSelect} />
+      ))}
     </div>
   );
 }
@@ -305,21 +473,102 @@ function RoomSchedulePanel() {
     code: string;
     name: string;
   } | null>(null);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   const campusesQuery = useSchoolCampuses();
   const buildingsQuery = useSchoolBuildings(campus === ALL ? undefined : campus);
-  const roomsQuery = useSchoolClassrooms({
-    name: searchedName || undefined,
-    campus: campus === ALL ? undefined : campus,
-    building: building === ALL ? undefined : building,
-  });
 
   const campuses = campusesQuery.data ?? [];
   const buildings = buildingsQuery.data ?? [];
-  const rooms = roomsQuery.data ?? [];
 
   useErrorToast(campusesQuery.error ?? buildingsQuery.error);
-  useErrorToast(roomsQuery.error);
+
+  const hasFilter = searchedName !== "" || campus !== ALL || building !== ALL;
+  const summary = [
+    campuses.find((c) => c.id === campus)?.name,
+    buildings.find((b) => b.id === building)?.name,
+    searchedName || null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  useMobileHeaderRight(
+    selectedRoom ? null : (
+      <FilterTrigger
+        label={summary || t("schoolSchedule.selectHint")}
+        onClick={() => setFilterDrawerOpen(true)}
+      />
+    ),
+    [selectedRoom, summary, t],
+  );
+
+  function handleSearch() {
+    setSearchedName(name.trim());
+    setFilterDrawerOpen(false);
+  }
+
+  const filterControls = (
+    <FieldGroup className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 md:flex-row">
+        <Field className="flex-1">
+          <FieldLabel>{t("schoolSchedule.campus")}</FieldLabel>
+          <Select
+            value={campus}
+            onValueChange={(v) => {
+              setCampus(v);
+              setBuilding(ALL);
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
+              {campuses.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field className="flex-1">
+          <FieldLabel>{t("schoolSchedule.building")}</FieldLabel>
+          <Select value={building} onValueChange={setBuilding}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
+              {buildings.map((b) => (
+                <SelectItem key={b.id} value={b.id}>
+                  {b.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+      <Field>
+        <FieldLabel htmlFor="room-name">{t("schoolSchedule.roomTab")}</FieldLabel>
+        <div className="flex gap-2">
+          <Input
+            id="room-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("schoolSchedule.roomNamePlaceholder")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSearch();
+            }}
+          />
+          <Button onClick={handleSearch}>
+            <Search data-icon="inline-start" />
+            {t("schoolSchedule.searchRoom")}
+          </Button>
+        </div>
+      </Field>
+    </FieldGroup>
+  );
 
   if (selectedRoom) {
     return (
@@ -333,91 +582,26 @@ function RoomSchedulePanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-2">
-        <Select
-          value={campus}
-          onValueChange={(v) => {
-            setCampus(v);
-            setBuilding(ALL);
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={t("schoolSchedule.campus")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
-            {campuses.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={building} onValueChange={setBuilding}>
-          <SelectTrigger>
-            <SelectValue placeholder={t("schoolSchedule.building")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
-            {buildings.map((b) => (
-              <SelectItem key={b.id} value={b.id}>
-                {b.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex gap-2">
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={t("schoolSchedule.roomNamePlaceholder")}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") setSearchedName(name.trim());
-          }}
-        />
-        <Button
-          onClick={() => setSearchedName(name.trim())}
-          disabled={roomsQuery.isLoading || roomsQuery.isValidating}
-        >
-          {roomsQuery.isValidating ? (
-            <Spinner data-icon="inline-start" />
-          ) : (
-            <Search data-icon="inline-start" />
-          )}
-          {t("schoolSchedule.searchRoom")}
-        </Button>
-      </div>
+      <div className="hidden md:block">{filterControls}</div>
+      <FilterDrawer
+        open={filterDrawerOpen}
+        onOpenChange={setFilterDrawerOpen}
+        title={t("schoolSchedule.roomTab")}
+      >
+        {filterControls}
+      </FilterDrawer>
 
-      {(roomsQuery.isLoading || roomsQuery.isValidating) && rooms.length === 0 ? (
-        <LoadingCards />
-      ) : rooms.length === 0 ? (
-        <EmptyState title={t("schoolSchedule.noRooms")} description={t("schoolSchedule.description")} />
+      {!hasFilter ? (
+        <EmptyState title={t("schoolSchedule.selectHint")} />
       ) : (
-        <div className="flex flex-col gap-2">
-          {rooms.map((room) => (
-            <button
-              key={room.code}
-              type="button"
-              onClick={() => setSelectedRoom({ code: room.code, name: room.name })}
-              className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5 text-left transition-colors active:bg-muted/60"
-            >
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-medium">{room.name}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {[room.campusDisplay, room.buildingDisplay, room.typeDisplay]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              </div>
-              {room.classSeats !== undefined && (
-                <Badge variant="outline" className="shrink-0">
-                  {t("schoolSchedule.seats", { count: room.classSeats })}
-                </Badge>
-              )}
-            </button>
-          ))}
-        </div>
+        <RoomListResults
+          filter={{
+            name: searchedName || undefined,
+            campus: campus === ALL ? undefined : campus,
+            building: building === ALL ? undefined : building,
+          }}
+          onSelect={setSelectedRoom}
+        />
       )}
     </div>
   );

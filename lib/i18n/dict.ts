@@ -681,6 +681,7 @@ export const zh = {
     seats: "座位 {count}",
     sections: "第 {start}-{end} 节",
     selectHint: "选择筛选条件后查询",
+    unscheduled: "未排课",
   },
   student: {
     title: "学生基本信息",
@@ -1454,6 +1455,7 @@ export const en = {
     seats: "{count} seats",
     sections: "Sections {start}-{end}",
     selectHint: "Pick filters and search",
+    unscheduled: "Not scheduled",
   },
   student: {
     title: "Student Info",
