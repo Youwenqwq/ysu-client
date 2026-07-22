@@ -10,7 +10,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { Progress } from "@/components/ui/progress";
 import {
   Empty,
-  EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
@@ -691,7 +690,6 @@ export default function EvaluationPage() {
                     <ClipboardCheck />
                   </EmptyMedia>
                   <EmptyTitle>{t("evaluation.noTasks")}</EmptyTitle>
-                  <EmptyDescription>{t("evaluation.description")}</EmptyDescription>
                 </EmptyHeader>
               </Empty>
             ) : (

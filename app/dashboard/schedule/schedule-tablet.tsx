@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Empty,
-  EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
@@ -114,7 +113,6 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
             <CalendarOff />
           </EmptyMedia>
           <EmptyTitle>{t("schedule.noData")}</EmptyTitle>
-          <EmptyDescription>{t("schedule.description")}</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );

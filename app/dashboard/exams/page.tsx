@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/field";
 import {
   Empty,
-  EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
@@ -140,7 +139,6 @@ export default function ExamsPage() {
               <CalendarOff />
             </EmptyMedia>
             <EmptyTitle>{t("exams.noData")}</EmptyTitle>
-            <EmptyDescription>{t("exams.description")}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (

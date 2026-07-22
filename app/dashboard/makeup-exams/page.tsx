@@ -157,7 +157,6 @@ export default function MakeupExamsPage() {
                 ? t("makeupExams.noAvailable")
                 : t("makeupExams.noRegistered")
             }
-            description={t("makeupExams.description")}
           />
         ) : (
           <ValidatingList validating={coursesQuery.isValidating} className="flex flex-col gap-4">

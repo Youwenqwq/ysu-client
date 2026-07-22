@@ -323,7 +323,7 @@ function CatalogPanel<T>({
       {loading && items.length === 0 ? (
         <LoadingCards />
       ) : items.length === 0 ? (
-        <SharedEmptyState title={t(noDataKey)} description={t("credits.description")} />
+        <SharedEmptyState title={t(noDataKey)} />
       ) : (
         <>
           <div className="flex flex-col gap-4">

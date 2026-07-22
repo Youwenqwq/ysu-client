@@ -3,7 +3,6 @@
 import { useMemo, useRef, useState } from "react";
 import {
   Empty,
-  EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
@@ -162,7 +161,6 @@ export function ScheduleMobile({
               <CalendarOff />
             </EmptyMedia>
             <EmptyTitle>{t("schedule.noData")}</EmptyTitle>
-            <EmptyDescription>{t("schedule.description")}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </div>
