@@ -15,6 +15,7 @@ import {
   EmptyState,
   LoadingCards,
   useErrorToast,
+  ValidatingList,
 } from "@/components/academic/list-state";
 import { FilterChips } from "@/components/academic/filter-chips";
 import {
@@ -46,7 +47,7 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
   useErrorToast(indicatorsQuery.error);
 
   if (resultQuery.isLoading && !result) return <LoadingCards />;
-  if (!result) return <EmptyState title={t("comprehensive.noResult")} description={t("comprehensive.description")} />;
+  if (!result) return <EmptyState title={t("comprehensive.noResult")} />;
 
   return (
     <div className="flex flex-col gap-4">
@@ -56,13 +57,13 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
             <span className="text-xs text-muted-foreground">
               {t("comprehensive.totalScore")}
             </span>
-            <span className="text-2xl font-semibold">{result.totalScore || "-"}</span>
+            <span className="text-2xl font-semibold tabular-nums">{result.totalScore || "-"}</span>
           </div>
           <div className="flex flex-col">
             <span className="text-xs text-muted-foreground">
               {t("comprehensive.classRank")}
             </span>
-            <span className="text-2xl font-semibold">
+            <span className="text-2xl font-semibold tabular-nums">
               {result.classRank || "-"}
               <span className="text-sm font-normal text-muted-foreground">
                 {" "}
@@ -74,7 +75,7 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
             <span className="text-xs text-muted-foreground">
               {t("comprehensive.gradeRank")}
             </span>
-            <span className="text-2xl font-semibold">
+            <span className="text-2xl font-semibold tabular-nums">
               {result.gradeRank || "-"}
               <span className="text-sm font-normal text-muted-foreground">
                 {" "}
@@ -138,53 +139,59 @@ function RadarPanel({ year, term }: { year: string; term: string }) {
   useErrorToast(radarQuery.error);
 
   if (radarQuery.isLoading && items.length === 0) return <LoadingCards />;
-  if (items.length === 0) return <EmptyState title={t("comprehensive.noRadar")} description={t("comprehensive.description")} />;
+  if (items.length === 0) return <EmptyState title={t("comprehensive.noRadar")} />;
 
   return (
-    <div className="flex flex-col gap-4">
-      {items.map((item, idx) => {
-        const personal = parseFloat(item.personal) || 0;
-        const average = parseFloat(item.average) || 0;
-        const max = parseFloat(item.maxScore) || 0;
-        const pct = (v: number) => (max > 0 ? Math.min(100, (v / max) * 100) : 0);
-        return (
-          <Card key={`${item.name}-${idx}`}>
-            <CardHeader>
-              <CardTitle className="text-base">{item.name}</CardTitle>
-              <CardDescription>
-                {t("comprehensive.personal")}: {item.personal || "-"} ·{" "}
-                {t("comprehensive.average")}: {item.average || "-"} ·{" "}
-                {t("comprehensive.maxScore")}: {item.maxScore || "-"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <span className="w-10 text-xs text-muted-foreground">
-                  {t("comprehensive.personal")}
-                </span>
-                <div className="h-2 flex-1 rounded-full bg-muted">
+    <ValidatingList validating={radarQuery.isValidating}>
+      <Card>
+        <CardContent className="flex flex-col gap-5 py-5">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-4 rounded-full bg-primary" />
+              {t("comprehensive.personal")}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-0.5 bg-foreground/60" />
+              {t("comprehensive.average")}
+            </span>
+          </div>
+          {items.map((item, idx) => {
+            const personal = parseFloat(item.personal) || 0;
+            const average = parseFloat(item.average) || 0;
+            const max = parseFloat(item.maxScore) || 0;
+            const pct = (v: number) => (max > 0 ? Math.min(100, (v / max) * 100) : 0);
+            return (
+              <div key={`${item.name}-${idx}`} className="flex flex-col gap-1.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-medium">{item.name}</span>
+                  <span className="text-sm font-semibold tabular-nums">
+                    {item.personal || "-"}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {" "}/ {item.maxScore || "-"}
+                    </span>
+                  </span>
+                </div>
+                <div className="relative h-2 rounded-full bg-muted">
                   <div
                     className="h-full rounded-full bg-primary"
                     style={{ width: `${pct(personal)}%` }}
                   />
+                  {max > 0 && average > 0 && (
+                    <div
+                      className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-foreground/60"
+                      style={{ left: `${pct(average)}%` }}
+                    />
+                  )}
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-10 text-xs text-muted-foreground">
-                  {t("comprehensive.average")}
+                <span className="text-xs text-muted-foreground">
+                  {t("comprehensive.average")}: {item.average || "-"}
                 </span>
-                <div className="h-2 flex-1 rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-muted-foreground/40"
-                    style={{ width: `${pct(average)}%` }}
-                  />
-                </div>
               </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </ValidatingList>
   );
 }
 
@@ -195,27 +202,31 @@ function YearsPanel() {
   useErrorToast(query.error);
 
   if (query.isLoading && items.length === 0) return <LoadingCards />;
-  if (items.length === 0) return <EmptyState title={t("comprehensive.noYearScores")} description={t("comprehensive.description")} />;
+  if (items.length === 0) return <EmptyState title={t("comprehensive.noYearScores")} />;
 
   return (
-    <Card>
-      <CardContent className="flex flex-col py-1">
-        {items.map((item, idx) => (
-          <div
-            key={`${item.year}-${item.term}`}
-            className={`flex items-center justify-between py-3 ${
-              idx > 0 ? "border-t border-border" : ""
-            }`}
-          >
-            <span className="text-sm">
-              {[item.yearDisplay, item.termDisplay].filter(Boolean).join(" ") ||
-                `${item.year}-${item.term}`}
-            </span>
-            <span className="text-sm font-semibold">{item.score || "-"}</span>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+    <ValidatingList validating={query.isValidating}>
+      <Card>
+        <CardContent className="flex flex-col py-1">
+          {items.map((item, idx) => (
+            <div
+              key={`${item.year}-${item.term}`}
+              className={`flex items-center justify-between py-3 ${
+                idx > 0 ? "border-t border-border" : ""
+              }`}
+            >
+              <span className="text-sm">
+                {[item.yearDisplay, item.termDisplay].filter(Boolean).join(" ") ||
+                  `${item.year}-${item.term}`}
+              </span>
+              <span className="text-base font-semibold tabular-nums">
+                {item.score || "-"}
+              </span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </ValidatingList>
   );
 }
 
@@ -241,51 +252,44 @@ function ReportPanel() {
   return (
     <div className="flex flex-col gap-4">
       {years.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {years.map((y) => (
-            <button
-              key={y.year}
-              type="button"
-              onClick={() => setYear(y.year)}
-              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                year === y.year
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground active:bg-muted/60"
-              }`}
-            >
-              {y.yearDisplay || y.year}
-            </button>
-          ))}
-        </div>
+        <FilterChips
+          items={years.map((y) => ({ value: y.year, label: y.yearDisplay || y.year }))}
+          value={year}
+          onChange={setYear}
+        />
       )}
 
       {(reportQuery.isLoading || reportQuery.isValidating) && entries.length === 0 ? (
         <LoadingCards />
       ) : entries.length === 0 ? (
-        <EmptyState title={t("comprehensive.noReport")} description={t("comprehensive.description")} />
+        <EmptyState title={t("comprehensive.noReport")} />
       ) : (
-        <Card>
-          <CardContent className="flex flex-col py-1">
-            {entries.map((entry, idx) => (
-              <div
-                key={`${entry.courseName}-${idx}`}
-                className={`flex items-center justify-between gap-2 py-3 ${
-                  idx > 0 ? "border-t border-border" : ""
-                }`}
-              >
-                <div className="flex min-w-0 flex-col">
-                  <span className="truncate text-sm">{entry.courseName}</span>
-                  {entry.credit && (
-                    <span className="text-xs text-muted-foreground">
-                      {t("comprehensive.credit")}: {entry.credit}
-                    </span>
-                  )}
+        <ValidatingList validating={reportQuery.isValidating}>
+          <Card>
+            <CardContent className="flex flex-col py-1">
+              {entries.map((entry, idx) => (
+                <div
+                  key={`${entry.courseName}-${idx}`}
+                  className={`flex items-center justify-between gap-2 py-3 ${
+                    idx > 0 ? "border-t border-border" : ""
+                  }`}
+                >
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm">{entry.courseName}</span>
+                    {entry.credit && (
+                      <span className="text-xs text-muted-foreground">
+                        {t("comprehensive.credit")}: {entry.credit}
+                      </span>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-base font-semibold tabular-nums">
+                    {entry.score || "-"}
+                  </span>
                 </div>
-                <span className="shrink-0 text-sm font-semibold">{entry.score || "-"}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              ))}
+            </CardContent>
+          </Card>
+        </ValidatingList>
       )}
     </div>
   );
@@ -342,7 +346,7 @@ export default function ComprehensivePage() {
   return (
     <div className="flex flex-col gap-6">
       {terms.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("comprehensive.noTerms")}</p>
+        <EmptyState title={t("comprehensive.noTerms")} />
       ) : (
         <div className="hidden md:block">
           <FilterChips
