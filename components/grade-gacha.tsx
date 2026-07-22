@@ -10,56 +10,80 @@ import {
   useGradeGachaStore,
   type PendingGrade,
 } from "@/lib/stores/grade-gacha";
+import {
+  letterOfScore,
+  letterOfGradeLevel,
+  tierOfLetter,
+  type GradeLetter,
+  type GachaTier,
+} from "@/providers/ysu/grade-letters";
 import { cn } from "@/lib/utils";
 
-type Rarity = "SSR" | "SR" | "R";
-
-/** 稀有度按分数映射:>=90 SSR,>=80 SR,其余 R;无分数按 R。 */
-function rarityOf(item: PendingGrade): Rarity {
-  const s = item.numericScore;
-  if (s !== undefined && Number.isFinite(s)) {
-    if (s >= 90) return "SSR";
-    if (s >= 80) return "SR";
-  }
-  return "R";
+/** 卡面等级:优先百分制(按学期选官方时期表),其次等级制文本,兜底按通过与否。 */
+function letterOf(item: PendingGrade): GradeLetter {
+  const num = item.numericScore ?? (item.score !== undefined ? Number(item.score) : NaN);
+  if (Number.isFinite(num)) return letterOfScore(num, item.semester);
+  return (
+    letterOfGradeLevel(item.gradeLevel) ??
+    letterOfGradeLevel(item.score) ??
+    (item.isPass ? "C" : "F")
+  );
 }
 
-const RARITY_STYLE: Record<
-  Rarity,
+const TIER_STYLE: Record<
+  GachaTier,
   { ring: string; text: string; glow: string }
 > = {
-  SSR: {
+  aplus: { ring: "", text: "", glow: "shadow-[0_0_52px_-6px_rgba(217,70,239,0.5)]" },
+  a: {
     ring: "border-amber-400/80",
     text: "text-amber-400",
     glow: "shadow-[0_0_48px_-8px_rgba(251,191,36,0.55)]",
   },
-  SR: {
+  b: {
     ring: "border-violet-400/80",
     text: "text-violet-400",
     glow: "shadow-[0_0_36px_-8px_rgba(167,139,250,0.5)]",
   },
-  R: {
+  c: {
     ring: "border-sky-400/70",
     text: "text-sky-400",
     glow: "shadow-[0_0_28px_-10px_rgba(56,189,248,0.45)]",
+  },
+  d: { ring: "border-zinc-500/40", text: "text-zinc-400", glow: "" },
+  f: {
+    ring: "border-red-500/70",
+    text: "text-red-400",
+    glow: "shadow-[0_0_28px_-8px_rgba(239,68,68,0.4)]",
   },
 };
 
 const SPRING = { type: "spring", stiffness: 260, damping: 26 } as const;
 const FLIP_SPRING = { type: "spring", stiffness: 200, damping: 22 } as const;
 
-/** SSR 翻卡时在卡片位置撒一把金色彩带。 */
-function fireSsrConfetti(el: HTMLElement | null) {
-  if (!el) return;
+/** 翻卡庆祝:A+ 彩虹撒花,A 系金色撒花,其余不撒。 */
+function fireTierConfetti(tier: GachaTier, el: HTMLElement | null) {
+  if (!el || (tier !== "aplus" && tier !== "a")) return;
   const rect = el.getBoundingClientRect();
+  const origin = {
+    x: (rect.left + rect.width / 2) / window.innerWidth,
+    y: (rect.top + rect.height / 2) / window.innerHeight,
+  };
+  if (tier === "aplus") {
+    confetti({
+      particleCount: 140,
+      spread: 100,
+      startVelocity: 38,
+      origin,
+      zIndex: 80,
+    });
+    return;
+  }
   confetti({
     particleCount: 90,
     spread: 75,
     startVelocity: 32,
-    origin: {
-      x: (rect.left + rect.width / 2) / window.innerWidth,
-      y: (rect.top + rect.height / 2) / window.innerHeight,
-    },
+    origin,
     colors: ["#fbbf24", "#f59e0b", "#fde68a", "#ffffff"],
     zIndex: 80,
   });
@@ -77,8 +101,9 @@ function GachaCard({
   onFlip: (el: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
-  const rarity = rarityOf(item);
-  const style = RARITY_STYLE[rarity];
+  const letter = letterOf(item);
+  const tier = tierOfLetter(letter);
+  const style = TIER_STYLE[tier];
   const scoreText = item.score || item.gradeLevel || "—";
 
   return (
@@ -107,40 +132,53 @@ function GachaCard({
           <span className="text-4xl font-bold text-white/70">?</span>
           <span className="text-xs text-white/50">{t("gacha.tapToReveal")}</span>
         </div>
-        {/* 卡面 */}
+        {/* 卡面:A+ 用旋转色相的彩虹描边,其余用静态色环 */}
         <div
           className={cn(
-            "absolute inset-0 flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 bg-card px-3 text-center [backface-visibility:hidden] [transform:rotateY(180deg)]",
-            style.ring,
+            "absolute inset-0 rounded-xl [backface-visibility:hidden] [transform:rotateY(180deg)]",
+            tier === "aplus" ? "p-[2px]" : cn("border-2", style.ring),
             style.glow,
           )}
         >
-          <span
-            className={cn(
-              "text-[10px] font-bold tracking-[0.3em]",
-              style.text,
-            )}
-          >
-            {rarity}
-          </span>
-          <span className="line-clamp-2 text-sm leading-snug font-medium">
-            {item.courseName}
-          </span>
-          <motion.span
-            className="text-3xl font-bold tabular-nums"
-            animate={flipped ? { scale: [1.5, 1], opacity: [0, 1] } : undefined}
-            transition={{ type: "spring", stiffness: 320, damping: 18, delay: 0.25 }}
-          >
-            {scoreText}
-          </motion.span>
-          <span className="text-xs text-muted-foreground">
-            {[
-              item.credit ? t("gacha.credit", { credit: item.credit }) : "",
-              item.semester ?? "",
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
+          {tier === "aplus" && (
+            <motion.div
+              aria-hidden
+              className="absolute inset-0 rounded-xl bg-[conic-gradient(from_0deg,#f87171,#fbbf24,#34d399,#60a5fa,#a78bfa,#f472b6,#f87171)]"
+              animate={{ filter: ["hue-rotate(0deg)", "hue-rotate(360deg)"] }}
+              transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
+            />
+          )}
+          <div className="relative flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-[10px] bg-card px-3 text-center">
+            <span
+              className={cn(
+                "flex items-center gap-0.5 text-sm font-bold tracking-[0.2em]",
+                tier === "aplus"
+                  ? "bg-gradient-to-r from-amber-300 via-fuchsia-400 to-sky-400 bg-clip-text text-transparent"
+                  : style.text,
+              )}
+            >
+              {tier === "aplus" && <Sparkles className="size-3.5 text-fuchsia-400" />}
+              {letter}
+            </span>
+            <span className="line-clamp-2 text-sm leading-snug font-medium">
+              {item.courseName}
+            </span>
+            <motion.span
+              className="text-3xl font-bold tabular-nums"
+              animate={flipped ? { scale: [1.5, 1], opacity: [0, 1] } : undefined}
+              transition={{ type: "spring", stiffness: 320, damping: 18, delay: 0.25 }}
+            >
+              {scoreText}
+            </motion.span>
+            <span className="text-xs text-muted-foreground">
+              {[
+                item.credit ? t("gacha.credit", { credit: item.credit }) : "",
+                item.semester ?? "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </div>
         </div>
       </motion.div>
     </motion.button>
@@ -174,20 +212,20 @@ export function GradeGachaModal({
     setFlipped((prev) => new Set(prev).add(key));
     const item = pending.find((p) => p.key === key);
     // 弹簧回正(约 0.4s)后再撒花,正对卡面
-    if (item && rarityOf(item) === "SSR") {
-      setTimeout(() => fireSsrConfetti(el), 400);
+    if (item) {
+      setTimeout(() => fireTierConfetti(tierOfLetter(letterOf(item)), el), 400);
     }
   }
 
   function flipAll() {
     setFlipped(new Set(pending.map((p) => p.key)));
-    // 与逐张翻转一致:SSR 在弹簧回正后撒花
+    // 与逐张翻转一致:A/A+ 在弹簧回正后撒花
     setTimeout(() => {
       for (const item of pending) {
-        if (rarityOf(item) !== "SSR") continue;
-        fireSsrConfetti(
+        fireTierConfetti(
+          tierOfLetter(letterOf(item)),
           document.querySelector<HTMLElement>(
-            `[data-card-key="${CSS.escape(item.key)}" ]`,
+            `[data-card-key="${CSS.escape(item.key)}"]`,
           ),
         );
       }
