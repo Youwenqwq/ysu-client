@@ -15,6 +15,7 @@ import {
   FileText,
   FilePenLine,
   GraduationCap,
+  Gauge,
   Hammer,
   Lightbulb,
   LogIn,
@@ -117,6 +118,7 @@ export default function MePage() {
   const platformLinks = [
     { href: "/dashboard/labor", label: t("app.labor"), icon: Hammer },
     { href: "/dashboard/credits", label: t("app.credits"), icon: Lightbulb },
+    { href: "/dashboard/comprehensive", label: t("app.comprehensive"), icon: Gauge },
   ];
 
   const displayName = student.data?.name || username || t("me.profileFallback");

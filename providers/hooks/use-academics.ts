@@ -5,6 +5,14 @@ import type {
   AcademicCompletion,
   AcademicWarning,
   ClassPeriod,
+  ComprehensiveIndicatorDetail,
+  ComprehensiveQueryOptions,
+  ComprehensiveRadarItem,
+  ComprehensiveReportPage,
+  ComprehensiveReportYears,
+  ComprehensiveResult,
+  ComprehensiveTerm,
+  ComprehensiveYearScore,
   CatalogPage,
   CatalogQueryOptions,
   Competition,
@@ -228,6 +236,75 @@ export function useCreditLibraryActivities(
     "innovationCredits",
     "credit-library-activities",
     () => provider.getCreditLibraryActivities(options),
+    options,
+  );
+}
+
+export function useComprehensiveTerms(): ProviderQueryResult<ComprehensiveTerm[]> {
+  const provider = useProvider();
+  return useProviderQuery("comprehensiveEval", "comprehensive-terms", () =>
+    provider.getComprehensiveTerms(),
+  );
+}
+
+export function useComprehensiveResult(
+  options?: ComprehensiveQueryOptions,
+): ProviderQueryResult<ComprehensiveResult> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "comprehensiveEval",
+    "comprehensive-result",
+    () => provider.getComprehensiveResult(options),
+    options,
+  );
+}
+
+export function useComprehensiveIndicators(
+  options?: ComprehensiveQueryOptions,
+): ProviderQueryResult<ComprehensiveIndicatorDetail[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "comprehensiveEval",
+    "comprehensive-indicators",
+    () => provider.getComprehensiveIndicators(options),
+    options,
+  );
+}
+
+export function useComprehensiveRadar(
+  options?: ComprehensiveQueryOptions,
+): ProviderQueryResult<ComprehensiveRadarItem[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "comprehensiveEval",
+    "comprehensive-radar",
+    () => provider.getComprehensiveRadar(options),
+    options,
+  );
+}
+
+export function useComprehensiveYearScores(): ProviderQueryResult<ComprehensiveYearScore[]> {
+  const provider = useProvider();
+  return useProviderQuery("comprehensiveEval", "comprehensive-year-scores", () =>
+    provider.getComprehensiveYearScores(),
+  );
+}
+
+export function useComprehensiveReportYears(): ProviderQueryResult<ComprehensiveReportYears> {
+  const provider = useProvider();
+  return useProviderQuery("comprehensiveEval", "comprehensive-report-years", () =>
+    provider.getComprehensiveReportYears(),
+  );
+}
+
+export function useComprehensiveReport(options?: {
+  year?: string;
+}): ProviderQueryResult<ComprehensiveReportPage> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "comprehensiveEval",
+    "comprehensive-report",
+    () => provider.getComprehensiveReport(options),
     options,
   );
 }

@@ -24,6 +24,9 @@ export interface SchoolConfig {
     readonly baseUrl: string;
     readonly ptBaseUrl: string;
   };
+  readonly xgxt?: {
+    readonly baseUrl: string;
+  };
   readonly features: {
     readonly hasMobile: boolean;
     readonly hasLabSchedule: boolean;

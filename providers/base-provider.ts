@@ -5,6 +5,14 @@ import type {
   AcademicWarning,
   AuthStatus,
   ClassPeriod,
+  ComprehensiveIndicatorDetail,
+  ComprehensiveQueryOptions,
+  ComprehensiveRadarItem,
+  ComprehensiveReportPage,
+  ComprehensiveReportYears,
+  ComprehensiveResult,
+  ComprehensiveTerm,
+  ComprehensiveYearScore,
   CatalogPage,
   CatalogQueryOptions,
   Competition,
@@ -134,6 +142,17 @@ export abstract class BaseProvider implements AcademicProvider {
   abstract getCreditLibraryActivities(
     options?: CatalogQueryOptions,
   ): Promise<CatalogPage<LibraryActivity>>;
+  abstract getComprehensiveTerms(): Promise<ComprehensiveTerm[]>;
+  abstract getComprehensiveResult(options?: ComprehensiveQueryOptions): Promise<ComprehensiveResult>;
+  abstract getComprehensiveIndicators(
+    options?: ComprehensiveQueryOptions,
+  ): Promise<ComprehensiveIndicatorDetail[]>;
+  abstract getComprehensiveRadar(
+    options?: ComprehensiveQueryOptions,
+  ): Promise<ComprehensiveRadarItem[]>;
+  abstract getComprehensiveYearScores(): Promise<ComprehensiveYearScore[]>;
+  abstract getComprehensiveReportYears(): Promise<ComprehensiveReportYears>;
+  abstract getComprehensiveReport(options?: { year?: string }): Promise<ComprehensiveReportPage>;
   abstract getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>;
   abstract getAcademicCompletion(): Promise<AcademicCompletion>;
   abstract getAcademicWarnings(): Promise<AcademicWarning[]>;

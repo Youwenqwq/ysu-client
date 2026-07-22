@@ -8,6 +8,14 @@ import type {
   AcademicWarning,
   AuthStatus,
   ClassPeriod,
+  ComprehensiveIndicatorDetail,
+  ComprehensiveQueryOptions,
+  ComprehensiveRadarItem,
+  ComprehensiveReportPage,
+  ComprehensiveReportYears,
+  ComprehensiveResult,
+  ComprehensiveTerm,
+  ComprehensiveYearScore,
   Course,
   CatalogPage,
   CatalogQueryOptions,
@@ -116,6 +124,15 @@ import {
   queryCreditSummary,
   queryLibraryActivities,
 } from "./scxt-fetcher";
+import {
+  queryAcademicReport,
+  queryAcademicReportYears,
+  queryEvaluationIndicators,
+  queryEvaluationRadar,
+  queryEvaluationResult,
+  queryEvaluationTerms,
+  queryYearScoreStatics,
+} from "./xgxt-fetcher";
 import type { CreditRecord as ScxtCreditRecord } from "./protocol/scxt";
 import {
   initializeSession,
@@ -142,6 +159,7 @@ function ysuCapabilities(): AcademicCapabilities {
     makeupExams: true,
     laborEducation: getSchoolConfig().ldxt !== undefined,
     innovationCredits: getSchoolConfig().scxt !== undefined,
+    comprehensiveEval: getSchoolConfig().xgxt !== undefined,
     gpa: true,
     evaluation: true,
     evaluationScorePreview: true,
@@ -820,6 +838,98 @@ export class YSUProvider extends BaseProvider {
       pageIndex: page.pageIndex,
       totalPages: page.totalPages,
       totalRecords: page.totalRecords,
+    };
+  }
+
+  async getComprehensiveTerms(): Promise<ComprehensiveTerm[]> {
+    const rows = await queryEvaluationTerms();
+    return rows.map((row) => ({
+      year: row.year,
+      term: row.term,
+      yearDisplay: row.yearDisplay,
+      termDisplay: row.termDisplay,
+    }));
+  }
+
+  async getComprehensiveResult(options?: ComprehensiveQueryOptions): Promise<ComprehensiveResult> {
+    const row = await queryEvaluationResult(options?.year, options?.term);
+    return {
+      totalScore: row.totalScore,
+      classRank: row.classRank,
+      classSize: row.classSize,
+      gradeRank: row.gradeRank,
+      gradeSize: row.gradeSize,
+      year: row.year,
+      term: row.term,
+      yearDisplay: row.yearDisplay || undefined,
+      termDisplay: row.termDisplay || undefined,
+      indicators: row.indicators.map((ind) => ({
+        name: ind.name,
+        score: ind.score,
+        rank: ind.rank,
+        maxScore: ind.maxScore || undefined,
+      })),
+    };
+  }
+
+  async getComprehensiveIndicators(
+    options?: ComprehensiveQueryOptions,
+  ): Promise<ComprehensiveIndicatorDetail[]> {
+    const rows = await queryEvaluationIndicators(options?.year, options?.term);
+    return rows.map((row) => ({
+      name: row.name,
+      score: row.score,
+      rank: row.rank,
+      maxScore: row.maxScore || undefined,
+      rangeText: row.rangeText || undefined,
+      proportion: row.proportion || undefined,
+      categoryDisplay: row.categoryDisplay || undefined,
+      description: row.description || undefined,
+    }));
+  }
+
+  async getComprehensiveRadar(options?: ComprehensiveQueryOptions): Promise<ComprehensiveRadarItem[]> {
+    const rows = await queryEvaluationRadar(options?.year, options?.term);
+    return rows.map((row) => ({
+      name: row.name,
+      personal: row.personal,
+      average: row.average,
+      maxScore: row.maxScore,
+    }));
+  }
+
+  async getComprehensiveYearScores(): Promise<ComprehensiveYearScore[]> {
+    const rows = await queryYearScoreStatics();
+    return rows.map((row) => ({
+      year: row.year,
+      term: row.term,
+      yearDisplay: row.yearDisplay || undefined,
+      termDisplay: row.termDisplay || undefined,
+      score: row.score,
+    }));
+  }
+
+  async getComprehensiveReportYears(): Promise<ComprehensiveReportYears> {
+    const data = await queryAcademicReportYears();
+    return {
+      years: data.years.map((y) => ({ year: y.year, yearDisplay: y.yearDisplay })),
+      defaultYear: data.defaultYear,
+    };
+  }
+
+  async getComprehensiveReport(options?: { year?: string }): Promise<ComprehensiveReportPage> {
+    const page = await queryAcademicReport(options?.year);
+    return {
+      entries: page.entries.map((entry) => ({
+        courseName: entry.courseName,
+        score: entry.score,
+        credit: entry.credit || undefined,
+        year: entry.year || undefined,
+        term: entry.term || undefined,
+      })),
+      totalSize: page.totalSize,
+      pageNumber: page.pageNumber,
+      pageSize: page.pageSize,
     };
   }
 

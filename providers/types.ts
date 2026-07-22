@@ -20,6 +20,7 @@ export interface AcademicCapabilities {
   makeupExams: boolean;
   laborEducation: boolean;
   innovationCredits: boolean;
+  comprehensiveEval: boolean;
   gpa: boolean;
   evaluation: boolean;
   evaluationScorePreview: boolean;
@@ -521,6 +522,93 @@ export interface CatalogQueryOptions {
   pageIndex?: number;
 }
 
+/** A comprehensive-evaluation term option (综合测评学年学期). */
+export interface ComprehensiveTerm {
+  year: string;
+  term: string;
+  yearDisplay: string;
+  termDisplay: string;
+}
+
+/** A single indicator score within a comprehensive-evaluation result. */
+export interface ComprehensiveIndicator {
+  name: string;
+  score: string;
+  rank: number;
+  maxScore?: string;
+}
+
+/** Comprehensive-evaluation result with ranks (综合测评成绩). */
+export interface ComprehensiveResult {
+  totalScore: string;
+  classRank: number;
+  classSize: number;
+  gradeRank: number;
+  gradeSize: number;
+  year: string;
+  term: string;
+  yearDisplay?: string;
+  termDisplay?: string;
+  indicators: ComprehensiveIndicator[];
+}
+
+/** Comprehensive-evaluation indicator detail (指标得分明细). */
+export interface ComprehensiveIndicatorDetail {
+  name: string;
+  score: string;
+  rank: number;
+  maxScore?: string;
+  rangeText?: string;
+  proportion?: string;
+  categoryDisplay?: string;
+  description?: string;
+}
+
+/** Radar comparison item (个人 vs 平均 vs 满分). */
+export interface ComprehensiveRadarItem {
+  name: string;
+  personal: string;
+  average: string;
+  maxScore: string;
+}
+
+/** Per-term score overview item (我和自己比一比). */
+export interface ComprehensiveYearScore {
+  year: string;
+  term: string;
+  yearDisplay?: string;
+  termDisplay?: string;
+  score: string;
+}
+
+/** Academic report year options (学业成绩报告). */
+export interface ComprehensiveReportYears {
+  years: Array<{ year: string; yearDisplay: string }>;
+  defaultYear: string;
+}
+
+/** A paged academic report (学业成绩报告). */
+export interface ComprehensiveReportPage {
+  entries: Array<{
+    courseName: string;
+    score: string;
+    credit?: string;
+    year?: string;
+    term?: string;
+  }>;
+  totalSize: number;
+  pageNumber: number;
+  pageSize: number;
+}
+
+/** Options for comprehensive-evaluation queries. */
+export interface ComprehensiveQueryOptions {
+  /** 测评学年代码（如 "2025"）；缺省时取最新测评批次。 */
+  year?: string;
+  /** 测评学期代码（"1"/"2"）；缺省时取最新测评批次。 */
+  term?: string;
+}
+
 export interface EvaluationType {
   name: string;
   code?: string;
@@ -773,6 +861,15 @@ export interface ProviderAcademics {
   getCreditSummary(): Promise<CreditSummary>;
   getCreditCompetitions(options?: CatalogQueryOptions): Promise<CatalogPage<Competition>>;
   getCreditLibraryActivities(options?: CatalogQueryOptions): Promise<CatalogPage<LibraryActivity>>;
+  getComprehensiveTerms(): Promise<ComprehensiveTerm[]>;
+  getComprehensiveResult(options?: ComprehensiveQueryOptions): Promise<ComprehensiveResult>;
+  getComprehensiveIndicators(
+    options?: ComprehensiveQueryOptions,
+  ): Promise<ComprehensiveIndicatorDetail[]>;
+  getComprehensiveRadar(options?: ComprehensiveQueryOptions): Promise<ComprehensiveRadarItem[]>;
+  getComprehensiveYearScores(): Promise<ComprehensiveYearScore[]>;
+  getComprehensiveReportYears(): Promise<ComprehensiveReportYears>;
+  getComprehensiveReport(options?: { year?: string }): Promise<ComprehensiveReportPage>;
   getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>;
   getAcademicCompletion(): Promise<AcademicCompletion>;
   getAcademicWarnings(): Promise<AcademicWarning[]>;

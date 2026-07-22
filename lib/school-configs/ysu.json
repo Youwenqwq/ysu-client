@@ -74,6 +74,9 @@
     "baseUrl": "http://202.206.247.49/ysu_xf",
     "ptBaseUrl": "http://202.206.247.49/ysu_pt"
   },
+  "xgxt": {
+    "baseUrl": "https://xgxt.ysu.edu.cn"
+  },
   "features": {
     "hasMobile": true,
     "hasLabSchedule": true,
