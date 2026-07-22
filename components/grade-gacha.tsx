@@ -32,29 +32,33 @@ function letterOf(item: PendingGrade): GradeLetter {
 
 const TIER_STYLE: Record<
   GachaTier,
-  { ring: string; text: string; glow: string }
+  { ring: string; text: string; aura: string }
 > = {
-  aplus: { ring: "", text: "", glow: "shadow-[0_0_52px_-6px_rgba(217,70,239,0.5)]" },
+  aplus: {
+    ring: "",
+    text: "",
+    aura: "bg-fuchsia-500/50",
+  },
   a: {
     ring: "border-amber-400/80",
     text: "text-amber-400",
-    glow: "shadow-[0_0_48px_-8px_rgba(251,191,36,0.55)]",
+    aura: "bg-amber-400/50",
   },
   b: {
     ring: "border-violet-400/80",
     text: "text-violet-400",
-    glow: "shadow-[0_0_36px_-8px_rgba(167,139,250,0.5)]",
+    aura: "bg-violet-400/45",
   },
   c: {
     ring: "border-sky-400/70",
     text: "text-sky-400",
-    glow: "shadow-[0_0_28px_-10px_rgba(56,189,248,0.45)]",
+    aura: "bg-sky-400/40",
   },
-  d: { ring: "border-zinc-500/40", text: "text-zinc-400", glow: "" },
+  d: { ring: "border-zinc-500/40", text: "text-zinc-400", aura: "" },
   f: {
     ring: "border-red-500/70",
     text: "text-red-400",
-    glow: "shadow-[0_0_28px_-8px_rgba(239,68,68,0.4)]",
+    aura: "bg-red-500/40",
   },
 };
 
@@ -111,7 +115,7 @@ function GachaCard({
       type="button"
       disabled={flipped}
       aria-label={flipped ? item.courseName : t("gacha.tapToReveal")}
-      className="w-36 [perspective:1200px] sm:w-40"
+      className="relative w-36 [perspective:1200px] sm:w-40"
       initial={{ opacity: 0, y: 28, scale: 0.9 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 16, scale: 0.94 }}
@@ -121,6 +125,18 @@ function GachaCard({
       onClick={(e) => onFlip(e.currentTarget)}
       data-card-key={item.key}
     >
+      {/* 光晕层:与卡面同圆角的色彩+大模糊,翻开时淡入;放在2D上下文,
+          避免Android WebView上preserve-3d内的blur渲染异常 */}
+      {style.aura && (
+        <div
+          aria-hidden
+          className={cn(
+            "absolute inset-0 rounded-xl blur-2xl transition-opacity duration-700",
+            style.aura,
+            flipped ? "opacity-100" : "opacity-0",
+          )}
+        />
+      )}
       <motion.div
         className="relative h-52 [transform-style:preserve-3d] sm:h-56"
         animate={{ rotateY: flipped ? 180 : 0 }}
@@ -135,9 +151,8 @@ function GachaCard({
         {/* 卡面:A+ 用旋转色相的彩虹描边,其余用静态色环 */}
         <div
           className={cn(
-            "absolute inset-0 rounded-xl [backface-visibility:hidden] [transform:rotateY(180deg)]",
+            "absolute inset-0 overflow-hidden rounded-xl bg-card [backface-visibility:hidden] [transform:rotateY(180deg)]",
             tier === "aplus" ? "p-[2px]" : cn("border-2", style.ring),
-            style.glow,
           )}
         >
           {tier === "aplus" && (
@@ -148,7 +163,7 @@ function GachaCard({
               transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
             />
           )}
-          <div className="relative flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-[10px] bg-card px-3 text-center">
+          <div className="relative flex h-full w-full flex-col items-center justify-center gap-1.5 bg-card px-3 text-center">
             <span
               className={cn(
                 "flex items-center gap-0.5 text-sm font-bold tracking-[0.2em]",
