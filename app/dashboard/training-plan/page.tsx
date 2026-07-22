@@ -1,5 +1,6 @@
 "use client";
 
+import { ResponsiveSelect } from "@/components/responsive-select";
 import { useMemo, useState } from "react";
 import {
   Card,
@@ -22,13 +23,6 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -282,64 +276,49 @@ export default function TrainingPlanPage() {
               <FieldLabel htmlFor="tp-required" className="text-xs font-medium text-muted-foreground">
                 {t("trainingPlan.filters.requiredLabel")}
               </FieldLabel>
-              <Select value={requiredFilter} onValueChange={setRequiredFilter}>
-                <SelectTrigger id="tp-required">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>
-                    {t("trainingPlan.filters.all")}
-                  </SelectItem>
-                  <SelectItem value={REQUIRED_YES}>
-                    {t("trainingPlan.filters.requiredOnly")}
-                  </SelectItem>
-                  <SelectItem value={REQUIRED_NO}>
-                    {t("trainingPlan.filters.electiveOnly")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <ResponsiveSelect
+                id="tp-required"
+                value={requiredFilter}
+                onValueChange={setRequiredFilter}
+                title={t("trainingPlan.filters.requiredLabel")}
+                items={[
+                  { value: ALL, label: t("trainingPlan.filters.all") },
+                  { value: REQUIRED_YES, label: t("trainingPlan.filters.requiredOnly") },
+                  { value: REQUIRED_NO, label: t("trainingPlan.filters.electiveOnly") },
+                ]}
+              />
             </Field>
 
             <Field>
               <FieldLabel htmlFor="tp-term" className="text-xs font-medium text-muted-foreground">
                 {t("trainingPlan.filters.termLabel")}
               </FieldLabel>
-              <Select value={termFilter} onValueChange={setTermFilter}>
-                <SelectTrigger id="tp-term">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>
-                    {t("trainingPlan.filters.all")}
-                  </SelectItem>
-                  {termOptions.map((opt) => (
-                    <SelectItem key={opt} value={opt}>
-                      {opt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ResponsiveSelect
+                id="tp-term"
+                value={termFilter}
+                onValueChange={setTermFilter}
+                title={t("trainingPlan.filters.termLabel")}
+                items={[
+                  { value: ALL, label: t("trainingPlan.filters.all") },
+                  ...termOptions.map((opt) => ({ value: opt, label: opt })),
+                ]}
+              />
             </Field>
 
             <Field>
               <FieldLabel htmlFor="tp-group" className="text-xs font-medium text-muted-foreground">
                 {t("trainingPlan.filters.groupLabel")}
               </FieldLabel>
-              <Select value={groupFilter} onValueChange={setGroupFilter}>
-                <SelectTrigger id="tp-group">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>
-                    {t("trainingPlan.filters.all")}
-                  </SelectItem>
-                  {groupOptions.map((opt) => (
-                    <SelectItem key={opt} value={opt}>
-                      {opt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ResponsiveSelect
+                id="tp-group"
+                value={groupFilter}
+                onValueChange={setGroupFilter}
+                title={t("trainingPlan.filters.groupLabel")}
+                items={[
+                  { value: ALL, label: t("trainingPlan.filters.all") },
+                  ...groupOptions.map((opt) => ({ value: opt, label: opt })),
+                ]}
+              />
             </Field>
           </FieldGroup>
 

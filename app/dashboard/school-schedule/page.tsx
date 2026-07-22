@@ -13,13 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Field,
   FieldGroup,
   FieldLabel,
@@ -36,6 +29,7 @@ import {
 } from "@/components/academic/filter-drawer";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
+import { ResponsiveSelect } from "@/components/responsive-select";
 import { cn } from "@/lib/utils";
 import {
   useSchoolBuildings,
@@ -293,57 +287,45 @@ function ClassSchedulePanel() {
     <FieldGroup className="flex flex-col gap-3 md:flex-row">
       <Field className="flex-1">
         <FieldLabel>{t("schoolSchedule.grade")}</FieldLabel>
-        <Select value={grade} onValueChange={setGrade}>
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
-            {gradeYears.map((g) => (
-              <SelectItem key={g.id} value={g.id}>
-                {g.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ResponsiveSelect
+          nested
+          value={grade}
+          onValueChange={setGrade}
+          title={t("schoolSchedule.grade")}
+          items={[
+            { value: ALL, label: t("schoolSchedule.all") },
+            ...gradeYears.map((g) => ({ value: g.id, label: g.name })),
+          ]}
+        />
       </Field>
       <Field className="flex-1">
         <FieldLabel>{t("schoolSchedule.department")}</FieldLabel>
-        <Select
+        <ResponsiveSelect
+          nested
           value={department}
           onValueChange={(v) => {
             setDepartment(v);
             setMajor(ALL);
           }}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
-            {departments.map((d) => (
-              <SelectItem key={d.id} value={d.id}>
-                {d.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          title={t("schoolSchedule.department")}
+          items={[
+            { value: ALL, label: t("schoolSchedule.all") },
+            ...departments.map((d) => ({ value: d.id, label: d.name })),
+          ]}
+        />
       </Field>
       <Field className="flex-1">
         <FieldLabel>{t("schoolSchedule.major")}</FieldLabel>
-        <Select value={major} onValueChange={setMajor}>
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
-            {majors.map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ResponsiveSelect
+          nested
+          value={major}
+          onValueChange={setMajor}
+          title={t("schoolSchedule.major")}
+          items={[
+            { value: ALL, label: t("schoolSchedule.all") },
+            ...majors.map((m) => ({ value: m.id, label: m.name })),
+          ]}
+        />
       </Field>
     </FieldGroup>
   );
@@ -503,41 +485,32 @@ function RoomSchedulePanel() {
       <div className="flex flex-col gap-3 md:flex-row">
         <Field className="flex-1">
           <FieldLabel>{t("schoolSchedule.campus")}</FieldLabel>
-          <Select
+          <ResponsiveSelect
+            nested
             value={campus}
             onValueChange={(v) => {
               setCampus(v);
               setBuilding(ALL);
             }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
-              {campuses.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            title={t("schoolSchedule.campus")}
+            items={[
+              { value: ALL, label: t("schoolSchedule.all") },
+              ...campuses.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
         </Field>
         <Field className="flex-1">
           <FieldLabel>{t("schoolSchedule.building")}</FieldLabel>
-          <Select value={building} onValueChange={setBuilding}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>{t("schoolSchedule.all")}</SelectItem>
-              {buildings.map((b) => (
-                <SelectItem key={b.id} value={b.id}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ResponsiveSelect
+            nested
+            value={building}
+            onValueChange={setBuilding}
+            title={t("schoolSchedule.building")}
+            items={[
+              { value: ALL, label: t("schoolSchedule.all") },
+              ...buildings.map((b) => ({ value: b.id, label: b.name })),
+            ]}
+          />
         </Field>
       </div>
       <Field>

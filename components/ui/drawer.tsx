@@ -36,6 +36,30 @@ function DrawerTrigger({
   return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />
 }
 
+/** 嵌套在另一个 Drawer 内部时使用（如筛选抽屉里再开选项抽屉）。 */
+function DrawerNested({
+  onOpenChange,
+  ...props
+}: React.ComponentProps<typeof DrawerPrimitive.NestedRoot>) {
+  const handleOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (!open && typeof document !== "undefined") {
+        const el = document.activeElement
+        if (el instanceof HTMLElement) el.blur()
+      }
+      onOpenChange?.(open)
+    },
+    [onOpenChange]
+  )
+  return (
+    <DrawerPrimitive.NestedRoot
+      data-slot="drawer"
+      {...props}
+      onOpenChange={handleOpenChange}
+    />
+  )
+}
+
 function DrawerPortal({
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Portal>) {
@@ -141,6 +165,7 @@ function DrawerDescription({
 
 export {
   Drawer,
+  DrawerNested,
   DrawerPortal,
   DrawerOverlay,
   DrawerTrigger,

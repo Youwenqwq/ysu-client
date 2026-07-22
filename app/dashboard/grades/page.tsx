@@ -1,5 +1,6 @@
 "use client";
 
+import { ResponsiveSelect } from "@/components/responsive-select";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,13 +14,6 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   FilterDrawer,
   FilterTrigger,
@@ -249,19 +243,18 @@ export default function GradesPage() {
     <FieldGroup className="flex flex-row flex-wrap items-end gap-3">
       <Field className="w-48">
         <FieldLabel htmlFor="grades-term">{t("grades.termLabel")}</FieldLabel>
-        <Select value={term} onValueChange={setTerm}>
-          <SelectTrigger id="grades-term">
-            <SelectValue placeholder={t("grades.allTerms")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_TERM}>{t("grades.allTerms")}</SelectItem>
-            {terms.map((tItem) => (
-              <SelectItem key={tItem} value={tItem}>
-                {tItem}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ResponsiveSelect
+          id="grades-term"
+          nested
+          value={term}
+          onValueChange={setTerm}
+          placeholder={t("grades.allTerms")}
+          title={t("grades.termLabel")}
+          items={[
+            { value: ALL_TERM, label: t("grades.allTerms") },
+            ...terms.map((tItem) => ({ value: tItem, label: tItem })),
+          ]}
+        />
       </Field>
       <Field className="w-48">
         <FieldLabel htmlFor="grades-course-name">{t("grades.courseNameLabel")}</FieldLabel>
