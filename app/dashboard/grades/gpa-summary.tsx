@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import type { GPAStats } from "@/providers/types";
@@ -16,39 +17,76 @@ function toNum(value?: string): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-/** GPA 仪表环：主色弧线表示 绩点/4.5，中心大数字。 */
-function GpaRing({ value }: { value: number | null }) {
-  const pct = value === null ? 0 : Math.min(1, Math.max(0, value / GPA_MAX));
-  const r = 46;
-  const circumference = 2 * Math.PI * r;
+/**
+ * 燕大 2024 版成绩评定：百分制 - 等级 - 绩点对应表（2024 秋季起）。
+ * 平均绩点按同一刻度换算“相当于某档”为客户端诠释，非官方定级。
+ */
+const GPA_BANDS = [
+  { min: 0, letter: "F" },
+  { min: 1.2, letter: "D" },
+  { min: 1.8, letter: "C-" },
+  { min: 2.2, letter: "C" },
+  { min: 2.6, letter: "C+" },
+  { min: 3.0, letter: "B-" },
+  { min: 3.4, letter: "B" },
+  { min: 3.8, letter: "B+" },
+  { min: 4.0, letter: "A-" },
+  { min: 4.3, letter: "A" },
+  { min: 4.5, letter: "A+" },
+] as const;
+
+function bandOf(gpa: number) {
+  let idx = 0;
+  for (let i = 0; i < GPA_BANDS.length; i++) {
+    if (gpa >= GPA_BANDS[i]!.min) idx = i;
+  }
+  return idx;
+}
+
+/** 等级标尺：尺子按绩点档分段，当前档高亮，指针落在精确位置。 */
+function GpaBandRuler({ value }: { value: number }) {
+  const { t } = useTranslation();
+  const pct = Math.min(100, Math.max(0, (value / GPA_MAX) * 100));
+  const current = bandOf(value);
+  const next = current + 1 < GPA_BANDS.length ? GPA_BANDS[current + 1]! : null;
+
+  const segments = GPA_BANDS.slice(0, -1).map((band, i) => ({
+    letter: band.letter,
+    widthPct: ((GPA_BANDS[i + 1]!.min - band.min) / GPA_MAX) * 100,
+    current: i === current,
+  }));
+
   return (
-    <div className="relative size-28 shrink-0">
-      <svg viewBox="0 0 112 112" className="size-full -rotate-90">
-        <circle
-          cx="56"
-          cy="56"
-          r={r}
-          fill="none"
-          strokeWidth="9"
-          className="stroke-muted"
+    <div className="flex flex-col gap-1.5">
+      <div className="relative">
+        <div className="flex h-2 w-full gap-px overflow-hidden rounded-full">
+          {segments.map((seg) => (
+            <div
+              key={seg.letter}
+              className={seg.current ? "bg-primary" : "bg-muted"}
+              style={{ width: `${seg.widthPct}%` }}
+            />
+          ))}
+        </div>
+        <div
+          className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-foreground"
+          style={{ left: `${pct}%` }}
         />
-        <circle
-          cx="56"
-          cy="56"
-          r={r}
-          fill="none"
-          strokeWidth="9"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - pct)}
-          className="stroke-primary transition-[stroke-dashoffset] duration-700 ease-out"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-semibold tabular-nums leading-none">
-          {value === null ? "-" : value.toFixed(2)}
+      </div>
+      <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+        <span>
+          {t("gpa.bandEquivalent", { letter: GPA_BANDS[current]!.letter })}
         </span>
-        <span className="mt-1 text-[10px] text-muted-foreground">/ {GPA_MAX}</span>
+        {next ? (
+          <span className="tabular-nums">
+            {t("gpa.toNextBand", {
+              letter: next.letter,
+              delta: (next.min - value).toFixed(2),
+            })}
+          </span>
+        ) : (
+          <span>{t("gpa.topBand")}</span>
+        )}
       </div>
     </div>
   );
@@ -102,9 +140,26 @@ export function GpaSummary({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5 pt-3">
-        <div className="flex items-center gap-5">
-          <GpaRing value={toNum(gpa?.gpaInitial)} />
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex flex-col gap-3">
+          {(() => {
+            const gpaValue = toNum(gpa?.gpaInitial);
+            return (
+              <>
+                <div className="flex items-end justify-between gap-2">
+                  <span className="text-5xl font-semibold tabular-nums leading-none">
+                    {gpaValue === null ? "-" : gpaValue.toFixed(2)}
+                  </span>
+                  {gpaValue !== null && (
+                    <Badge variant="secondary" className="mb-1">
+                      {GPA_BANDS[bandOf(gpaValue)]!.letter}
+                    </Badge>
+                  )}
+                </div>
+                {gpaValue !== null && <GpaBandRuler value={gpaValue} />}
+              </>
+            );
+          })()}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
             <StatRow label={t("dashboard.weightedAvg")} value={gpa?.weightedAvg} />
             <StatRow label={t("dashboard.arithmeticAvg")} value={gpa?.arithmeticAvg} />
             {termWeightedGpa !== null && (

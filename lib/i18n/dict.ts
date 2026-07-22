@@ -769,6 +769,9 @@ export const zh = {
     requiredFailed: "必修未通过学分",
     requiredGpaHighest: "必修最高绩点",
     degreeGpaHighest: "学位课最高绩点",
+    bandEquivalent: "相当于 {letter} 档水平",
+    toNextBand: "距 {letter} 还差 {delta}",
+    topBand: "已是最高档",
   },
 } as const;
 
@@ -1543,6 +1546,9 @@ export const en = {
     requiredFailed: "Req. Failed",
     requiredGpaHighest: "Req. Highest GPA",
     degreeGpaHighest: "Deg. Highest GPA",
+    bandEquivalent: "≈ {letter} band",
+    toNextBand: "{delta} to {letter}",
+    topBand: "Top band",
   },
 };
 
