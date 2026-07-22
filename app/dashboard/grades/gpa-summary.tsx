@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/lib/i18n/use-translation";
+import { useSettingsStore } from "@/lib/stores/settings";
 import type { GPAStats } from "@/providers/types";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react";
 
 /** 燕大满绩（2024 版成绩评定说明：A+ = 4.5）。 */
 const GPA_MAX = 4.5;
@@ -116,6 +117,8 @@ export function GpaSummary({
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const gpaVisible = useSettingsStore((s) => s.gpaVisible);
+  const setGpaVisible = useSettingsStore((s) => s.setGpaVisible);
 
   const credits: CreditSegment[] = (
     [
@@ -129,6 +132,19 @@ export function GpaSummary({
   const totalCredits = credits.reduce((sum, s) => sum + s.value, 0);
   const failedCredits = toNum(gpa?.requiredCreditFailed) ?? 0;
 
+  const gpaValue = toNum(gpa?.gpaInitial);
+  const bandIdx = gpaValue === null ? null : bandOf(gpaValue);
+  const encourageKey =
+    bandIdx === null
+      ? null
+      : bandIdx >= 8
+        ? "gpa.encourageA"
+        : bandIdx >= 5
+          ? "gpa.encourageB"
+          : bandIdx >= 2
+            ? "gpa.encourageC"
+            : "gpa.encourageLow";
+
   return (
     <Card>
       <CardHeader className="pb-0">
@@ -139,101 +155,109 @@ export function GpaSummary({
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5 pt-3">
-        <div className="flex flex-col gap-3">
-          {(() => {
-            const gpaValue = toNum(gpa?.gpaInitial);
-            return (
-              <>
-                <div className="flex items-end justify-between gap-2">
-                  <span className="text-5xl font-semibold tabular-nums leading-none">
-                    {gpaValue === null ? "-" : gpaValue.toFixed(2)}
-                  </span>
-                  {gpaValue !== null && (
-                    <Badge variant="secondary" className="mb-1">
-                      {GPA_BANDS[bandOf(gpaValue)]!.letter}
-                    </Badge>
-                  )}
-                </div>
-                {gpaValue !== null && <GpaBandRuler value={gpaValue} />}
-              </>
-            );
-          })()}
-          {/* 安静行：只留真正会被用到的平均分（选学期时追加学期加权） */}
-          <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
-            <span>
-              {t("dashboard.weightedAvg")}{" "}
-              <span className="font-semibold text-foreground tabular-nums">
-                {gpa?.weightedAvg || "-"}
-              </span>
+      <CardContent className="flex flex-col gap-3 pt-3">
+        <div className="flex items-end justify-between gap-2">
+          <div className="flex items-end gap-2">
+            <span className="text-5xl font-semibold tabular-nums leading-none">
+              {gpaVisible && gpaValue !== null ? gpaValue.toFixed(2) : "***"}
             </span>
-            <span>
-              {t("dashboard.arithmeticAvg")}{" "}
-              <span className="font-semibold text-foreground tabular-nums">
-                {gpa?.arithmeticAvg || "-"}
-              </span>
-            </span>
-            {termWeightedGpa !== null && (
-              <span>
-                {t("grades.termWeightedGpa")}{" "}
-                <span className="font-semibold text-foreground tabular-nums">
-                  {termWeightedGpa}
-                </span>
-              </span>
-            )}
+            <button
+              type="button"
+              onClick={() => setGpaVisible(!gpaVisible)}
+              aria-label={t("gpa.toggleVisibility")}
+              className="mb-1 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {gpaVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
           </div>
+          {gpaVisible && bandIdx !== null && (
+            <Badge variant="secondary" className="mb-1">
+              {GPA_BANDS[bandIdx]!.letter}
+            </Badge>
+          )}
         </div>
 
-        {totalCredits > 0 && (
-          <div className="flex flex-col gap-2">
-            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
-              {credits.map((s) => (
-                <div
-                  key={s.label}
-                  className={s.className}
-                  style={{ width: `${(s.value / totalCredits) * 100}%` }}
-                />
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>
-                {t("gpa.totalEarned")}{" "}
-                <span className="font-semibold text-foreground tabular-nums">
-                  {totalCredits.toFixed(1)}
-                </span>
-              </span>
-              {failedCredits > 0 && (
-                <span className="text-destructive">
-                  {t("gpa.requiredFailed")} {failedCredits}
-                </span>
-              )}
-            </div>
-          </div>
+        {gpaVisible && gpaValue !== null && <GpaBandRuler value={gpaValue} />}
+
+        {gpaVisible && encourageKey && (
+          <p className="text-sm text-muted-foreground">{t(encourageKey)}</p>
+        )}
+
+        {failedCredits > 0 && (
+          <p className="text-sm text-destructive">
+            {t("gpa.requiredFailed")} {failedCredits}
+          </p>
         )}
 
         {expanded && (
-          <div className="flex flex-col divide-y divide-border border-t pt-1">
-            <div className="py-1.5"><StatRow label={t("grades.gpaHighest")} value={gpa?.gpaHighest} /></div>
-            <div className="py-1.5"><StatRow label={t("grades.requiredGpaHighest")} value={gpa?.requiredGpaHighest} /></div>
-            <div className="py-1.5"><StatRow label={t("grades.degreeGpaInitial")} value={gpa?.degreeGpaInitial} /></div>
-            <div className="py-1.5"><StatRow label={t("gpa.degreeGpaHighest")} value={gpa?.degreeGpaHighest} /></div>
-            <div className="py-1.5"><StatRow label={t("grades.degreeWeightedAvg")} value={gpa?.degreeWeightedAvg} /></div>
-            {credits.map((s) => (
-              <div key={s.label} className="flex items-baseline justify-between gap-2 py-1.5">
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className={`size-2 rounded-full ${s.className}`} />
-                  {s.label}
+          <>
+            {/* 平均分（选学期时追加学期加权） */}
+            <div className="flex flex-wrap gap-x-5 gap-y-1 border-t pt-3 text-sm text-muted-foreground">
+              <span>
+                {t("dashboard.weightedAvg")}{" "}
+                <span className="font-semibold text-foreground tabular-nums">
+                  {gpa?.weightedAvg || "-"}
                 </span>
-                <span className="text-base font-semibold tabular-nums">{s.value}</span>
-              </div>
-            ))}
-          </div>
-        )}
+              </span>
+              <span>
+                {t("dashboard.arithmeticAvg")}{" "}
+                <span className="font-semibold text-foreground tabular-nums">
+                  {gpa?.arithmeticAvg || "-"}
+                </span>
+              </span>
+              {termWeightedGpa !== null && (
+                <span>
+                  {t("grades.termWeightedGpa")}{" "}
+                  <span className="font-semibold text-foreground tabular-nums">
+                    {termWeightedGpa}
+                  </span>
+                </span>
+              )}
+            </div>
 
-        {gpa?.planName && (
-          <p className="text-xs text-muted-foreground">
-            {[gpa.planName, gpa.studyType].filter(Boolean).join(" · ")}
-          </p>
+            {totalCredits > 0 && (
+              <div className="flex flex-col gap-2">
+                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                  {credits.map((s) => (
+                    <div
+                      key={s.label}
+                      className={s.className}
+                      style={{ width: `${(s.value / totalCredits) * 100}%` }}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {t("gpa.totalEarned")}{" "}
+                  <span className="font-semibold text-foreground tabular-nums">
+                    {totalCredits.toFixed(1)}
+                  </span>
+                </span>
+              </div>
+            )}
+
+            <div className="flex flex-col divide-y divide-border">
+              <div className="py-1.5"><StatRow label={t("grades.gpaHighest")} value={gpa?.gpaHighest} /></div>
+              <div className="py-1.5"><StatRow label={t("grades.requiredGpaHighest")} value={gpa?.requiredGpaHighest} /></div>
+              <div className="py-1.5"><StatRow label={t("grades.degreeGpaInitial")} value={gpa?.degreeGpaInitial} /></div>
+              <div className="py-1.5"><StatRow label={t("gpa.degreeGpaHighest")} value={gpa?.degreeGpaHighest} /></div>
+              <div className="py-1.5"><StatRow label={t("grades.degreeWeightedAvg")} value={gpa?.degreeWeightedAvg} /></div>
+              {credits.map((s) => (
+                <div key={s.label} className="flex items-baseline justify-between gap-2 py-1.5">
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={`size-2 rounded-full ${s.className}`} />
+                    {s.label}
+                  </span>
+                  <span className="text-base font-semibold tabular-nums">{s.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {gpa?.planName && (
+              <p className="text-xs text-muted-foreground">
+                {[gpa.planName, gpa.studyType].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

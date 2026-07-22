@@ -40,6 +40,7 @@ interface SettingsState {
   customJwxtBaseUrl: string;
   schoolId: string;
   scheduleCompactMode: boolean;
+  gpaVisible: boolean;
   notifyEnabled: boolean;
   notifyCheckInterval: number;
   notifyGrades: boolean;
@@ -72,6 +73,7 @@ interface SettingsState {
   setCustomJwxtBaseUrl: (url: string) => void;
   setSchoolId: (id: string) => void;
   setScheduleCompactMode: (v: boolean) => void;
+  setGpaVisible: (v: boolean) => void;
   setNotifyEnabled: (v: boolean) => void;
   setNotifyCheckInterval: (v: number) => void;
   setNotifyGrades: (v: boolean) => void;
@@ -109,6 +111,7 @@ export const useSettingsStore = create<SettingsState>()(
       customJwxtBaseUrl: "",
       schoolId: "ysu",
       scheduleCompactMode: false,
+      gpaVisible: false,
       notifyEnabled: false,
       notifyCheckInterval: 60,
       notifyGrades: true,
@@ -141,6 +144,7 @@ export const useSettingsStore = create<SettingsState>()(
       setCustomJwxtBaseUrl: (customJwxtBaseUrl) => set({ customJwxtBaseUrl }),
       setSchoolId: (schoolId) => set({ schoolId }),
       setScheduleCompactMode: (scheduleCompactMode) => set({ scheduleCompactMode }),
+      setGpaVisible: (gpaVisible) => set({ gpaVisible }),
       setNotifyEnabled: (notifyEnabled) => set({ notifyEnabled }),
       setNotifyCheckInterval: (notifyCheckInterval) => set({ notifyCheckInterval }),
       setNotifyGrades: (notifyGrades) => set({ notifyGrades }),

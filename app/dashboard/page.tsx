@@ -45,7 +45,8 @@ export default function DashboardPage() {
   const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours);
   const widgetShowNextDaySchedule = useSettingsStore((s) => s.widgetShowNextDaySchedule);
   const { t } = useTranslation();
-  const [showGPA, setShowGPA] = useState(false);
+  const showGPA = useSettingsStore((s) => s.gpaVisible);
+  const setShowGPA = useSettingsStore((s) => s.setGpaVisible);
 
   /** HH:mm（分钟数 → 时钟文本） */
   const clockText = (minutes: number): string =>
@@ -239,7 +240,7 @@ export default function DashboardPage() {
           </div>
           <button
             type="button"
-            onClick={() => setShowGPA((v) => !v)}
+            onClick={() => setShowGPA(!showGPA)}
             className="flex min-w-0 flex-col gap-0.5 text-left transition-opacity active:opacity-70"
           >
             <div className="flex items-center gap-1.5">
@@ -285,7 +286,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md" onClick={() => setShowGPA((v) => !v)}>
+        <Card className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md" onClick={() => setShowGPA(!showGPA)}>
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <BarChart3 className="size-6 text-primary shrink-0" />
             <div>
