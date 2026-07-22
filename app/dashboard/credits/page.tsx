@@ -39,10 +39,12 @@ import type {
   CatalogPage,
   CatalogQueryOptions,
   Competition,
+  CreditRecord,
   LibraryActivity,
 } from "@/providers/types";
 import type { ProviderQueryResult } from "@/providers/hooks";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 function DeclarationsPanel() {
   const { t } = useTranslation();
@@ -51,27 +53,29 @@ function DeclarationsPanel() {
   useErrorToast(query.error);
 
   if (query.isLoading && declarations.length === 0) return <LoadingCards />;
-  if (declarations.length === 0) return <SharedEmptyState title={t("credits.noDeclarations")} description={t("credits.description")} />;
+  if (declarations.length === 0) return <SharedEmptyState title={t("credits.noDeclarations")} />;
 
   return (
     <div className="flex flex-col gap-4">
       {declarations.map((decl, idx) => (
         <Card key={`${decl.itemName}-${idx}`}>
           <CardHeader>
-            <div className="flex items-start justify-between gap-2">
-              <CardTitle className="text-base">{decl.itemName}</CardTitle>
-              {decl.status && <Badge variant="secondary">{decl.status}</Badge>}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle className="text-base">{decl.itemName}</CardTitle>
+                <CardDescription>
+                  {[decl.categoryMajor, decl.categoryMinor].filter(Boolean).join(" · ")}
+                </CardDescription>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                {decl.score !== undefined && (
+                  <span className="text-lg font-semibold tabular-nums">{decl.score}</span>
+                )}
+                {decl.status && <Badge variant="secondary">{decl.status}</Badge>}
+              </div>
             </div>
-            <CardDescription>
-              {[decl.categoryMajor, decl.categoryMinor].filter(Boolean).join(" · ")}
-            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            {decl.score !== undefined && (
-              <span>
-                {t("credits.score")}: {decl.score}
-              </span>
-            )}
             {decl.awardLevel && (
               <span>
                 {t("credits.awardLevel")}: {decl.awardLevel}
@@ -86,6 +90,85 @@ function DeclarationsPanel() {
         </Card>
       ))}
     </div>
+  );
+}
+
+/** 认定记录卡：实际分值提到右侧大字位，与成绩页数字层级对齐。 */
+function RecordCard({ record }: { record: CreditRecord }) {
+  const { t } = useTranslation();
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <CardTitle className="text-base">{record.itemName}</CardTitle>
+            <CardDescription>
+              {[record.categoryMajor, record.categoryMinor].filter(Boolean).join(" · ")}
+            </CardDescription>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {record.actualScore !== undefined && (
+              <span className="text-lg font-semibold tabular-nums">
+                {record.actualScore}
+              </span>
+            )}
+            <div className="flex gap-1">
+              {record.grade && <Badge variant="default">{record.grade}</Badge>}
+              {record.status && <Badge variant="secondary">{record.status}</Badge>}
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+        {record.year && (
+          <span>
+            {t("credits.year")}: {record.year}
+          </span>
+        )}
+        {record.batch && (
+          <span>
+            {t("credits.batch")}: {record.batch}
+          </span>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** “全部批次”模式下按批次分组，默认只展开第一组，避免一次渲染全部历史记录。 */
+function RecordGroup({
+  title,
+  records,
+  defaultOpen,
+}: {
+  title: string;
+  records: CreditRecord[];
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground transition-colors active:bg-muted/60"
+      >
+        {open ? (
+          <ChevronDown className="size-4 shrink-0" />
+        ) : (
+          <ChevronRight className="size-4 shrink-0" />
+        )}
+        <span className="flex-1 truncate text-left">{title}</span>
+        <Badge variant="outline">{records.length}</Badge>
+      </button>
+      {open && (
+        <div className="flex flex-col gap-4">
+          {records.map((record, idx) => (
+            <RecordCard key={`${record.itemName}-${idx}`} record={record} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -152,42 +235,34 @@ function RecordsPanel() {
       {(recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0 ? (
         <LoadingCards />
       ) : records.length === 0 ? (
-        <SharedEmptyState title={t("credits.noRecords")} description={t("credits.description")} />
+        <SharedEmptyState title={t("credits.noRecords")} />
       ) : (
-        <div className="flex flex-col gap-4">
-          {records.map((record, idx) => (
-            <Card key={`${record.itemName}-${record.batch ?? ""}-${idx}`}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-base">{record.itemName}</CardTitle>
-                  <div className="flex shrink-0 gap-1">
-                    {record.grade && <Badge variant="default">{record.grade}</Badge>}
-                    {record.status && <Badge variant="secondary">{record.status}</Badge>}
-                  </div>
-                </div>
-                <CardDescription>
-                  {[record.categoryMajor, record.categoryMinor].filter(Boolean).join(" · ")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                {record.actualScore !== undefined && (
-                  <span>
-                    {t("credits.actualScore")}: {record.actualScore}
-                  </span>
-                )}
-                {record.year && (
-                  <span>
-                    {t("credits.year")}: {record.year}
-                  </span>
-                )}
-                {record.batch && (
-                  <span>
-                    {t("credits.batch")}: {record.batch}
-                  </span>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+        <div
+          className={cn(
+            "flex flex-col gap-4 transition-opacity",
+            recordsQuery.isValidating && "opacity-50",
+          )}
+        >
+          {batch === "all" ? (
+            Object.entries(
+              records.reduce<Record<string, CreditRecord[]>>((groups, record) => {
+                const key = record.batch || t("credits.unknownBatch");
+                (groups[key] ??= []).push(record);
+                return groups;
+              }, {}),
+            ).map(([batchName, list], gi) => (
+              <RecordGroup
+                key={batchName}
+                title={batchName}
+                records={list}
+                defaultOpen={gi === 0}
+              />
+            ))
+          ) : (
+            records.map((record, idx) => (
+              <RecordCard key={`${record.itemName}-${record.batch ?? ""}-${idx}`} record={record} />
+            ))
+          )}
         </div>
       )}
     </div>
