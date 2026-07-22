@@ -13,7 +13,7 @@ import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   useClassPeriods,
   useCurrentWeek,
-  useEvaluationTypes,
+  useEvaluationTasks,
   useExams,
   useGPAStats,
   useSchedule,
@@ -53,11 +53,12 @@ export default function DashboardPage() {
   const schedule = useSchedule({ courseCategory: "all", includeLabSchedule: true });
   const exams = useExams();
   const periodsRaw = useClassPeriods();
-  const evaluationTypes = useEvaluationTypes();
+  const evaluationTasks = useEvaluationTasks();
 
+  // 只统计进行中的评教任务：未开始/已结束的任务学生无法操作，不打扰。
   const pendingEvaluationCount = useMemo(
-    () => (evaluationTypes.data ?? []).reduce((sum, type) => sum + (type.count || 0), 0),
-    [evaluationTypes.data],
+    () => (evaluationTasks.data ?? []).filter((task) => task.status === "active").length,
+    [evaluationTasks.data],
   );
 
   const courses = useMemo(() => schedule.data ?? [], [schedule.data]);

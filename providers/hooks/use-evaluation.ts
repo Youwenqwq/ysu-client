@@ -22,6 +22,18 @@ export function useEvaluationTypes(
   );
 }
 
+export function useEvaluationTasks(
+  options?: TermQueryOptions,
+): ProviderQueryResult<EvaluationTask[]> {
+  const provider = useProvider();
+  return useProviderQuery(
+    "evaluation",
+    "evaluation-tasks",
+    () => provider.getEvaluationTasks(options),
+    options,
+  );
+}
+
 export function usePendingEvaluations(
   evalType: string | undefined,
   options?: TermQueryOptions,

@@ -46,6 +46,7 @@ export {
 } from "./use-academics";
 export {
   useEvaluationDetail,
+  useEvaluationTasks,
   useEvaluationTypes,
   usePendingEvaluations,
 } from "./use-evaluation";

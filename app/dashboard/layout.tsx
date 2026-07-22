@@ -32,13 +32,19 @@ import { toast } from "sonner";
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service";
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit";
 import {
+  BarChart3,
   BookOpen,
   Calendar,
+  CalendarDays,
   ClipboardCheck,
+  FilePenLine,
   FileText,
+  Gauge,
   GraduationCap,
+  Hammer,
   Info,
   LayoutDashboard,
+  Lightbulb,
   LogIn,
   LogOut,
   Settings,
@@ -66,13 +72,35 @@ export default function DashboardLayout({
   const avatarImage = useSettingsStore((s) => s.avatarImage);
   const hasBackground = !!backgroundImage;
 
-  const navItems = [
-    { title: t("app.overview"), url: "/dashboard", icon: LayoutDashboard },
-    { title: t("app.grades"), url: "/dashboard/grades", icon: GraduationCap },
-    { title: t("app.schedule"), url: "/dashboard/schedule", icon: Calendar },
-    { title: t("app.exams"), url: "/dashboard/exams", icon: FileText },
-    { title: t("app.trainingPlan"), url: "/dashboard/training-plan", icon: BookOpen },
-    { title: t("app.evaluation"), url: "/dashboard/evaluation", icon: ClipboardCheck },
+  const navGroups = [
+    {
+      label: t("app.nav"),
+      items: [
+        { title: t("app.overview"), url: "/dashboard", icon: LayoutDashboard },
+        { title: t("app.grades"), url: "/dashboard/grades", icon: GraduationCap },
+        { title: t("app.schedule"), url: "/dashboard/schedule", icon: Calendar },
+      ],
+    },
+    {
+      label: t("me.sectionAcademic"),
+      items: [
+        { title: t("app.exams"), url: "/dashboard/exams", icon: FileText },
+        { title: t("app.makeupExams"), url: "/dashboard/makeup-exams", icon: FilePenLine },
+        { title: t("app.trainingPlan"), url: "/dashboard/training-plan", icon: BookOpen },
+        { title: t("app.evaluation"), url: "/dashboard/evaluation", icon: ClipboardCheck },
+        { title: t("app.studentInfo"), url: "/dashboard/me/student", icon: User },
+        { title: t("app.gpa"), url: "/dashboard/me/gpa", icon: BarChart3 },
+      ],
+    },
+    {
+      label: t("me.sectionPlatforms"),
+      items: [
+        { title: t("app.labor"), url: "/dashboard/labor", icon: Hammer },
+        { title: t("app.credits"), url: "/dashboard/credits", icon: Lightbulb },
+        { title: t("app.comprehensive"), url: "/dashboard/comprehensive", icon: Gauge },
+        { title: t("app.schoolSchedule"), url: "/dashboard/school-schedule", icon: CalendarDays },
+      ],
+    },
   ];
 
   const titleByPath: Record<string, string> = {
@@ -88,6 +116,7 @@ export default function DashboardLayout({
     "/dashboard/school-schedule": t("app.schoolSchedule"),
     "/dashboard/training-plan": t("app.trainingPlan"),
     "/dashboard/evaluation": t("app.evaluation"),
+    "/dashboard/services": t("app.services"),
     "/dashboard/me": t("app.me"),
     "/dashboard/me/student": t("app.studentInfo"),
     "/dashboard/me/gpa": t("app.gpa"),
@@ -98,7 +127,7 @@ export default function DashboardLayout({
   };
   const pageTitle = titleByPath[pathname] ?? t("app.name");
 
-  const primaryPaths = new Set(["/dashboard", "/dashboard/schedule", "/dashboard/grades", "/dashboard/me"]);
+  const primaryPaths = new Set(["/dashboard", "/dashboard/schedule", "/dashboard/grades", "/dashboard/services", "/dashboard/me"]);
   const showBack = !primaryPaths.has(pathname);
 
   useEffect(() => {
@@ -171,28 +200,30 @@ export default function DashboardLayout({
           </div>
         </SidebarHeader>
         <SidebarContent className="gap-0">
-          <SidebarGroup>
-            <SidebarGroupLabel>{t("app.nav")}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-1.5">
-                {navItems.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.url}
-                      tooltip={item.title}
-                      className="py-3 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:translate-x-1 active:scale-[0.98] data-[active=true]:shadow-sm [&_svg]:transition-transform [&_svg]:duration-300 hover:[&_svg]:scale-110 data-[active=true]:[&_svg]:scale-110"
-                    >
-                      <Link href={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          {navGroups.map((group) => (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1.5">
+                  {group.items.map((item) => (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === item.url}
+                        tooltip={item.title}
+                        className="py-3 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:translate-x-1 active:scale-[0.98] data-[active=true]:shadow-sm [&_svg]:transition-transform [&_svg]:duration-300 hover:[&_svg]:scale-110 data-[active=true]:[&_svg]:scale-110"
+                      >
+                        <Link href={item.url}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
           <SidebarGroup className="mt-auto">
             <SidebarSeparator />
             <SidebarGroupContent>

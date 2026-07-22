@@ -6,6 +6,7 @@ import {
   Calendar,
   GraduationCap,
   LayoutDashboard,
+  LayoutGrid,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,13 +22,14 @@ export function MobileBottomNav() {
     { href: "/dashboard", label: t("app.overview"), icon: LayoutDashboard },
     { href: "/dashboard/schedule", label: t("app.schedule"), icon: Calendar },
     { href: "/dashboard/grades", label: t("app.grades"), icon: GraduationCap },
+    { href: "/dashboard/services", label: t("app.services"), icon: LayoutGrid },
     { href: "/dashboard/me", label: t("app.me"), icon: User },
   ];
 
   return (
     <nav
       className={cn(
-        "fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border backdrop-blur pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))] md:hidden",
+        "fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border backdrop-blur pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))] md:hidden",
         hasBackground
           ? "bg-background/60 supports-[backdrop-filter]:bg-background/40"
           : "bg-background/95 supports-[backdrop-filter]:bg-background/80",

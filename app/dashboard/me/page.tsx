@@ -8,23 +8,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 import {
-  BookOpen,
-  CalendarDays,
   ChevronRight,
-  ClipboardCheck,
-  FileText,
-  FilePenLine,
-  GraduationCap,
-  Gauge,
-  Hammer,
-  Lightbulb,
   LogIn,
   Settings,
   Sun,
   Moon,
-  User,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useSettingsStore } from "@/lib/stores/settings";
@@ -105,23 +94,8 @@ export default function MePage() {
     router.replace("/login");
   }
 
-  const academicLinks = [
-    { href: "/dashboard/me/student", label: t("app.studentInfo"), icon: User },
-    { href: "/dashboard/me/gpa", label: t("app.gpa"), icon: GraduationCap },
-    { href: "/dashboard/makeup-exams", label: t("app.makeupExams"), icon: FilePenLine },
-    { href: "/dashboard/evaluation", label: t("app.evaluation"), icon: ClipboardCheck, mobileOnly: true },
-    { href: "/dashboard/exams", label: t("app.exams"), icon: FileText, mobileOnly: true },
-    { href: "/dashboard/training-plan", label: t("app.trainingPlan"), icon: BookOpen, mobileOnly: true },
-  ];
-
   const avatarImage = useSettingsStore((s) => s.avatarImage);
 
-  const platformLinks = [
-    { href: "/dashboard/labor", label: t("app.labor"), icon: Hammer },
-    { href: "/dashboard/credits", label: t("app.credits"), icon: Lightbulb },
-    { href: "/dashboard/comprehensive", label: t("app.comprehensive"), icon: Gauge },
-    { href: "/dashboard/school-schedule", label: t("app.schoolSchedule"), icon: CalendarDays },
-  ];
 
   const displayName = student.data?.name || username || t("me.profileFallback");
   const initials = (student.data?.name || username || "U").slice(-2);
@@ -163,49 +137,6 @@ export default function MePage() {
           </div>
         </CardContent>
       </Card>
-
-      <Section title={t("me.sectionAcademic")}>
-        <Card>
-          <CardContent className="flex flex-col py-1">
-            {academicLinks.map((item, idx) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 py-3 transition-colors active:bg-muted/60",
-                  item.mobileOnly && "md:hidden",
-                  idx > 0 && "border-t border-border",
-                )}
-              >
-                <item.icon className="size-5 shrink-0 text-muted-foreground" />
-                <span className="flex-1 text-sm">{item.label}</span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      </Section>
-
-      <Section title={t("me.sectionPlatforms")}>
-        <Card>
-          <CardContent className="flex flex-col py-1">
-            {platformLinks.map((item, idx) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 py-3 transition-colors active:bg-muted/60",
-                  idx > 0 && "border-t border-border",
-                )}
-              >
-                <item.icon className="size-5 shrink-0 text-muted-foreground" />
-                <span className="flex-1 text-sm">{item.label}</span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      </Section>
 
       <Section title={t("me.sectionPreferences")}>
         <Card>
