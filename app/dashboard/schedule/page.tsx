@@ -23,10 +23,11 @@ import {
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
-import { useClassPeriods, useCurrentWeek, useSchedule } from "@/providers/hooks";
+import { useClassPeriods, useCurrentWeek, useExams, useSchedule } from "@/providers/hooks";
 import { ChevronDown, ChevronLeft, ChevronRight, Search, Grid3x2, Grid3x3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isCourseActiveInWeek, periodIsInUse } from "./schedule-utils";
+import { computeExamBlocks } from "./exam-blocks";
 import { ScheduleTablet } from "./schedule-tablet";
 import { ScheduleMobile } from "./schedule-mobile";
 import { syncScheduleToWidget } from "@/lib/native/widget-bridge";
@@ -50,6 +51,7 @@ export default function SchedulePage() {
   });
   const currentWeekQuery = useCurrentWeek({ semester: queriedTerm || undefined });
   const periodsQuery = useClassPeriods();
+  const examsQuery = useExams({ semester: queriedTerm || undefined });
 
   const courses = useMemo(() => scheduleQuery.data ?? [], [scheduleQuery.data]);
   const currentWeek = currentWeekQuery.data ?? null;
@@ -178,6 +180,11 @@ export default function SchedulePage() {
     return courses.filter((c) => isCourseActiveInWeek(c, selectedWeek));
   }, [courses, selectedWeek]);
 
+  const examBlocks = useMemo(
+    () => computeExamBlocks(examsQuery.data ?? [], periods, currentWeek, selectedWeek),
+    [examsQuery.data, periods, currentWeek, selectedWeek],
+  );
+
   const currentWeekday = currentWeek?.weekday ?? 0;
 
   if (loading && courses.length === 0) {
@@ -267,6 +274,7 @@ export default function SchedulePage() {
         >
           <ScheduleMobile
             courses={filteredCourses}
+            examBlocks={examBlocks}
             periods={periods}
             currentWeekday={currentWeekday}
             currentWeek={currentWeek}

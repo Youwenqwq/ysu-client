@@ -19,6 +19,8 @@ import { CalendarOff, Layers } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { cn } from "@/lib/utils";
 import type { ClassPeriod, Course, CurrentWeek } from "@/providers/types";
+import type { ExamBlock } from "./exam-blocks";
+import { formatExamTime } from "@/lib/academic/exam-utils";
 import {
   computeMergedBlocks,
   buildSectionTimeMap,
@@ -34,6 +36,7 @@ import { SigninModal } from "./signin-modal";
 
 interface Props {
   courses: Course[];
+  examBlocks?: ExamBlock[];
   periods: ClassPeriod[];
   currentWeekday: number;
   currentWeek: CurrentWeek | null;
@@ -52,6 +55,7 @@ type OverlapState = { day: number; section: number; courses: Course[] } | null;
 
 export function ScheduleMobile({
   courses,
+  examBlocks = [],
   periods,
   currentWeekday,
   currentWeek,
@@ -63,6 +67,7 @@ export function ScheduleMobile({
 }: Props) {
   const { t } = useTranslation();
   const [overlapDrawer, setOverlapDrawer] = useState<OverlapState>(null);
+  const [examDrawer, setExamDrawer] = useState<ExamBlock | null>(null);
   const [activityCourse, setActivityCourse] = useState<Course | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
   const [signinActivityId, setSigninActivityId] = useState<string | null>(null);
@@ -164,7 +169,7 @@ export function ScheduleMobile({
     );
   }
 
-  function blockStyle(block: ScheduleBlock) {
+  function blockStyle(block: { day: number; start: number; end: number }) {
     const startRow = sectionToRow.get(block.start);
     const endRow = sectionToRow.get(block.end);
     if (!startRow || !endRow) return { display: "none" as const };
@@ -319,7 +324,62 @@ export function ScheduleMobile({
             </button>
           );
         })}
+        {examBlocks.map((block, idx) => (
+          <button
+            key={`exam-${idx}`}
+            type="button"
+            onClick={(e) => {
+              e.currentTarget.blur();
+              setExamDrawer(block);
+            }}
+            className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md border border-amber-500/50 bg-amber-500/15 p-1 text-left transition-opacity active:opacity-60"
+            style={blockStyle(block)}
+          >
+            <span className="line-clamp-1 text-[9px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+              {t("schedule.examTag")}
+            </span>
+            <span className="line-clamp-3 text-[10.5px] font-medium leading-tight text-foreground">
+              {block.exam.name}
+            </span>
+            {block.exam.examLocation && !compact && (
+              <span className="line-clamp-1 text-[9px] leading-tight text-foreground/70">
+                {block.exam.examLocation}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
+
+      <Drawer open={!!examDrawer} onOpenChange={(v) => !v && setExamDrawer(null)}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>{examDrawer?.exam.name}</DrawerTitle>
+            {examDrawer?.exam.examName && (
+              <DrawerDescription>{examDrawer.exam.examName}</DrawerDescription>
+            )}
+          </DrawerHeader>
+          {examDrawer && (
+            <div className="flex flex-col gap-2 px-4 pb-6 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t("schedule.examTime")}</span>
+                <span>{formatExamTime(examDrawer.exam)}</span>
+              </div>
+              {examDrawer.exam.examLocation && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{t("schedule.examLocation")}</span>
+                  <span>{examDrawer.exam.examLocation}</span>
+                </div>
+              )}
+              {examDrawer.exam.seatNumber && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{t("schedule.examSeat")}</span>
+                  <span>{examDrawer.exam.seatNumber}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </DrawerContent>
+      </Drawer>
 
       <Drawer open={!!overlapDrawer} onOpenChange={(v) => !v && setOverlapDrawer(null)}>
         <DrawerContent>
