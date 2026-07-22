@@ -15,6 +15,7 @@ import {
   EmptyState,
   LoadingCards,
   useErrorToast,
+  ValidatingList,
 } from "@/components/academic/list-state";
 import { formatTimeRange } from "@/lib/academic/time";
 import { useTranslation } from "@/lib/i18n/use-translation";
@@ -23,6 +24,7 @@ import {
   useLaborRecords,
   useLaborSummary,
 } from "@/providers/hooks";
+import { cn } from "@/lib/utils";
 import {
   Clock,
   Hourglass,
@@ -31,25 +33,149 @@ import {
   User,
 } from "lucide-react";
 
+function RecordsPanel() {
+  const { t } = useTranslation();
+  const recordsQuery = useLaborRecords();
+  const records = recordsQuery.data ?? [];
+  useErrorToast(recordsQuery.error);
+
+  if ((recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0) {
+    return <LoadingCards className="h-28" />;
+  }
+  if (records.length === 0) {
+    return <EmptyState title={t("labor.noRecords")} />;
+  }
+  return (
+    <ValidatingList validating={recordsQuery.isValidating} className="flex flex-col gap-4">
+      {records.map((record, idx) => (
+        <Card key={`${record.name}-${record.timeStart ?? idx}`}>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-2">
+              <CardTitle className="text-base">
+                {record.name}
+                {record.enrollType && (
+                  <Badge variant="outline" className="ml-2 align-middle">
+                    {record.enrollType}
+                  </Badge>
+                )}
+              </CardTitle>
+              {record.status && <Badge variant="secondary">{record.status}</Badge>}
+            </div>
+            <CardDescription>
+              {[record.term, record.category].filter(Boolean).join(" · ")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+              {record.hours !== undefined && (
+                <span className="flex items-center gap-1">
+                  <Hourglass className="size-4" />
+                  {t("labor.hours")}: {record.hours}
+                </span>
+              )}
+              {record.teacher && (
+                <span className="flex items-center gap-1">
+                  <User className="size-4" />
+                  {record.teacher}
+                </span>
+              )}
+            </div>
+            {formatTimeRange(record.timeStart, record.timeEnd) && (
+              <div className="flex items-center gap-2">
+                <Clock className="size-4 shrink-0 text-muted-foreground" />
+                <span>{formatTimeRange(record.timeStart, record.timeEnd)}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </ValidatingList>
+  );
+}
+
+function ActivitiesPanel() {
+  const { t } = useTranslation();
+  const activitiesQuery = useLaborActivities();
+  const activities = activitiesQuery.data ?? [];
+  useErrorToast(activitiesQuery.error);
+
+  if (
+    (activitiesQuery.isLoading || activitiesQuery.isValidating) &&
+    activities.length === 0
+  ) {
+    return <LoadingCards className="h-28" />;
+  }
+  if (activities.length === 0) {
+    return <EmptyState title={t("labor.noActivities")} />;
+  }
+  return (
+    <ValidatingList
+      validating={activitiesQuery.isValidating}
+      className="flex flex-col gap-4"
+    >
+      {activities.map((activity, idx) => (
+        <Card key={`${activity.name}-${activity.timeStart ?? idx}`}>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-2">
+              <CardTitle className="text-base">{activity.name}</CardTitle>
+              {activity.isEnrolled && (
+                <Badge variant="default">{t("labor.enrolled")}</Badge>
+              )}
+            </div>
+            <CardDescription>
+              {[activity.category, activity.department].filter(Boolean).join(" · ")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+              {activity.hours !== undefined && (
+                <span className="flex items-center gap-1">
+                  <Hourglass className="size-4" />
+                  {t("labor.hours")}: {activity.hours}
+                </span>
+              )}
+              {activity.location && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="size-4" />
+                  {activity.location}
+                </span>
+              )}
+            </div>
+            {formatTimeRange(activity.timeStart, activity.timeEnd) && (
+              <div className="flex items-center gap-2">
+                <Clock className="size-4 shrink-0 text-muted-foreground" />
+                <span>
+                  {t("labor.activityTime")}:{" "}
+                  {formatTimeRange(activity.timeStart, activity.timeEnd)}
+                </span>
+              </div>
+            )}
+            {formatTimeRange(activity.enrollStart, activity.enrollEnd) && (
+              <div className="flex items-center gap-2">
+                <ScrollText className="size-4 shrink-0 text-muted-foreground" />
+                <span>
+                  {t("labor.enrollWindow")}:{" "}
+                  {formatTimeRange(activity.enrollStart, activity.enrollEnd)}
+                </span>
+              </div>
+            )}
+            {activity.operation && (
+              <p className="text-xs text-muted-foreground">{activity.operation}</p>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </ValidatingList>
+  );
+}
+
 export default function LaborPage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<"records" | "activities">("records");
 
   const summaryQuery = useLaborSummary();
-  const recordsQuery = useLaborRecords();
-  const activitiesQuery = useLaborActivities();
-
   const summary = summaryQuery.data;
-  const records = recordsQuery.data ?? [];
-  const activities = activitiesQuery.data ?? [];
-
-  useErrorToast(summaryQuery.error ?? recordsQuery.error ?? activitiesQuery.error);
-
-  const recordsLoading =
-    (recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0;
-  const activitiesLoading =
-    (activitiesQuery.isLoading || activitiesQuery.isValidating) &&
-    activities.length === 0;
+  useErrorToast(summaryQuery.error);
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,12 +187,17 @@ export default function LaborPage() {
               <Skeleton className="h-12 w-24" />
             </div>
           ) : summary ? (
-            <div className="flex gap-8">
+            <div
+              className={cn(
+                "flex gap-8 transition-opacity",
+                summaryQuery.isValidating && "opacity-50",
+              )}
+            >
               <div className="flex flex-col">
                 <span className="text-xs text-muted-foreground">
                   {t("labor.totalHours")}
                 </span>
-                <span className="text-2xl font-semibold">
+                <span className="text-2xl font-semibold tabular-nums">
                   {summary.totalHours ?? "-"}
                   <span className="ml-1 text-sm font-normal text-muted-foreground">
                     {t("labor.hoursUnit")}
@@ -77,7 +208,7 @@ export default function LaborPage() {
                 <span className="text-xs text-muted-foreground">
                   {t("labor.totalCredits")}
                 </span>
-                <span className="text-2xl font-semibold">
+                <span className="text-2xl font-semibold tabular-nums">
                   {summary.totalCredits ?? "-"}
                 </span>
               </div>
@@ -93,121 +224,10 @@ export default function LaborPage() {
         </TabsList>
 
         <TabsContent value="records" className="mt-4">
-          {recordsLoading ? (
-            <LoadingCards className="h-28" />
-          ) : records.length === 0 ? (
-            <EmptyState title={t("labor.noRecords")} description={t("labor.description")} />
-          ) : (
-            <div className="flex flex-col gap-4">
-              {records.map((record, idx) => (
-                <Card key={`${record.name}-${record.timeStart ?? idx}`}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base">
-                        {record.name}
-                        {record.enrollType && (
-                          <Badge variant="outline" className="ml-2 align-middle">
-                            {record.enrollType}
-                          </Badge>
-                        )}
-                      </CardTitle>
-                      {record.status && <Badge variant="secondary">{record.status}</Badge>}
-                    </div>
-                    <CardDescription>
-                      {[record.term, record.category].filter(Boolean).join(" · ")}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-2 text-sm">
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
-                      {record.hours !== undefined && (
-                        <span className="flex items-center gap-1">
-                          <Hourglass className="size-4" />
-                          {t("labor.hours")}: {record.hours}
-                        </span>
-                      )}
-                      {record.teacher && (
-                        <span className="flex items-center gap-1">
-                          <User className="size-4" />
-                          {record.teacher}
-                        </span>
-                      )}
-                    </div>
-                    {formatTimeRange(record.timeStart, record.timeEnd) && (
-                      <div className="flex items-center gap-2">
-                        <Clock className="size-4 shrink-0 text-muted-foreground" />
-                        <span>{formatTimeRange(record.timeStart, record.timeEnd)}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+          <RecordsPanel />
         </TabsContent>
-
         <TabsContent value="activities" className="mt-4">
-          {activitiesLoading ? (
-            <LoadingCards className="h-28" />
-          ) : activities.length === 0 ? (
-            <EmptyState title={t("labor.noActivities")} description={t("labor.description")} />
-          ) : (
-            <div className="flex flex-col gap-4">
-              {activities.map((activity, idx) => (
-                <Card key={`${activity.name}-${activity.timeStart ?? idx}`}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base">{activity.name}</CardTitle>
-                      {activity.isEnrolled && (
-                        <Badge variant="default">{t("labor.enrolled")}</Badge>
-                      )}
-                    </div>
-                    <CardDescription>
-                      {[activity.category, activity.department]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-2 text-sm">
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
-                      {activity.hours !== undefined && (
-                        <span className="flex items-center gap-1">
-                          <Hourglass className="size-4" />
-                          {t("labor.hours")}: {activity.hours}
-                        </span>
-                      )}
-                      {activity.location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="size-4" />
-                          {activity.location}
-                        </span>
-                      )}
-                    </div>
-                    {formatTimeRange(activity.timeStart, activity.timeEnd) && (
-                      <div className="flex items-center gap-2">
-                        <Clock className="size-4 shrink-0 text-muted-foreground" />
-                        <span>
-                          {t("labor.activityTime")}:{" "}
-                          {formatTimeRange(activity.timeStart, activity.timeEnd)}
-                        </span>
-                      </div>
-                    )}
-                    {formatTimeRange(activity.enrollStart, activity.enrollEnd) && (
-                      <div className="flex items-center gap-2">
-                        <ScrollText className="size-4 shrink-0 text-muted-foreground" />
-                        <span>
-                          {t("labor.enrollWindow")}:{" "}
-                          {formatTimeRange(activity.enrollStart, activity.enrollEnd)}
-                        </span>
-                      </div>
-                    )}
-                    {activity.operation && (
-                      <p className="text-xs text-muted-foreground">{activity.operation}</p>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+          <ActivitiesPanel />
         </TabsContent>
       </Tabs>
     </div>

@@ -16,6 +16,7 @@ import {
   EmptyState,
   LoadingCards,
   useErrorToast,
+  ValidatingList,
 } from "@/components/academic/list-state";
 import { FilterChips } from "@/components/academic/filter-chips";
 import { formatTimeRange } from "@/lib/academic/time";
@@ -159,7 +160,7 @@ export default function MakeupExamsPage() {
             description={t("makeupExams.description")}
           />
         ) : (
-          <div className="flex flex-col gap-4">
+          <ValidatingList validating={coursesQuery.isValidating} className="flex flex-col gap-4">
             {courses.map((course, idx) => (
               <Card key={`${course.taskId || course.code}-${idx}`}>
                 <CardHeader>
@@ -218,7 +219,7 @@ export default function MakeupExamsPage() {
                 </CardContent>
               </Card>
             ))}
-          </div>
+          </ValidatingList>
         ))}
 
       <Dialog

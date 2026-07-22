@@ -18,6 +18,7 @@ import {
   EmptyState as SharedEmptyState,
   LoadingCards,
   useErrorToast,
+  ValidatingList,
 } from "@/components/academic/list-state";
 import { FilterChips } from "@/components/academic/filter-chips";
 import {
@@ -43,7 +44,6 @@ import type {
   LibraryActivity,
 } from "@/providers/types";
 import type { ProviderQueryResult } from "@/providers/hooks";
-import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 function DeclarationsPanel() {
@@ -237,11 +237,9 @@ function RecordsPanel() {
       ) : records.length === 0 ? (
         <SharedEmptyState title={t("credits.noRecords")} />
       ) : (
-        <div
-          className={cn(
-            "flex flex-col gap-4 transition-opacity",
-            recordsQuery.isValidating && "opacity-50",
-          )}
+        <ValidatingList
+          validating={recordsQuery.isValidating}
+          className="flex flex-col gap-4"
         >
           {batch === "all" ? (
             Object.entries(
@@ -263,7 +261,7 @@ function RecordsPanel() {
               <RecordCard key={`${record.itemName}-${record.batch ?? ""}-${idx}`} record={record} />
             ))
           )}
-        </div>
+        </ValidatingList>
       )}
     </div>
   );

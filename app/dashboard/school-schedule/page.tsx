@@ -28,6 +28,7 @@ import {
   EmptyState,
   LoadingCards,
   useErrorToast,
+  ValidatingList,
 } from "@/components/academic/list-state";
 import {
   FilterDrawer,
@@ -240,16 +241,11 @@ function ClassListResults({
     return <EmptyState title={t("schoolSchedule.noClasses")} />;
   }
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-2 transition-opacity",
-        classesQuery.isValidating && "opacity-50",
-      )}
-    >
+    <ValidatingList validating={classesQuery.isValidating} className="flex flex-col gap-2">
       {classes.map((cls) => (
         <ClassRow key={cls.classId} cls={cls} onSelect={onSelect} />
       ))}
-    </div>
+    </ValidatingList>
   );
 }
 
@@ -450,16 +446,11 @@ function RoomListResults({
     return <EmptyState title={t("schoolSchedule.noRooms")} />;
   }
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-2 transition-opacity",
-        roomsQuery.isValidating && "opacity-50",
-      )}
-    >
+    <ValidatingList validating={roomsQuery.isValidating} className="flex flex-col gap-2">
       {rooms.map((room) => (
         <RoomRow key={room.code} room={room} onSelect={onSelect} />
       ))}
-    </div>
+    </ValidatingList>
   );
 }
 
