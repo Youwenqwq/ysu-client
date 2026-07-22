@@ -498,12 +498,12 @@ export function resetJWXT(): void {
   ensuredWeuApps.clear();
   inflightWeu.clear();
   weuStore.clear();
-  cachedCurrentTerm = null;
+  currentTermCache.clear();
+  inflightCurrentTerm.clear();
   cachedMakeupTerm = null;
   inflightMakeupTerm = null;
   cachedStudentInfo = null;
   inflightStudentInfo = null;
-  inflightCurrentTerm = null;
   cachedCurrentWeek = null;
   inflightCurrentWeek = null;
 }
@@ -963,8 +963,8 @@ async function post(
   return emapPost(url, data, appId);
 }
 
-let cachedCurrentTerm: string | null = null;
-let inflightCurrentTerm: Promise<string> | null = null;
+const currentTermCache = new Map<string, string>();
+const inflightCurrentTerm = new Map<string, Promise<string>>();
 
 let cachedCurrentWeek: { key: string; value: CurrentWeek } | null = null;
 let inflightCurrentWeek: Promise<CurrentWeek> | null = null;
@@ -973,10 +973,13 @@ async function getCurrentTerm(
   appId: string,
   pathKey: string,
 ): Promise<string> {
-  if (cachedCurrentTerm) return cachedCurrentTerm;
-  if (inflightCurrentTerm) return inflightCurrentTerm;
+  const cacheKey = `${appId}|${pathKey}`;
+  const cached = currentTermCache.get(cacheKey);
+  if (cached) return cached;
+  const inflight = inflightCurrentTerm.get(cacheKey);
+  if (inflight) return inflight;
 
-  inflightCurrentTerm = (async () => {
+  const promise = (async () => {
     try {
       await ensureWeu(appId);
       const datas = await post(_apiPaths[pathKey]!, {}, appId);
@@ -992,14 +995,15 @@ async function getCurrentTerm(
       if (!term) {
         throw new JWXTProtocolError('current term query returned empty DM');
       }
-      cachedCurrentTerm = term;
+      currentTermCache.set(cacheKey, term);
       return term;
     } finally {
-      inflightCurrentTerm = null;
+      inflightCurrentTerm.delete(cacheKey);
     }
   })();
 
-  return inflightCurrentTerm;
+  inflightCurrentTerm.set(cacheKey, promise);
+  return promise;
 }
 
 async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {

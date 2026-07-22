@@ -121,8 +121,8 @@ export default function ExamsPage() {
         <div className="flex flex-col gap-6">
           {upcomingExams.length > 0 && (
             <div className="grid gap-4 md:grid-cols-2">
-              {upcomingExams.map((exam, idx) => (
-                <Card key={idx}>
+              {upcomingExams.map((exam) => (
+                <Card key={`${exam.name}-${exam.startAt ?? ""}-${exam.examLocation ?? ""}`}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <CardTitle className="text-base">{exam.name}</CardTitle>
@@ -152,8 +152,8 @@ export default function ExamsPage() {
             <>
               <h3 className="text-sm font-medium text-muted-foreground">{t("exams.completedExams")}</h3>
               <div className="grid gap-4 md:grid-cols-2">
-                {completedExams.map((exam, idx) => (
-                  <Card key={idx} className="opacity-60">
+                {completedExams.map((exam) => (
+                  <Card key={`${exam.name}-${exam.startAt ?? ""}-${exam.examLocation ?? ""}`} className="opacity-60">
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <CardTitle className="text-base">{exam.name}</CardTitle>

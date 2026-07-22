@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import {
   BookOpen,
   ChevronRight,
@@ -104,8 +105,8 @@ export default function MePage() {
   const academicLinks = [
     { href: "/dashboard/me/student", label: t("app.studentInfo"), icon: User },
     { href: "/dashboard/me/gpa", label: t("app.gpa"), icon: GraduationCap },
-    { href: "/dashboard/exams", label: t("app.exams"), icon: FileText, mobileOnly: true },
     { href: "/dashboard/makeup-exams", label: t("app.makeupExams"), icon: FilePenLine },
+    { href: "/dashboard/exams", label: t("app.exams"), icon: FileText, mobileOnly: true },
     { href: "/dashboard/training-plan", label: t("app.trainingPlan"), icon: BookOpen, mobileOnly: true },
   ];
 
@@ -155,36 +156,21 @@ export default function MePage() {
       <Section title={t("me.sectionAcademic")}>
         <Card>
           <CardContent className="flex flex-col py-1">
-            {academicLinks
-              .filter((item) => !item.mobileOnly)
-              .map((item, idx) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 py-3 transition-colors active:bg-muted/60 ${
-                    idx > 0 ? "border-t border-border" : ""
-                  }`}
-                >
-                  <item.icon className="size-5 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 text-sm">{item.label}</span>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                </Link>
-              ))}
-            {academicLinks
-              .filter((item) => item.mobileOnly)
-              .map((item, idx) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 py-3 transition-colors active:bg-muted/60 md:hidden ${
-                    idx > 0 || academicLinks.filter((i) => !i.mobileOnly).length > 0 ? "border-t border-border" : ""
-                  }`}
-                >
-                  <item.icon className="size-5 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 text-sm">{item.label}</span>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                </Link>
-              ))}
+            {academicLinks.map((item, idx) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 py-3 transition-colors active:bg-muted/60",
+                  item.mobileOnly && "md:hidden",
+                  idx > 0 && "border-t border-border",
+                )}
+              >
+                <item.icon className="size-5 shrink-0 text-muted-foreground" />
+                <span className="flex-1 text-sm">{item.label}</span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </Link>
+            ))}
           </CardContent>
         </Card>
       </Section>
