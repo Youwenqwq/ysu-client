@@ -10,7 +10,6 @@ import {
   FilePenLine,
   FileText,
   Gauge,
-  GraduationCap,
   Hammer,
   Lightbulb,
   User,
@@ -59,7 +58,6 @@ export default function ServicesPage() {
 
   const academicItems: ServiceItem[] = [
     { href: "/dashboard/me/student", label: t("app.studentInfo"), icon: User },
-    { href: "/dashboard/me/gpa", label: t("app.gpa"), icon: GraduationCap },
     { href: "/dashboard/exams", label: t("app.exams"), icon: FileText },
     { href: "/dashboard/makeup-exams", label: t("app.makeupExams"), icon: FilePenLine },
     { href: "/dashboard/training-plan", label: t("app.trainingPlan"), icon: BookOpen },

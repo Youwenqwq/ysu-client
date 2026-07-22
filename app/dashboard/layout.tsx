@@ -32,7 +32,6 @@ import { toast } from "sonner";
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service";
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit";
 import {
-  BarChart3,
   BookOpen,
   Calendar,
   CalendarDays,
@@ -89,7 +88,6 @@ export default function DashboardLayout({
         { title: t("app.trainingPlan"), url: "/dashboard/training-plan", icon: BookOpen },
         { title: t("app.evaluation"), url: "/dashboard/evaluation", icon: ClipboardCheck },
         { title: t("app.studentInfo"), url: "/dashboard/me/student", icon: User },
-        { title: t("app.gpa"), url: "/dashboard/me/gpa", icon: BarChart3 },
       ],
     },
     {
@@ -119,7 +117,6 @@ export default function DashboardLayout({
     "/dashboard/services": t("app.services"),
     "/dashboard/me": t("app.me"),
     "/dashboard/me/student": t("app.studentInfo"),
-    "/dashboard/me/gpa": t("app.gpa"),
     "/dashboard/me/background": t("app.backgroundSettings"),
     "/dashboard/me/settings": t("settings.title"),
     "/dashboard/me/avatar": t("app.avatarSettings"),

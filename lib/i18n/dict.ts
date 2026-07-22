@@ -762,8 +762,6 @@ export const zh = {
     },
   },
   gpa: {
-    title: "学分绩点统计",
-    description: "学业成绩总览",
     planName: "培养方案",
     studyType: "学习形式",
     requiredEarned: "必修已得学分",
@@ -1539,8 +1537,6 @@ export const en = {
     },
   },
   gpa: {
-    title: "GPA Statistics",
-    description: "Academic performance overview",
     planName: "Plan",
     studyType: "Study Type",
     requiredEarned: "Req. Credits",

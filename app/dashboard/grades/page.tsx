@@ -42,6 +42,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
+import { GpaSummary } from "./gpa-summary";
 import { useCurrentWeek, useGPAStats, useGrades } from "@/providers/hooks";
 import { useProvider } from "@/providers/use-provider";
 import type {
@@ -50,7 +51,7 @@ import type {
   GradeDistribution,
   GradeRanking,
 } from "@/providers/types";
-import { Search, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 const ALL_TERM = "__all__";
 
@@ -66,7 +67,6 @@ export default function GradesPage() {
   const [term, setTerm] = useState(ALL_TERM);
   const [courseName, setCourseName] = useState("");
   const [queriedCourseName, setQueriedCourseName] = useState("");
-  const [showAllGpa, setShowAllGpa] = useState(false);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -243,20 +243,6 @@ export default function GradesPage() {
     return (totalWeightedPoints / totalCredits).toFixed(4);
   }, [filtered, term]);
 
-  const basicGpaItems = [
-    { label: t("grades.gpaInitial"), value: gpa.data?.gpaInitial },
-    { label: t("dashboard.weightedAvg"), value: gpa.data?.weightedAvg },
-    { label: t("dashboard.arithmeticAvg"), value: gpa.data?.arithmeticAvg },
-    ...(termWeightedGpa !== null ? [{ label: t("grades.termWeightedGpa"), value: termWeightedGpa }] : []),
-  ];
-
-  const extraGpaItems = [
-    { label: t("grades.gpaHighest"), value: gpa.data?.gpaHighest },
-    { label: t("grades.requiredGpaHighest"), value: gpa.data?.requiredGpaHighest },
-    { label: t("grades.degreeGpaInitial"), value: gpa.data?.degreeGpaInitial },
-    { label: t("grades.degreeWeightedAvg"), value: gpa.data?.degreeWeightedAvg },
-  ];
-
   if (loading && grades.length === 0) {
     return (
       <div className="flex flex-col gap-8">
@@ -333,46 +319,7 @@ export default function GradesPage() {
 
   return (
     <div className="flex flex-col gap-6 md:gap-8">
-      <Card className="gap-1 py-3 md:gap-4 md:py-4">
-        <CardHeader className="md:pb-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <CardTitle className="text-sm md:text-base">{t("grades.gpaTitle")}</CardTitle>
-              <CardDescription className="hidden md:block">{t("grades.gpaDescription")}</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setShowAllGpa((v) => !v)}>
-              {showAllGpa ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className={`pt-0 md:pt-0 ${!showAllGpa ? "hidden md:block" : ""}`}>
-          {showAllGpa && (
-            <div className="flex flex-col divide-y divide-border md:hidden">
-              {[...basicGpaItems, ...extraGpaItems].map((item) => (
-                <div key={item.label} className="flex items-center justify-between py-1.5 text-sm">
-                  <span className="text-muted-foreground">{item.label}</span>
-                  <span className="font-semibold tabular-nums">{item.value || "-"}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="hidden grid-cols-2 gap-3 md:grid md:grid-cols-3 md:gap-4">
-            {basicGpaItems.map((item) => (
-              <div key={item.label} className="flex flex-col gap-1 rounded-md border p-3">
-                <span className="text-xs text-muted-foreground">{item.label}</span>
-                <span className="text-lg font-semibold">{item.value || "-"}</span>
-              </div>
-            ))}
-            {showAllGpa &&
-              extraGpaItems.map((item) => (
-                <div key={item.label} className="flex flex-col gap-1 rounded-md border p-3">
-                  <span className="text-xs text-muted-foreground">{item.label}</span>
-                  <span className="text-lg font-semibold">{item.value || "-"}</span>
-                </div>
-              ))}
-          </div>
-        </CardContent>
-      </Card>
+      <GpaSummary gpa={gpa.data} termWeightedGpa={termWeightedGpa} />
 
       <Card className="hidden md:block">
         <CardHeader>
