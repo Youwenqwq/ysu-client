@@ -292,11 +292,16 @@ export default function GradesPage() {
     let totalWeightedPoints = 0;
     let totalCredits = 0;
     for (const g of filtered) {
+      // TODO: 此逻辑实际应该由对应 Provider 提供，之后要整合到 ysu provider 里
+      // 仅统计主修培养方案内课程的正考成绩
+      if (!g.isMajor || g.isRetake !== "正考") continue;
       const gp = numericValue(g.numericGradePoint, g.gradePoint);
       const cr = numericValue(g.numericCredit, g.credit);
       if (gp !== undefined && cr !== undefined && cr > 0) {
-        totalWeightedPoints += gp * cr;
-        totalCredits += cr;
+        // 学位课学分和绩点按 1.2 倍计入
+        const weight = g.isDegreeCourse ? 1.2 : 1;
+        totalWeightedPoints += gp * cr * weight;
+        totalCredits += cr * weight;
       }
     }
     if (totalCredits === 0) return null;
