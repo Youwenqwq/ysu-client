@@ -22,6 +22,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { InstallAppButton } from "@/components/install-app-button";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
@@ -265,6 +266,8 @@ export function AboutContent() {
             <span className="flex-1 text-sm">{t("about.website")}</span>
             <ExternalLink className="size-4 shrink-0 text-muted-foreground" />
           </a>
+
+          <InstallAppButton />
 
           <Separator />
 

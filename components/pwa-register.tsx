@@ -3,10 +3,13 @@
 import { useEffect } from "react";
 
 import { isCapacitor } from "@/lib/native/platform";
+import { initializePwaInstallCapture } from "@/lib/pwa-install";
 import { APP_BUILD, APP_VERSION } from "@/lib/version";
 
 export function PwaRegister() {
   useEffect(() => {
+    initializePwaInstallCapture();
+
     if (
       process.env.NODE_ENV !== "production" ||
       !window.isSecureContext ||
