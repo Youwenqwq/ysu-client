@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import appIcon from "@/public/icons/icon-192.png";
 import {
   Code,
   CircleFadingArrowUp,
@@ -195,7 +196,7 @@ export function AboutContent() {
             className="size-24 overflow-hidden rounded-3xl shadow-sm ring-1 ring-border transition-transform active:scale-95"
           >
             <Image
-              src="/icon.svg"
+              src={appIcon}
               alt="App icon"
               width={96}
               height={96}

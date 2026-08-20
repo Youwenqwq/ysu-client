@@ -62,7 +62,7 @@ echo "========================================"
 rm -rf .edgeone
 export PAGES_SOURCE=skills
 cd website
-edgeone pages deploy
+edgeone makers deploy
 cd ..
 
 echo "Website deployed!"

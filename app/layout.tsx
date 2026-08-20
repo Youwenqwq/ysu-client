@@ -32,6 +32,11 @@ export const metadata: Metadata = {
   applicationName: "燕大终端",
   authors: [{ name: "ysu-client contributors" }],
   keywords: ["燕大终端", "YSU Terminal", "燕山大学", "YSU", "教务系统"],
+  appleWebApp: {
+    capable: true,
+    title: "燕大终端",
+    statusBarStyle: "default",
+  },
 }
 
 export const viewport: Viewport = {
