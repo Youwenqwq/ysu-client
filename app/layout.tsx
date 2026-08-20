@@ -12,6 +12,7 @@ import { BackgroundImage } from "@/components/background-image"
 import { BackButtonHandler } from "@/components/back-button-handler"
 import { DeepLinkHandler } from "@/components/deep-link-handler"
 import { NotifyProvider } from "@/components/notify-provider"
+import { PwaRegister } from "@/components/pwa-register"
 import { ProviderProvider } from "@/providers/provider-context"
 import { cn } from "@/lib/utils";
 
@@ -59,6 +60,7 @@ export default function RootLayout({
       className={cn("antialiased", fontMono.variable, "font-sans", geist.variable)}
     >
       <body>
+        <PwaRegister />
         <I18nProvider>
           <ThemeProvider>
             <ProviderProvider>

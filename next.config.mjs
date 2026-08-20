@@ -27,6 +27,7 @@ const nextConfig = {
   },
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version,
+    NEXT_PUBLIC_APP_BASE_PATH: process.env.APP_BASE_PATH || '',
     NEXT_PUBLIC_APP_BUILD: gitHash,
   },
 };
