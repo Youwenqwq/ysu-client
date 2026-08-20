@@ -11,6 +11,7 @@ import {
   installCookies,
   cookieEntryFromJSON,
   fetchWithJar,
+  fetchStateless,
   headerSingle,
   type HttpResponse,
 } from "@/lib/cookie";
@@ -789,13 +790,16 @@ export async function initiateWechatMFA(): Promise<WechatMFAContext> {
 
   // Fetch the WeChat QR connect page to extract UUID from the QR image URL.
   // Only need the HTML — short timeout, no resources.
-  const wxResp = await fetch(wxOAuthUrl, {
+  // NOTE: 必须走 fetchStateless（Web 端经代理）；裸 fetch 在浏览器里会被 CORS 拦截。
+  const wxResp = await fetchStateless({
     method: 'GET',
+    url: wxOAuthUrl,
     headers: {
       'User-Agent': DESKTOP_UA,
       Accept: 'text/html',
     },
-    signal: AbortSignal.timeout(8_000),
+    redirect: 'follow',
+    timeoutMs: 8_000,
   });
 
   const html = await wxResp.text();
@@ -820,14 +824,16 @@ export async function pollWechatQR(
   const lastParam = lastErrcode !== undefined ? `&last=${lastErrcode}` : '';
   const pollUrl = `${WECHAT_POLL_BASE}?uuid=${encodeURIComponent(uuid)}${lastParam}`;
 
-  const resp = await fetch(pollUrl, {
+  const resp = await fetchStateless({
     method: 'GET',
+    url: pollUrl,
     headers: {
       Referer: 'https://open.weixin.qq.com/',
       'User-Agent':
         DESKTOP_UA,
     },
-    signal: AbortSignal.timeout(Math.min(timeoutMs, 30_000)),
+    redirect: 'follow',
+    timeoutMs: Math.min(timeoutMs, 30_000),
   });
 
   const text = await resp.text();

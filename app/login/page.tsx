@@ -38,6 +38,7 @@ import {
   clearRememberedCredentials,
 } from "@/lib/storage/secure";
 import { checkRateLimit, rateLimitMessage } from "@/lib/rate-limit";
+import { isCapacitor } from "@/lib/native/platform";
 import { useMFAModalStore } from "@/lib/stores/mfa-modal";
 import { getActiveProvider, setActiveProviderSchool } from "@/providers/provider-service";
 
@@ -58,7 +59,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
+  // Web 端 secure-storage 退化为明文 localStorage，刻意不提供"记住密码"，
+  // 避免账号密码明文落盘；会话 cookie 的持久化与教务系统本身的安全模型一致。
+  const canRemember = isCapacitor();
+
   useEffect(() => {
+    if (!isCapacitor()) return;
     loadRememberedCredentials().then((r) => {
       if (r) {
         setUsername(r.username);
@@ -96,6 +102,7 @@ export default function LoginPage() {
   }
 
   async function syncRememberedLoginPreference() {
+    if (!isCapacitor()) return;
     if (remember) {
       await saveRememberedCredentials(username, password);
     } else {
@@ -299,16 +306,18 @@ export default function LoginPage() {
                   />
                 </Field>
               )}
-              <Field orientation="horizontal">
-                <Checkbox
-                  id="remember"
-                  checked={remember}
-                  onCheckedChange={(c) => setRemember(c === true)}
-                />
-                <FieldLabel htmlFor="remember" className="text-sm font-normal cursor-pointer">
-                  {t("login.remember")}
-                </FieldLabel>
-              </Field>
+              {canRemember && (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="remember"
+                    checked={remember}
+                    onCheckedChange={(c) => setRemember(c === true)}
+                  />
+                  <FieldLabel htmlFor="remember" className="text-sm font-normal cursor-pointer">
+                    {t("login.remember")}
+                  </FieldLabel>
+                </Field>
+              )}
               <Button type="submit" disabled={loading || countdown > 0}>
                 {loading && <Spinner data-icon="inline-start" />}
                 {loading

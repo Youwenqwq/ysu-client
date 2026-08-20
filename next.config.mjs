@@ -19,6 +19,9 @@ const nextConfig = {
   output: 'export',
   distDir: 'dist',
   trailingSlash: true,
+  // Web 部署到站点 /app 子路径时用 APP_BASE_PATH=/app 构建；
+  // Capacitor 打包保持默认空值。
+  basePath: process.env.APP_BASE_PATH || '',
   images: {
     unoptimized: true,
   },

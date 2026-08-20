@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-燕山大学教务系统第三方客户端（"燕大终端"）。基于 Next.js 16 静态导出 + Capacitor 8 Android WebView 壳应用，支持 OTA 热更新。
+燕山大学教务系统第三方客户端（"燕大终端"）。基于 Next.js 16 静态导出 + Capacitor 8 Android WebView 壳应用，支持 OTA 热更新。Web 端（浏览器）通过 EdgeOne 边缘函数代理访问教务系统。
 
-- **Target**: Android APK only (via Capacitor), no web deployment
-- **Next.js config**: `output: 'export'`, `distDir: 'dist'`, `trailingSlash: true`, images unoptimized
+- **Target**: Android APK (via Capacitor) + Web 静态部署（`scripts/deploy-website.sh` 构建并注入）
+- **Next.js config**: `output: 'export'`, `distDir: 'dist'`, `trailingSlash: true`, images unoptimized, `basePath` 由 `APP_BASE_PATH` 环境变量控制（Web 部署用 `/app`，Capacitor 留空）
+- **Web 传输层**: 浏览器禁改 `Cookie`/`Referer`/`User-Agent` 等头部且教务系统无 CORS 头，Web 端所有教务流量经 `lib/cookie.ts` 的 `proxyHttpSend()` 走同源 `/api/proxy`（EdgeOne 边缘函数 `website/edge-functions/api/proxy.js`，目标 host 硬白名单）。协议细节见函数文件头注释。
 - **State**: Zustand + `persist` middleware backed by `@aparajita/capacitor-secure-storage`
 - **Styling**: Tailwind CSS v4 + shadcn/ui + `next-themes` (dark/light)
 - **i18n**: Custom lightweight hook at `lib/i18n/`, locales in `lib/i18n/locales/`
@@ -21,8 +22,7 @@ pnpm run build            # Static export to dist/
 pnpm run typecheck        # tsc --noEmit
 pnpm run lint             # ESLint
 pnpm run format           # Prettier write
-pnpm run test             # Vitest regression tests
-pnpm run test -- providers/hooks/use-provider-query.test.ts providers/ysu/emap-fetcher.test.ts providers/ysu/relogin.test.ts
+pnpm run test             # Vitest regression tests (config: vitest.config.ts, node env)
 
 
 npx cap sync             # Sync dist/ to Capacitor android/
@@ -40,7 +40,7 @@ cd website && pnpm dev       # Astro dev server
 cd website && pnpm build     # Static export to website/dist/
 ```
 
-`edgeone pages deploy dist` deploys `website/dist/` directly without rebuilding.
+Web 站点+App 一体化部署：`scripts/deploy-website.sh` 拉取最新 OTA 文件、构建 App 到 `website/public/app/`（gitignored）、再 `edgeone makers deploy`（CLI 自动构建 Astro 并包含 `edge-functions/`）。
 
 ## High-Level Architecture
 
@@ -108,7 +108,7 @@ When debugging provider data loading, start from `providers/hooks/use-provider-q
 
 - Auth Zustand persistence uses `secureStorage` from `lib/storage/secure.ts`; the web fallback stores data under Capacitor-style keys such as `capacitor-storage_academic-client-auth`, not plain `academic-client-auth`.
 - Provider persistent cache keys are built by `providerCacheKey()` in `providers/hooks/use-provider-query.ts` and stored under `academic-client-cache:` / legacy `ysu-cache:` prefixes.
-- `CapacitorHttp.enabled` is required for real university requests; browser dev may show CORS failures that do not reproduce in Android WebView.
+- `CapacitorHttp.enabled` is required for real university requests; Web 端浏览器流量统一走边缘代理（`proxyHttpSend`），不存在 CORS 问题
 
 ### Website
 
@@ -116,9 +116,9 @@ When debugging provider data loading, start from `providers/hooks/use-provider-q
 - **i18n**: Astro native `i18n` config with `prefixDefaultLocale: false` — default locale at `/`, English at `/en/`
 - **Pattern**: Page content lives in shared components (`HomePage.astro`, `ChangelogPage.astro`, etc.), language pages are thin wrappers
 - **Styling**: Tailwind v4 `@theme` custom properties + `@custom-variant dark (&:is(.dark *))`
-- **Deployment**: `edgeone pages deploy dist` — directly uploads `website/dist/` (no rebuild)
-- **OTA files**: `release.sh` copies `dist.zip`, `app-release.apk`, `version.json` to `website/dist/updates/`
-- **Generated files** (do not commit): `website/src/data/changelog.json`, `website/.edgeone/`
+- **Deployment**: `scripts/deploy-website.sh`（或 release 流程）在 `website/` 下执行 `edgeone makers deploy`，CLI 自动构建 Astro 并打包 `edge-functions/` 与 `public/`（含注入的 App 产物 `public/app/`）
+- **OTA files**: `release.sh` copies `dist.zip`, `app-release.apk`, `version.json` to `website/public/updates/`
+- **Generated files** (do not commit): `website/src/data/changelog.json`, `website/.edgeone/`, `website/public/app/`
 
 ### App Shell Layout
 

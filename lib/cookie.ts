@@ -173,7 +173,11 @@ function domainMatches(cookieDomain: string, host: string): boolean {
 
 function pathMatches(cookiePath: string, requestPath: string): boolean {
   if (!cookiePath || cookiePath === '/') return true;
-  return requestPath === cookiePath || requestPath.startsWith(cookiePath + '/');
+  if (requestPath === cookiePath) return true;
+  if (!requestPath.startsWith(cookiePath)) return false;
+  // RFC 6265 §5.1.4: 前缀匹配时，cookie path 以 '/' 结尾，
+  // 或请求路径的下一个字符是 '/' 才算匹配。
+  return cookiePath.endsWith('/') || requestPath.charAt(cookiePath.length) === '/';
 }
 
 function secureMatches(cookie: SimpleCookie, url: string): boolean {
@@ -201,6 +205,21 @@ export class SimpleCookieJar {
     try {
       const parsed = parseSetCookie(cookieStr, url);
       if (!parsed) return;
+      if (parsed.expires !== null && parsed.expires <= Math.floor(Date.now() / 1000)) {
+        // Max-Age=0 / 已过期的 Set-Cookie 是删除指令：移除同 name+domain+path
+        // 的条目，而不是存一个空值僵尸（僵尸会因"最长 path 优先"去重规则
+        // 抢在真实 cookie 前被发出去，导致 CAS 收到空 CASTGC）。
+        this.cookies = this.cookies.filter(
+          (c) =>
+            !(
+              c.name === parsed.name &&
+              c.domain === parsed.domain &&
+              c.path === parsed.path
+            ),
+        );
+        this._dirty = true;
+        return;
+      }
       this.cookies = this.cookies.filter(
         (c) =>
           !(
@@ -223,6 +242,7 @@ export class SimpleCookieJar {
     const now = Math.floor(Date.now() / 1000);
 
     const matched = this.cookies.filter((c) => {
+      if (c.value === '') return false; // 空值 cookie 无意义且会遮蔽同名真实值
       if (c.expires !== null && c.expires < now) return false;
       if (!domainMatches(c.domain, host)) return false;
       if (!pathMatches(c.path, pathname)) return false;
@@ -318,6 +338,15 @@ export async function fetchWithJar(
   return followRedirects(jar, req);
 }
 
+/**
+ * 无会话请求：走平台传输层（原生 CapacitorHttp / Web 边缘代理），
+ * 但使用一次性 jar，不读写任何持久 cookie。
+ * 用于微信扫码登录等与教务会话无关的第三方端点。
+ */
+export async function fetchStateless(req: HttpRequest): Promise<HttpResponse> {
+  return fetchWithJar(new SimpleCookieJar(), req);
+}
+
 import { isCapacitor } from './native/platform';
 import { getCustomUserAgent } from './custom-user-agent';
 
@@ -334,8 +363,49 @@ async function send(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpRespons
   if (isCapacitor()) {
     return capacitorHttpSend(jar, req);
   }
+  // Web 端无法直连教务系统（CORS + Cookie/User-Agent/Referer 为浏览器
+  // forbidden header），统一走 EdgeOne 边缘函数代理。
+  return proxyHttpSend(jar, req);
+}
 
-  const headers = new Headers(req.headers);
+/**
+ * Web 端传输：经 EdgeOne 代理转发（协议见 website/edge-functions/api/proxy.js）。
+ * 浏览器禁改的头部经 x-proxy-* 映射；上游状态码经 x-proxy-status 回传
+ * （浏览器 fetch redirect:'manual' 会把 3xx 变成 opaqueredirect 隐藏 Location，
+ * 因此代理对浏览器恒返回 200）。
+ *
+ * 代理基址默认同源 /api/proxy（App 与代理部署在同一 EdgeOne Pages 站点）；
+ * 本地开发用 NEXT_PUBLIC_PROXY_BASE_URL 指向已部署的代理，
+ * 例如 https://ysu.welain.com/api/proxy 。
+ */
+async function proxyHttpSend(
+  jar: SimpleCookieJar,
+  req: HttpRequest,
+): Promise<HttpResponse> {
+  const headers = new Headers();
+  for (const [k, v] of Object.entries(req.headers ?? {})) {
+    const lower = k.toLowerCase();
+    if (lower === 'cookie') continue; // jar 是唯一 cookie 来源
+    if (lower === 'user-agent') {
+      headers.set('x-proxy-ua', v);
+    } else if (lower === 'referer') {
+      headers.set('x-proxy-referer', v);
+    } else if (lower === 'origin') {
+      headers.set('x-proxy-origin', v);
+    } else if (
+      lower === 'accept-encoding' ||
+      lower === 'host' ||
+      lower === 'content-length' ||
+      lower === 'connection'
+    ) {
+      continue;
+    } else {
+      headers.set(k, v);
+    }
+  }
+  if (!headers.has('x-proxy-ua')) {
+    headers.set('x-proxy-ua', getCustomUserAgent());
+  }
   if (!headers.has('accept')) {
     headers.set('accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8');
   }
@@ -344,28 +414,66 @@ async function send(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpRespons
   }
   const cookieHeader = await jar.getCookieString(req.url);
   if (cookieHeader) {
-    headers.set('cookie', cookieHeader);
+    headers.set('x-proxy-cookie', cookieHeader);
   }
 
-  const response = await fetch(req.url, {
+  const proxyBase = process.env.NEXT_PUBLIC_PROXY_BASE_URL || '/api/proxy';
+  const proxyUrl = `${proxyBase}?url=${encodeURIComponent(req.url)}`;
+  const response = await fetch(proxyUrl, {
     method: req.method,
     headers,
     body: req.body,
-    redirect: 'manual',
-    credentials: 'include',
+    // 代理恒返回 200，不存在需要浏览器处理的重定向
+    redirect: 'follow',
     signal: AbortSignal.timeout(req.timeoutMs ?? DEFAULT_TIMEOUT_MS),
   });
 
-  const setCookies =
-    typeof response.headers.getSetCookie === 'function'
-      ? response.headers.getSetCookie()
-      : splitSetCookie(response.headers.get('set-cookie') ?? '');
-
-  for (const sc of setCookies) {
-    await jar.setCookie(sc, req.url, { ignoreError: true });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`proxy request failed: HTTP ${response.status} ${detail}`);
   }
 
-  return toHttpResponse(response, req.url);
+  // 上游 Set-Cookie（base64(JSON) 分片）回装 jar；域名归属按上游 URL 解析
+  let parsedSetCookies: string[] = [];
+  const encodedSetCookie = response.headers.get('x-proxy-set-cookie');
+  if (encodedSetCookie) {
+    try {
+      const b64 = encodedSetCookie.split(', ').join('');
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const setCookies: unknown = JSON.parse(new TextDecoder().decode(bytes));
+      if (Array.isArray(setCookies)) {
+        parsedSetCookies = setCookies.filter((s): s is string => typeof s === 'string');
+        for (const sc of parsedSetCookies) {
+          await jar.setCookie(sc, req.url, { ignoreError: true });
+        }
+      }
+    } catch {
+      // 代理头损坏不致命，忽略
+    }
+  }
+
+  const respHeaders: Record<string, string | string[]> = {};
+  for (const [k, v] of response.headers.entries()) {
+    const lower = k.toLowerCase();
+    if (lower === 'x-proxy-set-cookie' || lower === 'x-proxy-status') continue;
+    if (lower.startsWith('access-control-')) continue;
+    respHeaders[lower] = v;
+  }
+  if (parsedSetCookies.length > 0) {
+    respHeaders['set-cookie'] = parsedSetCookies;
+  }
+
+  const realStatus = Number(response.headers.get('x-proxy-status')) || response.status;
+
+  return {
+    status: realStatus,
+    headers: respHeaders,
+    url: req.url,
+    text: () => response.clone().text(),
+    arrayBuffer: () => response.arrayBuffer(),
+  };
 }
 
 async function capacitorHttpSend(
@@ -586,31 +694,6 @@ function stripBodyHeaders(
 function hasHeader(headers: Readonly<Record<string, string>>, name: string): boolean {
   const lowerName = name.toLowerCase();
   return Object.keys(headers).some((key) => key.toLowerCase() === lowerName);
-}
-
-function toHttpResponse(response: Response, requestUrl: string): HttpResponse {
-  const headers: Record<string, string | string[]> = {};
-  const setCookies =
-    typeof response.headers.getSetCookie === 'function'
-      ? response.headers.getSetCookie()
-      : splitSetCookie(response.headers.get('set-cookie') ?? '');
-
-  for (const [k, v] of response.headers.entries()) {
-    const lowerK = k.toLowerCase();
-    if (lowerK === 'set-cookie') continue;
-    headers[lowerK] = v;
-  }
-  if (setCookies.length > 0) {
-    headers['set-cookie'] = setCookies;
-  }
-
-  return {
-    status: response.status,
-    headers,
-    url: response.url || requestUrl,
-    text: () => response.text(),
-    arrayBuffer: () => response.arrayBuffer(),
-  };
 }
 
 export function headerSingle(
