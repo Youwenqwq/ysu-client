@@ -41,7 +41,6 @@ import {
 } from "@/components/ui/dialog";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { isCapacitor } from "@/lib/native/platform";
-import { isPwaSupported, prepareWebUpdate } from "@/lib/pwa-updater";
 import { blurActiveElement } from "@/lib/utils";
 import { useSettingsStore } from "@/lib/stores/settings";
 import { useUpdateStore } from "@/lib/stores/update";
@@ -70,14 +69,12 @@ export function AboutContent() {
   const [errorMsg, setErrorMsg] = useState("");
   const [showMirrorDialog, setShowMirrorDialog] = useState(false);
   const [updatePlatform, setUpdatePlatform] = useState<
-    "unsupported" | "native" | "pwa"
+    "unsupported" | "native"
   >("unsupported");
 
   useEffect(() => {
     if (isCapacitor()) {
       setUpdatePlatform("native");
-    } else if (isPwaSupported()) {
-      setUpdatePlatform("pwa");
     }
   }, []);
 
@@ -144,20 +141,15 @@ export function AboutContent() {
   }
 
   const handleCheck = useCallback(async () => {
-    if (updatePlatform === "unsupported") return;
+    if (updatePlatform !== "native") return;
 
     setState("checking");
     try {
       const { checkForUpdate } = await import("@/lib/updater");
       const info = await checkForUpdate(false, updateMirror, updateChannel);
-      const hasUpdate = updatePlatform === "native"
-        ? info.available || info.apkUpdateAvailable
-        : info.available;
+      const hasUpdate = info.available || info.apkUpdateAvailable;
       setUpdateStatus(hasUpdate);
       if (hasUpdate) {
-        if (updatePlatform === "pwa") {
-          await prepareWebUpdate();
-        }
         setUpdateInfo(info);
         blurActiveElement();
         setShowDialog(true);
@@ -271,7 +263,7 @@ export function AboutContent() {
 
           <Separator />
 
-          {/* Native 与支持 Service Worker 的 Web 端均可主动检查新版本。 */}
+          {/* Native 使用 OTA 检查更新；Web PWA 由 Service Worker 自动提示。 */}
           {canCheck && (
             <UpdateSection
               state={state}

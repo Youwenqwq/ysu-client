@@ -1,6 +1,7 @@
 export const zh = {
   app: {
     name: "燕大终端",
+    offlineReady: "该应用已可离线使用",
     nav: "导航",
     overview: "总览",
     studentInfo: "学生信息",
@@ -179,6 +180,8 @@ export const zh = {
     apply: "重启应用",
     applying: "正在应用更新...",
     downloaded: "更新已下载，重启后生效",
+    pwaReady: "发现新版本，刷新后生效",
+    pwaRestart: "立即刷新",
     restartNow: "立即重启",
     error: "更新失败",
     errorNetwork: "网络错误，请检查网络连接",
@@ -809,6 +812,7 @@ export const zh = {
 export const en = {
   app: {
     name: "YSU Terminal",
+    offlineReady: "This app is ready for offline use",
     nav: "Navigation",
     overview: "Overview",
     studentInfo: "Student Info",
@@ -987,6 +991,8 @@ export const en = {
     apply: "Restart App",
     applying: "Applying update...",
     downloaded: "Update downloaded. Restart to apply.",
+    pwaReady: "A new version is ready. Refresh to apply.",
+    pwaRestart: "Refresh Now",
     restartNow: "Restart Now",
     error: "Update failed",
     errorNetwork: "Network error. Please check your connection.",

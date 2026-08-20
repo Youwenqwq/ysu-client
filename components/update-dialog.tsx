@@ -14,8 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useUpdateStore } from "@/lib/stores/update";
-import { isCapacitor } from "@/lib/native/platform";
-import { applyWebUpdate } from "@/lib/pwa-updater";
 import {
   downloadAndApply,
   applyAndRestart,
@@ -23,13 +21,7 @@ import {
   installDownloadedApk,
 } from "@/lib/updater";
 
-type DialogState =
-  | "idle"
-  | "downloading"
-  | "downloaded"
-  | "installing"
-  | "applying"
-  | "error";
+type DialogState = "idle" | "downloading" | "downloaded" | "installing" | "error";
 
 export function UpdateDialog() {
   const { t } = useTranslation();
@@ -43,9 +35,7 @@ export function UpdateDialog() {
 
   const isApk = updateInfo?.apkUpdateAvailable ?? false;
   const isWeb = !isApk && (updateInfo?.available ?? false);
-  const isPwa = isWeb && !isCapacitor();
-  const isBusy =
-    state === "downloading" || state === "installing" || state === "applying";
+  const isBusy = state === "downloading" || state === "installing";
 
   const handleClose = useCallback(() => {
     setShowDialog(false);
@@ -58,7 +48,7 @@ export function UpdateDialog() {
   }, [setShowDialog]);
 
   const handleDownload = useCallback(async () => {
-    if (!updateInfo || isPwa) return;
+    if (!updateInfo) return;
 
     setState("downloading");
     setProgress(0);
@@ -74,20 +64,11 @@ export function UpdateDialog() {
       setErrorMsg(t("update.errorDownload"));
       setState("error");
     }
-  }, [updateInfo, isApk, isPwa, t]);
+  }, [updateInfo, isApk, t]);
 
   const handleRestart = useCallback(async () => {
     try {
       await applyAndRestart();
-    } catch {
-      setErrorMsg(t("update.errorUnknown"));
-      setState("error");
-    }
-  }, [t]);
-  const handleApplyWebUpdate = useCallback(async () => {
-    setState("applying");
-    try {
-      await applyWebUpdate();
     } catch {
       setErrorMsg(t("update.errorUnknown"));
       setState("error");
@@ -109,23 +90,19 @@ export function UpdateDialog() {
     ? t("update.apkNewVersionTitle", { version: updateInfo?.version ?? "" })
     : t("update.newVersionTitle", { version: updateInfo?.version ?? "" });
 
-  const primaryLabel = state === "applying"
-    ? t("update.applying")
-    : isPwa
-      ? t("update.restartNow")
-      : state === "downloaded"
-        ? isApk
-          ? t("update.install")
-          : t("update.restartNow")
-        : state === "installing"
-          ? t("update.installing")
-          : isApk
-            ? t("update.apkDownload")
-            : t("update.download");
+  const primaryLabel =
+    state === "downloaded"
+      ? isApk
+        ? t("update.install")
+        : t("update.restartNow")
+      : state === "installing"
+        ? t("update.installing")
+        : isApk
+          ? t("update.apkDownload")
+          : t("update.download");
 
-  const primaryAction = isPwa
-    ? handleApplyWebUpdate
-    : state === "downloaded"
+  const primaryAction =
+    state === "downloaded"
       ? isApk
         ? handleInstall
         : handleRestart
@@ -202,11 +179,7 @@ export function UpdateDialog() {
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 my-4">
-          {state === "applying" ? (
-            <p className="text-sm text-muted-foreground">
-              {t("update.applying")}
-            </p>
-          ) : state === "downloading" ? (
+          {state === "downloading" ? (
             <div className="flex flex-col gap-2">
               <span className="text-sm text-muted-foreground">
                 {t("update.downloading")} {progress}%

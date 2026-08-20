@@ -1,5 +1,4 @@
-const swUrl = new URL(self.location.href);
-const version = swUrl.searchParams.get("v") || "dev";
+const version = "__PWA_CACHE_VERSION__";
 const scopeUrl = new URL(self.registration.scope);
 const scopePath = scopeUrl.pathname.endsWith("/")
   ? scopeUrl.pathname
