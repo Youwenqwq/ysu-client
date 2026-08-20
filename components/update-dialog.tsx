@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useUpdateStore } from "@/lib/stores/update";
+import { isCapacitor } from "@/lib/native/platform";
+import { applyWebUpdate } from "@/lib/pwa-updater";
 import {
   downloadAndApply,
   applyAndRestart,
@@ -21,7 +23,13 @@ import {
   installDownloadedApk,
 } from "@/lib/updater";
 
-type DialogState = "idle" | "downloading" | "downloaded" | "installing" | "error";
+type DialogState =
+  | "idle"
+  | "downloading"
+  | "downloaded"
+  | "installing"
+  | "applying"
+  | "error";
 
 export function UpdateDialog() {
   const { t } = useTranslation();
@@ -35,6 +43,9 @@ export function UpdateDialog() {
 
   const isApk = updateInfo?.apkUpdateAvailable ?? false;
   const isWeb = !isApk && (updateInfo?.available ?? false);
+  const isPwa = isWeb && !isCapacitor();
+  const isBusy =
+    state === "downloading" || state === "installing" || state === "applying";
 
   const handleClose = useCallback(() => {
     setShowDialog(false);
@@ -47,7 +58,7 @@ export function UpdateDialog() {
   }, [setShowDialog]);
 
   const handleDownload = useCallback(async () => {
-    if (!updateInfo) return;
+    if (!updateInfo || isPwa) return;
 
     setState("downloading");
     setProgress(0);
@@ -63,11 +74,20 @@ export function UpdateDialog() {
       setErrorMsg(t("update.errorDownload"));
       setState("error");
     }
-  }, [updateInfo, isApk, t]);
+  }, [updateInfo, isApk, isPwa, t]);
 
   const handleRestart = useCallback(async () => {
     try {
       await applyAndRestart();
+    } catch {
+      setErrorMsg(t("update.errorUnknown"));
+      setState("error");
+    }
+  }, [t]);
+  const handleApplyWebUpdate = useCallback(async () => {
+    setState("applying");
+    try {
+      await applyWebUpdate();
     } catch {
       setErrorMsg(t("update.errorUnknown"));
       setState("error");
@@ -89,19 +109,23 @@ export function UpdateDialog() {
     ? t("update.apkNewVersionTitle", { version: updateInfo?.version ?? "" })
     : t("update.newVersionTitle", { version: updateInfo?.version ?? "" });
 
-  const primaryLabel =
-    state === "downloaded"
-      ? isApk
-        ? t("update.install")
-        : t("update.restartNow")
-      : state === "installing"
-        ? t("update.installing")
-        : isApk
-          ? t("update.apkDownload")
-          : t("update.download");
+  const primaryLabel = state === "applying"
+    ? t("update.applying")
+    : isPwa
+      ? t("update.restartNow")
+      : state === "downloaded"
+        ? isApk
+          ? t("update.install")
+          : t("update.restartNow")
+        : state === "installing"
+          ? t("update.installing")
+          : isApk
+            ? t("update.apkDownload")
+            : t("update.download");
 
-  const primaryAction =
-    state === "downloaded"
+  const primaryAction = isPwa
+    ? handleApplyWebUpdate
+    : state === "downloaded"
       ? isApk
         ? handleInstall
         : handleRestart
@@ -162,14 +186,14 @@ export function UpdateDialog() {
     <Dialog
       open={canShow}
       onOpenChange={(open) => {
-        if (!open && state !== "downloading" && state !== "installing") {
+        if (!open && !isBusy) {
           handleClose();
         } else if (open) {
           setShowDialog(true);
         }
       }}
     >
-      <DialogContent className="max-h-[85vh] flex flex-col" showCloseButton={state !== "downloading" && state !== "installing"}>
+      <DialogContent className="max-h-[85vh] flex flex-col" showCloseButton={!isBusy}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="sr-only">
@@ -178,7 +202,11 @@ export function UpdateDialog() {
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 my-4">
-          {state === "downloading" ? (
+          {state === "applying" ? (
+            <p className="text-sm text-muted-foreground">
+              {t("update.applying")}
+            </p>
+          ) : state === "downloading" ? (
             <div className="flex flex-col gap-2">
               <span className="text-sm text-muted-foreground">
                 {t("update.downloading")} {progress}%
@@ -203,14 +231,14 @@ export function UpdateDialog() {
         </div>
 
         <DialogFooter>
-          {state !== "downloading" && (
+          {!isBusy && (
             <Button variant="outline" onClick={handleClose}>
               {state === "downloaded" ? t("update.cancel") : t("update.skip")}
             </Button>
           )}
           <Button
             onClick={primaryAction}
-            disabled={state === "downloading" || state === "installing"}
+            disabled={isBusy}
           >
             {primaryLabel}
           </Button>

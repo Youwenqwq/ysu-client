@@ -4,6 +4,7 @@ import { registerPlugin } from "@capacitor/core";
 import { clean, compare, gt, prerelease, valid } from "semver";
 import { getLocalStorageItemWithFallback, STORAGE_KEYS } from "./storage/keys";
 import { APP_VERSION } from "./version";
+import { isCapacitor } from "./native/platform";
 
 export type UpdateChannel = "stable" | "prerelease";
 
@@ -248,17 +249,19 @@ export async function checkForUpdate(
       apkDownloadUrl: "",
     };
 
-    const apkUpdateCandidate = await getApkUpdateCandidate(candidates);
-    if (apkUpdateCandidate) {
-      result.version = apkUpdateCandidate.webVersion;
-      result.body = apkUpdateCandidate.body ?? "";
-      result.apkUpdateAvailable = true;
-      result.apkDownloadUrl = apkUpdateCandidate.apkDownloadUrl
-        ? getApkUrl(mirrorPrefix, apkUpdateCandidate.apkDownloadUrl)
-        : "";
-      // If APK needs update, web update is moot — force APK-only flow
-      if (result.available) {
-        result.available = false;
+    if (isCapacitor()) {
+      const apkUpdateCandidate = await getApkUpdateCandidate(candidates);
+      if (apkUpdateCandidate) {
+        result.version = apkUpdateCandidate.webVersion;
+        result.body = apkUpdateCandidate.body ?? "";
+        result.apkUpdateAvailable = true;
+        result.apkDownloadUrl = apkUpdateCandidate.apkDownloadUrl
+          ? getApkUrl(mirrorPrefix, apkUpdateCandidate.apkDownloadUrl)
+          : "";
+        // If APK needs update, web update is moot — force APK-only flow
+        if (result.available) {
+          result.available = false;
+        }
       }
     }
 

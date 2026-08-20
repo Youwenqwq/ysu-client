@@ -10,6 +10,7 @@ import { useSettingsStore } from "@/lib/stores/settings";
 import { useUpdateStore } from "@/lib/stores/update";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { isCapacitor } from "@/lib/native/platform";
+import { isPwaSupported, prepareWebUpdate } from "@/lib/pwa-updater";
 import { blurActiveElement } from "@/lib/utils";
 import { initSafeArea } from "@/lib/native/webview-compat";
 import { trackAppLaunch } from "@/lib/analytics";
@@ -42,12 +43,19 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
   const [showAnalyticsPrompt, setShowAnalyticsPrompt] = useState(false);
 
   const performUpdateCheck = useCallback(async () => {
-    if (!isCapacitor()) return;
+    const native = isCapacitor();
+    if (!native && !isPwaSupported()) return;
+
     const { checkForUpdate } = await import("@/lib/updater");
     const info = await checkForUpdate(true, updateMirror, updateChannel);
-    const hasUpdate = info.available || info.apkUpdateAvailable;
+    const hasUpdate = native
+      ? info.available || info.apkUpdateAvailable
+      : info.available;
     setUpdateStatus(hasUpdate);
     if (hasUpdate) {
+      if (!native) {
+        await prepareWebUpdate();
+      }
       const { setUpdateInfo, setShowDialog } = useUpdateStore.getState();
       setUpdateInfo(info);
       blurActiveElement();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import appIcon from "@/public/icons/icon-192.png";
@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { isCapacitor } from "@/lib/native/platform";
+import { isPwaSupported, prepareWebUpdate } from "@/lib/pwa-updater";
 import { blurActiveElement } from "@/lib/utils";
 import { useSettingsStore } from "@/lib/stores/settings";
 import { useUpdateStore } from "@/lib/stores/update";
@@ -67,6 +68,17 @@ export function AboutContent() {
   const [state, setState] = useState<UpdateState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [showMirrorDialog, setShowMirrorDialog] = useState(false);
+  const [updatePlatform, setUpdatePlatform] = useState<
+    "unsupported" | "native" | "pwa"
+  >("unsupported");
+
+  useEffect(() => {
+    if (isCapacitor()) {
+      setUpdatePlatform("native");
+    } else if (isPwaSupported()) {
+      setUpdatePlatform("pwa");
+    }
+  }, []);
 
   const updateMirror = useSettingsStore((s) => s.updateMirror);
   const updateChannel = useSettingsStore((s) => s.updateChannel);
@@ -131,12 +143,20 @@ export function AboutContent() {
   }
 
   const handleCheck = useCallback(async () => {
+    if (updatePlatform === "unsupported") return;
+
     setState("checking");
     try {
       const { checkForUpdate } = await import("@/lib/updater");
       const info = await checkForUpdate(false, updateMirror, updateChannel);
-      setUpdateStatus(info.available || info.apkUpdateAvailable);
-      if (info.apkUpdateAvailable || info.available) {
+      const hasUpdate = updatePlatform === "native"
+        ? info.available || info.apkUpdateAvailable
+        : info.available;
+      setUpdateStatus(hasUpdate);
+      if (hasUpdate) {
+        if (updatePlatform === "pwa") {
+          await prepareWebUpdate();
+        }
         setUpdateInfo(info);
         blurActiveElement();
         setShowDialog(true);
@@ -153,7 +173,15 @@ export function AboutContent() {
       }
       setState("error");
     }
-  }, [setUpdateStatus, setUpdateInfo, setShowDialog, t, updateMirror, updateChannel]);
+  }, [
+    setUpdateStatus,
+    setUpdateInfo,
+    setShowDialog,
+    t,
+    updateMirror,
+    updateChannel,
+    updatePlatform,
+  ]);
 
   const handleReset = useCallback(async () => {
     try {
@@ -184,7 +212,8 @@ export function AboutContent() {
     }
   }, [feedbackRating, feedbackText]);
 
-  const canCheck = isCapacitor();
+  const canCheck = updatePlatform !== "unsupported";
+  const canReset = updatePlatform === "native";
 
   return (
     <div className="flex flex-1 flex-col">
@@ -239,7 +268,7 @@ export function AboutContent() {
 
           <Separator />
 
-          {/* Web 端即访问即刷新，无 OTA 概念，不展示检查更新入口 */}
+          {/* Native 与支持 Service Worker 的 Web 端均可主动检查新版本。 */}
           {canCheck && (
             <UpdateSection
               state={state}
@@ -247,6 +276,7 @@ export function AboutContent() {
               onCheck={handleCheck}
               onRetry={handleCheck}
               onReset={handleReset}
+              canReset={canReset}
               onOpenMirror={openMirrorDialog}
               onLongPress={openMirrorDialog}
               t={t}
@@ -421,23 +451,27 @@ export function AboutContent() {
               </ToggleGroup>
             </div>
           </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              {t("update.resetToFactory")}
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setShowMirrorDialog(false);
-                handleReset();
-              }}
-            >
-              <RotateCcw className="size-3.5" />
-              {t("update.resetToFactory")}
-            </Button>
-          </div>
+          {canReset && (
+            <>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {t("update.resetToFactory")}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowMirrorDialog(false);
+                    handleReset();
+                  }}
+                >
+                  <RotateCcw className="size-3.5" />
+                  {t("update.resetToFactory")}
+                </Button>
+              </div>
+            </>
+          )}
           <DialogFooter>
             <Button onClick={confirmMirror}>{t("update.confirm")}</Button>
           </DialogFooter>
@@ -645,12 +679,14 @@ function UpdateSection({
   onCheck,
   onRetry,
   onReset,
+  canReset,
   onOpenMirror,
   onLongPress,
   t,
 }: {
   state: UpdateState;
   errorMsg: string;
+  canReset: boolean;
   onCheck: () => void;
   onRetry: () => void;
   onReset: () => void;
@@ -719,9 +755,11 @@ function UpdateSection({
               <Settings className="size-3.5" />
               {t("update.mirrorSettings")}
             </Button>
-            <Button size="sm" variant="ghost" onClick={onReset}>
-              {t("update.resetToFactory")}
-            </Button>
+            {canReset && (
+              <Button size="sm" variant="ghost" onClick={onReset}>
+                {t("update.resetToFactory")}
+              </Button>
+            )}
           </div>
         </div>
       );
