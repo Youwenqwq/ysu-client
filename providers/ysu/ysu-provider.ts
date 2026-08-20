@@ -467,8 +467,8 @@ export class YSUProvider extends BaseProvider {
     return initiateWechatMFA();
   }
 
-  async pollWechatMfaQr(uuid: string, lastErrcode?: number): Promise<WechatQrPollResult> {
-    return pollWechatQR(uuid, lastErrcode);
+  async pollWechatMfaQr(uuid: string, lastErrcode?: number, signal?: AbortSignal): Promise<WechatQrPollResult> {
+    return pollWechatQR(uuid, lastErrcode, signal);
   }
 
   async completeWechatMfa(code: string, state: string): Promise<string> {

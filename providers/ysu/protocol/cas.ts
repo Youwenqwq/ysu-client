@@ -820,6 +820,7 @@ export async function initiateWechatMFA(): Promise<WechatMFAContext> {
 export async function pollWechatQR(
   uuid: string,
   lastErrcode?: number,
+  signal?: AbortSignal,
 ): Promise<{ status: 'waiting' | 'scanned' | 'confirmed'; code?: string }> {
   const lastParam = lastErrcode !== undefined ? `&last=${lastErrcode}` : '';
   const pollUrl = `${WECHAT_POLL_BASE}?uuid=${encodeURIComponent(uuid)}${lastParam}`;
@@ -834,6 +835,7 @@ export async function pollWechatQR(
     },
     redirect: 'follow',
     timeoutMs: Math.min(timeoutMs, 30_000),
+    signal,
   });
 
   const text = await resp.text();

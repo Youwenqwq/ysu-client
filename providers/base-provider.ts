@@ -111,7 +111,7 @@ export abstract class BaseProvider implements AcademicProvider {
   abstract requestMfaCode(input: MfaRequestInput): Promise<MfaChallenge>;
   abstract submitMfaCode(input: MfaSubmitInput): Promise<string>;
   abstract initiateWechatMfa(): Promise<WechatMfaContext>;
-  abstract pollWechatMfaQr(uuid: string, lastErrcode?: number): Promise<WechatQrPollResult>;
+  abstract pollWechatMfaQr(uuid: string, lastErrcode?: number, signal?: AbortSignal): Promise<WechatQrPollResult>;
   abstract completeWechatMfa(code: string, state: string): Promise<string>;
   abstract checkAuthStatus(): Promise<AuthStatus>;
   abstract logout(): Promise<void>;

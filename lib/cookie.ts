@@ -313,6 +313,12 @@ export interface HttpRequest {
   readonly body?: string | URLSearchParams;
   readonly redirect: 'manual' | 'follow';
   readonly timeoutMs?: number;
+  /**
+   * 可选中止信号。Web 传输层（proxyHttpSend）真实取消请求；
+   * CapacitorHttp 不支持中止 in-flight 请求，仅在发送前检查
+   * （已中止则直接抛错），已发出的请求结果由调用方丢弃。
+   */
+  readonly signal?: AbortSignal;
   /** Passed to CapacitorHttp as responseType (e.g. 'base64' for binary data). */
   readonly responseType?: string;
 }
@@ -425,7 +431,12 @@ async function proxyHttpSend(
     body: req.body,
     // 代理恒返回 200，不存在需要浏览器处理的重定向
     redirect: 'follow',
-    signal: AbortSignal.timeout(req.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+    signal: req.signal
+      ? AbortSignal.any([
+          AbortSignal.timeout(req.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+          req.signal,
+        ])
+      : AbortSignal.timeout(req.timeoutMs ?? DEFAULT_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -485,6 +496,10 @@ async function capacitorHttpSend(
   const CapacitorCookies = capCore?.CapacitorCookies;
   if (!CapacitorHttp?.request) {
     throw new Error('CapacitorHttp not available');
+  }
+  // CapacitorHttp 不支持中止 in-flight 请求；发送前检查，已中止直接抛错。
+  if (req.signal?.aborted) {
+    throw new DOMException('The operation was aborted.', 'AbortError');
   }
 
   // Push jar cookies → native store so HttpURLConnection sends them.

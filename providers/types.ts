@@ -886,7 +886,7 @@ export interface ProviderAuth {
   requestMfaCode(input: MfaRequestInput): Promise<MfaChallenge>;
   submitMfaCode(input: MfaSubmitInput): Promise<string>;
   initiateWechatMfa(): Promise<WechatMfaContext>;
-  pollWechatMfaQr(uuid: string, lastErrcode?: number): Promise<WechatQrPollResult>;
+  pollWechatMfaQr(uuid: string, lastErrcode?: number, signal?: AbortSignal): Promise<WechatQrPollResult>;
   completeWechatMfa(code: string, state: string): Promise<string>;
   checkAuthStatus(): Promise<AuthStatus>;
   logout(): Promise<void>;

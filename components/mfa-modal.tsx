@@ -55,7 +55,16 @@ export function MFAModal() {
   const [wechatError, setWechatError] = useState('');
   const [qrImageUrl, setQrImageUrl] = useState('');
   const wechatCtxRef = useRef<{ uuid: string; state: string } | null>(null);
-  const pollingRef = useRef(false);
+  // 轮询代数令牌：每次启动/停止自增。旧循环的 in-flight 长轮询返回后
+  // 比对代数即退出，避免切换 MFA 方式后旧 uuid 的轮询被新流程复活。
+  const pollGenRef = useRef(0);
+  const pollAbortRef = useRef<AbortController | null>(null);
+
+  function stopWechatPolling() {
+    pollGenRef.current++;
+    pollAbortRef.current?.abort();
+    pollAbortRef.current = null;
+  }
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -80,14 +89,15 @@ export function MFAModal() {
     setCountdown(0);
     setWechatStatus('idle');
     setWechatError('');
+    setQrImageUrl('');
     wechatCtxRef.current = null;
-    pollingRef.current = false;
+    stopWechatPolling();
   }, [open, showWechat]);
 
   // Stop polling when modal closes or method changes away from weixin.
   useEffect(() => {
     if (!open || mfaMethod !== 'weixin') {
-      pollingRef.current = false;
+      stopWechatPolling();
     }
   }, [open, mfaMethod]);
 
@@ -120,7 +130,7 @@ export function MFAModal() {
   }
 
   function handleCancel() {
-    pollingRef.current = false;
+    stopWechatPolling();
     cancelMFA();
     setCode("");
   }
@@ -132,31 +142,40 @@ export function MFAModal() {
     setWechatStatus('initiating');
     setWechatError('');
 
+    const gen = ++pollGenRef.current;
+    const abort = new AbortController();
+    pollAbortRef.current = abort;
+
     try {
       const provider = getActiveProvider();
       const ctx = await provider.initiateWechatMfa();
+      if (gen !== pollGenRef.current) return; // 等待期间流程已被取消/取代
       wechatCtxRef.current = { uuid: ctx.uuid, state: ctx.state };
 
       // CAS's WeChat app only supports qrconnect (PC QR-scan login).
-      // Show the QR code image — user scans with another device.
+      // 二维码立即渲染，长轮询后台并行（与官方网页行为一致）——
+      // lp.open.weixin.qq.com 无状态变化时会挂起约 25s 才返回，
+      // 若等首次 poll 再渲染，用户会白等 15~20s。
       setQrImageUrl(ctx.qrImageUrl);
+      setWechatStatus('waiting');
 
       // Start polling.
-      pollingRef.current = true;
       let lastErrcode: number | undefined;
 
-      while (pollingRef.current) {
+      while (gen === pollGenRef.current) {
         let result: { status: 'waiting' | 'scanned' | 'confirmed'; code?: string };
         try {
-          result = await provider.pollWechatMfaQr(ctx.uuid, lastErrcode);
+          result = await provider.pollWechatMfaQr(ctx.uuid, lastErrcode, abort.signal);
         } catch {
-          // Poll request itself failed (network, timeout) — retry.
+          // Poll request itself failed (network, timeout, abort) — retry unless superseded.
+          if (gen !== pollGenRef.current || abort.signal.aborted) return;
           continue;
         }
+        if (gen !== pollGenRef.current) return; // 长轮询挂起期间流程已切换
 
         if (result.status === 'confirmed' && result.code) {
           setWechatStatus('confirmed');
-          pollingRef.current = false;
+          stopWechatPolling();
 
           try {
             const credential = await provider.completeWechatMfa(result.code, ctx.state);
@@ -177,26 +196,31 @@ export function MFAModal() {
         }
       }
     } catch (err) {
+      if (gen !== pollGenRef.current) return; // 错误归属已被新流程取代
       setWechatStatus('error');
       setWechatError((err as Error).message || t("login.errorMfaWechatFailed"));
     }
   }
 
   function handleWechatRetry() {
+    stopWechatPolling();
     setWechatStatus('idle');
     setWechatError('');
+    setQrImageUrl('');
     wechatCtxRef.current = null;
   }
 
   function handleMethodChange(v: string) {
     if (!v) return;
-    pollingRef.current = false;
+    stopWechatPolling();
     setMfaMethod(v as YSUMfaMethod);
     setLocalMethodCode('');
     setLocalHint('');
     setCountdown(0);
     setWechatStatus('idle');
     setWechatError('');
+    setQrImageUrl('');
+    wechatCtxRef.current = null;
   }
 
   const isWechat = mfaMethod === 'weixin';

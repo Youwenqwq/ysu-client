@@ -182,9 +182,10 @@ export async function initiateWechatMFA(): Promise<WechatMFAContext> {
 export async function pollWechatQR(
   uuid: string,
   lastErrcode?: number,
+  signal?: AbortSignal,
 ): Promise<WechatQrPollResult> {
   try {
-    return await _pollWechatQR(uuid, lastErrcode);
+    return await _pollWechatQR(uuid, lastErrcode, signal);
   } catch (e) {
     throw mapCASError(e);
   }
