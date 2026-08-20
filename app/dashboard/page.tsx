@@ -10,6 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { compareExamStartTime, formatExamTime, isExamCompleted } from "@/lib/academic/exam-utils";
 import { useSettingsStore } from "@/lib/stores/settings";
 import { useTranslation } from "@/lib/i18n/use-translation";
+import { useStoredMediaUrl } from "@/lib/storage/media";
+import { loadAvatarImage } from "@/lib/storage/avatar";
 import {
   useClassPeriods,
   useCurrentWeek,
@@ -42,6 +44,7 @@ function isCourseActiveToday(course: Course, currentWeek: number, currentWeekday
 export default function DashboardPage() {
   const router = useRouter();
   const avatarImage = useSettingsStore((s) => s.avatarImage);
+  const avatarUrl = useStoredMediaUrl(avatarImage, loadAvatarImage);
   const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours);
   const widgetShowNextDaySchedule = useSettingsStore((s) => s.widgetShowNextDaySchedule);
   const { t } = useTranslation();
@@ -211,7 +214,7 @@ export default function DashboardPage() {
       <Card className="md:hidden">
         <CardHeader className="flex flex-row items-center gap-3 pb-3">
           <Avatar className="size-14 shrink-0">
-            {avatarImage && <AvatarImage src={avatarImage} alt="avatar" />}
+            {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
             <AvatarFallback className="text-base font-medium">
               {student.data?.name ? student.data.name.slice(-2) : "--"}
             </AvatarFallback>

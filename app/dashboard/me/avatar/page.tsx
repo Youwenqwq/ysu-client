@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSettingsStore } from "@/lib/stores/settings";
 import { useTranslation } from "@/lib/i18n/use-translation";
-import { saveAvatarImage, removeAvatarImage } from "@/lib/storage/avatar";
+import { saveAvatarImage, removeAvatarImage, loadAvatarImage } from "@/lib/storage/avatar";
+import { useStoredMediaUrl } from "@/lib/storage/media";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 
@@ -18,6 +19,7 @@ export default function AvatarSettingsPage() {
 
   const avatarImage = useSettingsStore((s) => s.avatarImage);
   const setAvatarImage = useSettingsStore((s) => s.setAvatarImage);
+  const avatarUrl = useStoredMediaUrl(avatarImage, loadAvatarImage);
 
   const [uploading, setUploading] = useState(false);
 
@@ -73,7 +75,7 @@ export default function AvatarSettingsPage() {
         <CardContent>
           <div className="flex flex-col items-center gap-6">
             <Avatar className="size-24">
-              {avatarImage ? <AvatarImage src={avatarImage} alt="avatar" /> : null}
+              {avatarUrl ? <AvatarImage src={avatarUrl} alt="avatar" /> : null}
               <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
             </Avatar>
 

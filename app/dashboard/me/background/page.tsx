@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/field";
 import { useSettingsStore, type CardStyle, type BackgroundStyle } from "@/lib/stores/settings";
 import { useTranslation } from "@/lib/i18n/use-translation";
-import { saveBackgroundImage, removeBackgroundImage } from "@/lib/storage/background";
+import { saveBackgroundImage, removeBackgroundImage, loadBackgroundImage } from "@/lib/storage/background";
+import { useStoredMediaUrl } from "@/lib/storage/media";
 import { ImagePlus, Trash2 } from "lucide-react";
 
 export default function BackgroundSettingsPage() {
@@ -24,6 +25,7 @@ export default function BackgroundSettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const backgroundImage = useSettingsStore((s) => s.backgroundImage);
+  const backgroundUrl = useStoredMediaUrl(backgroundImage, loadBackgroundImage);
   const setBackgroundImage = useSettingsStore((s) => s.setBackgroundImage);
   const overlayOpacity = useSettingsStore((s) => s.backgroundOverlayOpacity);
   const setOverlayOpacity = useSettingsStore((s) => s.setBackgroundOverlayOpacity);
@@ -133,11 +135,11 @@ export default function BackgroundSettingsPage() {
               className="hidden"
               onChange={handleFileChange}
             />
-            {backgroundImage ? (
+            {backgroundUrl ? (
               <div className="flex items-center gap-4">
                 <div
                   className="size-20 rounded-lg border bg-cover bg-center"
-                  style={{ backgroundImage: `url(${backgroundImage})` }}
+                  style={{ backgroundImage: `url(${backgroundUrl})` }}
                 />
                 <div className="flex flex-col gap-2">
                   <Button variant="outline" size="sm" onClick={handleSelectImage}>

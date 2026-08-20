@@ -28,6 +28,8 @@ import { useSettingsStore } from "@/lib/stores/settings";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
+import { useStoredMediaUrl } from "@/lib/storage/media";
+import { loadAvatarImage } from "@/lib/storage/avatar";
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service";
 import { useStudentInfo } from "@/providers/hooks";
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit";
@@ -104,6 +106,7 @@ export default function MePage() {
   }
 
   const avatarImage = useSettingsStore((s) => s.avatarImage);
+  const avatarUrl = useStoredMediaUrl(avatarImage, loadAvatarImage);
 
 
   const displayName = student.data?.name || username || t("me.profileFallback");
@@ -129,7 +132,7 @@ export default function MePage() {
         <Card className="transition-colors hover:bg-muted/40 active:bg-muted/60">
           <CardContent className="flex items-center gap-4 py-5">
           <Avatar className="size-14">
-            {avatarImage && <AvatarImage src={avatarImage} alt="avatar" />}
+            {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
             <AvatarFallback className="text-lg">{initials}</AvatarFallback>
           </Avatar>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">

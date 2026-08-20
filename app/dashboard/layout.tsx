@@ -55,6 +55,8 @@ import { RefreshIndicator } from "@/components/refresh-indicator";
 import { StaleIndicator } from "@/components/stale-indicator";
 import { UpdateDialog } from "@/components/update-dialog";
 import { APP_VERSION, APP_BUILD } from "@/lib/version";
+import { useStoredMediaUrl } from "@/lib/storage/media";
+import { loadAvatarImage } from "@/lib/storage/avatar";
 
 export default function DashboardLayout({
   children,
@@ -70,6 +72,7 @@ export default function DashboardLayout({
   const backgroundImage = useSettingsStore((s) => s.backgroundImage);
   const avatarImage = useSettingsStore((s) => s.avatarImage);
   const hasBackground = !!backgroundImage;
+  const avatarUrl = useStoredMediaUrl(avatarImage, loadAvatarImage);
 
   const navGroups = [
     {
@@ -272,7 +275,7 @@ export default function DashboardLayout({
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative size-8 rounded-full">
                   <Avatar className="size-8">
-                    {avatarImage && <AvatarImage src={avatarImage} alt="avatar" />}
+                    {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
                     <AvatarFallback className="text-xs">
                       {username?.slice(-2) || "U"}
                     </AvatarFallback>

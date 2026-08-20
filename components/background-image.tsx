@@ -2,9 +2,12 @@
 
 import { useEffect } from "react";
 import { useSettingsStore } from "@/lib/stores/settings";
+import { useStoredMediaUrl } from "@/lib/storage/media";
+import { loadBackgroundImage } from "@/lib/storage/background";
 
 export function BackgroundImage() {
   const backgroundImage = useSettingsStore((s) => s.backgroundImage);
+  const backgroundUrl = useStoredMediaUrl(backgroundImage, loadBackgroundImage);
   const overlayOpacity = useSettingsStore((s) => s.backgroundOverlayOpacity);
   const backgroundStyle = useSettingsStore((s) => s.backgroundStyle);
   const backgroundBlurAmount = useSettingsStore((s) => s.backgroundBlurAmount);
@@ -24,7 +27,7 @@ export function BackgroundImage() {
     };
   }, [backgroundImage, cardStyle, cardOpacity]);
 
-  if (!backgroundImage) return null;
+  if (!backgroundUrl) return null;
 
   const cardStyleCss =
     cardStyle === "translucent"
@@ -56,7 +59,7 @@ export function BackgroundImage() {
         aria-hidden="true"
         className="fixed inset-0 -z-10"
         style={{
-          backgroundImage: `url(${backgroundImage})`,
+          backgroundImage: `url(${backgroundUrl})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundAttachment: "fixed",
