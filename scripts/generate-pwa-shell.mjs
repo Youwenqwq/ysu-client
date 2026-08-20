@@ -10,6 +10,7 @@ const excludedSegments = new Set(["_next", "_not-found", "404"]);
 
 const routes = new Set();
 const dataAssets = new Set();
+const staticAssets = new Set();
 
 function toPosix(path) {
   return path.split(sep).join("/");
@@ -30,6 +31,10 @@ function walk(directory) {
 
     const relativePath = toPosix(relative(distDir, path));
     const segments = relativePath.split("/");
+    if (segments[0] === "_next" && segments[1] === "static") {
+      staticAssets.add(`./${relativePath}`);
+      continue;
+    }
     if (isExcluded(segments)) continue;
 
     if (entry === "index.html") {
@@ -48,7 +53,7 @@ function walk(directory) {
 
 walk(distDir);
 
-const assets = [...routes, ...dataAssets].sort((a, b) => a.localeCompare(b));
+const assets = [...routes, ...dataAssets, ...staticAssets].sort((a, b) => a.localeCompare(b));
 writeFileSync(outputFile, `${JSON.stringify({ assets }, null, 2)}\n`);
 
 const pkg = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));

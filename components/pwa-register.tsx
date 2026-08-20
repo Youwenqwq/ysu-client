@@ -13,6 +13,8 @@ import {
 
 const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 const OFFLINE_READY_KEY = "academic-client-pwa-offline-ready";
+const OFFLINE_READY_STANDALONE_KEY =
+  "academic-client-pwa-offline-ready-standalone";
 
 export function PwaRegister() {
   const { t } = useTranslation();
@@ -35,7 +37,12 @@ export function PwaRegister() {
     }
 
     const basePath = process.env.NEXT_PUBLIC_APP_BASE_PATH || "";
-    const wasControlled = navigator.serviceWorker.controller !== null;
+    const isStandalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    const offlineReadyKey = isStandalone
+      ? OFFLINE_READY_STANDALONE_KEY
+      : OFFLINE_READY_KEY;
     let registration: ServiceWorkerRegistration | null = null;
     let disposed = false;
 
@@ -47,10 +54,10 @@ export function PwaRegister() {
         watchPwaRegistration(target);
         void prepareWebUpdate(target);
 
-        if (wasControlled || localStorage.getItem(OFFLINE_READY_KEY)) return;
+        if (localStorage.getItem(offlineReadyKey)) return;
         await navigator.serviceWorker.ready;
         if (disposed) return;
-        localStorage.setItem(OFFLINE_READY_KEY, "1");
+        localStorage.setItem(offlineReadyKey, "1");
         toast.success(tRef.current("app.offlineReady"));
       })
       .catch(() => {});

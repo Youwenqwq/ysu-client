@@ -19,6 +19,7 @@ const shellUrls = [
 ].map((path) => new URL(path, scopeUrl).href);
 
 const appShellUrl = new URL("./", scopeUrl).href;
+const precacheBatchSize = 8;
 
 async function loadShellUrls() {
   const urls = new Set(shellUrls);
@@ -63,19 +64,21 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(cacheName).then(async (cache) => {
       const urls = await loadShellUrls();
-      await Promise.all(
-        urls.map(async (url) => {
-          try {
-            const request = new Request(url, { cache: "reload" });
-            const response = await fetch(request);
-            if (isCacheable(response)) {
-              await cache.put(request, response);
+      for (let index = 0; index < urls.length; index += precacheBatchSize) {
+        await Promise.all(
+          urls.slice(index, index + precacheBatchSize).map(async (url) => {
+            try {
+              const request = new Request(url, { cache: "reload" });
+              const response = await fetch(request);
+              if (isCacheable(response)) {
+                await cache.put(request, response);
+              }
+            } catch {
+              // A missing shell asset must not prevent the worker from installing.
             }
-          } catch {
-            // A missing shell asset must not prevent the worker from installing.
-          }
-        }),
-      );
+          }),
+        );
+      }
     }),
   );
 });
