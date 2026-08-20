@@ -5,6 +5,7 @@ import Markdown from "react-markdown";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -115,6 +116,9 @@ export function AnnouncementDialog({ onDismissed }: AnnouncementDialogProps) {
             </Badge>
             <DialogTitle>{announcementInfo.title}</DialogTitle>
           </div>
+          <DialogDescription className="sr-only">
+            {t("announcement.dialogDescription")}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 my-4">

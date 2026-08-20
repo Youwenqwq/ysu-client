@@ -830,6 +830,7 @@ export default function EvaluationPage() {
                     )}
                     {q.questionType !== "01" && q.questionType !== "07" && (
                       <Textarea
+                        name={`evaluation-text-${q.tmid}`}
                         placeholder={t("evaluation.textPlaceholder")}
                         value={answers[q.tmid]?.text || ""}
                         onChange={(e) =>

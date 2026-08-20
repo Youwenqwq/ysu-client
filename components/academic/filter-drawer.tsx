@@ -29,7 +29,11 @@ export function FilterTrigger({
     <Button
       variant="ghost"
       size="sm"
-      onClick={onClick}
+      onClick={(e) => {
+        // 抽屉打开前先移走焦点，避免 Chrome aria-hidden/focus 警告
+        e.currentTarget.blur();
+        onClick();
+      }}
       className="h-8 max-w-44 gap-0.5 px-2 text-sm"
     >
       <span className="truncate">{label}</span>
@@ -57,7 +61,10 @@ export function FilterDrawer({
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>{title}</DrawerTitle>
-          {description && <DrawerDescription>{description}</DrawerDescription>}
+          {/* vaul/radix 要求可访问描述；无显式描述时回退为 sr-only 标题 */}
+          <DrawerDescription className={description ? undefined : "sr-only"}>
+            {description ?? title}
+          </DrawerDescription>
         </DrawerHeader>
         <div className="px-4 pb-6">{children}</div>
       </DrawerContent>

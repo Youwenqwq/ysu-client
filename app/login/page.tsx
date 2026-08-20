@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuthStore } from "@/lib/stores/auth";
+import { blurActiveElement } from "@/lib/utils";
 import { useSettingsStore } from "@/lib/stores/settings";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { getSchoolId, setSchoolConfig } from "@/lib/server-config";
@@ -204,6 +205,8 @@ export default function LoginPage() {
       toast.error(t("login.errorMissingCredentials"));
       return;
     }
+    // 登录可能弹出 MFA 对话框；先移走焦点，避免 Chrome aria-hidden/focus 警告
+    blurActiveElement();
 
     const limit = checkRateLimit();
     if (!limit.allowed) {

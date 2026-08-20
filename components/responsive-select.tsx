@@ -14,6 +14,7 @@ import {
   Drawer,
   DrawerNested,
   DrawerContent,
+  DrawerDescription,
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
@@ -78,7 +79,11 @@ export function ResponsiveSelect({
       <button
         type="button"
         id={id}
-        onClick={() => setOpen(true)}
+        onClick={(e) => {
+          // 抽屉打开前先移走焦点，避免 Chrome aria-hidden/focus 警告
+          e.currentTarget.blur();
+          setOpen(true);
+        }}
         className={cn(
           // 外观与 SelectTrigger 保持一致
           "flex h-8 w-full items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none dark:bg-input/30",
@@ -94,6 +99,9 @@ export function ResponsiveSelect({
         <DrawerContent>
           <DrawerHeader>
             <DrawerTitle>{title ?? placeholder ?? ""}</DrawerTitle>
+            <DrawerDescription className="sr-only">
+              {title ?? placeholder ?? ""}
+            </DrawerDescription>
           </DrawerHeader>
           <div className="px-4 pb-6">
             <FilterOptionList

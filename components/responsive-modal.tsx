@@ -27,19 +27,30 @@ interface ResponsiveModalProps {
   children: React.ReactNode;
 }
 
+// Root 与子件共享同一个 isMobile：每个组件各自调用 useIsMobile 时，
+// 多个 matchMedia 监听器的 setState 不一定落在同一批提交里，
+// 断点跨越瞬间可能出现 Root=Drawer + Content=DialogContent 的混合渲染
+// （`DialogPortal` must be used within `Dialog`）。
+const ResponsiveModalMobileContext = React.createContext<boolean>(false);
+
+function useResponsiveModalIsMobile(): boolean {
+  return React.useContext(ResponsiveModalMobileContext);
+}
+
 export function ResponsiveModal({ open, onOpenChange, children }: ResponsiveModalProps) {
   const isMobile = useIsMobile();
-  if (isMobile) {
-    return (
-      <Drawer open={open} onOpenChange={onOpenChange}>
-        {children}
-      </Drawer>
-    );
-  }
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {children}
-    </Dialog>
+    <ResponsiveModalMobileContext.Provider value={isMobile}>
+      {isMobile ? (
+        <Drawer open={open} onOpenChange={onOpenChange}>
+          {children}
+        </Drawer>
+      ) : (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          {children}
+        </Dialog>
+      )}
+    </ResponsiveModalMobileContext.Provider>
   );
 }
 
@@ -53,7 +64,7 @@ export function ResponsiveModalContent({
   children,
   ...props
 }: ResponsiveModalContentProps) {
-  const isMobile = useIsMobile();
+  const isMobile = useResponsiveModalIsMobile();
   const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
 
   useEffect(() => {
@@ -88,7 +99,7 @@ export function ResponsiveModalHeader({
   children,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  const isMobile = useIsMobile();
+  const isMobile = useResponsiveModalIsMobile();
   if (isMobile) {
     return (
       <DrawerHeader className={className} {...props}>
@@ -108,7 +119,7 @@ export function ResponsiveModalTitle({
   children,
   ...props
 }: React.HTMLAttributes<HTMLHeadingElement>) {
-  const isMobile = useIsMobile();
+  const isMobile = useResponsiveModalIsMobile();
   if (isMobile) {
     return (
       <DrawerTitle className={className} {...props}>
@@ -128,7 +139,7 @@ export function ResponsiveModalDescription({
   children,
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
-  const isMobile = useIsMobile();
+  const isMobile = useResponsiveModalIsMobile();
   if (isMobile) {
     return (
       <DrawerDescription className={className} {...props}>
@@ -153,7 +164,7 @@ export function ResponsiveModalFooter({
   children,
   ...props
 }: ResponsiveModalFooterProps) {
-  const isMobile = useIsMobile();
+  const isMobile = useResponsiveModalIsMobile();
   if (isMobile) {
     return (
       <DrawerFooter className={cn(drawerClassName)} {...props}>
@@ -178,7 +189,7 @@ export function ResponsiveModalBody({
   children,
   ...props
 }: ResponsiveModalBodyProps) {
-  const isMobile = useIsMobile();
+  const isMobile = useResponsiveModalIsMobile();
   if (isMobile) {
     return (
       <div

@@ -244,6 +244,7 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                       </div>
                       <Input
                         ref={codeInputRef}
+                        name="signin-code"
                         type="tel"
                         inputMode="numeric"
                         maxLength={4}
@@ -266,6 +267,7 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                         {t("activity.scanCodeDesc")}
                       </p>
                       <Input
+                        name="signin-code"
                         placeholder={t("activity.codeInputPlaceholder")}
                         value={code}
                         onChange={(e) => setCode(e.target.value)}

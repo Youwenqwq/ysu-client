@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { isCapacitor } from "@/lib/native/platform";
+import { blurActiveElement } from "@/lib/utils";
 import { useSettingsStore } from "@/lib/stores/settings";
 import { useUpdateStore } from "@/lib/stores/update";
 import { useLongPress } from "@/hooks/use-long-press";
@@ -136,6 +137,7 @@ export function AboutContent() {
       setUpdateStatus(info.available || info.apkUpdateAvailable);
       if (info.apkUpdateAvailable || info.available) {
         setUpdateInfo(info);
+        blurActiveElement();
         setShowDialog(true);
         setState("idle");
       } else {
@@ -236,7 +238,8 @@ export function AboutContent() {
 
           <Separator />
 
-          {canCheck ? (
+          {/* Web 端即访问即刷新，无 OTA 概念，不展示检查更新入口 */}
+          {canCheck && (
             <UpdateSection
               state={state}
               errorMsg={errorMsg}
@@ -247,20 +250,6 @@ export function AboutContent() {
               onLongPress={openMirrorDialog}
               t={t}
             />
-          ) : (
-            <button
-              type="button"
-              disabled
-              className="flex items-center gap-3 py-3 text-muted-foreground transition-colors"
-            >
-              <CircleFadingArrowUp className="size-5 shrink-0" />
-              <span className="flex-1 text-left text-sm">
-                {t("about.checkUpdate")}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {t("about.version")} {APP_VERSION}
-              </span>
-            </button>
           )}
 
           <Separator />
@@ -524,6 +513,7 @@ export function AboutContent() {
                   <div className="flex flex-col gap-2">
                     <span className="text-sm font-medium">{t("about.feedbackText")}</span>
                     <textarea
+                      name="feedback-text"
                       value={feedbackText}
                       onChange={(e) => setFeedbackText(e.target.value)}
                       placeholder={t("about.feedbackTextPlaceholder")}

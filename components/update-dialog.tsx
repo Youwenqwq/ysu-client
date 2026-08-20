@@ -5,6 +5,7 @@ import Markdown from "react-markdown";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -171,6 +172,9 @@ export function UpdateDialog() {
       <DialogContent className="max-h-[85vh] flex flex-col" showCloseButton={state !== "downloading" && state !== "installing"}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {t("update.dialogDescription")}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 my-4">

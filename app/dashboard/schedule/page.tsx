@@ -188,19 +188,19 @@ export default function SchedulePage() {
     );
   }
 
-  const filterControls = (
+  const renderFilterControls = (idPrefix: string) => (
     <FieldGroup className="flex flex-row flex-wrap items-end gap-3">
       <Field className="w-48">
-        <FieldLabel htmlFor="schedule-term">{t("schedule.termLabel")}</FieldLabel>
+        <FieldLabel htmlFor={`${idPrefix}-term`}>{t("schedule.termLabel")}</FieldLabel>
         <Input
-          id="schedule-term"
+          id={`${idPrefix}-term`}
           value={term}
           onChange={(e) => setTerm(e.target.value)}
           placeholder={t("schedule.termPlaceholder")}
         />
       </Field>
       <Field className="min-w-[16rem]">
-        <FieldLabel htmlFor="schedule-week">{t("schedule.weekLabel")}</FieldLabel>
+        <FieldLabel htmlFor={`${idPrefix}-week`}>{t("schedule.weekLabel")}</FieldLabel>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1">
             <Button
@@ -213,7 +213,7 @@ export default function SchedulePage() {
               <ChevronLeft />
             </Button>
             <Input
-              id="schedule-week"
+              id={`${idPrefix}-week`}
               type="number"
               value={selectedWeek || ""}
               onChange={(e) => setSelectedWeek(parseInt(e.target.value, 10) || 0)}
@@ -253,7 +253,7 @@ export default function SchedulePage() {
           <CardTitle>{t("schedule.title")}</CardTitle>
           <CardDescription>{t("schedule.description")}</CardDescription>
         </CardHeader>
-        <CardContent>{filterControls}</CardContent>
+        <CardContent>{renderFilterControls("schedule-desktop")}</CardContent>
       </Card>
 
       {isMobile ? (
@@ -298,7 +298,7 @@ export default function SchedulePage() {
         title={t("schedule.title")}
         description={t("schedule.description")}
       >
-        {filterControls}
+        {renderFilterControls("schedule-drawer")}
       </FilterDrawer>
     </div>
   );

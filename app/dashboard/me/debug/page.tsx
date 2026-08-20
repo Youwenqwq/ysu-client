@@ -498,6 +498,7 @@ export default function DebugPage() {
                 {customUserAgentEnabled && (
                   <>
                     <Textarea
+                      name="custom-user-agent"
                       value={uaDraft}
                       onChange={(event) => setUaDraft(event.target.value)}
                       placeholder={t("debug.emptyUserAgentPlaceholder")}

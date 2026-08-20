@@ -75,12 +75,12 @@ export default function ExamsPage() {
     [queriedTerm, t],
   );
 
-  const filterControls = (
+  const renderFilterControls = (idPrefix: string) => (
     <FieldGroup className="flex flex-row flex-wrap items-end gap-3">
       <Field className="w-48">
-        <FieldLabel htmlFor="exams-term">{t("exams.termLabel")}</FieldLabel>
+        <FieldLabel htmlFor={`${idPrefix}-term`}>{t("exams.termLabel")}</FieldLabel>
         <Input
-          id="exams-term"
+          id={`${idPrefix}-term`}
           value={term}
           onChange={(e) => setTerm(e.target.value)}
           placeholder={t("exams.termPlaceholder")}
@@ -120,7 +120,7 @@ export default function ExamsPage() {
           <CardTitle>{t("exams.title")}</CardTitle>
           <CardDescription>{t("exams.description")}</CardDescription>
         </CardHeader>
-        <CardContent>{filterControls}</CardContent>
+        <CardContent>{renderFilterControls("exams-desktop")}</CardContent>
       </Card>
 
       <FilterDrawer
@@ -129,7 +129,7 @@ export default function ExamsPage() {
         title={t("exams.title")}
         description={t("exams.description")}
       >
-        {filterControls}
+        {renderFilterControls("exams-drawer")}
       </FilterDrawer>
 
       {exams.length === 0 ? (

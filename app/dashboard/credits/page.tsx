@@ -307,6 +307,7 @@ function CatalogPanel<T>({
     <div className="flex flex-col gap-4">
       <div className="flex gap-2">
         <Input
+          name="credits-search"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           placeholder={t("credits.searchPlaceholder")}

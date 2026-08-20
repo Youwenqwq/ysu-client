@@ -15,11 +15,12 @@ import { NotifyProvider } from "@/components/notify-provider"
 import { ProviderProvider } from "@/providers/provider-context"
 import { cn } from "@/lib/utils";
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans' })
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans', preload: false })
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+  preload: false,
 })
 
 export const metadata: Metadata = {

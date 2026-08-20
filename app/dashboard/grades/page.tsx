@@ -318,12 +318,11 @@ export default function GradesPage() {
     );
   }
 
-  const filterControls = (
+  const renderFilterControls = (idPrefix: string) => (
     <FieldGroup className="flex flex-row flex-wrap items-end gap-3">
       <Field className="w-48">
-        <FieldLabel htmlFor="grades-term">{t("grades.termLabel")}</FieldLabel>
+        <FieldLabel>{t("grades.termLabel")}</FieldLabel>
         <ResponsiveSelect
-          id="grades-term"
           nested
           value={term}
           onValueChange={setTerm}
@@ -336,9 +335,9 @@ export default function GradesPage() {
         />
       </Field>
       <Field className="w-48">
-        <FieldLabel htmlFor="grades-course-name">{t("grades.courseNameLabel")}</FieldLabel>
+        <FieldLabel htmlFor={`${idPrefix}-course-name`}>{t("grades.courseNameLabel")}</FieldLabel>
         <Input
-          id="grades-course-name"
+          id={`${idPrefix}-course-name`}
           value={courseName}
           onChange={(e) => setCourseName(e.target.value)}
           placeholder={t("grades.courseNamePlaceholder")}
@@ -390,7 +389,7 @@ export default function GradesPage() {
           <CardTitle>{t("grades.title")}</CardTitle>
           <CardDescription>{t("grades.description")}</CardDescription>
         </CardHeader>
-        <CardContent>{filterControls}</CardContent>
+        <CardContent>{renderFilterControls("grades-desktop")}</CardContent>
       </Card>
 
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -472,7 +471,7 @@ export default function GradesPage() {
         title={t("grades.title")}
         description={t("grades.description")}
       >
-        {filterControls}
+        {renderFilterControls("grades-drawer")}
         {gachaEnabled && scoredGrades.length > 0 && (
           <Button
             variant="ghost"

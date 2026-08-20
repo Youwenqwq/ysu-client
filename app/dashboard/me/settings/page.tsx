@@ -151,6 +151,20 @@ export default function SettingsPage() {
     router.replace("/login");
   }
 
+  // 新成绩抽卡开关：Web 端直接跟在背景图下方，Capacitor 端位于小组件小节内
+  const gradeGachaRow = (
+    <div className="flex items-center gap-3 border-t border-border py-3">
+      <Sparkles className="size-5 shrink-0 text-muted-foreground" />
+      <div className="flex flex-1 flex-col">
+        <span className="text-sm">{t("settings.gradeGacha")}</span>
+        <span className="text-xs text-muted-foreground">
+          {t("settings.gradeGachaDesc")}
+        </span>
+      </div>
+      <Switch checked={gradeGachaEnabled} onCheckedChange={setGradeGachaEnabled} />
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
@@ -244,49 +258,47 @@ export default function SettingsPage() {
               <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
             </Link>
 
-            {/* 小组件 */}
-            <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
-              {t("settings.widget")}
-            </h3>
+            {/* 新成绩抽卡（Web 端直接跟在背景图下方；Capacitor 端在小组件小节内） */}
+            {!isCapacitor() && gradeGachaRow}
 
-            {/* 课表同步提醒阈值 */}
-            <SettingNumberInput
-              icon={Clock}
-              label={t("settings.widgetSyncReminder")}
-              value={widgetSyncReminderHours}
-              onChange={(v) => {
-                setWidgetSyncReminderHours(v);
-                syncWidgetSettingsToWidget(v, widgetShowNextDaySchedule).catch(() => {});
-              }}
-              min={0}
-              max={168}
-              unit={t("settings.widgetSyncReminderUnit")}
-            />
+            {/* 小组件 — 仅 Capacitor 平台 */}
+            {isCapacitor() && (
+              <>
+                <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
+                  {t("settings.widget")}
+                </h3>
 
-            {/* 无课显示下一有课日 */}
-            <div className="flex items-center gap-3 border-t border-border py-3">
-              <CalendarClock className="size-5 shrink-0 text-muted-foreground" />
-              <span className="flex-1 text-sm">{t("settings.widgetShowNextDay")}</span>
-              <Switch
-                checked={widgetShowNextDaySchedule}
-                onCheckedChange={(v) => {
-                  setWidgetShowNextDaySchedule(v);
-                  syncWidgetSettingsToWidget(widgetSyncReminderHours, v).catch(() => {});
-                }}
-              />
-            </div>
+                {/* 课表同步提醒阈值 */}
+                <SettingNumberInput
+                  icon={Clock}
+                  label={t("settings.widgetSyncReminder")}
+                  value={widgetSyncReminderHours}
+                  onChange={(v) => {
+                    setWidgetSyncReminderHours(v);
+                    syncWidgetSettingsToWidget(v, widgetShowNextDaySchedule).catch(() => {});
+                  }}
+                  min={0}
+                  max={168}
+                  unit={t("settings.widgetSyncReminderUnit")}
+                />
 
-            {/* 新成绩抽卡 */}
-            <div className="flex items-center gap-3 border-t border-border py-3">
-              <Sparkles className="size-5 shrink-0 text-muted-foreground" />
-              <div className="flex flex-1 flex-col">
-                <span className="text-sm">{t("settings.gradeGacha")}</span>
-                <span className="text-xs text-muted-foreground">
-                  {t("settings.gradeGachaDesc")}
-                </span>
-              </div>
-              <Switch checked={gradeGachaEnabled} onCheckedChange={setGradeGachaEnabled} />
-            </div>
+                {/* 无课显示下一有课日 */}
+                <div className="flex items-center gap-3 border-t border-border py-3">
+                  <CalendarClock className="size-5 shrink-0 text-muted-foreground" />
+                  <span className="flex-1 text-sm">{t("settings.widgetShowNextDay")}</span>
+                  <Switch
+                    checked={widgetShowNextDaySchedule}
+                    onCheckedChange={(v) => {
+                      setWidgetShowNextDaySchedule(v);
+                      syncWidgetSettingsToWidget(widgetSyncReminderHours, v).catch(() => {});
+                    }}
+                  />
+                </div>
+
+                {/* 新成绩抽卡 */}
+                {gradeGachaRow}
+              </>
+            )}
           </CardContent>
         </Card>
       </Section>
@@ -605,6 +617,7 @@ function SettingNumberInput({
       </div>
       <div className="flex items-center gap-1.5">
         <Input
+          name="setting-number"
           type="number"
           value={local}
           onChange={(e) => setLocal(e.target.value)}

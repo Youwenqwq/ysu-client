@@ -353,9 +353,9 @@ export function ScheduleMobile({
         <DrawerContent>
           <DrawerHeader>
             <DrawerTitle>{examDrawer?.exam.name}</DrawerTitle>
-            {examDrawer?.exam.examName && (
-              <DrawerDescription>{examDrawer.exam.examName}</DrawerDescription>
-            )}
+            <DrawerDescription className={examDrawer?.exam.examName ? undefined : "sr-only"}>
+              {examDrawer?.exam.examName || examDrawer?.exam.name || ""}
+            </DrawerDescription>
           </DrawerHeader>
           {examDrawer && (
             <div className="flex flex-col gap-2 px-4 pb-6 text-sm">

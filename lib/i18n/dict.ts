@@ -204,6 +204,7 @@ export const zh = {
     installing: "安装中...",
     skip: "稍后提醒",
     noReleaseNotes: "暂无更新说明",
+    dialogDescription: "版本更新详情",
   },
   announcement: {
     levelInfo: "通知",
@@ -212,6 +213,7 @@ export const zh = {
     gotIt: "知道了",
     dismiss: "不再提醒",
     noContent: "暂无公告内容",
+    dialogDescription: "应用公告",
   },
   login: {
     title: "燕大终端",
@@ -1004,6 +1006,7 @@ export const en = {
     installing: "Installing...",
     skip: "Remind me later",
     noReleaseNotes: "No release notes",
+    dialogDescription: "Version update details",
   },
   announcement: {
     levelInfo: "Info",
@@ -1012,6 +1015,7 @@ export const en = {
     gotIt: "Got it",
     dismiss: "Don't remind again",
     noContent: "No announcement content",
+    dialogDescription: "App announcement",
   },
   login: {
     title: "YSU Terminal",

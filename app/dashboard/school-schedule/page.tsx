@@ -480,7 +480,7 @@ function RoomSchedulePanel() {
     setFilterDrawerOpen(false);
   }
 
-  const filterControls = (
+  const renderFilterControls = (idPrefix: string) => (
     <FieldGroup className="flex flex-col gap-3">
       <div className="flex flex-col gap-3 md:flex-row">
         <Field className="flex-1">
@@ -514,10 +514,10 @@ function RoomSchedulePanel() {
         </Field>
       </div>
       <Field>
-        <FieldLabel htmlFor="room-name">{t("schoolSchedule.roomTab")}</FieldLabel>
+        <FieldLabel htmlFor={`${idPrefix}-room-name`}>{t("schoolSchedule.roomTab")}</FieldLabel>
         <div className="flex gap-2">
           <Input
-            id="room-name"
+            id={`${idPrefix}-room-name`}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("schoolSchedule.roomNamePlaceholder")}
@@ -546,13 +546,13 @@ function RoomSchedulePanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="hidden md:block">{filterControls}</div>
+      <div className="hidden md:block">{renderFilterControls("room-desktop")}</div>
       <FilterDrawer
         open={filterDrawerOpen}
         onOpenChange={setFilterDrawerOpen}
         title={t("schoolSchedule.roomTab")}
       >
-        {filterControls}
+        {renderFilterControls("room-drawer")}
       </FilterDrawer>
 
       {!hasFilter ? (
