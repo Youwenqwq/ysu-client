@@ -2,3 +2,5 @@
 .env
 .edgeone/*
 .tef_dist/*
+# App bundle injected by scripts/deploy-website.sh
+public/app/

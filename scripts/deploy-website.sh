@@ -3,47 +3,6 @@ set -euo pipefail
 
 REPO="Youwenqwq/ysu-client"
 
-edit_announcement() {
-  local file="$1"
-  local tmpfile
-  tmpfile=$(mktemp)
-
-  if [[ -f "$file" ]]; then
-    cp "$file" "$tmpfile"
-  else
-    local now expire
-    now=$(node -e "console.log(new Date().toISOString())")
-    expire=$(node -e "const d = new Date(); d.setUTCDate(d.getUTCDate() + 7); console.log(d.toISOString())")
-    cat > "$tmpfile" <<EOF
-{
-  "id": "$(date +%Y%m%d-%H%M%S)",
-  "title": "公告标题",
-  "content": "公告内容，支持 **Markdown** 格式。",
-  "level": "info",
-  "publishedAt": "${now}",
-  "expireAt": "${expire}"
-}
-EOF
-  fi
-
-  ${EDITOR:-nano} "$tmpfile"
-
-  if ! jq empty "$tmpfile" 2>/dev/null; then
-    echo "Error: Invalid JSON. Aborting."
-    rm -f "$tmpfile"
-    return 1
-  fi
-
-  if ! jq -e '.id and .title and .content and .level and .expireAt' "$tmpfile" >/dev/null 2>&1; then
-    echo "Error: Missing required fields (id, title, content, level, expireAt). Aborting."
-    rm -f "$tmpfile"
-    return 1
-  fi
-
-  mv "$tmpfile" "$file"
-  echo "Announcement saved."
-}
-
 TMP_RELEASE_DIR=""
 cleanup() {
   [[ -n "${TMP_RELEASE_DIR:-}" ]] && rm -rf "$TMP_RELEASE_DIR"
@@ -86,24 +45,15 @@ else
   echo "Warning: no stable GitHub release found, skipping OTA files."
 fi
 
-# Announcement management
-ANNOUNCEMENT_FILE="website/public/updates/announcement.json"
-mkdir -p "$(dirname "$ANNOUNCEMENT_FILE")"
-
+# Build the web app and inject it into the site bundle at /app.
+# APP_BASE_PATH makes Next.js emit /app-prefixed asset URLs;
+# the app talks to the same-origin edge proxy at /api/proxy.
 echo ""
-if [[ -f "$ANNOUNCEMENT_FILE" ]]; then
-  echo "Current announcement:"
-  jq -r '"  \(.title) [\(.level)] (expires: \(.expireAt))"' "$ANNOUNCEMENT_FILE" 2>/dev/null || echo "  (exists but unable to parse)"
-  read -p "Update announcement? [y/N] " -n 1 -r
-else
-  echo "No active announcement."
-  read -p "Create announcement? [y/N] " -n 1 -r
-fi
-echo ""
-
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-  edit_announcement "$ANNOUNCEMENT_FILE"
-fi
+echo "Building web app bundle..."
+APP_BASE_PATH=/app pnpm run build
+rm -rf website/public/app
+mkdir -p website/public/app
+cp -r dist/. website/public/app/
 
 echo ""
 echo "========================================"

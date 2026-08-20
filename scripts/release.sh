@@ -316,66 +316,6 @@ else
   cp version.json website/public/updates/
 fi
 
-# Announcement management
-edit_announcement() {
-  local file="$1"
-  local tmpfile
-  tmpfile=$(mktemp)
-
-  if [[ -f "$file" ]]; then
-    cp "$file" "$tmpfile"
-  else
-    local now expire
-    now=$(node -e "console.log(new Date().toISOString())")
-    expire=$(node -e "const d = new Date(); d.setUTCDate(d.getUTCDate() + 7); console.log(d.toISOString())")
-    cat > "$tmpfile" <<EOF
-{
-  "id": "$(date +%Y%m%d-%H%M%S)",
-  "title": "公告标题",
-  "content": "公告内容，支持 **Markdown** 格式。",
-  "level": "info",
-  "publishedAt": "${now}",
-  "expireAt": "${expire}"
-}
-EOF
-  fi
-
-  ${EDITOR:-nano} "$tmpfile"
-
-  if ! jq empty "$tmpfile" 2>/dev/null; then
-    echo "Error: Invalid JSON. Aborting."
-    rm -f "$tmpfile"
-    return 1
-  fi
-
-  if ! jq -e '.id and .title and .content and .level and .expireAt' "$tmpfile" >/dev/null 2>&1; then
-    echo "Error: Missing required fields (id, title, content, level, expireAt). Aborting."
-    rm -f "$tmpfile"
-    return 1
-  fi
-
-  mv "$tmpfile" "$file"
-  echo "Announcement saved."
-}
-
-ANNOUNCEMENT_FILE="website/public/updates/announcement.json"
-mkdir -p "$(dirname "$ANNOUNCEMENT_FILE")"
-
-echo ""
-if [[ -f "$ANNOUNCEMENT_FILE" ]]; then
-  echo "Current announcement:"
-  jq -r '"  \(.title) [\(.level)] (expires: \(.expireAt))"' "$ANNOUNCEMENT_FILE" 2>/dev/null || echo "  (exists but unable to parse)"
-  read -p "Update announcement? [y/N] " -n 1 -r
-else
-  echo "No active announcement."
-  read -p "Create announcement? [y/N] " -n 1 -r
-fi
-echo ""
-
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-  edit_announcement "$ANNOUNCEMENT_FILE"
-fi
-
 # Deploy to EdgeOne Pages
 echo ""
 echo "========================================"
