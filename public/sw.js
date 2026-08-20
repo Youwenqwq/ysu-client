@@ -7,10 +7,12 @@ const scopePath = scopeUrl.pathname.endsWith("/")
 const cachePrefix = `ysu-app-shell:${scopePath}:`;
 const cacheName = `${cachePrefix}${version}`;
 
+const shellManifestUrl = new URL("./pwa-shell.json", scopeUrl).href;
 const shellUrls = [
   "./",
   "./login/",
   "./manifest.webmanifest",
+  "./pwa-shell.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-192.png",
@@ -19,23 +21,51 @@ const shellUrls = [
 
 const appShellUrl = new URL("./", scopeUrl).href;
 
+async function loadShellUrls() {
+  const urls = new Set(shellUrls);
+  try {
+    const response = await fetch(shellManifestUrl, { cache: "reload" });
+    if (response.ok) {
+      const shell = await response.json();
+      if (Array.isArray(shell.assets)) {
+        for (const path of shell.assets) {
+          if (typeof path === "string") {
+            urls.add(new URL(path, scopeUrl).href);
+          }
+        }
+      }
+    }
+  } catch {
+    // Keep the minimal shell when the generated manifest is unavailable.
+  }
+  return [...urls];
+}
+
+function withoutSearch(url) {
+  const normalized = new URL(url);
+  normalized.search = "";
+  normalized.hash = "";
+  return normalized.href;
+}
+
 function isCacheable(response) {
   return response.ok && response.type === "basic";
 }
 
-async function fetchAndCache(cache, request) {
+async function fetchAndCache(cache, request, cacheKey = request) {
   const response = await fetch(request);
   if (isCacheable(response)) {
-    await cache.put(request, response.clone());
+    await cache.put(cacheKey, response.clone());
   }
   return response;
 }
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(cacheName).then((cache) =>
-      Promise.all(
-        shellUrls.map(async (url) => {
+    caches.open(cacheName).then(async (cache) => {
+      const urls = await loadShellUrls();
+      await Promise.all(
+        urls.map(async (url) => {
           try {
             const request = new Request(url, { cache: "reload" });
             const response = await fetch(request);
@@ -46,8 +76,8 @@ self.addEventListener("install", (event) => {
             // A missing shell asset must not prevent the worker from installing.
           }
         }),
-      ),
-    ),
+      );
+    }),
   );
 });
 
@@ -66,14 +96,17 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-async function networkFirst(request) {
+async function networkFirst(request, ignoreSearch = false) {
   const cache = await caches.open(cacheName);
+  const cacheKey = ignoreSearch
+    ? new Request(withoutSearch(request.url))
+    : request;
 
   try {
-    return await fetchAndCache(cache, request);
+    return await fetchAndCache(cache, request, cacheKey);
   } catch {
     return (
-      (await cache.match(request)) ||
+      (await cache.match(cacheKey)) ||
       (await cache.match(appShellUrl)) ||
       Response.error()
     );
@@ -115,8 +148,18 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (request.mode === "navigate") {
-    event.respondWith(networkFirst(request));
+  const isRscPayload =
+    scopedPath.endsWith(".txt") &&
+    (scopedPath.includes("__next") || scopedPath.endsWith("index.txt"));
+  if (isRscPayload) {
+    event.respondWith(networkFirst(request, true));
+    return;
+  }
+
+  const isDocument =
+    request.mode === "navigate" || scopedPath === "" || scopedPath.endsWith("/");
+  if (isDocument) {
+    event.respondWith(networkFirst(request, true));
     return;
   }
 
