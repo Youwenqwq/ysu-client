@@ -27,6 +27,7 @@ import {
 import { useMFAModalStore } from "@/lib/stores/mfa-modal";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { getActiveProvider } from "@/providers/provider-service";
+import type { WechatQrPollResult } from "@/providers/types";
 import type { YSUMfaMethod } from "@/providers/ysu";
 import { useAuthStore } from "@/lib/stores/auth";
 import { isTablet } from "@/lib/native/platform";
@@ -161,17 +162,29 @@ export function MFAModal() {
 
       // Start polling.
       let lastErrcode: number | undefined;
+      let consecutiveFailures = 0;
 
       while (gen === pollGenRef.current) {
-        let result: { status: 'waiting' | 'scanned' | 'confirmed'; code?: string };
+        let result: WechatQrPollResult;
         try {
           result = await provider.pollWechatMfaQr(ctx.uuid, lastErrcode, abort.signal);
         } catch {
-          // Poll request itself failed (network, timeout, abort) — retry unless superseded.
+          // Poll request itself failed (network, timeout, abort) — 退避后重试，
+          // 连续失败超上限则报错退出，避免代理瞬断造成高频重试风暴。
           if (gen !== pollGenRef.current || abort.signal.aborted) return;
+          consecutiveFailures++;
+          if (consecutiveFailures >= 5) {
+            setWechatStatus('error');
+            setWechatError(t("login.errorMfaWechatFailed"));
+            return;
+          }
+          const { promise: backoff, resolve: backoffDone } = Promise.withResolvers<void>();
+          setTimeout(backoffDone, 2000);
+          await backoff;
           continue;
         }
         if (gen !== pollGenRef.current) return; // 长轮询挂起期间流程已切换
+        consecutiveFailures = 0;
 
         if (result.status === 'confirmed' && result.code) {
           setWechatStatus('confirmed');
@@ -188,11 +201,21 @@ export function MFAModal() {
           return;
         }
 
+        if (result.status === 'expired') {
+          // 终态（402 过期 / 空响应体 / 666 等未知码）：官方页面同样停止轮询。
+          setWechatStatus('error');
+          setWechatError(t("login.mfaWechatExpired"));
+          stopWechatPolling();
+          return;
+        }
+
         if (result.status === 'scanned') {
           setWechatStatus('scanned');
-          lastErrcode = 404;
+          lastErrcode = result.errcode ?? 404;
         } else {
+          // waiting：408 等待扫码；403 用户在微信中取消（官方行为：带 last 继续轮询）
           setWechatStatus('waiting');
+          if (result.errcode === 403) lastErrcode = 403;
         }
       }
     } catch (err) {

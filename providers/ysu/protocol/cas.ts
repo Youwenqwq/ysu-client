@@ -25,6 +25,7 @@ import {
   getCasCookieDomain,
   getSchoolConfig,
 } from "@/lib/server-config";
+import { isCapacitor } from "@/lib/native/platform";
 import type { YSUMfaMethod } from "../types";
 
 // ─── Constants ────────────────────────────────────────────────────────── //
@@ -817,11 +818,87 @@ export async function initiateWechatMFA(): Promise<WechatMFAContext> {
   };
 }
 
-export async function pollWechatQR(
+interface WechatQrPollRaw {
+  /** 空响应体（未知 uuid）时为 null。 */
+  errcode: number | null;
+  code: string;
+}
+
+declare global {
+  interface Window {
+    /** 微信 qrconnect JSONP 轮询写入的全局结果。 */
+    wx_errcode?: number;
+    wx_code?: string;
+  }
+}
+
+/**
+ * Web 端轮询走 <script> JSONP —— 微信官方 qrconnect 页面的同款机制。
+ * script 标签不受 CORS 限制，响应体执行后写入 window.wx_errcode/wx_code，
+ * 浏览器可直接读取，无需经边缘代理转发（代理出口 IP 的轮询会被微信
+ * 以 wx_errcode=666 终态拒绝，且 15s 长挂起会占用边缘函数并发）。
+ */
+function pollWechatQrViaScriptTag(
   uuid: string,
-  lastErrcode?: number,
+  lastErrcode: number | undefined,
   signal?: AbortSignal,
-): Promise<{ status: 'waiting' | 'scanned' | 'confirmed'; code?: string }> {
+): Promise<WechatQrPollRaw> {
+  const { promise, resolve, reject } = Promise.withResolvers<WechatQrPollRaw>();
+
+  let settled = false;
+  const script = document.createElement('script');
+
+  const cleanup = () => {
+    clearTimeout(timer);
+    script.remove();
+    signal?.removeEventListener('abort', onAbort);
+  };
+  const fail = (e: Error) => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    reject(e);
+  };
+  const onAbort = () => fail(new DOMException('The operation was aborted.', 'AbortError'));
+  // 服务端无状态变化时挂起约 15s，30s 兜底（与官方页面 timeout:3e4 一致）
+  const timer = setTimeout(() => fail(new Error('wechat qr poll timeout')), 30_000);
+
+  // 重置全局位：空响应体（未知 uuid）不会写入这些全局，
+  // 不重置会误读上一轮残留值。
+  window.wx_errcode = undefined;
+  window.wx_code = undefined;
+
+  script.onload = () => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    resolve({
+      errcode: typeof window.wx_errcode === 'number' ? window.wx_errcode : null,
+      code: window.wx_code || '',
+    });
+  };
+  script.onerror = () => fail(new Error('wechat qr poll script load failed'));
+
+  if (signal?.aborted) {
+    onAbort();
+    return promise;
+  }
+  signal?.addEventListener('abort', onAbort);
+
+  const lastParam = lastErrcode !== undefined ? `&last=${lastErrcode}` : '';
+  // 追加时间戳防缓存（官方页面 jQuery cache:false 的等效行为）
+  script.src = `${WECHAT_POLL_BASE}?uuid=${encodeURIComponent(uuid)}${lastParam}&_=${Date.now()}`;
+  document.head.appendChild(script);
+
+  return promise;
+}
+
+/** 原生端轮询：CapacitorHttp 无 CORS 限制，直连微信长轮询端点。 */
+async function pollWechatQrViaHttp(
+  uuid: string,
+  lastErrcode: number | undefined,
+  signal?: AbortSignal,
+): Promise<WechatQrPollRaw> {
   const lastParam = lastErrcode !== undefined ? `&last=${lastErrcode}` : '';
   const pollUrl = `${WECHAT_POLL_BASE}?uuid=${encodeURIComponent(uuid)}${lastParam}`;
 
@@ -842,16 +919,40 @@ export async function pollWechatQR(
   const errcodeMatch = text.match(/window\.wx_errcode=(\d+)/);
   const codeMatch = text.match(/window\.wx_code='([^']*)'/);
 
-  const errcode = errcodeMatch ? parseInt(errcodeMatch[1]!, 10) : 0;
-  const code = codeMatch?.[1] || '';
+  return {
+    errcode: errcodeMatch ? parseInt(errcodeMatch[1]!, 10) : null,
+    code: codeMatch?.[1] || '',
+  };
+}
 
+export async function pollWechatQR(
+  uuid: string,
+  lastErrcode?: number,
+  signal?: AbortSignal,
+): Promise<{
+  status: 'waiting' | 'scanned' | 'confirmed' | 'expired';
+  code?: string;
+  errcode?: number;
+}> {
+  const { errcode, code } = isCapacitor()
+    ? await pollWechatQrViaHttp(uuid, lastErrcode, signal)
+    : await pollWechatQrViaScriptTag(uuid, lastErrcode, signal);
+
+  // errcode 语义与官方 qrconnect 页面 JS 的 switch 一致：
+  //   405 已确认（带 code）；404 已扫码；408 等待扫码；
+  //   403 用户在微信中取消（官方行为：带 last=403 继续轮询）；
+  //   402 二维码过期；空响应体（未知 uuid）与其余未知码（666 等）均为终态，
+  //   官方页面对 default 分支不再轮询 —— 统一映射为 expired 由 UI 提示重新获取。
   if (errcode === 405 && code) {
-    return { status: 'confirmed', code };
+    return { status: 'confirmed', code, errcode };
   }
   if (errcode === 404) {
-    return { status: 'scanned' };
+    return { status: 'scanned', errcode };
   }
-  return { status: 'waiting' };
+  if (errcode === 408 || errcode === 403) {
+    return { status: 'waiting', errcode };
+  }
+  return { status: 'expired', errcode: errcode ?? undefined };
 }
 
 export async function completeWechatMFA(

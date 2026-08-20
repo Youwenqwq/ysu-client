@@ -87,8 +87,16 @@ export interface WechatMfaContext {
 }
 
 export interface WechatQrPollResult {
-  status: "waiting" | "scanned" | "confirmed";
+  /**
+   * errcode 语义与微信官方 qrconnect 页面 JS 一致：
+   * 408 等待扫码 → waiting；404 已扫码 → scanned；405 已确认 → confirmed（带 code）；
+   * 403 用户在微信中取消 → waiting（带 errcode，继续轮询）；
+   * 402 二维码过期 / 空响应体（未知 uuid）/ 666 等未知码 → expired（终态，须重新获取二维码）。
+   */
+  status: "waiting" | "scanned" | "confirmed" | "expired";
   code?: string;
+  /** 微信返回的原始 errcode；空响应体时为 undefined。 */
+  errcode?: number;
 }
 
 export interface AuthStatus {
