@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 import { I18nProvider } from "@/lib/i18n/context"
 import { SDKProvider } from "@/components/sdk-provider"
+import { ActivationGate } from "@/components/activation-gate"
 import { MFAModal } from "@/components/mfa-modal"
 import { BackgroundImage } from "@/components/background-image"
 import { BackButtonHandler } from "@/components/back-button-handler"
@@ -66,17 +67,19 @@ export default function RootLayout({
           <PwaUpdatePrompt />
           <ThemeProvider>
             <ProviderProvider>
-              <SDKProvider>
-                <TooltipProvider>
-                  <BackgroundImage />
-                  <BackButtonHandler />
-                  <DeepLinkHandler />
-                  <NotifyProvider />
-                  {children}
-                  <Toaster />
-                  <MFAModal />
-                </TooltipProvider>
-              </SDKProvider>
+              <ActivationGate>
+                <SDKProvider>
+                  <TooltipProvider>
+                    <BackgroundImage />
+                    <BackButtonHandler />
+                    <DeepLinkHandler />
+                    <NotifyProvider />
+                    {children}
+                    <Toaster />
+                    <MFAModal />
+                  </TooltipProvider>
+                </SDKProvider>
+              </ActivationGate>
             </ProviderProvider>
           </ThemeProvider>
         </I18nProvider>

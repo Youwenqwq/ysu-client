@@ -355,6 +355,7 @@ export async function fetchStateless(req: HttpRequest): Promise<HttpResponse> {
 
 import { isCapacitor } from './native/platform';
 import { getCustomUserAgent } from './custom-user-agent';
+import { useActivationStore } from './stores/activation';
 
 // Cache Capacitor core module to avoid dynamic import overhead on every request.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -384,6 +385,18 @@ async function send(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpRespons
  * 本地开发用 NEXT_PUBLIC_PROXY_BASE_URL 指向已部署的代理，
  * 例如 https://ysu.welain.com/api/proxy 。
  */
+/**
+ * 激活接口地址：与代理同站点的 /api/activate；本地开发经
+ * NEXT_PUBLIC_PROXY_BASE_URL 推导到已部署站点（见 proxyHttpSend 注释）。
+ */
+export function getActivateUrl(): string {
+  const base = process.env.NEXT_PUBLIC_PROXY_BASE_URL;
+  if (base) {
+    return base.replace(/\/api\/proxy\/?$/, '/api/activate');
+  }
+  return '/api/activate';
+}
+
 async function proxyHttpSend(
   jar: SimpleCookieJar,
   req: HttpRequest,
@@ -422,6 +435,11 @@ async function proxyHttpSend(
   if (cookieHeader) {
     headers.set('x-proxy-cookie', cookieHeader);
   }
+  // Web 激活凭证：proxy 配置 ACTIVATION_TOKEN 后逐请求校验（见 proxy.js）
+  const activationToken = useActivationStore.getState().token;
+  if (activationToken) {
+    headers.set('x-activation', activationToken);
+  }
 
   const proxyBase = process.env.NEXT_PUBLIC_PROXY_BASE_URL || '/api/proxy';
   const proxyUrl = `${proxyBase}?url=${encodeURIComponent(req.url)}`;
@@ -441,6 +459,10 @@ async function proxyHttpSend(
 
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
+    // token 被服务端轮换/吊销：清除本地凭证，ActivationGate 回落到激活页
+    if (response.status === 403 && detail.includes('ACTIVATION_REQUIRED')) {
+      useActivationStore.getState().clearToken();
+    }
     throw new Error(`proxy request failed: HTTP ${response.status} ${detail}`);
   }
 

@@ -5,6 +5,7 @@ export const STORAGE_KEYS = {
   settings: `${APP_PREFIX}-settings`,
   legacySettings: `${LEGACY_PREFIX}-settings`,
   auth: `${APP_PREFIX}-auth`,
+  activation: `${APP_PREFIX}-activation`,
   legacyAuth: `${LEGACY_PREFIX}-auth`,
   cachePrefix: `${APP_PREFIX}-cache:`,
   legacyCachePrefix: `${LEGACY_PREFIX}-cache:`,

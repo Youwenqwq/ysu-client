@@ -59,6 +59,15 @@ export const zh = {
     cacheStorageFull: "存储空间不足，部分数据无法缓存",
     cacheStorageFullDesc: "请清理设备存储空间后重试",
   },
+  activation: {
+    title: "激活应用",
+    description: "当前应用仅限个人小范围使用，请输入激活密钥后使用。",
+    placeholder: "激活密钥",
+    submit: "激活",
+    verifying: "验证中...",
+    invalid: "密钥不正确，请检查后重试",
+    networkError: "验证失败，请检查网络后重试",
+  },
   me: {
     profileFallback: "未登录",
     sectionAcademic: "学业",
@@ -869,6 +878,15 @@ export const en = {
     staleDataTooltip: "Showing cached data, refresh failed",
     cacheStorageFull: "Storage full, unable to cache data",
     cacheStorageFullDesc: "Please free up device storage and try again",
+  },
+  activation: {
+    title: "Activate App",
+    description: "The web version is for limited use only. Enter your activation key to continue.",
+    placeholder: "Activation key",
+    submit: "Activate",
+    verifying: "Verifying...",
+    invalid: "Invalid key, please check and try again",
+    networkError: "Verification failed, please check your network and try again",
   },
   me: {
     profileFallback: "Not signed in",

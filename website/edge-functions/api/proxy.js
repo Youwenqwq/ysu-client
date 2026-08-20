@@ -23,8 +23,11 @@
  *
  * 安全设计：
  * - 目标 host 硬编码白名单，仅默认端口，拒绝 URL userinfo，防止开放代理滥用；
- * - 浏览器跨域调用限制到站点 Origin（同源请求/curl 不受限）——
- *   完整的鉴权门槛（配额/身份校验）后续再加；
+ * - 浏览器跨域调用限制到站点 Origin（同源请求/curl 不受限）；
+ * - 激活门槛：配置环境变量 ACTIVATION_TOKEN（逗号分隔可多个）后，
+ *   请求须携带匹配的 X-Activation 头，否则 403 ACTIVATION_REQUIRED；
+ *   未配置则完全不校验。这是 Web 端人数控制的真正强制点（客户端
+ *   ActivationGate 只是体验层），校验为纯内存字符串比较，无 KV/存储开销；
  * - 剥离代理链头（Proxy-Authorization / X-Forwarded-* 等），防止伪造上游视角；
  * - 不在此处记录任何请求体（含登录密码）。
  * - 注意：202.206.247.49（实践教学平台）上游为明文 HTTP，会话 cookie 在
@@ -80,6 +83,7 @@ const SKIP_REQUEST_HEADERS = new Set([
   'x-proxy-ua',
   'x-proxy-referer',
   'x-proxy-origin',
+  'x-activation', // 激活凭证仅用于代理鉴权，不透传上游
 ]);
 
 // 不透传给客户端的上游响应头（body 已由运行时解压，编码/长度头必须丢弃）
@@ -112,11 +116,34 @@ function corsHeaders(origin) {
     : {};
 }
 
-function errorResponse(status, message, origin) {
-  return new Response(JSON.stringify({ error: message }), {
+function errorResponse(status, message, origin, code) {
+  return new Response(JSON.stringify(code ? { error: message, code } : { error: message }), {
     status,
     headers: { 'content-type': 'application/json', ...corsHeaders(origin) },
   });
+}
+
+// 激活 token 列表：环境变量 ACTIVATION_TOKEN，逗号分隔可配多个；未配置返回空数组
+function parseActivationTokens(env) {
+  const raw = env?.ACTIVATION_TOKEN ?? globalThis?.ACTIVATION_TOKEN;
+  if (typeof raw !== 'string') return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// 常量时间比较，避免逐字节短路泄露前缀信息
+function timingSafeEqual(a, b) {
+  const bytes = new TextEncoder();
+  const ba = bytes.encode(a);
+  const bb = bytes.encode(b);
+  let diff = ba.length ^ bb.length;
+  const len = Math.max(ba.length, bb.length, 1);
+  for (let i = 0; i < len; i++) {
+    diff |= (ba.length ? ba[i % ba.length] : 0) ^ (bb.length ? bb[i % bb.length] : 0);
+  }
+  return diff === 0;
 }
 
 function encodeSetCookies(setCookies) {
@@ -142,7 +169,7 @@ function preflightResponse(origin) {
       ...corsHeaders(origin),
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers':
-        'Content-Type, X-Requested-With, X-Proxy-Cookie, X-Proxy-Ua, X-Proxy-Referer, X-Proxy-Origin',
+        'Content-Type, X-Requested-With, X-Proxy-Cookie, X-Proxy-Ua, X-Proxy-Referer, X-Proxy-Origin, X-Activation',
       'Access-Control-Max-Age': '86400',
     },
   });
@@ -156,7 +183,7 @@ export function onRequestOptions({ request }) {
   return preflightResponse(origin);
 }
 
-export async function onRequest({ request }) {
+export async function onRequest({ request, env }) {
   // 平台上 onRequest 可能优先于 onRequestOptions，OPTIONS 在通用入口里兜底
   if (request.method === 'OPTIONS') {
     return onRequestOptions({ request });
@@ -165,6 +192,16 @@ export async function onRequest({ request }) {
   const origin = resolveOrigin(request);
   if (origin === 'DENY') {
     return errorResponse(403, 'origin not allowed', null);
+  }
+
+  // 激活门槛：配置 ACTIVATION_TOKEN 后才校验；纯内存比较，无 KV/存储开销。
+  // 在解析目标 URL 之前拒绝，未激活流量不消耗上游请求额度。
+  const activationTokens = parseActivationTokens(env);
+  if (activationTokens.length > 0) {
+    const presented = request.headers.get('x-activation') || '';
+    if (!activationTokens.some((t) => timingSafeEqual(t, presented))) {
+      return errorResponse(403, 'activation required', origin, 'ACTIVATION_REQUIRED');
+    }
   }
 
   const reqUrl = new URL(request.url);
