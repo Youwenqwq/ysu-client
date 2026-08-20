@@ -6,39 +6,52 @@ const scopePath = scopeUrl.pathname.endsWith("/")
 const cachePrefix = `ysu-app-shell:${scopePath}:`;
 const cacheName = `${cachePrefix}${version}`;
 
-const shellManifestUrl = new URL("./pwa-shell.json", scopeUrl).href;
-const shellUrls = [
-  "./",
-  "./login/",
-  "./manifest.webmanifest",
-  "./pwa-shell.json",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/icon-maskable-192.png",
-  "./icons/icon-maskable-512.png",
-].map((path) => new URL(path, scopeUrl).href);
-
 const appShellUrl = new URL("./", scopeUrl).href;
-const precacheBatchSize = 8;
+const shellPackUrl = new URL("./pwa-shell.pack", scopeUrl).href;
+const packMagic = [0x59, 0x53, 0x50, 0x4b]; // "YSPK"
+const packVersion = 1;
 
-async function loadShellUrls() {
-  const urls = new Set(shellUrls);
-  try {
-    const response = await fetch(shellManifestUrl, { cache: "reload" });
-    if (response.ok) {
-      const shell = await response.json();
-      if (Array.isArray(shell.assets)) {
-        for (const path of shell.assets) {
-          if (typeof path === "string") {
-            urls.add(new URL(path, scopeUrl).href);
-          }
-        }
-      }
-    }
-  } catch {
-    // Keep the minimal shell when the generated manifest is unavailable.
+// The shell ships as a single gzipped pack (see scripts/generate-pwa-shell.mjs):
+//   [4B magic "YSPK"][u32le version][u32le headerLength][header JSON][body]
+// Fetching one file instead of hundreds keeps the CDN's anti-bot challenge out
+// of the precache path, and makes install all-or-nothing: any failure rejects
+// and the worker never activates with a partial shell.
+async function installShell(cache) {
+  const response = await fetch(new Request(shellPackUrl, { cache: "reload" }));
+  if (!response.ok || !response.body) {
+    throw new Error(`Shell pack request failed: ${response.status}`);
   }
-  return [...urls];
+  const payload = await new Response(
+    response.body.pipeThrough(new DecompressionStream("gzip")),
+  ).arrayBuffer();
+  const view = new DataView(payload);
+  if (
+    payload.byteLength < 12 ||
+    !packMagic.every((byte, index) => view.getUint8(index) === byte) ||
+    view.getUint32(4, true) !== packVersion
+  ) {
+    throw new Error("Invalid shell pack");
+  }
+  const headerLength = view.getUint32(8, true);
+  const header = JSON.parse(
+    new TextDecoder().decode(new Uint8Array(payload, 12, headerLength)),
+  );
+  if (!Array.isArray(header.files)) {
+    throw new Error("Invalid shell pack header");
+  }
+  const bodyStart = 12 + headerLength;
+  await Promise.all(
+    header.files.map((file) => {
+      if (file.o + file.l > payload.byteLength - bodyStart) {
+        throw new Error("Shell pack entry out of bounds");
+      }
+      const body = payload.slice(bodyStart + file.o, bodyStart + file.o + file.l);
+      return cache.put(
+        new URL(file.p, scopeUrl).href,
+        new Response(body, { headers: { "content-type": file.t } }),
+      );
+    }),
+  );
 }
 
 function withoutSearch(url) {
@@ -48,39 +61,44 @@ function withoutSearch(url) {
   return normalized.href;
 }
 
-function isCacheable(response) {
-  return response.ok && response.type === "basic";
+// Extensions whose responses must match a specific Content-Type. An anti-bot
+// JS challenge answers 200 text/html for any URL; caching that response would
+// poison the cache and break script/style loading.
+const strictContentTypes = [
+  [".js", "javascript"],
+  [".css", "text/css"],
+];
+
+function isCacheable(request, response) {
+  if (!response.ok || response.type !== "basic") {
+    return false;
+  }
+  // EdgeOne answers anti-bot JS challenges with 200 text/html served
+  // "Return Directly" (no origin fetch). Caching one poisons the cache:
+  // documents white-screen and scripts fail to parse. Real EdgeOne Pages
+  // responses always carry Cache Hit / Cache Miss instead.
+  if (response.headers.get("eo-cache-status") === "Return Directly") {
+    return false;
+  }
+  const pathname = new URL(request.url).pathname;
+  for (const [extension, contentType] of strictContentTypes) {
+    if (pathname.endsWith(extension)) {
+      return (response.headers.get("content-type") || "").includes(contentType);
+    }
+  }
+  return true;
 }
 
 async function fetchAndCache(cache, request, cacheKey = request) {
   const response = await fetch(request);
-  if (isCacheable(response)) {
+  if (isCacheable(request, response)) {
     await cache.put(cacheKey, response.clone());
   }
   return response;
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(cacheName).then(async (cache) => {
-      const urls = await loadShellUrls();
-      for (let index = 0; index < urls.length; index += precacheBatchSize) {
-        await Promise.all(
-          urls.slice(index, index + precacheBatchSize).map(async (url) => {
-            try {
-              const request = new Request(url, { cache: "reload" });
-              const response = await fetch(request);
-              if (isCacheable(response)) {
-                await cache.put(request, response);
-              }
-            } catch {
-              // A missing shell asset must not prevent the worker from installing.
-            }
-          }),
-        );
-      }
-    }),
-  );
+  event.waitUntil(caches.open(cacheName).then(installShell));
 });
 
 self.addEventListener("activate", (event) => {
