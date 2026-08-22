@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/stores/auth";
@@ -19,6 +19,8 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarSeparator,
+  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -59,6 +61,82 @@ import { APP_VERSION, APP_BUILD } from "@/lib/version";
 import { useStoredMediaUrl } from "@/lib/storage/media";
 import { loadAvatarImage } from "@/lib/storage/avatar";
 
+const SIDEBAR_WIDTH_KEY = "dashboard-sidebar-width";
+const DEFAULT_SIDEBAR_WIDTH = 288; // 18rem
+const MIN_SIDEBAR_WIDTH = 208; // 13rem
+const MAX_SIDEBAR_WIDTH = 384; // 24rem
+
+function SidebarResizeHandle() {
+  const { state, setOpen, isMobile } = useSidebar();
+
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      // 折叠态（图标栏）下拖拽先展开，再继续调宽
+      const needExpand = state === "collapsed";
+      if (needExpand) setOpen(true);
+
+      const handle = event.currentTarget;
+      const wrapper = handle.closest<HTMLElement>("[data-slot=sidebar-wrapper]");
+      const gap = wrapper?.querySelector<HTMLElement>("[data-slot=sidebar-gap]");
+      const container = wrapper?.querySelector<HTMLElement>("[data-slot=sidebar-container]");
+      if (!wrapper) return;
+
+      const startX = event.clientX;
+      const startWidth = needExpand
+        ? DEFAULT_SIDEBAR_WIDTH
+        : (gap?.getBoundingClientRect().width ?? DEFAULT_SIDEBAR_WIDTH);
+
+      // 拖拽期间禁用宽度过渡，避免拖动延迟
+      gap?.classList.add("transition-none!");
+      container?.classList.add("transition-none!");
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+
+      const onPointerMove = (e: PointerEvent) => {
+        const width = Math.min(
+          MAX_SIDEBAR_WIDTH,
+          Math.max(MIN_SIDEBAR_WIDTH, Math.round(startWidth + e.clientX - startX)),
+        );
+        wrapper.style.setProperty("--sidebar-width", `${width}px`);
+      };
+
+      const onPointerUp = () => {
+        document.removeEventListener("pointermove", onPointerMove);
+        document.removeEventListener("pointerup", onPointerUp);
+        document.removeEventListener("pointercancel", onPointerUp);
+        gap?.classList.remove("transition-none!");
+        container?.classList.remove("transition-none!");
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        const finalWidth = gap?.getBoundingClientRect().width ?? startWidth;
+        try {
+          localStorage.setItem(SIDEBAR_WIDTH_KEY, String(Math.round(finalWidth)));
+        } catch {
+          // localStorage unavailable
+        }
+      };
+
+      document.addEventListener("pointermove", onPointerMove);
+      document.addEventListener("pointerup", onPointerUp);
+      document.addEventListener("pointercancel", onPointerUp);
+    },
+    [state, setOpen],
+  );
+
+  if (isMobile) return null;
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize sidebar"
+      onPointerDown={handlePointerDown}
+      onDoubleClick={() => setOpen(false)}
+      className="absolute inset-y-0 -right-2 z-20 hidden w-4 cursor-col-resize touch-none justify-center after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent after:transition-colors hover:after:bg-sidebar-border md:flex"
+    />
+  );
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -74,6 +152,36 @@ export default function DashboardLayout({
   const avatarImage = useSettingsStore((s) => s.avatarImage);
   const hasBackground = !!backgroundImage;
   const avatarUrl = useStoredMediaUrl(avatarImage, loadAvatarImage);
+
+  // 侧边栏宽度：挂载后从 localStorage 恢复（此前已由 hasHydrated 门控，不会闪烁）
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  // 折叠状态：sidebar.tsx 会写入 sidebar_state cookie，这里在挂载时恢复
+  const [defaultSidebarOpen] = useState(
+    () => !document.cookie.split("; ").includes("sidebar_state=false"),
+  );
+  useEffect(() => {
+    try {
+      const stored = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+      if (Number.isFinite(stored) && stored > 0) {
+        setSidebarWidth(Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, stored)));
+      }
+    } catch {
+      // localStorage unavailable
+    }
+  }, []);
+
+  // Ctrl/Cmd+B 折叠/展开侧边栏
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        if (!window.matchMedia("(min-width: 768px)").matches) return;
+        e.preventDefault();
+        document.querySelector<HTMLElement>("[data-sidebar=trigger]")?.click();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const navGroups = [
     {
@@ -193,9 +301,10 @@ export default function DashboardLayout({
   }
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": "18rem" } as React.CSSProperties}>
+    <SidebarProvider defaultOpen={defaultSidebarOpen} style={{ "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}>
       <UpdateDialog />
       <Sidebar
+        collapsible="icon"
         className={
           "[&_[data-sidebar=menu-button]]:py-3 " +
           (hasBackground
@@ -203,10 +312,11 @@ export default function DashboardLayout({
             : "")
         }
       >
+        <SidebarResizeHandle />
         <SidebarHeader>
-          <div className="flex items-center gap-2 px-2 py-3">
+          <div className="flex items-center gap-2 px-2 py-3 transition-all duration-200 ease-linear group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
             <GraduationCap className="size-6 shrink-0 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]" />
-            <span className="font-semibold">{t("app.name")}</span>
+            <span className="font-semibold group-data-[collapsible=icon]:hidden">{t("app.name")}</span>
           </div>
         </SidebarHeader>
         <SidebarContent className="gap-0">
@@ -258,10 +368,10 @@ export default function DashboardLayout({
         <SidebarFooter>
           <button
             onClick={() => router.push("/dashboard/me/about")}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
           >
-            <Info className="size-3.5" />
-            <span>v{APP_VERSION} ({APP_BUILD})</span>
+            <Info className="size-3.5 shrink-0" />
+            <span className="group-data-[collapsible=icon]:hidden">v{APP_VERSION} ({APP_BUILD})</span>
           </button>
         </SidebarFooter>
       </Sidebar>
@@ -269,6 +379,7 @@ export default function DashboardLayout({
         <MobileTopBar title={pageTitle} showBack={showBack} />
         <header className="hidden items-center justify-between gap-4 border-b px-6 py-4 md:flex">
           <div className="flex items-center gap-3">
+            <SidebarTrigger aria-label={t("app.toggleSidebar")} title={t("app.toggleSidebar")} />
             <h1 className="text-lg font-semibold animate-in fade-in slide-in-from-left-2 duration-300">
               {pageTitle}
             </h1>
