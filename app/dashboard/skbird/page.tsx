@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { useTranslation } from "@/lib/i18n/use-translation";
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
 import { SkbirdError, SKBIRD_ERRNO_TOKEN_INVALID } from "@/lib/extras/skbird/client";
 import { getSkbirdClient, useSkbirdStore } from "@/lib/extras/skbird/store";
 import type { SkbirdCategory, SkbirdThread } from "@/lib/extras/skbird/types";
@@ -138,6 +139,31 @@ export default function SkbirdPage() {
     canLoadMore && !loading && !error,
   );
 
+  // 移动端功能入口注入顶栏右侧（与成绩/日程页同一模式）；桌面端仍走工具栏内按钮
+  useMobileHeaderRight(
+    <div className="flex items-center gap-0.5">
+      <Button asChild size="icon-sm" variant="ghost" aria-label={t("skbird.messagesTitle")} className="relative">
+        <Link href="/dashboard/skbird/messages">
+          <Bell className="size-4" />
+          {unread > 0 ? (
+            <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive" />
+          ) : null}
+        </Link>
+      </Button>
+      <Button asChild size="icon-sm" variant="ghost" aria-label={t("skbird.meTitle")}>
+        <Link href="/dashboard/skbird/me">
+          <User className="size-4" />
+        </Link>
+      </Button>
+      <Button asChild size="icon-sm" variant="ghost" aria-label={t("skbird.settingsTitle")}>
+        <Link href="/dashboard/skbird/settings">
+          <Settings className="size-4" />
+        </Link>
+      </Button>
+    </div>,
+    [unread, t],
+  );
+
   if (hasHydrated && !token) {
     return (
       <div className="p-4">
@@ -158,7 +184,7 @@ export default function SkbirdPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="flex flex-col gap-4 p-4 max-sm:px-2">
       <div className="flex items-center gap-2">
         {/* tab 栏：移动端搜索展开时让位 */}
         <div
@@ -253,8 +279,8 @@ export default function SkbirdPage() {
           </Button>
         </form>
 
-        {/* 功能入口：移动端搜索展开时隐藏 */}
-        <div className={cn("flex items-center", searchOpen && "max-sm:hidden")}>
+        {/* 功能入口：桌面端显示；移动端已注入顶栏 */}
+        <div className="flex items-center max-sm:hidden">
           <Button asChild size="icon" variant="ghost" aria-label={t("skbird.messagesTitle")} className="relative">
             <Link href="/dashboard/skbird/messages">
               <Bell className="size-4" />
@@ -316,7 +342,7 @@ export default function SkbirdPage() {
         </Empty>
       ) : (
         <>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 max-sm:gap-0 max-sm:divide-y max-sm:divide-border">
             {threads.map((thread, i) => (
               <SkbirdThreadCard key={thread.threadId || `t-${i}`} thread={thread} />
             ))}

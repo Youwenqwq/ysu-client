@@ -156,9 +156,9 @@ function ThreadDetail() {
   const display = unlocked ?? thread;
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-4">
+    <div className="flex flex-col gap-4 p-4 max-sm:px-2">
+      <Card className="max-sm:rounded-none max-sm:bg-transparent max-sm:py-0 max-sm:ring-0">
+        <CardContent className="flex flex-col gap-3 p-4 max-sm:p-0">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             {thread.avatarUrl ? (
               <SkbirdImage
