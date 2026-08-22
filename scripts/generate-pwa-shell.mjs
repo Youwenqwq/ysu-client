@@ -124,7 +124,11 @@ try {
   // Git is unavailable in some build environments.
 }
 
-const buildVersion = `${pkg.version}-${gitHash}`;
+// Trailing timestamp orders PWA cache generations: the worker keeps the two
+// newest caches so unreloaded tabs keep resolving chunks from the previous
+// build, and lets clients detect downgrade installs (older sw.js served by a
+// stale CDN edge node) by comparing versions.
+const buildVersion = `${pkg.version}-${gitHash}-${Date.now()}`;
 const workerFile = join(distDir, "sw.js");
 const workerSource = readFileSync(workerFile, "utf8");
 if (!workerSource.includes("__PWA_CACHE_VERSION__")) {

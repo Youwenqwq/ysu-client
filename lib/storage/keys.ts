@@ -17,6 +17,8 @@ export const STORAGE_KEYS = {
   legacyLoginRateLimit: `${LEGACY_PREFIX}-login-rate-limit`,
   lastUpdateCheck: `${APP_PREFIX}-last-update-check`,
   legacyLastUpdateCheck: `${LEGACY_PREFIX}-last-update-check`,
+  pwaLastUpdateCheck: `${APP_PREFIX}-pwa-last-update-check`,
+  pwaDismissedUpdate: `${APP_PREFIX}-pwa-dismissed-update`,
   otaCleanup: `${APP_PREFIX}-ota-cleanup`,
   legacyOtaCleanup: `${LEGACY_PREFIX}-ota-cleanup`,
   lastDismissedAnnouncementId: `${APP_PREFIX}-last-dismissed-announcement-id`,

@@ -7,11 +7,10 @@ import { useTranslation } from "@/lib/i18n/use-translation";
 import { isCapacitor } from "@/lib/native/platform";
 import { initializePwaInstallCapture } from "@/lib/pwa-install";
 import {
+  PWA_UPDATE_CHECK_INTERVAL_MS,
   prepareWebUpdate,
   watchPwaRegistration,
 } from "@/lib/pwa-updater";
-
-const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 const OFFLINE_READY_KEY = "academic-client-pwa-offline-ready";
 const OFFLINE_READY_STANDALONE_KEY =
   "academic-client-pwa-offline-ready-standalone";
@@ -69,7 +68,7 @@ export function PwaRegister() {
     };
     const intervalId = window.setInterval(
       checkForUpdate,
-      UPDATE_CHECK_INTERVAL_MS,
+      PWA_UPDATE_CHECK_INTERVAL_MS,
     );
     document.addEventListener("visibilitychange", checkForUpdate);
 

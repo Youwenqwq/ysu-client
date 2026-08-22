@@ -61,6 +61,14 @@ function withoutSearch(url) {
   return normalized.href;
 }
 
+// Version strings end with a build timestamp ("1.2.3-ab12345-1718000000000");
+// it orders cache generations so activate can keep the two newest and drop
+// the rest. Legacy caches without a timestamp sort first and get cleaned.
+function buildTimestamp(cacheKey) {
+  const match = /-(\d{10,})$/.exec(cacheKey);
+  return match ? Number(match[1]) : 0;
+}
+
 // Extensions whose responses must match a specific Content-Type. An anti-bot
 // JS challenge answers 200 text/html for any URL; caching that response would
 // poison the cache and break script/style loading.
@@ -89,14 +97,6 @@ function isCacheable(request, response) {
   return true;
 }
 
-async function fetchAndCache(cache, request, cacheKey = request) {
-  const response = await fetch(request);
-  if (isCacheable(request, response)) {
-    await cache.put(cacheKey, response.clone());
-  }
-  return response;
-}
-
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(cacheName).then(installShell));
 });
@@ -104,51 +104,50 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     Promise.all([
-      caches.keys().then((names) =>
-        Promise.all(
-          names
-            .filter((name) => name.startsWith(cachePrefix) && name !== cacheName)
-            .map((name) => caches.delete(name)),
-        ),
-      ),
+      caches.keys().then((names) => {
+        const generations = names
+          .filter((name) => name.startsWith(cachePrefix))
+          .sort((a, b) => buildTimestamp(b) - buildTimestamp(a));
+        // Keep the two newest generations: unreloaded tabs still run the
+        // previous build and resolve its chunks from the previous cache.
+        return Promise.all(
+          generations.slice(2).map((name) => caches.delete(name)),
+        );
+      }),
       self.clients.claim(),
     ]),
   );
 });
 
-async function networkFirst(request, ignoreSearch = false) {
+// Everything in scope is served from the installed shell. The CDN only sees
+// sw.js update checks and pack downloads, so rate limiting / anti-bot
+// challenges can no longer break the app once it is installed.
+async function cacheFirst(event) {
+  const { request } = event;
   const cache = await caches.open(cacheName);
-  const cacheKey = ignoreSearch
-    ? new Request(withoutSearch(request.url))
-    : request;
+  const key = withoutSearch(request.url);
+
+  const cached =
+    (await cache.match(key)) ||
+    // Previous generation's cache keeps unreloaded tabs working after an
+    // update activated underneath them.
+    (await caches.match(key));
+  if (cached) return cached;
 
   try {
-    return await fetchAndCache(cache, request, cacheKey);
+    const response = await fetch(request);
+    if (isCacheable(request, response)) {
+      await cache.put(key, response.clone());
+    }
+    return response;
   } catch {
-    return (
-      (await cache.match(cacheKey)) ||
-      (await cache.match(appShellUrl)) ||
-      Response.error()
-    );
+    if (request.mode === "navigate") {
+      const shell =
+        (await cache.match(appShellUrl)) || (await caches.match(appShellUrl));
+      if (shell) return shell;
+    }
+    return Response.error();
   }
-}
-
-async function cacheFirst(request) {
-  const cache = await caches.open(cacheName);
-  return (await cache.match(request)) || fetchAndCache(cache, request);
-}
-
-async function staleWhileRevalidate(event) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(event.request);
-  const update = fetchAndCache(cache, event.request);
-
-  if (cached) {
-    event.waitUntil(update.catch(() => undefined));
-    return cached;
-  }
-
-  return update;
 }
 
 self.addEventListener("fetch", (event) => {
@@ -168,33 +167,22 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  const isRscPayload =
-    scopedPath.endsWith(".txt") &&
-    (scopedPath.includes("__next") || scopedPath.endsWith("index.txt"));
-  if (isRscPayload) {
-    event.respondWith(networkFirst(request, true));
-    return;
-  }
+  // The pack itself is only fetched by installShell; never serve it stale.
+  if (scopedPath === "pwa-shell.pack") return;
 
-  const isDocument =
-    request.mode === "navigate" || scopedPath === "" || scopedPath.endsWith("/");
-  if (isDocument) {
-    event.respondWith(networkFirst(request, true));
-    return;
-  }
-
-  if (scopedPath.startsWith("_next/static/")) {
-    event.respondWith(cacheFirst(request));
-    return;
-  }
-
-  if (scopedPath === "manifest.webmanifest" || scopedPath.startsWith("icons/")) {
-    event.respondWith(staleWhileRevalidate(event));
-  }
+  event.respondWith(cacheFirst(event));
 });
 
 self.addEventListener("message", (event) => {
-  if (event.data?.type === "SKIP_WAITING") {
+  const type = event.data?.type;
+  if (type === "SKIP_WAITING") {
     self.skipWaiting();
+    return;
+  }
+  // Lets the page compare the waiting worker's build against the active one,
+  // so stale/downgrade installs (CDN edge nodes serving an older sw.js during
+  // deploy propagation) never surface as an "update available" prompt.
+  if (type === "GET_VERSION" && event.ports?.[0]) {
+    event.ports[0].postMessage({ version });
   }
 });

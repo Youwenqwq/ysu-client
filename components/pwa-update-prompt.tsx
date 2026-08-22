@@ -5,13 +5,12 @@ import { RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/lib/i18n/use-translation";
-import { applyWebUpdate } from "@/lib/pwa-updater";
+import { applyWebUpdate, dismissWebUpdate } from "@/lib/pwa-updater";
 import { usePwaUpdateStore } from "@/lib/stores/pwa-update";
 
 export function PwaUpdatePrompt() {
   const { t } = useTranslation();
   const updateAvailable = usePwaUpdateStore((s) => s.updateAvailable);
-  const setUpdateAvailable = usePwaUpdateStore((s) => s.setUpdateAvailable);
   const [applying, setApplying] = useState(false);
 
   if (!updateAvailable) return null;
@@ -37,7 +36,7 @@ export function PwaUpdatePrompt() {
       <Button
         size="sm"
         variant="ghost"
-        onClick={() => setUpdateAvailable(false)}
+        onClick={() => void dismissWebUpdate()}
         disabled={applying}
       >
         {t("update.skip")}
