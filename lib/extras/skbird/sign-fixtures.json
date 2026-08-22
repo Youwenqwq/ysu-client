@@ -1,0 +1,441 @@
+[
+ {
+  "entries": [
+   [
+    "from",
+    ""
+   ],
+   [
+    "id",
+    "2135280966"
+   ],
+   [
+    "randnum__",
+    "25348674649732260117"
+   ],
+   [
+    "timestamp__",
+    "1787377840"
+   ]
+  ],
+  "expected": "ADF19F1FDD7043218E300ADBD3352E8F"
+ },
+ {
+  "entries": [
+   [
+    "from",
+    "detail"
+   ],
+   [
+    "id",
+    "2135280966"
+   ],
+   [
+    "randnum__",
+    "95235582959278813381"
+   ],
+   [
+    "timestamp__",
+    "1787377840"
+   ]
+  ],
+  "expected": "B6AAC503F7AFE8068AE91BF9BFD8F01D"
+ },
+ {
+  "entries": [
+   [
+    "sign",
+    "lmFoZpWcYXGZmA%3D%3D"
+   ],
+   [
+    "randnum__",
+    "26961472397997315342"
+   ],
+   [
+    "timestamp__",
+    "1787377840"
+   ]
+  ],
+  "expected": "088CE17A1B8BC72D2EC30133825445D7"
+ },
+ {
+  "entries": [
+   [
+    "with_hongbao",
+    "0"
+   ],
+   [
+    "sign",
+    "bzJjWm85cnM2MHpONFpxS05lT2lXVTVGbHlZclp6VFdTLytlb3NwbkhIQ0JIWGR4aHFVdEpGdTRVWGZFM3dCNTNmSkhGdThEQTRWTEgzZWNPU0NFcHNaSk5OdVVtZll3ZWMwU000RDY4MTg9"
+   ],
+   [
+    "id",
+    "2135280966"
+   ],
+   [
+    "randnum__",
+    "71339997396966306481"
+   ],
+   [
+    "timestamp__",
+    "1787377840"
+   ]
+  ],
+  "expected": "473F9C6BD52AA8A228FA66C5C8670F45"
+ },
+ {
+  "entries": [
+   [
+    "randnum__",
+    "60542355786711974346"
+   ],
+   [
+    "timestamp__",
+    "1787377840"
+   ]
+  ],
+  "expected": "E1688B7DC0BA1AFBE3645C22FB8CACD7"
+ },
+ {
+  "entries": [
+   [
+    "randnum__",
+    "64106423860322093280"
+   ],
+   [
+    "timestamp__",
+    "1787377841"
+   ]
+  ],
+  "expected": "8CC8167E12E76F120329F0A7AF4BAFAF"
+ },
+ {
+  "entries": [
+   [
+    "count",
+    "10"
+   ],
+   [
+    "type",
+    "3"
+   ],
+   [
+    "randnum__",
+    "10375312847055596780"
+   ],
+   [
+    "timestamp__",
+    "1787377841"
+   ]
+  ],
+  "expected": "095C095172BB7494D7FCF49DB97640A4"
+ },
+ {
+  "entries": [
+   [
+    "from",
+    ""
+   ],
+   [
+    "id",
+    "2135309518"
+   ],
+   [
+    "randnum__",
+    "01032901280494075437"
+   ],
+   [
+    "timestamp__",
+    "1787377841"
+   ]
+  ],
+  "expected": "1E5DF278E2718B602AEF300FB043E13C"
+ },
+ {
+  "entries": [
+   [
+    "from",
+    "detail"
+   ],
+   [
+    "id",
+    "2135309518"
+   ],
+   [
+    "randnum__",
+    "80077727851796329602"
+   ],
+   [
+    "timestamp__",
+    "1787377841"
+   ]
+  ],
+  "expected": "570212A132ACE200973ABC0B414DF0C9"
+ },
+ {
+  "entries": [
+   [
+    "sign",
+    "lmFoZpaUam2Umg%3D%3D"
+   ],
+   [
+    "randnum__",
+    "37307497171199253342"
+   ],
+   [
+    "timestamp__",
+    "1787377841"
+   ]
+  ],
+  "expected": "18DA4C619BD642EC52B819088DB73F25"
+ },
+ {
+  "entries": [
+   [
+    "randnum__",
+    "41696943894761610175"
+   ],
+   [
+    "timestamp__",
+    "1787377842"
+   ]
+  ],
+  "expected": "A6114B1D94C65A1BCE151BA2FB93D866"
+ },
+ {
+  "entries": [
+   [
+    "with_hongbao",
+    "0"
+   ],
+   [
+    "sign",
+    "R0pGNVRNbDRLVFJtbHNHSGd0VEg3ZnhRYWpnN2ZVbjRqeFVBWGZ5Ni95SnZjYWhCV0g4ZGV5Y2ZwWXZEVkcvNlFHQ1pzbDNxL0dMYXJ1VUMwU09uYzVvQms1czBBbHIwRHlPUkt2VjM4L1k9"
+   ],
+   [
+    "id",
+    "2135309518"
+   ],
+   [
+    "randnum__",
+    "93704147096172007097"
+   ],
+   [
+    "timestamp__",
+    "1787377842"
+   ]
+  ],
+  "expected": "35231C82EE90A6FC72BF9678B92919A9"
+ },
+ {
+  "entries": [
+   [
+    "action",
+    "1"
+   ],
+   [
+    "id",
+    "2135309518"
+   ],
+   [
+    "randnum__",
+    "37018527075376218300"
+   ],
+   [
+    "timestamp__",
+    "1787377843"
+   ]
+  ],
+  "expected": "BDEC12F37FC0A585EA5522EB5A7E5116"
+ },
+ {
+  "entries": [
+   [
+    "action",
+    "1"
+   ],
+   [
+    "id",
+    "2135309518"
+   ],
+   [
+    "comment_id",
+    "0"
+   ],
+   [
+    "randnum__",
+    "77538157600484314782"
+   ],
+   [
+    "timestamp__",
+    "1787377844"
+   ]
+  ],
+  "expected": "2D5F74B78CE8E39B05650DD36F4EF0BF"
+ },
+ {
+  "entries": [
+   [
+    "randnum__",
+    "37694961008216523275"
+   ],
+   [
+    "timestamp__",
+    "1787377845"
+   ]
+  ],
+  "expected": "CA908D543915FD19BB145E1A8ED7A398"
+ },
+ {
+  "entries": [
+   [
+    "count",
+    "10"
+   ],
+   [
+    "type",
+    "3"
+   ],
+   [
+    "randnum__",
+    "40051189200251163687"
+   ],
+   [
+    "timestamp__",
+    "1787377845"
+   ]
+  ],
+  "expected": "A42549DB773E40CB6F77578C5EC7370D"
+ },
+ {
+  "entries": [
+   [
+    "from",
+    ""
+   ],
+   [
+    "id",
+    "2135309518"
+   ],
+   [
+    "randnum__",
+    "03270011363617024233"
+   ],
+   [
+    "timestamp__",
+    "1787377846"
+   ]
+  ],
+  "expected": "8482AF3C767ED5066A9AB7D51401A922"
+ },
+ {
+  "entries": [
+   [
+    "from",
+    "detail"
+   ],
+   [
+    "id",
+    "2135309518"
+   ],
+   [
+    "randnum__",
+    "57152710100872506613"
+   ],
+   [
+    "timestamp__",
+    "1787377846"
+   ]
+  ],
+  "expected": "40DDA80F15FB516AA2CA42316DD06935"
+ },
+ {
+  "entries": [
+   [
+    "sign",
+    "lmFoZpaUam2Umg%3D%3D"
+   ],
+   [
+    "randnum__",
+    "31662800752709458332"
+   ],
+   [
+    "timestamp__",
+    "1787377846"
+   ]
+  ],
+  "expected": "4BB87CB7CE1DEEE7C0AEF35C48729A0F"
+ },
+ {
+  "entries": [
+   [
+    "randnum__",
+    "02727437842242216539"
+   ],
+   [
+    "timestamp__",
+    "1787377846"
+   ]
+  ],
+  "expected": "0D3A2711A4DABD69A25925C5F421BB06"
+ },
+ {
+  "entries": [
+   [
+    "with_hongbao",
+    "0"
+   ],
+   [
+    "sign",
+    "TkZvdFVkcmdkS2dUYThjQ3phdjF2TW44Rmk3b2VIcWJkYURaU2tjeThldE1WemVqODR3d3RZNm9CQW5VTEJxcWF3NTZ1bi96RG1Nb2ZsUkdyWkR5akRCWG90azBXbG4ySUprZFNLSUsrclE9"
+   ],
+   [
+    "id",
+    "2135309518"
+   ],
+   [
+    "randnum__",
+    "99648278565953871466"
+   ],
+   [
+    "timestamp__",
+    "1787377846"
+   ]
+  ],
+  "expected": "C3661FD82429F84BD025C3791D963425"
+ },
+ {
+  "entries": [
+   [
+    "count",
+    "10"
+   ],
+   [
+    "type",
+    "3"
+   ],
+   [
+    "randnum__",
+    "28721467219317729469"
+   ],
+   [
+    "timestamp__",
+    "1787377849"
+   ]
+  ],
+  "expected": "9720076E23E061DD8E55AF3A7F572D12"
+ },
+ {
+  "entries": [
+   [
+    "randnum__",
+    "58557990004406567433"
+   ],
+   [
+    "timestamp__",
+    "1787377849"
+   ]
+  ],
+  "expected": "9CDCAEFA6B659112A218BABA50C2E1E3"
+ }
+]

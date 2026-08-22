@@ -53,6 +53,7 @@ import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { MobileTopBar } from "@/components/mobile-top-bar";
 import { RefreshIndicator } from "@/components/refresh-indicator";
 import { StaleIndicator } from "@/components/stale-indicator";
+import { EXTRA_FEATURES } from "@/lib/extras/registry";
 import { UpdateDialog } from "@/components/update-dialog";
 import { APP_VERSION, APP_BUILD } from "@/lib/version";
 import { useStoredMediaUrl } from "@/lib/storage/media";
@@ -101,9 +102,21 @@ export default function DashboardLayout({
         { title: t("app.schoolSchedule"), url: "/dashboard/school-schedule", icon: CalendarDays },
       ],
     },
+    // 玩具箱：与教务无关的第三方功能（lib/extras/registry.ts）
+    {
+      label: t("extras.nav"),
+      items: EXTRA_FEATURES.map((f) => ({
+        title: t(f.nav.titleKey),
+        url: f.nav.url,
+        icon: f.nav.icon,
+      })),
+    },
   ];
 
   const titleByPath: Record<string, string> = {
+    ...Object.fromEntries(
+      EXTRA_FEATURES.flatMap((f) => Object.entries(f.titleKeys).map(([path, key]) => [path, t(key)])),
+    ),
     "/dashboard": t("app.overview"),
     "/dashboard/grades": t("app.grades"),
     "/dashboard/schedule": t("app.schedule"),

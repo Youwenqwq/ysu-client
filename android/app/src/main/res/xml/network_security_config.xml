@@ -4,12 +4,14 @@
   - 202.206.247.49：双创平台（ysu_pt / ysu_xf），裸 IP 部署，无 HTTPS；
   - xgxt.ysu.edu.cn：学工系统的 CAS service 登记为 http 方案，授权链
     必经一跳 http（携带一次性 ST 票据）后由服务端 301 到 https，
-    会话 cookie 均在 https 下建立。
+    会话 cookie 均在 https 下建立；
+  - zanao.com：森空鸟 API 仅开放 80 端口，无 HTTPS 可用。
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">202.206.247.49</domain>
         <domain includeSubdomains="false">xgxt.ysu.edu.cn</domain>
+        <domain includeSubdomains="true">zanao.com</domain>
     </domain-config>
 </network-security-config>

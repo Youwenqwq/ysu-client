@@ -35,6 +35,7 @@ import { useStudentInfo } from "@/providers/hooks";
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit";
 import { useTheme } from "next-themes";
 import { APP_VERSION, APP_BUILD } from "@/lib/version";
+import { EXTRA_FEATURES } from "@/lib/extras/registry";
 
 export default function MePage() {
   const router = useRouter();
@@ -126,6 +127,13 @@ export default function MePage() {
     { href: "/dashboard/school-schedule", label: t("app.schoolSchedule"), icon: CalendarDays },
   ];
 
+  // 玩具箱入口（移动端经"我的"页进入；桌面端走侧边栏）
+  const extraItems = EXTRA_FEATURES.map((f) => ({
+    href: f.nav.url,
+    label: t(f.nav.titleKey),
+    icon: f.nav.icon,
+  }));
+
   return (
     <div className="flex flex-col gap-4">
       <Link href="/dashboard/me/student" className="block">
@@ -174,6 +182,12 @@ export default function MePage() {
       <Section title={t("me.sectionPlatforms")}>
         <LinkCard items={platformItems} />
       </Section>
+
+      {extraItems.length > 0 && (
+        <Section title={t("extras.nav")}>
+          <LinkCard items={extraItems} />
+        </Section>
+      )}
 
       <Section title={t("me.sectionPreferences")}>
         <LinkCard

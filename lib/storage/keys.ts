@@ -22,6 +22,7 @@ export const STORAGE_KEYS = {
   lastDismissedAnnouncementId: `${APP_PREFIX}-last-dismissed-announcement-id`,
   legacyLastDismissedAnnouncementId: `${LEGACY_PREFIX}-last-dismissed-announcement-id`,
   gradeGacha: `${APP_PREFIX}-grade-gacha`,
+  skbird: `${APP_PREFIX}-skbird`,
   secureAuthToken: `${APP_PREFIX}-auth-token`,
   legacySecureAuthToken: `${LEGACY_PREFIX}-castgc`,
   secureRememberedCredentials: `${APP_PREFIX}-remember-me`,
