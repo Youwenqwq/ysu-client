@@ -7,6 +7,7 @@
  */
 import type { LucideIcon } from "lucide-react";
 import { skbirdFeature } from "./skbird/feature";
+import { meterFeature } from "./meter/feature";
 
 export interface ExtraFeature {
   id: string;
@@ -20,4 +21,4 @@ export interface ExtraFeature {
   titleKeys: Record<string, string>;
 }
 
-export const EXTRA_FEATURES: ExtraFeature[] = [skbirdFeature];
+export const EXTRA_FEATURES: ExtraFeature[] = [skbirdFeature, meterFeature];

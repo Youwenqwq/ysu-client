@@ -95,3 +95,5 @@ website/.edgeone/
 /Failed
 /Toolchain
 
+# Should be ignored test file
+lib/extras/meter/client.test.ts

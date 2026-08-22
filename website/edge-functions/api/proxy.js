@@ -51,6 +51,8 @@ const ALLOWED_HOSTS = new Set([
   'b2.cdn.zanao.com',
   // 森空鸟头像：user_info.headimgurl 为微信 http 直链，需代理中转
   'thirdwx.qlogo.cn',
+  // 17wanxiao 智能水电（空调电表）查询
+  'xqh5.17wanxiao.com',
 ]);
 
 // 允许发起浏览器跨域调用的 Origin（同源请求无 Origin 头，不受限）。
