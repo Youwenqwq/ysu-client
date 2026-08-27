@@ -11,7 +11,7 @@ android {
         applicationId "com.youwenqwq.ysuclient"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionName "1.4.2"
+        versionName "1.5.0"
         def versionMatcher = versionName =~ /^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?$/
         if (!versionMatcher.matches()) {
             throw new GradleException("Invalid versionName: ${versionName}")
