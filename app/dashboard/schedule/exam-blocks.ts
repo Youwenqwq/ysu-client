@@ -18,7 +18,19 @@ export interface ExamBlock {
   end: number;
 }
 
-function mondayOfWeek(currentWeek: CurrentWeek, selectedWeek: number): Date | null {
+function mondayOfWeek(
+  currentWeek: CurrentWeek | null,
+  selectedWeek: number,
+  termStartDate?: string,
+): Date | null {
+  if (termStartDate) {
+    const firstMonday = new Date(`${termStartDate}T00:00:00`);
+    if (!Number.isNaN(firstMonday.getTime())) {
+      firstMonday.setDate(firstMonday.getDate() + (selectedWeek - 1) * 7);
+      return firstMonday;
+    }
+  }
+  if (!currentWeek) return null;
   const start = currentWeek.weekStartDate ?? currentWeek.weekDates?.[0];
   if (!start) return null;
   const monday = new Date(`${start}T00:00:00`);
@@ -71,9 +83,10 @@ export function computeExamBlocks(
   periods: ClassPeriod[],
   currentWeek: CurrentWeek | null,
   selectedWeek: number,
+  termStartDate?: string,
 ): ExamBlock[] {
-  if (!currentWeek?.week || selectedWeek <= 0) return [];
-  const monday = mondayOfWeek(currentWeek, selectedWeek);
+  if (selectedWeek <= 0 || (!termStartDate && !currentWeek?.week)) return [];
+  const monday = mondayOfWeek(currentWeek, selectedWeek, termStartDate);
   if (!monday) return [];
 
   const timeMap = buildSectionTimeMap(periods);
