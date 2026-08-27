@@ -57,7 +57,54 @@ function formatShortDate(value: string | undefined): string | null {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-export function computeWeekDateLabels(currentWeek: CurrentWeek | null, selectedWeek: number): (string | null)[] {
+function parseLocalDate(value: string | undefined): Date | null {
+  if (!value) return null;
+  const match = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function resolveInitialScheduleWeek(
+  currentWeek: CurrentWeek | null,
+  termStartDate?: string,
+  now = new Date(),
+): number {
+  const firstDay = parseLocalDate(termStartDate);
+  if (firstDay && now.getTime() < firstDay.getTime()) return 1;
+  if (currentWeek && Number.isFinite(currentWeek.week) && currentWeek.week >= 1) {
+    return currentWeek.week;
+  }
+  if (firstDay) {
+    const elapsedDays = Math.floor((now.getTime() - firstDay.getTime()) / 86_400_000);
+    return Math.max(1, Math.floor(elapsedDays / 7) + 1);
+  }
+  return 1;
+}
+
+function weekLabelsFromStart(
+  startDate: string | undefined,
+  week: number,
+): (string | null)[] | null {
+  if (week <= 0) return null;
+  const firstDay = parseLocalDate(startDate);
+  if (!firstDay) return null;
+  firstDay.setDate(firstDay.getDate() + (week - 1) * 7);
+  return Array.from({ length: 7 }, (_, idx) => {
+    const date = new Date(firstDay);
+    date.setDate(firstDay.getDate() + idx);
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+  });
+}
+
+export function computeWeekDateLabels(
+  currentWeek: CurrentWeek | null,
+  selectedWeek: number,
+  termStartDate?: string,
+): (string | null)[] {
+  const calendarLabels = weekLabelsFromStart(termStartDate, selectedWeek);
+  if (calendarLabels) return calendarLabels;
+
   if (!currentWeek?.week) return Array(7).fill(null);
 
   if (Array.isArray(currentWeek.weekDates) && currentWeek.weekDates.length === 7) {

@@ -20,10 +20,10 @@ import {
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
-import { useClassPeriods, useCurrentWeek, useExams, useSchedule } from "@/providers/hooks";
+import { useClassPeriods, useCurrentWeek, useExams, useSchedule, useTermCalendar } from "@/providers/hooks";
 import { ChevronLeft, ChevronRight, Search, Grid3x2, Grid3x3 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isCourseActiveInWeek, periodIsInUse } from "./schedule-utils";
+import { isCourseActiveInWeek, periodIsInUse, resolveInitialScheduleWeek } from "./schedule-utils";
 import { computeExamBlocks } from "./exam-blocks";
 import { ScheduleTablet } from "./schedule-tablet";
 import { ScheduleMobile } from "./schedule-mobile";
@@ -47,16 +47,20 @@ export default function SchedulePage() {
     includeLabSchedule: true,
   });
   const currentWeekQuery = useCurrentWeek({ semester: queriedTerm || undefined });
+  const termCalendarQuery = useTermCalendar({ semester: queriedTerm || undefined });
   const periodsQuery = useClassPeriods();
   const examsQuery = useExams({ semester: queriedTerm || undefined });
 
   const courses = useMemo(() => scheduleQuery.data ?? [], [scheduleQuery.data]);
   const currentWeek = currentWeekQuery.data ?? null;
+  const termCalendar = termCalendarQuery.data;
   const loading =
     scheduleQuery.isLoading ||
     scheduleQuery.isValidating ||
     currentWeekQuery.isLoading ||
     currentWeekQuery.isValidating ||
+    termCalendarQuery.isLoading ||
+    termCalendarQuery.isValidating ||
     periodsQuery.isLoading ||
     periodsQuery.isValidating;
 
@@ -108,15 +112,19 @@ export default function SchedulePage() {
   });
 
   useEffect(() => {
-    if (!currentWeek?.week) return;
-    setSelectedWeek((curr) => (curr === 0 ? currentWeek.week : curr));
-  }, [currentWeek]);
+    if (!currentWeek && !termCalendar?.startDate) return;
+    setSelectedWeek((curr) =>
+      curr <= 0
+        ? resolveInitialScheduleWeek(currentWeek, termCalendar?.startDate)
+        : curr,
+    );
+  }, [currentWeek, termCalendar?.startDate]);
 
   useEffect(() => {
-    const errors = [scheduleQuery.error, currentWeekQuery.error, periodsQuery.error].filter(Boolean);
+    const errors = [scheduleQuery.error, currentWeekQuery.error, termCalendarQuery.error, periodsQuery.error].filter(Boolean);
     if (errors.length === 0) return;
     toast.error(errors[0]?.message || t("app.updating"));
-  }, [scheduleQuery.error, currentWeekQuery.error, periodsQuery.error, t]);
+  }, [scheduleQuery.error, currentWeekQuery.error, termCalendarQuery.error, periodsQuery.error, t]);
 
   useEffect(() => {
     if (!scheduleQuery.data || !currentWeek) return;
@@ -139,6 +147,7 @@ export default function SchedulePage() {
       await Promise.all([
         scheduleQuery.mutate(),
         currentWeekQuery.mutate(),
+        termCalendarQuery.mutate(),
         periodsQuery.mutate(),
       ]);
     } else {
@@ -173,8 +182,8 @@ export default function SchedulePage() {
   }, [courses, selectedWeek]);
 
   const examBlocks = useMemo(
-    () => computeExamBlocks(examsQuery.data ?? [], periods, currentWeek, selectedWeek),
-    [examsQuery.data, periods, currentWeek, selectedWeek],
+    () => computeExamBlocks(examsQuery.data ?? [], periods, currentWeek, selectedWeek, termCalendar?.startDate),
+    [examsQuery.data, periods, currentWeek, selectedWeek, termCalendar?.startDate],
   );
 
   const currentWeekday = currentWeek?.weekday ?? 0;
@@ -230,7 +239,7 @@ export default function SchedulePage() {
               <ChevronRight />
             </Button>
           </div>
-          {currentWeek?.week && (
+          {currentWeek && currentWeek.week >= 1 && (
             <Badge variant="secondary">{t("schedule.currentWeekBadge", { week: currentWeek.week })}</Badge>
           )}
         </div>
@@ -271,6 +280,7 @@ export default function SchedulePage() {
             currentWeekday={currentWeekday}
             currentWeek={currentWeek}
             selectedWeek={selectedWeek}
+            termStartDate={termCalendar?.startDate}
             nowMinutes={nowMinutes}
             compact={compactMode}
             onPrevWeek={() => shiftWeek(-1)}
@@ -286,6 +296,7 @@ export default function SchedulePage() {
               currentWeekday={currentWeekday}
               currentWeek={currentWeek}
               selectedWeek={selectedWeek}
+              termStartDate={termCalendar?.startDate}
               nowMinutes={nowMinutes}
             />
           </CardContent>

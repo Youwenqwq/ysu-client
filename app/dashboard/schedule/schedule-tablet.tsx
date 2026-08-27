@@ -34,6 +34,7 @@ interface Props {
   currentWeekday: number;
   currentWeek: CurrentWeek | null;
   selectedWeek: number;
+  termStartDate?: string;
   nowMinutes: number;
 }
 
@@ -41,7 +42,7 @@ const DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 const LUNCH_AFTER = 4;
 const DINNER_AFTER = 8;
 
-export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, selectedWeek, nowMinutes }: Props) {
+export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, selectedWeek, termStartDate, nowMinutes }: Props) {
   const { t } = useTranslation();
   const [overlapDialog, setOverlapDialog] = useState<{ day: number; section: number; courses: Course[] } | null>(null);
   const [activityCourse, setActivityCourse] = useState<Course | null>(null);
@@ -52,7 +53,10 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
 
   const isCurrentWeek = currentWeek?.week === selectedWeek;
   const timeMap = useMemo(() => buildSectionTimeMap(periods), [periods]);
-  const weekDates = useMemo(() => computeWeekDateLabels(currentWeek, selectedWeek), [currentWeek, selectedWeek]);
+  const weekDates = useMemo(
+    () => computeWeekDateLabels(currentWeek, selectedWeek, termStartDate),
+    [currentWeek, selectedWeek, termStartDate],
+  );
 
   const isBlockCurrent = (block: ScheduleBlock): boolean => {
     if (!isCurrentWeek || block.day !== currentWeek?.weekday) return false;

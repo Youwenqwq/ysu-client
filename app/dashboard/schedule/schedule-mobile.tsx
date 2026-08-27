@@ -40,6 +40,7 @@ interface Props {
   currentWeekday: number;
   currentWeek: CurrentWeek | null;
   selectedWeek: number;
+  termStartDate?: string;
   nowMinutes: number;
   compact?: boolean;
   onPrevWeek?: () => void;
@@ -59,6 +60,7 @@ export function ScheduleMobile({
   currentWeekday,
   currentWeek,
   selectedWeek,
+  termStartDate,
   nowMinutes,
   compact = false,
   onPrevWeek,
@@ -100,8 +102,8 @@ export function ScheduleMobile({
   }
 
   const weekDates = useMemo(
-    () => computeWeekDateLabels(currentWeek, selectedWeek),
-    [currentWeek, selectedWeek],
+    () => computeWeekDateLabels(currentWeek, selectedWeek, termStartDate),
+    [currentWeek, selectedWeek, termStartDate],
   );
 
   const isCurrentWeek = currentWeek?.week === selectedWeek;
