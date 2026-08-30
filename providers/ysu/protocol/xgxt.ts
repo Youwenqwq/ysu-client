@@ -8,6 +8,7 @@
  * 纯函数 + 模块级状态(cookie jar)。
  */
 import { SimpleCookieJar, fetchWithJar, headerSingle, type HttpResponse } from "@/lib/cookie"
+import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 import { authorize, getCredentialApplied } from "./cas"
 import { getSchoolConfig } from "@/lib/server-config"
 
@@ -227,22 +228,31 @@ function buildApiUrl(path: string): string {
 
 /** 确保 session 已携带学工系统 cookie，并完成应用角色绑定。 */
 async function ensureAuthorized(): Promise<void> {
-  await getCredentialApplied()
-  const cookies = await xgxtJar.getAllCookies()
-  const hasSession = cookies.some((c) => c.domain && c.domain.includes(cookieDomain()))
-  if (!hasSession) {
-    if (inflightAuth) {
-      await inflightAuth
-    } else {
-      inflightAuth = authorize(zhcpServiceUrl(), xgxtJar)
-      try {
-        await inflightAuth
-      } finally {
-        inflightAuth = null
-      }
-    }
+  await waitForAuthTransition()
+  if (appRoleReady) return
+  if (inflightAuth) {
+    await inflightAuth
+    return
   }
-  await ensureAppRole()
+
+  const promise = withAuthTransition(async () => {
+    if (appRoleReady) return
+
+    await getCredentialApplied()
+    const cookies = await xgxtJar.getAllCookies()
+    const hasSession = cookies.some((c) => c.domain && c.domain.includes(cookieDomain()))
+    if (!hasSession) {
+      await authorize(zhcpServiceUrl(), xgxtJar)
+    }
+    await ensureAppRole()
+  })
+
+  inflightAuth = promise
+  try {
+    await promise
+  } finally {
+    if (inflightAuth === promise) inflightAuth = null
+  }
 }
 
 /**
@@ -369,7 +379,9 @@ async function reauthorize(failedGeneration: number): Promise<void> {
     return
   }
 
-  inflightReauth = (async () => {
+  const promise = withAuthTransition(async () => {
+    if (sessionGeneration !== failedGeneration) return
+
     const domain = cookieDomain()
     const cookies = await xgxtJar.getAllCookies()
     for (const c of cookies) {
@@ -381,11 +393,12 @@ async function reauthorize(failedGeneration: number): Promise<void> {
     await authorize(zhcpServiceUrl(), xgxtJar)
     await ensureAppRole()
     sessionGeneration += 1
-  })()
+  })
+  inflightReauth = promise
   try {
-    await inflightReauth
+    await promise
   } finally {
-    inflightReauth = null
+    if (inflightReauth === promise) inflightReauth = null
   }
 }
 
@@ -487,6 +500,7 @@ async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
   } catch (e) {
     if (e instanceof XgxtNotLoggedInError) {
       await reauthorize(requestGeneration)
+      await waitForAuthTransition()
       return await fn()
     }
     throw e

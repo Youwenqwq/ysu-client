@@ -31,6 +31,8 @@ import {
 import { checkRateLimit, recordLoginAttempt } from "@/lib/rate-limit"
 import { useAuthStore } from "@/lib/stores/auth"
 import { casUrls } from "@/lib/server-config"
+import { getText } from "@/lib/i18n/get-text"
+import { withAuthTransition } from "./auth-transition"
 import { ProviderError, ProviderErrorCode, wrapError } from "../errors"
 import type { WechatQrPollResult } from "../types"
 import { getYSUMfaMethods, isYSUMfaMethod } from "./types"
@@ -44,7 +46,20 @@ export interface LoginStep1Result {
 
 export type { MFAChallenge, WechatMFAContext }
 
+export function mapCASSessionError(e: unknown): ProviderError | undefined {
+  if (!(e instanceof NotAuthenticatedError)) return undefined
+  return new ProviderError(
+    ProviderErrorCode.AUTH_SESSION_EXPIRED,
+    getText("app.sessionExpired"),
+    e,
+    401
+  )
+}
+
 function mapCASError(e: unknown): ProviderError {
+  const sessionError = mapCASSessionError(e)
+  if (sessionError) return sessionError
+
   if (e instanceof NeedCaptchaError) {
     return new ProviderError(ProviderErrorCode.AUTH_CAPTCHA_REQUIRED, e.message, e, 403)
   }
@@ -61,9 +76,6 @@ function mapCASError(e: unknown): ProviderError {
   }
   if (e instanceof MFAFailedError) {
     return new ProviderError(ProviderErrorCode.AUTH_INVALID_CREDENTIAL, e.message, e, 401)
-  }
-  if (e instanceof NotAuthenticatedError) {
-    return new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, e.message, e, 401)
   }
   if (e instanceof CASProtocolError) {
     return new ProviderError(ProviderErrorCode.BACKEND_PROTOCOL_ERROR, e.message, e, 500)
@@ -86,8 +98,10 @@ export async function prepareLogin(): Promise<void> {
   }
 }
 
-export function resetLoginSession(): void {
-  resetCAS()
+export async function resetLoginSession(): Promise<void> {
+  await withAuthTransition(async () => {
+    resetCAS()
+  })
 }
 
 export async function checkCaptchaNeeded(username: string): Promise<boolean> {

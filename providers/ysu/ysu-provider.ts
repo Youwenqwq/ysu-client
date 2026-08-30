@@ -354,15 +354,15 @@ export class YSUProvider extends BaseProvider {
   }
 
   protected async onReset(): Promise<void> {
-    resetSession()
+    await resetSession()
   }
 
   async prepareLogin(): Promise<void> {
     await prepareLogin()
   }
 
-  resetLoginSession(): void {
-    resetLoginSession()
+  async resetLoginSession(): Promise<void> {
+    await resetLoginSession()
   }
 
   getCaptchaUrl(): string | null {

@@ -25,9 +25,13 @@ import type {
   CreditSummary as ScxtCreditSummary,
   LibraryActivity as ScxtLibraryActivity,
 } from "./protocol/scxt"
+import { mapCASSessionError } from "./cas-auth"
 import { ProviderError, ProviderErrorCode, wrapError } from "../errors"
 
 function mapScxtError(e: unknown): ProviderError {
+  const sessionError = mapCASSessionError(e)
+  if (sessionError) return sessionError
+
   if (e instanceof ScxtNotLoggedInError) {
     return new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, e.message, e, 401)
   }

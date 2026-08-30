@@ -140,15 +140,19 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
             await new Promise((r) => setTimeout(r, 800))
             status = await provider.checkAuthStatus()
           }
+          if (cancelled || !useAuthStore.getState().isAuthenticated) return
           if (status.authenticated) {
+            useAuthStore.getState().setSessionExpired(false)
             provider.warmup?.().catch(() => {})
-          }
-          if (!status.authenticated) {
+          } else {
+            useAuthStore.getState().setSessionExpired(true)
             toast.error(t("app.sessionExpired"))
           }
         })().catch((err) => {
+          if (cancelled || !useAuthStore.getState().isAuthenticated) return
           const e = err as Error & { code?: string; status?: number }
-          if (e.code === "AUTH_REQUIRED" || e.status === 401) {
+          if (e.code === "AUTH_REQUIRED" || e.code === "AUTH_SESSION_EXPIRED" || e.status === 401) {
+            useAuthStore.getState().setSessionExpired(true)
             toast.error(t("app.sessionExpired"))
           }
           // Silently ignore non-auth errors during startup to avoid
@@ -158,8 +162,10 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
       .catch((err) => {
         if (cancelled) return
         markProviderError(err)
+        if (!useAuthStore.getState().isAuthenticated) return
         const e = err as Error & { code?: string; status?: number }
-        if (e.code === "AUTH_REQUIRED" || e.status === 401) {
+        if (e.code === "AUTH_REQUIRED" || e.code === "AUTH_SESSION_EXPIRED" || e.status === 401) {
+          useAuthStore.getState().setSessionExpired(true)
           toast.error(t("app.sessionExpired"))
         }
         // Silently ignore non-auth errors during startup to avoid

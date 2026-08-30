@@ -9,10 +9,12 @@ interface AuthState {
   mobileSession: string | null
   username: string | null
   isAuthenticated: boolean
+  sessionExpired: boolean
   hasHydrated: boolean
   setCredential: (credential: string, username?: string) => void
   setJWXTSession: (session: string) => void
   setMobileSession: (session: string) => void
+  setSessionExpired: (expired: boolean) => void
   clearCredential: () => void
   setHasHydrated: (v: boolean) => void
 }
@@ -25,10 +27,20 @@ export const useAuthStore = create<AuthState>()(
       mobileSession: null,
       username: null,
       isAuthenticated: false,
+      sessionExpired: false,
       hasHydrated: false,
-      setCredential: (credential, username) => set({ credential, username, isAuthenticated: true }),
+      setCredential: (credential, username) =>
+        set({
+          credential,
+          username,
+          isAuthenticated: true,
+          sessionExpired: false,
+          jwxtSession: null,
+          mobileSession: null,
+        }),
       setJWXTSession: (jwxtSession) => set({ jwxtSession }),
       setMobileSession: (mobileSession) => set({ mobileSession }),
+      setSessionExpired: (sessionExpired) => set({ sessionExpired }),
       clearCredential: () =>
         set({
           credential: null,
@@ -36,6 +48,7 @@ export const useAuthStore = create<AuthState>()(
           mobileSession: null,
           username: null,
           isAuthenticated: false,
+          sessionExpired: false,
         }),
       setHasHydrated: (v) => set({ hasHydrated: v }),
     }),

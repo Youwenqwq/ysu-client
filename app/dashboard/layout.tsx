@@ -23,6 +23,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
+import { Alert, AlertTitle } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -49,6 +50,7 @@ import {
   LogIn,
   LogOut,
   Settings,
+  TriangleAlert,
   User,
 } from "lucide-react"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
@@ -141,7 +143,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const rawPathname = usePathname()
   const pathname = rawPathname.replace(/\/$/, "")
-  const { isAuthenticated, hasHydrated, username } = useAuthStore()
+  const { isAuthenticated, hasHydrated, username, sessionExpired } = useAuthStore()
   const { t } = useTranslation()
 
   const backgroundImage = useSettingsStore((s) => s.backgroundImage)
@@ -151,6 +153,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // 侧边栏宽度：挂载后从 localStorage 恢复（此前已由 hasHydrated 门控，不会闪烁）
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH)
+  const [reloginLoading, setReloginLoading] = useState(false)
   // 折叠状态：sidebar.tsx 会写入 sidebar_state cookie，这里在挂载时恢复
   const [defaultSidebarOpen] = useState(
     () => !document.cookie.split("; ").includes("sidebar_state=false")
@@ -292,6 +295,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   async function handleRelogin() {
+    if (reloginLoading) return
+
     const limit = checkRateLimit()
     if (!limit.allowed) {
       toast.error(
@@ -305,6 +310,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return
     }
     recordLoginAttempt()
+    setReloginLoading(true)
 
     try {
       const success = await reloginActiveProvider()
@@ -314,6 +320,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
     } catch {
       // fall through
+    } finally {
+      setReloginLoading(false)
     }
     await logoutActiveProvider()
     router.replace("/login")
@@ -417,6 +425,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </Sidebar>
       <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] pb-[calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))] md:overflow-auto md:pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] md:pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom))]">
         <MobileTopBar title={pageTitle} showBack={showBack} />
+        {sessionExpired && (
+          <Alert variant="destructive" className="mx-4 mt-4 md:mx-6 md:mt-6">
+            <TriangleAlert />
+            <AlertTitle className="flex flex-wrap items-center gap-3">
+              <span>{t("app.sessionExpired")}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRelogin}
+                disabled={reloginLoading}
+                aria-busy={reloginLoading}
+              >
+                {reloginLoading ? t("app.updating") : t("app.relogin")}
+              </Button>
+            </AlertTitle>
+          </Alert>
+        )}
         <header className="hidden items-center justify-between gap-4 border-b px-6 py-4 md:flex">
           <div className="flex items-center gap-3">
             <SidebarTrigger aria-label={t("app.toggleSidebar")} title={t("app.toggleSidebar")} />

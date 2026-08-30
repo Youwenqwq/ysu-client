@@ -8,6 +8,7 @@
  * 纯函数 + 模块级状态(cookie jar)。
  */
 import { SimpleCookieJar, fetchWithJar, headerSingle, type HttpResponse } from "@/lib/cookie"
+import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 import { authorize, getCredentialApplied } from "./cas"
 import { parseTables, type TableData } from "./table"
 import { getSchoolConfig } from "@/lib/server-config"
@@ -183,6 +184,7 @@ function scxtConfig(): { baseUrl: string; ptBaseUrl: string } {
  * 子系统报「访问参数获取失败」。
  */
 async function ensureAuthorized(): Promise<void> {
+  await waitForAuthTransition()
   if (authorized) return
   await getCredentialApplied()
   if (inflightAuth) {
@@ -190,7 +192,9 @@ async function ensureAuthorized(): Promise<void> {
     return
   }
 
-  inflightAuth = (async () => {
+  const promise = withAuthTransition(async () => {
+    if (authorized) return
+
     const { baseUrl, ptBaseUrl } = scxtConfig()
     const ptHomeUrl = `${ptBaseUrl}${HOME_PATH}`
     const referer = { Referer: ptHomeUrl }
@@ -239,12 +243,13 @@ async function ensureAuthorized(): Promise<void> {
     }
     await getPageAbs(`${baseUrl}${HOME_PATH}`)
     authorized = true
-  })()
+  })
 
+  inflightAuth = promise
   try {
-    await inflightAuth
+    await promise
   } finally {
-    inflightAuth = null
+    if (inflightAuth === promise) inflightAuth = null
   }
 }
 
@@ -321,6 +326,7 @@ async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
     if (e instanceof ScxtNotLoggedInError) {
       authorized = false
       await ensureAuthorized()
+      await waitForAuthTransition()
       return await fn()
     }
     throw e
