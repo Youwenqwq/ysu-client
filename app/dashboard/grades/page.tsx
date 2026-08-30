@@ -1,27 +1,17 @@
-"use client";
+"use client"
 
-import { ResponsiveSelect } from "@/components/responsive-select";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import {
-  FilterDrawer,
-  FilterTrigger,
-} from "@/components/academic/filter-drawer";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group";
+import { ResponsiveSelect } from "@/components/responsive-select"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { FilterDrawer, FilterTrigger } from "@/components/academic/filter-drawer"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   ResponsiveModal,
   ResponsiveModalBody,
@@ -29,113 +19,98 @@ import {
   ResponsiveModalDescription,
   ResponsiveModalHeader,
   ResponsiveModalTitle,
-} from "@/components/responsive-modal";
-import { Separator } from "@/components/ui/separator";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
-import { GpaSummary } from "./gpa-summary";
-import { useCurrentWeek, useGPAStats, useGrades } from "@/providers/hooks";
-import { useProvider } from "@/providers/use-provider";
-import type {
-  Grade,
-  GradeStatistics,
-  GradeDistribution,
-  GradeRanking,
-} from "@/providers/types";
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Dices } from "lucide-react";
-import { useSettingsStore } from "@/lib/stores/settings";
-import {
-  useGradeGachaStore,
-  gradeKey,
-  type PendingGrade,
-} from "@/lib/stores/grade-gacha";
-import { GradeGachaModal } from "@/components/grade-gacha";
+} from "@/components/responsive-modal"
+import { Separator } from "@/components/ui/separator"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
+import { GpaSummary } from "./gpa-summary"
+import { useCurrentWeek, useGPAStats, useGrades } from "@/providers/hooks"
+import { useProvider } from "@/providers/use-provider"
+import type { Grade, GradeStatistics, GradeDistribution, GradeRanking } from "@/providers/types"
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Dices } from "lucide-react"
+import { useSettingsStore } from "@/lib/stores/settings"
+import { useGradeGachaStore, gradeKey, type PendingGrade } from "@/lib/stores/grade-gacha"
+import { GradeGachaModal } from "@/components/grade-gacha"
 
-const ALL_TERM = "__all__";
+const ALL_TERM = "__all__"
 
 function numericValue(value: number | undefined, fallback?: string): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  const parsed = Number(fallback);
-  return Number.isFinite(parsed) ? parsed : undefined;
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  const parsed = Number(fallback)
+  return Number.isFinite(parsed) ? parsed : undefined
 }
 
 export default function GradesPage() {
-  const provider = useProvider();
-  const { t } = useTranslation();
-  const [term, setTerm] = useState(ALL_TERM);
-  const [courseName, setCourseName] = useState("");
-  const [queriedCourseName, setQueriedCourseName] = useState("");
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-  const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null);
-  const [statsOpen, setStatsOpen] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [statsResult, setStatsResult] = useState<GradeStatistics | null>(null);
-  const [distributionResult, setDistributionResult] = useState<GradeDistribution[] | null>(null);
-  const [rankingResult, setRankingResult] = useState<GradeRanking | null>(null);
-  const [statsError, setStatsError] = useState<string | null>(null);
-  const [statsScope, setStatsScope] = useState<"class" | "course">("class");
-  const [sortMode, setSortMode] = useState<"default" | "asc" | "desc">("default");
-  const didAutoSelectTerm = useRef(false);
+  const provider = useProvider()
+  const { t } = useTranslation()
+  const [term, setTerm] = useState(ALL_TERM)
+  const [courseName, setCourseName] = useState("")
+  const [queriedCourseName, setQueriedCourseName] = useState("")
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
+  const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null)
+  const [statsOpen, setStatsOpen] = useState(false)
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [statsResult, setStatsResult] = useState<GradeStatistics | null>(null)
+  const [distributionResult, setDistributionResult] = useState<GradeDistribution[] | null>(null)
+  const [rankingResult, setRankingResult] = useState<GradeRanking | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [statsScope, setStatsScope] = useState<"class" | "course">("class")
+  const [sortMode, setSortMode] = useState<"default" | "asc" | "desc">("default")
+  const didAutoSelectTerm = useRef(false)
 
-  const gradesQuery = useGrades({ courseName: queriedCourseName || undefined });
-  const gpa = useGPAStats();
-  const currentWeek = useCurrentWeek();
-  const grades = useMemo(() => gradesQuery.data ?? [], [gradesQuery.data]);
-  const loading = gradesQuery.isLoading || gradesQuery.isValidating;
+  const gradesQuery = useGrades({ courseName: queriedCourseName || undefined })
+  const gpa = useGPAStats()
+  const currentWeek = useCurrentWeek()
+  const grades = useMemo(() => gradesQuery.data ?? [], [gradesQuery.data])
+  const loading = gradesQuery.isLoading || gradesQuery.isValidating
 
   // --- 新成绩抽卡:diff 基线维护 + 未收下前隐藏新成绩 ---
-  const gachaEnabled = useSettingsStore((s) => s.gradeGachaEnabled);
-  const gachaHydrated = useGradeGachaStore((s) => s.hasHydrated);
-  const gachaPending = useGradeGachaStore((s) => s.pending);
-  const [gachaOpen, setGachaOpen] = useState(false);
+  const gachaEnabled = useSettingsStore((s) => s.gradeGachaEnabled)
+  const gachaHydrated = useGradeGachaStore((s) => s.hasHydrated)
+  const gachaPending = useGradeGachaStore((s) => s.pending)
+  const [gachaOpen, setGachaOpen] = useState(false)
 
   useEffect(() => {
-    if (!gachaHydrated || gradesQuery.data === undefined) return;
-    const store = useGradeGachaStore.getState();
+    if (!gachaHydrated || gradesQuery.data === undefined) return
+    const store = useGradeGachaStore.getState()
     if (!gachaEnabled) {
       // 开关关闭时静默跟随基线,避免重新打开后一次性涌出全部历史
-      if (store.pending.length === 0) store.setBaseline(gradesQuery.data);
-      return;
+      if (store.pending.length === 0) store.setBaseline(gradesQuery.data)
+      return
     }
     if (Object.keys(store.seenSignatures).length === 0 && store.pending.length === 0) {
-      store.setBaseline(gradesQuery.data); // 首次运行只建基线
-      return;
+      store.setBaseline(gradesQuery.data) // 首次运行只建基线
+      return
     }
-    store.stagePending(gradesQuery.data);
-  }, [gradesQuery.data, gachaHydrated, gachaEnabled]);
+    store.stagePending(gradesQuery.data)
+  }, [gradesQuery.data, gachaHydrated, gachaEnabled])
 
   useEffect(() => {
-    if (gachaEnabled && gachaPending.length > 0) setGachaOpen(true);
-  }, [gachaEnabled, gachaPending.length]);
+    if (gachaEnabled && gachaPending.length > 0) setGachaOpen(true)
+  }, [gachaEnabled, gachaPending.length])
 
-  const pendingKeys = useMemo(
-    () => new Set(gachaPending.map((p) => p.key)),
-    [gachaPending],
-  );
+  const pendingKeys = useMemo(() => new Set(gachaPending.map((p) => p.key)), [gachaPending])
   // 待抽取期间按旧数据展示:新成绩暂不出现在列表与学期选项中
   const displayGrades = useMemo(
-    () =>
-      gachaPending.length > 0
-        ? grades.filter((g) => !pendingKeys.has(gradeKey(g)))
-        : grades,
-    [grades, gachaPending.length, pendingKeys],
-  );
+    () => (gachaPending.length > 0 ? grades.filter((g) => !pendingKeys.has(gradeKey(g))) : grades),
+    [grades, gachaPending.length, pendingKeys]
+  )
 
   // --- 玩耍模式:随机抽已有成绩播放动画(不动基线、不隐藏数据) ---
-  const [playItems, setPlayItems] = useState<PendingGrade[] | null>(null);
+  const [playItems, setPlayItems] = useState<PendingGrade[] | null>(null)
   const scoredGrades = useMemo(
     () => displayGrades.filter((g) => g.score || g.gradeLevel),
-    [displayGrades],
-  );
+    [displayGrades]
+  )
 
   function handlePlayDraw() {
-    setFilterDrawerOpen(false);
+    setFilterDrawerOpen(false)
     // 1~3 张,张数概率递减
-    const count = 1 + (Math.random() < 0.35 ? 1 : 0) + (Math.random() < 0.15 ? 1 : 0);
-    const pool = [...scoredGrades];
-    const picks: PendingGrade[] = [];
+    const count = 1 + (Math.random() < 0.35 ? 1 : 0) + (Math.random() < 0.15 ? 1 : 0)
+    const pool = [...scoredGrades]
+    const picks: PendingGrade[] = []
     while (picks.length < count && pool.length > 0) {
-      const [g] = pool.splice(Math.floor(Math.random() * pool.length), 1);
+      const [g] = pool.splice(Math.floor(Math.random() * pool.length), 1)
       picks.push({
         key: gradeKey(g),
         courseName: g.courseName,
@@ -145,107 +120,108 @@ export default function GradesPage() {
         gradeLevel: g.gradeLevel,
         credit: g.credit,
         isPass: g.isPass,
-      });
+      })
     }
-    if (picks.length > 0) setPlayItems(picks);
+    if (picks.length > 0) setPlayItems(picks)
   }
 
   const terms = useMemo(
-    () => Array.from(new Set(displayGrades.map((g) => g.semester).filter(Boolean) as string[])).sort(),
-    [displayGrades],
-  );
+    () =>
+      Array.from(new Set(displayGrades.map((g) => g.semester).filter(Boolean) as string[])).sort(),
+    [displayGrades]
+  )
 
   useEffect(() => {
-    const errors = [gradesQuery.error, gpa.error, currentWeek.error].filter(Boolean);
-    if (errors.length === 0) return;
-    toast.error(errors[0]?.message || t("app.updating"));
-  }, [gradesQuery.error, gpa.error, currentWeek.error, t]);
+    const errors = [gradesQuery.error, gpa.error, currentWeek.error].filter(Boolean)
+    if (errors.length === 0) return
+    toast.error(errors[0]?.message || t("app.updating"))
+  }, [gradesQuery.error, gpa.error, currentWeek.error, t])
 
   useEffect(() => {
     if (currentWeek.data?.semester) {
-      setTerm((prev) => (prev === ALL_TERM ? currentWeek.data!.semester! : prev));
+      setTerm((prev) => (prev === ALL_TERM ? currentWeek.data!.semester! : prev))
     }
-  }, [currentWeek.data]);
+  }, [currentWeek.data])
 
   useEffect(() => {
     if (terms.length > 0 && term === ALL_TERM && !didAutoSelectTerm.current) {
-      didAutoSelectTerm.current = true;
-      const latest = terms[terms.length - 1];
-      if (latest) setTerm(latest);
+      didAutoSelectTerm.current = true
+      const latest = terms[terms.length - 1]
+      if (latest) setTerm(latest)
     }
-  }, [terms, term]);
+  }, [terms, term])
 
   async function handleSearch() {
-    const nextCourseName = courseName.trim();
+    const nextCourseName = courseName.trim()
     if (nextCourseName === queriedCourseName) {
-      await gradesQuery.mutate();
+      await gradesQuery.mutate()
     } else {
-      setQueriedCourseName(nextCourseName);
+      setQueriedCourseName(nextCourseName)
     }
   }
 
   async function fetchStatsForScope(grade: Grade, scope: "class" | "course") {
-    setStatsResult(null);
-    setDistributionResult(null);
-    setRankingResult(null);
-    setStatsError(null);
+    setStatsResult(null)
+    setDistributionResult(null)
+    setRankingResult(null)
+    setStatsError(null)
 
     const params = {
       semester: grade.semester || undefined,
       classId: scope === "class" ? grade.classId?.trim() : undefined,
       courseCode: scope === "course" ? grade.courseCode?.trim() : undefined,
-    };
+    }
 
-    setStatsLoading(true);
+    setStatsLoading(true)
     try {
       const [stats, distribution, ranking] = await Promise.all([
         provider.getGradeStatistics(params).catch(() => null),
         provider.getGradeDistribution(params).catch(() => null),
         provider.getGradeRanking(params).catch(() => null),
-      ]);
-      setStatsResult(stats);
-      setDistributionResult(distribution);
-      setRankingResult(ranking);
+      ])
+      setStatsResult(stats)
+      setDistributionResult(distribution)
+      setRankingResult(ranking)
       if (!stats && !distribution && !ranking) {
-        setStatsError(t("grades.stats.loadFailed"));
+        setStatsError(t("grades.stats.loadFailed"))
       }
     } catch (err) {
-      setStatsError((err as Error).message || t("grades.stats.loadFailed"));
+      setStatsError((err as Error).message || t("grades.stats.loadFailed"))
     } finally {
-      setStatsLoading(false);
+      setStatsLoading(false)
     }
   }
 
   async function handleOpenStats(grade: Grade) {
-    setSelectedGrade(grade);
-    setStatsOpen(true);
+    setSelectedGrade(grade)
+    setStatsOpen(true)
 
-    const hasClass = !!grade.classId?.trim();
-    const hasCourse = !!grade.courseCode?.trim();
+    const hasClass = !!grade.classId?.trim()
+    const hasCourse = !!grade.courseCode?.trim()
     if (!hasClass && !hasCourse) {
-      setStatsResult(null);
-      setDistributionResult(null);
-      setRankingResult(null);
-      setStatsError(t("grades.stats.noClassOrCourse"));
-      return;
+      setStatsResult(null)
+      setDistributionResult(null)
+      setRankingResult(null)
+      setStatsError(t("grades.stats.noClassOrCourse"))
+      return
     }
 
-    const initialScope: "class" | "course" = hasClass ? "class" : "course";
-    setStatsScope(initialScope);
-    await fetchStatsForScope(grade, initialScope);
+    const initialScope: "class" | "course" = hasClass ? "class" : "course"
+    setStatsScope(initialScope)
+    await fetchStatsForScope(grade, initialScope)
   }
 
   async function handleScopeChange(scope: "class" | "course") {
-    if (!selectedGrade || scope === statsScope) return;
-    setStatsScope(scope);
-    await fetchStatsForScope(selectedGrade, scope);
+    if (!selectedGrade || scope === statsScope) return
+    setStatsScope(scope)
+    await fetchStatsForScope(selectedGrade, scope)
   }
 
   function cycleSort() {
-    setSortMode((prev) => (prev === "default" ? "desc" : prev === "desc" ? "asc" : "default"));
+    setSortMode((prev) => (prev === "default" ? "desc" : prev === "desc" ? "asc" : "default"))
   }
 
-  const SortIcon = sortMode === "asc" ? ArrowUp : sortMode === "desc" ? ArrowDown : ArrowUpDown;
+  const SortIcon = sortMode === "asc" ? ArrowUp : sortMode === "desc" ? ArrowDown : ArrowUpDown
 
   useMobileHeaderRight(
     <div className="flex items-center gap-0.5">
@@ -263,50 +239,50 @@ export default function GradesPage() {
         onClick={() => setFilterDrawerOpen(true)}
       />
     </div>,
-    [term, sortMode, t],
-  );
+    [term, sortMode, t]
+  )
 
   const filtered = useMemo(() => {
     return displayGrades.filter((g) => {
-      if (term !== ALL_TERM && g.semester !== term) return false;
-      return true;
-    });
-  }, [displayGrades, term]);
+      if (term !== ALL_TERM && g.semester !== term) return false
+      return true
+    })
+  }, [displayGrades, term])
 
   const sorted = useMemo(() => {
-    if (sortMode === "default") return filtered;
+    if (sortMode === "default") return filtered
     return [...filtered].sort((a, b) => {
-      const scoreA = numericValue(a.numericScore, a.score);
-      const scoreB = numericValue(b.numericScore, b.score);
-      const validA = scoreA !== undefined;
-      const validB = scoreB !== undefined;
-      if (!validA && !validB) return 0;
-      if (!validA) return 1;
-      if (!validB) return -1;
-      return sortMode === "asc" ? scoreA - scoreB : scoreB - scoreA;
-    });
-  }, [filtered, sortMode]);
+      const scoreA = numericValue(a.numericScore, a.score)
+      const scoreB = numericValue(b.numericScore, b.score)
+      const validA = scoreA !== undefined
+      const validB = scoreB !== undefined
+      if (!validA && !validB) return 0
+      if (!validA) return 1
+      if (!validB) return -1
+      return sortMode === "asc" ? scoreA - scoreB : scoreB - scoreA
+    })
+  }, [filtered, sortMode])
 
   const termWeightedGpa = useMemo(() => {
-    if (term === ALL_TERM) return null;
-    let totalWeightedPoints = 0;
-    let totalCredits = 0;
+    if (term === ALL_TERM) return null
+    let totalWeightedPoints = 0
+    let totalCredits = 0
     for (const g of filtered) {
       // TODO: 此逻辑实际应该由对应 Provider 提供，之后要整合到 ysu provider 里
       // 仅统计主修培养方案内课程的正考成绩
-      if (!g.isMajor || g.isRetake !== "正考") continue;
-      const gp = numericValue(g.numericGradePoint, g.gradePoint);
-      const cr = numericValue(g.numericCredit, g.credit);
+      if (!g.isMajor || g.isRetake !== "正考") continue
+      const gp = numericValue(g.numericGradePoint, g.gradePoint)
+      const cr = numericValue(g.numericCredit, g.credit)
       if (gp !== undefined && cr !== undefined && cr > 0) {
         // 学位课学分和绩点按 1.2 倍计入
-        const weight = g.isDegreeCourse ? 1.2 : 1;
-        totalWeightedPoints += gp * cr * weight;
-        totalCredits += cr * weight;
+        const weight = g.isDegreeCourse ? 1.2 : 1
+        totalWeightedPoints += gp * cr * weight
+        totalCredits += cr * weight
       }
     }
-    if (totalCredits === 0) return null;
-    return (totalWeightedPoints / totalCredits).toFixed(4);
-  }, [filtered, term]);
+    if (totalCredits === 0) return null
+    return (totalWeightedPoints / totalCredits).toFixed(4)
+  }, [filtered, term])
 
   if (loading && grades.length === 0) {
     return (
@@ -315,7 +291,7 @@ export default function GradesPage() {
         <Skeleton className="h-12" />
         <Skeleton className="h-96" />
       </div>
-    );
+    )
   }
 
   const renderFilterControls = (idPrefix: string) => (
@@ -365,20 +341,16 @@ export default function GradesPage() {
       </Field>
       <Button
         onClick={() => {
-          handleSearch();
-          setFilterDrawerOpen(false);
+          handleSearch()
+          setFilterDrawerOpen(false)
         }}
         disabled={loading}
       >
-        {loading ? (
-          <Spinner data-icon="inline-start" />
-        ) : (
-          <Search data-icon="inline-start" />
-        )}
+        {loading ? <Spinner data-icon="inline-start" /> : <Search data-icon="inline-start" />}
         {t("grades.search")}
       </Button>
     </FieldGroup>
-  );
+  )
 
   return (
     <div className="flex flex-col gap-6 md:gap-8">
@@ -428,7 +400,7 @@ export default function GradesPage() {
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-lg font-semibold tabular-nums leading-none">
+                    <span className="text-lg leading-none font-semibold tabular-nums">
                       {g.score || "-"}
                     </span>
                     {g.gradeLevel && (
@@ -438,9 +410,7 @@ export default function GradesPage() {
                     )}
                   </div>
                   {g.gradePoint && (
-                    <span className="text-[10px] text-muted-foreground">
-                      GP {g.gradePoint}
-                    </span>
+                    <span className="text-[10px] text-muted-foreground">GP {g.gradePoint}</span>
                   )}
                   <div className="flex items-center gap-1">
                     {g.isDegreeCourse && (
@@ -507,20 +477,14 @@ export default function GradesPage() {
                   variant="outline"
                   value={statsScope}
                   onValueChange={(v) => {
-                    if (v === "class" || v === "course") handleScopeChange(v);
+                    if (v === "class" || v === "course") handleScopeChange(v)
                   }}
                   disabled={statsLoading}
                 >
-                  <ToggleGroupItem
-                    value="class"
-                    disabled={!selectedGrade.classId?.trim()}
-                  >
+                  <ToggleGroupItem value="class" disabled={!selectedGrade.classId?.trim()}>
                     {t("grades.stats.scopeClass")}
                   </ToggleGroupItem>
-                  <ToggleGroupItem
-                    value="course"
-                    disabled={!selectedGrade.courseCode?.trim()}
-                  >
+                  <ToggleGroupItem value="course" disabled={!selectedGrade.courseCode?.trim()}>
                     {t("grades.stats.scopeCourse")}
                   </ToggleGroupItem>
                 </ToggleGroup>
@@ -539,9 +503,7 @@ export default function GradesPage() {
             ) : (
               <>
                 <section className="flex flex-col gap-2">
-                  <h3 className="text-sm font-semibold">
-                    {t("grades.stats.sectionStatistics")}
-                  </h3>
+                  <h3 className="text-sm font-semibold">{t("grades.stats.sectionStatistics")}</h3>
                   {statsResult ? (
                     <div className="grid grid-cols-3 gap-2">
                       <div className="flex flex-col gap-1 rounded-md border p-2.5">
@@ -577,18 +539,13 @@ export default function GradesPage() {
                 <Separator />
 
                 <section className="flex flex-col gap-2">
-                  <h3 className="text-sm font-semibold">
-                    {t("grades.stats.sectionDistribution")}
-                  </h3>
+                  <h3 className="text-sm font-semibold">{t("grades.stats.sectionDistribution")}</h3>
                   {distributionResult && distributionResult.length > 0 ? (
                     <div className="flex flex-col gap-1.5">
                       {(() => {
-                        const maxCount = Math.max(
-                          ...distributionResult.map((d) => d.count || 0),
-                          1,
-                        );
+                        const maxCount = Math.max(...distributionResult.map((d) => d.count || 0), 1)
                         return distributionResult.map((d, i) => {
-                          const pct = ((d.count || 0) / maxCount) * 100;
+                          const pct = ((d.count || 0) / maxCount) * 100
                           return (
                             <div key={i} className="flex items-center gap-3 text-xs">
                               <span className="w-16 shrink-0 truncate">
@@ -602,12 +559,12 @@ export default function GradesPage() {
                                   />
                                 </div>
                               </div>
-                              <span className="w-12 shrink-0 text-right tabular-nums text-muted-foreground">
+                              <span className="w-12 shrink-0 text-right text-muted-foreground tabular-nums">
                                 {t("grades.stats.count", { count: d.count })}
                               </span>
                             </div>
-                          );
-                        });
+                          )
+                        })
                       })()}
                     </div>
                   ) : (
@@ -618,9 +575,7 @@ export default function GradesPage() {
                 <Separator />
 
                 <section className="flex flex-col gap-2">
-                  <h3 className="text-sm font-semibold">
-                    {t("grades.stats.sectionRanking")}
-                  </h3>
+                  <h3 className="text-sm font-semibold">{t("grades.stats.sectionRanking")}</h3>
                   {rankingResult ? (
                     <div className="grid grid-cols-2 gap-2">
                       <div className="flex flex-col gap-1 rounded-md border p-2.5">
@@ -660,5 +615,5 @@ export default function GradesPage() {
         onClose={() => setPlayItems(null)}
       />
     </div>
-  );
+  )
 }

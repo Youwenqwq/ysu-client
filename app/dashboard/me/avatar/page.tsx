@@ -1,67 +1,67 @@
-"use client";
+"use client"
 
-import { useRef, useState } from "react";
-import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useSettingsStore } from "@/lib/stores/settings";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { saveAvatarImage, removeAvatarImage, loadAvatarImage } from "@/lib/storage/avatar";
-import { useStoredMediaUrl } from "@/lib/storage/media";
-import { ImagePlus, Trash2 } from "lucide-react";
-import { useAuthStore } from "@/lib/stores/auth";
+import { useRef, useState } from "react"
+import { toast } from "sonner"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useSettingsStore } from "@/lib/stores/settings"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { saveAvatarImage, removeAvatarImage, loadAvatarImage } from "@/lib/storage/avatar"
+import { useStoredMediaUrl } from "@/lib/storage/media"
+import { ImagePlus, Trash2 } from "lucide-react"
+import { useAuthStore } from "@/lib/stores/auth"
 
 export default function AvatarSettingsPage() {
-  const { t } = useTranslation();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const username = useAuthStore((s) => s.username);
+  const { t } = useTranslation()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const username = useAuthStore((s) => s.username)
 
-  const avatarImage = useSettingsStore((s) => s.avatarImage);
-  const setAvatarImage = useSettingsStore((s) => s.setAvatarImage);
-  const avatarUrl = useStoredMediaUrl(avatarImage, loadAvatarImage);
+  const avatarImage = useSettingsStore((s) => s.avatarImage)
+  const setAvatarImage = useSettingsStore((s) => s.setAvatarImage)
+  const avatarUrl = useStoredMediaUrl(avatarImage, loadAvatarImage)
 
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState(false)
 
-  const initials = (username || "U").slice(-2);
+  const initials = (username || "U").slice(-2)
 
   function handleSelectImage() {
-    fileInputRef.current?.click();
+    fileInputRef.current?.click()
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const file = e.target.files?.[0]
+    if (!file) return
     if (file.size > 10 * 1024 * 1024) {
-      toast.error(t("app.avatarImageTooLarge"));
-      e.target.value = "";
-      return;
+      toast.error(t("app.avatarImageTooLarge"))
+      e.target.value = ""
+      return
     }
 
-    setUploading(true);
-    const reader = new FileReader();
+    setUploading(true)
+    const reader = new FileReader()
     reader.onload = async () => {
       try {
-        const storedUrl = await saveAvatarImage(reader.result as string);
-        setAvatarImage(storedUrl);
-        toast.success(t("app.avatarSaveSuccess"));
+        const storedUrl = await saveAvatarImage(reader.result as string)
+        setAvatarImage(storedUrl)
+        toast.success(t("app.avatarSaveSuccess"))
       } catch {
-        toast.error(t("app.networkError"));
+        toast.error(t("app.networkError"))
       } finally {
-        setUploading(false);
+        setUploading(false)
       }
-    };
+    }
     reader.onerror = () => {
-      toast.error(t("app.networkError"));
-      setUploading(false);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+      toast.error(t("app.networkError"))
+      setUploading(false)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ""
   }
 
   async function handleRemoveImage() {
-    await removeAvatarImage();
-    setAvatarImage("");
+    await removeAvatarImage()
+    setAvatarImage("")
   }
 
   return (
@@ -88,34 +88,22 @@ export default function AvatarSettingsPage() {
             />
 
             <div className="flex gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSelectImage}
-                disabled={uploading}
-              >
+              <Button variant="outline" size="sm" onClick={handleSelectImage} disabled={uploading}>
                 <ImagePlus data-icon="inline-start" />
                 {avatarImage ? t("app.avatarReplace") : t("app.avatarSelect")}
               </Button>
               {avatarImage && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRemoveImage}
-                  disabled={uploading}
-                >
+                <Button variant="ghost" size="sm" onClick={handleRemoveImage} disabled={uploading}>
                   <Trash2 data-icon="inline-start" />
                   {t("app.avatarRemove")}
                 </Button>
               )}
             </div>
 
-            <p className="text-center text-xs text-muted-foreground">
-              {t("app.avatarCropHint")}
-            </p>
+            <p className="text-center text-xs text-muted-foreground">{t("app.avatarCropHint")}</p>
           </div>
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

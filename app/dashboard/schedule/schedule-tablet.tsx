@@ -1,18 +1,19 @@
-"use client";
+"use client"
 
-import { useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMemo, useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CalendarOff, Layers } from "lucide-react";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { cn } from "@/lib/utils";
-import type { Course, ClassPeriod, CurrentWeek } from "@/providers/types";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { CalendarOff, Layers } from "lucide-react"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { cn } from "@/lib/utils"
+import type { Course, ClassPeriod, CurrentWeek } from "@/providers/types"
 import {
   computeMergedBlocks,
   buildSectionTimeMap,
@@ -23,90 +24,107 @@ import {
   periodEndTime,
   periodStartTime,
   type ScheduleBlock,
-} from "./schedule-utils";
-import { COURSE_BG_CLASSES, courseColorIndex } from "./course-color";
-import { ActivityModal } from "./activity-modal";
-import { SigninModal } from "./signin-modal";
+} from "./schedule-utils"
+import { COURSE_BG_CLASSES, courseColorIndex } from "./course-color"
+import { ActivityModal } from "./activity-modal"
+import { SigninModal } from "./signin-modal"
 
 interface Props {
-  courses: Course[];
-  periods: ClassPeriod[];
-  currentWeekday: number;
-  currentWeek: CurrentWeek | null;
-  selectedWeek: number;
-  termStartDate?: string;
-  nowMinutes: number;
+  courses: Course[]
+  periods: ClassPeriod[]
+  currentWeekday: number
+  currentWeek: CurrentWeek | null
+  selectedWeek: number
+  termStartDate?: string
+  nowMinutes: number
 }
 
-const DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
-const LUNCH_AFTER = 4;
-const DINNER_AFTER = 8;
+const DAYS = [1, 2, 3, 4, 5, 6, 7] as const
+const LUNCH_AFTER = 4
+const DINNER_AFTER = 8
 
-export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, selectedWeek, termStartDate, nowMinutes }: Props) {
-  const { t } = useTranslation();
-  const [overlapDialog, setOverlapDialog] = useState<{ day: number; section: number; courses: Course[] } | null>(null);
-  const [activityCourse, setActivityCourse] = useState<Course | null>(null);
-  const [activityOpen, setActivityOpen] = useState(false);
-  const [signinActivityId, setSigninActivityId] = useState<string | null>(null);
-  const [signinType, setSigninType] = useState(1);
-  const [signinOpen, setSigninOpen] = useState(false);
+export function ScheduleTablet({
+  courses,
+  periods,
+  currentWeekday,
+  currentWeek,
+  selectedWeek,
+  termStartDate,
+  nowMinutes,
+}: Props) {
+  const { t } = useTranslation()
+  const [overlapDialog, setOverlapDialog] = useState<{
+    day: number
+    section: number
+    courses: Course[]
+  } | null>(null)
+  const [activityCourse, setActivityCourse] = useState<Course | null>(null)
+  const [activityOpen, setActivityOpen] = useState(false)
+  const [signinActivityId, setSigninActivityId] = useState<string | null>(null)
+  const [signinType, setSigninType] = useState(1)
+  const [signinOpen, setSigninOpen] = useState(false)
 
-  const isCurrentWeek = currentWeek?.week === selectedWeek;
-  const timeMap = useMemo(() => buildSectionTimeMap(periods), [periods]);
+  const isCurrentWeek = currentWeek?.week === selectedWeek
+  const timeMap = useMemo(() => buildSectionTimeMap(periods), [periods])
   const weekDates = useMemo(
     () => computeWeekDateLabels(currentWeek, selectedWeek, termStartDate),
-    [currentWeek, selectedWeek, termStartDate],
-  );
+    [currentWeek, selectedWeek, termStartDate]
+  )
 
   const isBlockCurrent = (block: ScheduleBlock): boolean => {
-    if (!isCurrentWeek || block.day !== currentWeek?.weekday) return false;
-    if (block.courses.length !== 1) return false;
-    return isCourseCurrent(block.courses[0], nowMinutes, timeMap);
-  };
+    if (!isCurrentWeek || block.day !== currentWeek?.weekday) return false
+    if (block.courses.length !== 1) return false
+    return isCourseCurrent(block.courses[0], nowMinutes, timeMap)
+  }
 
   const { sectionToRow, totalRows, lunchRow, dinnerRow } = useMemo(() => {
-    const map = new Map<number, number>();
-    let row = 2;
-    let lunch: number | null = null;
-    let dinner: number | null = null;
-    const sectionSet = new Set(periods.map((p) => p.section));
+    const map = new Map<number, number>()
+    let row = 2
+    let lunch: number | null = null
+    let dinner: number | null = null
+    const sectionSet = new Set(periods.map((p) => p.section))
     for (const p of periods) {
       if (p.section === LUNCH_AFTER + 1 && sectionSet.has(LUNCH_AFTER)) {
-        lunch = row;
-        row++;
+        lunch = row
+        row++
       }
       if (p.section === DINNER_AFTER + 1 && sectionSet.has(DINNER_AFTER)) {
-        dinner = row;
-        row++;
+        dinner = row
+        row++
       }
-      map.set(p.section, row);
-      row++;
+      map.set(p.section, row)
+      row++
     }
-    return { sectionToRow: map, totalRows: row - 1, lunchRow: lunch, dinnerRow: dinner };
-  }, [periods]);
+    return {
+      sectionToRow: map,
+      totalRows: row - 1,
+      lunchRow: lunch,
+      dinnerRow: dinner,
+    }
+  }, [periods])
 
   const gridTemplateRows = useMemo(() => {
-    const sizes: string[] = ["auto"];
+    const sizes: string[] = ["auto"]
     for (let r = 2; r <= totalRows; r++) {
       if (r === lunchRow || r === dinnerRow) {
-        sizes.push("18px");
+        sizes.push("18px")
       } else {
-        sizes.push("minmax(52px, 1fr)");
+        sizes.push("minmax(52px, 1fr)")
       }
     }
-    return sizes.join(" ");
-  }, [totalRows, lunchRow, dinnerRow]);
+    return sizes.join(" ")
+  }, [totalRows, lunchRow, dinnerRow])
 
-  const mergedBlocks = useMemo(() => computeMergedBlocks(courses, periods), [courses, periods]);
+  const mergedBlocks = useMemo(() => computeMergedBlocks(courses, periods), [courses, periods])
 
   function blockStyle(block: ScheduleBlock) {
-    const startRow = sectionToRow.get(block.start);
-    const endRow = sectionToRow.get(block.end);
-    if (!startRow || !endRow) return { display: "none" as const };
+    const startRow = sectionToRow.get(block.start)
+    const endRow = sectionToRow.get(block.end)
+    if (!startRow || !endRow) return { display: "none" as const }
     return {
       gridRow: `${startRow} / ${endRow + 1}`,
       gridColumn: `${block.day + 1}`,
-    };
+    }
   }
 
   if (courses.length === 0) {
@@ -119,7 +137,7 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
           <EmptyTitle>{t("schedule.noData")}</EmptyTitle>
         </EmptyHeader>
       </Empty>
-    );
+    )
   }
 
   return (
@@ -132,7 +150,7 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
             gridTemplateRows,
           }}
         >
-          <div className="border-b border-r border-border" />
+          <div className="border-r border-b border-border" />
 
           {DAYS.map((d, idx) => (
             <div
@@ -142,7 +160,7 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
                 idx < 6 && "border-r",
                 isCurrentWeek && d === currentWeekday
                   ? "bg-primary/5 text-primary"
-                  : "text-muted-foreground",
+                  : "text-muted-foreground"
               )}
             >
               <span className="text-[11px]">{t(`dashboard.weekdayShort.${d}`)}</span>
@@ -153,8 +171,8 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
           ))}
 
           {periods.map((p) => {
-            const row = sectionToRow.get(p.section);
-            if (!row) return null;
+            const row = sectionToRow.get(p.section)
+            if (!row) return null
             return (
               <div
                 key={p.section}
@@ -165,7 +183,7 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
                 {periodStartTime(p) && <span>{periodStartTime(p)}</span>}
                 {periodEndTime(p) && <span>{periodEndTime(p)}</span>}
               </div>
-            );
+            )
           })}
 
           {lunchRow !== null && (
@@ -188,41 +206,41 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
 
           {DAYS.flatMap((d) =>
             periods.map((p) => {
-              const row = sectionToRow.get(p.section);
-              if (!row) return null;
+              const row = sectionToRow.get(p.section)
+              if (!row) return null
               return (
                 <div
                   key={`cell-${d}-${p.section}`}
                   className={cn(
                     "border-b border-border",
                     d < 7 && "border-r",
-                    isCurrentWeek && d === currentWeekday && "bg-primary/5",
+                    isCurrentWeek && d === currentWeekday && "bg-primary/5"
                   )}
                   style={{ gridRow: row, gridColumn: d + 1 }}
                 />
-              );
-            }),
+              )
+            })
           )}
 
           {mergedBlocks.map((block, idx) => {
             if (block.courses.length === 1) {
-              const c = block.courses[0];
-              const colorIdx = courseColorIndex(c);
+              const c = block.courses[0]
+              const colorIdx = courseColorIndex(c)
               return (
                 <button
                   key={`block-${idx}`}
                   className={cn(
                     "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1.5 text-left transition-opacity active:opacity-60",
                     COURSE_BG_CLASSES[colorIdx],
-                    isBlockCurrent(block) && "ring-1 ring-primary",
+                    isBlockCurrent(block) && "ring-1 ring-primary"
                   )}
                   style={blockStyle(block)}
                   onClick={() => {
-                    setActivityCourse(c);
-                    setActivityOpen(true);
+                    setActivityCourse(c)
+                    setActivityOpen(true)
                   }}
                 >
-                  <span className="line-clamp-3 text-[11px] font-medium leading-tight text-foreground">
+                  <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">
                     {c.name}
                   </span>
                   {c.classroom && (
@@ -236,7 +254,7 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
                     </span>
                   )}
                 </button>
-              );
+              )
             }
             return (
               <button
@@ -244,7 +262,11 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
                 className="relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60"
                 style={blockStyle(block)}
                 onClick={() =>
-                  setOverlapDialog({ day: block.day, section: block.start, courses: block.courses })
+                  setOverlapDialog({
+                    day: block.day,
+                    section: block.start,
+                    courses: block.courses,
+                  })
                 }
               >
                 <Layers className="size-3 text-muted-foreground" />
@@ -253,7 +275,7 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
                 </span>
                 <span className="text-[9px] text-muted-foreground">{t("schedule.overlap")}</span>
               </button>
-            );
+            )
           })}
         </div>
       </div>
@@ -270,7 +292,9 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
             </DialogTitle>
             <DialogDescription>
               {overlapDialog
-                ? t("schedule.overlapCourses", { count: overlapDialog.courses.length })
+                ? t("schedule.overlapCourses", {
+                    count: overlapDialog.courses.length,
+                  })
                 : ""}
             </DialogDescription>
           </DialogHeader>
@@ -279,11 +303,11 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
               return (
                 <Card
                   key={i}
-                  className="cursor-pointer hover:bg-accent/50 transition-colors"
+                  className="cursor-pointer transition-colors hover:bg-accent/50"
                   onClick={() => {
-                    setOverlapDialog(null);
-                    setActivityCourse(c);
-                    setActivityOpen(true);
+                    setOverlapDialog(null)
+                    setActivityCourse(c)
+                    setActivityOpen(true)
                   }}
                 >
                   <CardHeader className="pb-2">
@@ -293,10 +317,11 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="text-sm text-muted-foreground">
-                    {t("schedule.weeks")}: {c.weeks} · {t("schedule.sections")}: {courseStartSection(c)}-{courseEndSection(c)}
+                    {t("schedule.weeks")}: {c.weeks} · {t("schedule.sections")}:{" "}
+                    {courseStartSection(c)}-{courseEndSection(c)}
                   </CardContent>
                 </Card>
-              );
+              )
             })}
           </div>
         </DialogContent>
@@ -308,9 +333,9 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
         open={activityOpen}
         onOpenChange={setActivityOpen}
         onSigninActivity={(id, type) => {
-          setSigninActivityId(id);
-          setSigninType(type);
-          setSigninOpen(true);
+          setSigninActivityId(id)
+          setSigninType(type)
+          setSigninOpen(true)
         }}
       />
 
@@ -321,5 +346,5 @@ export function ScheduleTablet({ courses, periods, currentWeekday, currentWeek, 
         onOpenChange={setSigninOpen}
       />
     </>
-  );
+  )
 }

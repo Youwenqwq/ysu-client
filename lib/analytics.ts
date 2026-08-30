@@ -1,15 +1,15 @@
-import { useSettingsStore } from "@/lib/stores/settings";
-import { APP_VERSION } from "@/lib/version";
-import { isCapacitor } from "@/lib/native/platform";
+import { useSettingsStore } from "@/lib/stores/settings"
+import { APP_VERSION } from "@/lib/version"
+import { isCapacitor } from "@/lib/native/platform"
 
-const STATS_ENDPOINT = "https://ysu.welain.com/api/stats";
+const STATS_ENDPOINT = "https://ysu.welain.com/api/stats"
 
 export async function trackAppLaunch(): Promise<void> {
-  const store = useSettingsStore.getState();
-  if (!store.analyticsConsent) return;
+  const store = useSettingsStore.getState()
+  if (!store.analyticsConsent) return
 
-  const today = new Date().toISOString().split("T")[0];
-  if (store.lastAnalyticsDate === today) return;
+  const today = new Date().toISOString().split("T")[0]
+  if (store.lastAnalyticsDate === today) return
 
   try {
     await fetch(STATS_ENDPOINT, {
@@ -22,8 +22,8 @@ export async function trackAppLaunch(): Promise<void> {
         platform: isCapacitor() ? "capacitor" : "web",
         ua: navigator.userAgent,
       }),
-    });
-    store.setLastAnalyticsDate(today);
+    })
+    store.setLastAnalyticsDate(today)
   } catch {
     // Silently ignore network errors — analytics must never block startup
   }

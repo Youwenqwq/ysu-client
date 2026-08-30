@@ -20,6 +20,6 @@ export function useIsMobile() {
       return () => mql.removeEventListener("change", callback)
     },
     () => window.matchMedia(MOBILE_QUERY).matches,
-    () => false,
+    () => false
   )
 }

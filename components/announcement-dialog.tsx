@@ -1,7 +1,7 @@
-"use client";
+"use client"
 
-import { useCallback, useMemo } from "react";
-import Markdown from "react-markdown";
+import { useCallback, useMemo } from "react"
+import Markdown from "react-markdown"
 import {
   Dialog,
   DialogContent,
@@ -9,106 +9,111 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { useAnnouncementStore } from "@/lib/stores/announcement";
-import { dismissAnnouncement, type AnnouncementLevel } from "@/lib/announcement";
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useAnnouncementStore } from "@/lib/stores/announcement"
+import { dismissAnnouncement, type AnnouncementLevel } from "@/lib/announcement"
 
 interface AnnouncementDialogProps {
-  onDismissed?: () => void;
+  onDismissed?: () => void
 }
 
 const levelBadgeClass: Record<AnnouncementLevel, string> = {
   info: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100",
   warning: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 hover:bg-amber-100",
   critical: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100",
-};
+}
 
 const levelLabelKey: Record<AnnouncementLevel, string> = {
   info: "announcement.levelInfo",
   warning: "announcement.levelWarning",
   critical: "announcement.levelCritical",
-};
+}
 
 export function AnnouncementDialog({ onDismissed }: AnnouncementDialogProps) {
-  const { t } = useTranslation();
-  const announcementInfo = useAnnouncementStore((s) => s.announcementInfo);
-  const showDialog = useAnnouncementStore((s) => s.showDialog);
-  const setShowDialog = useAnnouncementStore((s) => s.setShowDialog);
+  const { t } = useTranslation()
+  const announcementInfo = useAnnouncementStore((s) => s.announcementInfo)
+  const showDialog = useAnnouncementStore((s) => s.showDialog)
+  const setShowDialog = useAnnouncementStore((s) => s.setShowDialog)
 
   const handleClose = useCallback(() => {
-    setShowDialog(false);
-    onDismissed?.();
-  }, [setShowDialog, onDismissed]);
+    setShowDialog(false)
+    onDismissed?.()
+  }, [setShowDialog, onDismissed])
 
   const handleDismiss = useCallback(() => {
     if (announcementInfo?.id) {
-      dismissAnnouncement(announcementInfo.id);
+      dismissAnnouncement(announcementInfo.id)
     }
-    handleClose();
-  }, [announcementInfo, handleClose]);
+    handleClose()
+  }, [announcementInfo, handleClose])
 
   const markdownComponents = useMemo(
     () => ({
       h1: ({ children }: { children?: React.ReactNode }) => (
-        <h1 className="text-lg font-semibold mt-3 mb-1">{children}</h1>
+        <h1 className="mt-3 mb-1 text-lg font-semibold">{children}</h1>
       ),
       h2: ({ children }: { children?: React.ReactNode }) => (
-        <h2 className="text-base font-medium mt-3 mb-1">{children}</h2>
+        <h2 className="mt-3 mb-1 text-base font-medium">{children}</h2>
       ),
       h3: ({ children }: { children?: React.ReactNode }) => (
-        <h3 className="text-sm font-medium mt-2 mb-1">{children}</h3>
+        <h3 className="mt-2 mb-1 text-sm font-medium">{children}</h3>
       ),
       p: ({ children }: { children?: React.ReactNode }) => (
-        <p className="text-sm text-muted-foreground leading-relaxed">{children}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{children}</p>
       ),
       ul: ({ children }: { children?: React.ReactNode }) => (
-        <ul className="list-disc list-inside text-sm text-muted-foreground space-y-0.5">{children}</ul>
+        <ul className="list-inside list-disc space-y-0.5 text-sm text-muted-foreground">
+          {children}
+        </ul>
       ),
       ol: ({ children }: { children?: React.ReactNode }) => (
-        <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-0.5">{children}</ol>
+        <ol className="list-inside list-decimal space-y-0.5 text-sm text-muted-foreground">
+          {children}
+        </ol>
       ),
-      li: ({ children }: { children?: React.ReactNode }) => (
-        <li className="text-sm">{children}</li>
-      ),
+      li: ({ children }: { children?: React.ReactNode }) => <li className="text-sm">{children}</li>,
       a: ({ children, href }: { children?: React.ReactNode; href?: string }) => (
-        <a href={href} className="text-primary underline underline-offset-2" target="_blank" rel="noopener noreferrer">
+        <a
+          href={href}
+          className="text-primary underline underline-offset-2"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           {children}
         </a>
       ),
       code: ({ children }: { children?: React.ReactNode }) => (
-        <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+        <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">{children}</code>
       ),
       pre: ({ children }: { children?: React.ReactNode }) => (
-        <pre className="bg-muted p-2 rounded-md overflow-x-auto text-xs font-mono">{children}</pre>
+        <pre className="overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs">{children}</pre>
       ),
       strong: ({ children }: { children?: React.ReactNode }) => (
         <strong className="font-semibold text-foreground">{children}</strong>
       ),
-      em: ({ children }: { children?: React.ReactNode }) => (
-        <em className="italic">{children}</em>
-      ),
+      em: ({ children }: { children?: React.ReactNode }) => <em className="italic">{children}</em>,
       blockquote: ({ children }: { children?: React.ReactNode }) => (
-        <blockquote className="border-l-2 border-muted-foreground/30 pl-3 italic text-muted-foreground">
+        <blockquote className="border-l-2 border-muted-foreground/30 pl-3 text-muted-foreground italic">
           {children}
         </blockquote>
       ),
     }),
     []
-  );
+  )
 
-  if (!announcementInfo) return null;
+  if (!announcementInfo) return null
 
   return (
     <Dialog
       open={showDialog}
       onOpenChange={(open) => {
-        if (!open) handleClose();
+        if (!open) handleClose()
       }}
     >
-      <DialogContent className="max-h-[85vh] flex flex-col" showCloseButton={false}>
+      <DialogContent className="flex max-h-[85vh] flex-col" showCloseButton={false}>
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Badge className={levelBadgeClass[announcementInfo.level]}>
@@ -121,17 +126,13 @@ export function AnnouncementDialog({ onDismissed }: AnnouncementDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto min-h-0 my-4">
+        <div className="my-4 min-h-0 flex-1 overflow-y-auto">
           {announcementInfo.content ? (
-            <div className="text-sm max-w-none space-y-2">
-              <Markdown components={markdownComponents}>
-                {announcementInfo.content}
-              </Markdown>
+            <div className="max-w-none space-y-2 text-sm">
+              <Markdown components={markdownComponents}>{announcementInfo.content}</Markdown>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              {t("announcement.noContent")}
-            </p>
+            <p className="text-sm text-muted-foreground">{t("announcement.noContent")}</p>
           )}
         </div>
 
@@ -145,5 +146,5 @@ export function AnnouncementDialog({ onDismissed }: AnnouncementDialogProps) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

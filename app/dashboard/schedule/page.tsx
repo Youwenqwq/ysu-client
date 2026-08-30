@@ -1,64 +1,72 @@
-"use client";
+"use client"
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
+import { useEffect, useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { FilterDrawer, FilterTrigger } from "@/components/academic/filter-drawer"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
 import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+  useClassPeriods,
+  useCurrentWeek,
+  useExams,
+  useSchedule,
+  useTermCalendar,
+} from "@/providers/hooks"
+import { ChevronLeft, ChevronRight, Search, Grid3x2, Grid3x3 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import {
-  FilterDrawer,
-  FilterTrigger,
-} from "@/components/academic/filter-drawer";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
-import { useClassPeriods, useCurrentWeek, useExams, useSchedule, useTermCalendar } from "@/providers/hooks";
-import { ChevronLeft, ChevronRight, Search, Grid3x2, Grid3x3 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { isCourseActiveInWeek, periodIsInUse, resolveInitialScheduleWeek, resolveWidgetCurrentWeek } from "./schedule-utils";
-import { computeExamBlocks } from "./exam-blocks";
-import { ScheduleTablet } from "./schedule-tablet";
-import { ScheduleMobile } from "./schedule-mobile";
-import { syncScheduleToWidget } from "@/lib/native/widget-bridge";
-import { syncClassAlarmsToNative } from "@/lib/native/notify";
-import { useSettingsStore } from "@/lib/stores/settings";
+  isCourseActiveInWeek,
+  periodIsInUse,
+  resolveInitialScheduleWeek,
+  resolveWidgetCurrentWeek,
+} from "./schedule-utils"
+import { computeExamBlocks } from "./exam-blocks"
+import { ScheduleTablet } from "./schedule-tablet"
+import { ScheduleMobile } from "./schedule-mobile"
+import { syncScheduleToWidget } from "@/lib/native/widget-bridge"
+import { syncClassAlarmsToNative } from "@/lib/native/notify"
+import { useSettingsStore } from "@/lib/stores/settings"
 
 export default function SchedulePage() {
-  const { t } = useTranslation();
-  const isMobile = useIsMobile();
-  const compactMode = useSettingsStore((s) => s.scheduleCompactMode);
-  const setCompactMode = useSettingsStore((s) => s.setScheduleCompactMode);
-  const [selectedWeek, setSelectedWeek] = useState<number>(0);
-  const [term, setTerm] = useState("");
-  const [queriedTerm, setQueriedTerm] = useState("");
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const { t } = useTranslation()
+  const isMobile = useIsMobile()
+  const compactMode = useSettingsStore((s) => s.scheduleCompactMode)
+  const setCompactMode = useSettingsStore((s) => s.setScheduleCompactMode)
+  const [selectedWeek, setSelectedWeek] = useState<number>(0)
+  const [term, setTerm] = useState("")
+  const [queriedTerm, setQueriedTerm] = useState("")
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
 
   const scheduleQuery = useSchedule({
     semester: queriedTerm || undefined,
     courseCategory: "all",
     includeLabSchedule: true,
-  });
-  const currentWeekQuery = useCurrentWeek({ semester: queriedTerm || undefined });
-  const termCalendarQuery = useTermCalendar({ semester: queriedTerm || undefined });
-  const periodsQuery = useClassPeriods();
-  const examsQuery = useExams({ semester: queriedTerm || undefined });
+  })
+  const currentWeekQuery = useCurrentWeek({
+    semester: queriedTerm || undefined,
+  })
+  const termCalendarQuery = useTermCalendar({
+    semester: queriedTerm || undefined,
+  })
+  const periodsQuery = useClassPeriods()
+  const examsQuery = useExams({ semester: queriedTerm || undefined })
 
-  const courses = useMemo(() => scheduleQuery.data ?? [], [scheduleQuery.data]);
-  const currentWeek = currentWeekQuery.data ?? null;
-  const termCalendar = termCalendarQuery.data;
+  const courses = useMemo(() => scheduleQuery.data ?? [], [scheduleQuery.data])
+  const currentWeek = currentWeekQuery.data ?? null
+  const termCalendar = termCalendarQuery.data
 
   const widgetCurrentWeek = useMemo(
     () => resolveWidgetCurrentWeek(currentWeek, termCalendar?.startDate),
-    [currentWeek, termCalendar?.startDate],
-  );
+    [currentWeek, termCalendar?.startDate]
+  )
   const loading =
     scheduleQuery.isLoading ||
     scheduleQuery.isValidating ||
@@ -67,97 +75,102 @@ export default function SchedulePage() {
     termCalendarQuery.isLoading ||
     termCalendarQuery.isValidating ||
     periodsQuery.isLoading ||
-    periodsQuery.isValidating;
+    periodsQuery.isValidating
 
   // In compact mode, adjust <main> padding-bottom to match the actual nav bar height,
   // so the content area ends exactly at the nav top edge.
   useEffect(() => {
-    if (!compactMode) return;
-    const main = document.querySelector("main");
-    const nav = document.querySelector('nav[aria-label="Primary"]');
-    if (!main || !nav) return;
+    if (!compactMode) return
+    const main = document.querySelector("main")
+    const nav = document.querySelector('nav[aria-label="Primary"]')
+    if (!main || !nav) return
     const adjust = () => {
-      main.style.paddingBottom = `${nav.getBoundingClientRect().height}px`;
-    };
-    adjust();
-    const observer = new ResizeObserver(adjust);
-    observer.observe(nav);
+      main.style.paddingBottom = `${nav.getBoundingClientRect().height}px`
+    }
+    adjust()
+    const observer = new ResizeObserver(adjust)
+    observer.observe(nav)
     return () => {
-      observer.disconnect();
-      main.style.paddingBottom = "";
-    };
-  }, [compactMode]);
+      observer.disconnect()
+      main.style.paddingBottom = ""
+    }
+  }, [compactMode])
 
   const periods = useMemo(() => {
-    if (!periodsQuery.data) return [];
-    return periodsQuery.data.filter(periodIsInUse).sort((a, b) => a.section - b.section);
-  }, [periodsQuery.data]);
+    if (!periodsQuery.data) return []
+    return periodsQuery.data.filter(periodIsInUse).sort((a, b) => a.section - b.section)
+  }, [periodsQuery.data])
 
   const [nowMinutes, setNowMinutes] = useState(() => {
-    const now = new Date();
-    return now.getHours() * 60 + now.getMinutes();
-  });
+    const now = new Date()
+    return now.getHours() * 60 + now.getMinutes()
+  })
 
   useEffect(() => {
     const id = setInterval(() => {
-      const now = new Date();
-      setNowMinutes(now.getHours() * 60 + now.getMinutes());
-    }, 60_000);
-    return () => clearInterval(id);
-  }, []);
+      const now = new Date()
+      setNowMinutes(now.getHours() * 60 + now.getMinutes())
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   function shiftWeek(delta: number) {
-    setSelectedWeek((w) => Math.max(1, (w || 1) + delta));
+    setSelectedWeek((w) => Math.max(1, (w || 1) + delta))
   }
 
   // 用 ref 持有最新的 periods 数据，避免 periods 变化触发 effect 重新执行
-  const periodsRef = useRef(periods);
+  const periodsRef = useRef(periods)
   useEffect(() => {
-    periodsRef.current = periods;
-  });
+    periodsRef.current = periods
+  })
 
   useEffect(() => {
-    if (!currentWeek && !termCalendar?.startDate) return;
+    if (!currentWeek && !termCalendar?.startDate) return
     setSelectedWeek((curr) =>
-      curr <= 0
-        ? resolveInitialScheduleWeek(currentWeek, termCalendar?.startDate)
-        : curr,
-    );
-  }, [currentWeek, termCalendar?.startDate]);
+      curr <= 0 ? resolveInitialScheduleWeek(currentWeek, termCalendar?.startDate) : curr
+    )
+  }, [currentWeek, termCalendar?.startDate])
 
   useEffect(() => {
-    const errors = [scheduleQuery.error, currentWeekQuery.error, termCalendarQuery.error, periodsQuery.error].filter(Boolean);
-    if (errors.length === 0) return;
-    toast.error(errors[0]?.message || t("app.updating"));
-  }, [scheduleQuery.error, currentWeekQuery.error, termCalendarQuery.error, periodsQuery.error, t]);
+    const errors = [
+      scheduleQuery.error,
+      currentWeekQuery.error,
+      termCalendarQuery.error,
+      periodsQuery.error,
+    ].filter(Boolean)
+    if (errors.length === 0) return
+    toast.error(errors[0]?.message || t("app.updating"))
+  }, [scheduleQuery.error, currentWeekQuery.error, termCalendarQuery.error, periodsQuery.error, t])
 
   useEffect(() => {
-    if (!scheduleQuery.data || !widgetCurrentWeek) return;
-    const activeCourses = scheduleQuery.data.filter((course) => isCourseActiveInWeek(course, widgetCurrentWeek.week));
+    if (!scheduleQuery.data || !widgetCurrentWeek) return
+    const activeCourses = scheduleQuery.data.filter((course) =>
+      isCourseActiveInWeek(course, widgetCurrentWeek.week)
+    )
     syncScheduleToWidget(
       activeCourses,
       widgetCurrentWeek,
       periodsRef.current,
       useSettingsStore.getState().widgetSyncReminderHours,
-      useSettingsStore.getState().widgetShowNextDaySchedule,
-    ).catch(() => {});
-    syncClassAlarmsToNative(activeCourses, widgetCurrentWeek, periodsRef.current).catch(() => {});
-  }, [scheduleQuery.data, widgetCurrentWeek]);
+      useSettingsStore.getState().widgetShowNextDaySchedule
+    ).catch(() => {})
+    syncClassAlarmsToNative(activeCourses, widgetCurrentWeek, periodsRef.current).catch(() => {})
+  }, [scheduleQuery.data, widgetCurrentWeek])
 
   async function handleQuery() {
-    const nextTerm = term.trim();
+    const nextTerm = term.trim()
     if (nextTerm === queriedTerm) {
       await Promise.all([
         scheduleQuery.mutate(),
         currentWeekQuery.mutate(),
         termCalendarQuery.mutate(),
         periodsQuery.mutate(),
-      ]);
+      ])
     } else {
-      setQueriedTerm(nextTerm);
-      setSelectedWeek(0);
+      setQueriedTerm(nextTerm)
+      setSelectedWeek(0)
     }
-    setFilterDrawerOpen(false);
+    setFilterDrawerOpen(false)
   }
 
   useMobileHeaderRight(
@@ -172,24 +185,33 @@ export default function SchedulePage() {
         {compactMode ? <Grid3x3 className="size-4" /> : <Grid3x2 className="size-4" />}
       </Button>
       <FilterTrigger
-        label={selectedWeek ? t("schedule.weekShort", { week: selectedWeek }) : t("schedule.weekLabel")}
+        label={
+          selectedWeek ? t("schedule.weekShort", { week: selectedWeek }) : t("schedule.weekLabel")
+        }
         onClick={() => setFilterDrawerOpen(true)}
       />
     </div>,
-    [selectedWeek, t, compactMode, setCompactMode],
-  );
+    [selectedWeek, t, compactMode, setCompactMode]
+  )
 
   const filteredCourses = useMemo(() => {
-    if (selectedWeek <= 0) return courses;
-    return courses.filter((c) => isCourseActiveInWeek(c, selectedWeek));
-  }, [courses, selectedWeek]);
+    if (selectedWeek <= 0) return courses
+    return courses.filter((c) => isCourseActiveInWeek(c, selectedWeek))
+  }, [courses, selectedWeek])
 
   const examBlocks = useMemo(
-    () => computeExamBlocks(examsQuery.data ?? [], periods, currentWeek, selectedWeek, termCalendar?.startDate),
-    [examsQuery.data, periods, currentWeek, selectedWeek, termCalendar?.startDate],
-  );
+    () =>
+      computeExamBlocks(
+        examsQuery.data ?? [],
+        periods,
+        currentWeek,
+        selectedWeek,
+        termCalendar?.startDate
+      ),
+    [examsQuery.data, periods, currentWeek, selectedWeek, termCalendar?.startDate]
+  )
 
-  const currentWeekday = currentWeek?.weekday ?? 0;
+  const currentWeekday = currentWeek?.weekday ?? 0
 
   if (loading && courses.length === 0) {
     return (
@@ -197,7 +219,7 @@ export default function SchedulePage() {
         <Skeleton className="h-12" />
         <Skeleton className="h-96" />
       </div>
-    );
+    )
   }
 
   const renderFilterControls = (idPrefix: string) => (
@@ -243,23 +265,23 @@ export default function SchedulePage() {
             </Button>
           </div>
           {currentWeek && currentWeek.week >= 1 && (
-            <Badge variant="secondary">{t("schedule.currentWeekBadge", { week: currentWeek.week })}</Badge>
+            <Badge variant="secondary">
+              {t("schedule.currentWeekBadge", { week: currentWeek.week })}
+            </Badge>
           )}
         </div>
       </Field>
       <Button onClick={handleQuery} disabled={loading}>
-        {loading ? (
-          <Spinner data-icon="inline-start" />
-        ) : (
-          <Search data-icon="inline-start" />
-        )}
+        {loading ? <Spinner data-icon="inline-start" /> : <Search data-icon="inline-start" />}
         {t("schedule.query")}
       </Button>
     </FieldGroup>
-  );
+  )
 
   return (
-    <div className={compactMode && isMobile ? "flex flex-1 flex-col min-h-0" : "flex flex-col gap-6"}>
+    <div
+      className={compactMode && isMobile ? "flex min-h-0 flex-1 flex-col" : "flex flex-col gap-6"}
+    >
       <Card className="hidden md:block">
         <CardHeader>
           <CardTitle>{t("schedule.title")}</CardTitle>
@@ -271,8 +293,8 @@ export default function SchedulePage() {
       {isMobile ? (
         <div
           className={cn(
-            "flex flex-col -mx-4 -mt-4 -mb-4 md:m-0",
-            compactMode && "flex-1 min-h-0 overflow-hidden",
+            "-mx-4 -mt-4 -mb-4 flex flex-col md:m-0",
+            compactMode && "min-h-0 flex-1 overflow-hidden"
           )}
           style={compactMode ? undefined : { minHeight: "calc(100dvh - 102px)" }}
         >
@@ -315,5 +337,5 @@ export default function SchedulePage() {
         {renderFilterControls("schedule-drawer")}
       </FilterDrawer>
     </div>
-  );
+  )
 }

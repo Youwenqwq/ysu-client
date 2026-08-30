@@ -1,39 +1,33 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import confetti from "canvas-confetti";
-import { Sparkles, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import {
-  useGradeGachaStore,
-  type PendingGrade,
-} from "@/lib/stores/grade-gacha";
+import { useEffect, useState } from "react"
+import { AnimatePresence, motion } from "motion/react"
+import confetti from "canvas-confetti"
+import { Sparkles, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useGradeGachaStore, type PendingGrade } from "@/lib/stores/grade-gacha"
 import {
   letterOfScore,
   letterOfGradeLevel,
   tierOfLetter,
   type GradeLetter,
   type GachaTier,
-} from "@/providers/ysu/grade-letters";
-import { cn } from "@/lib/utils";
+} from "@/providers/ysu/grade-letters"
+import { cn } from "@/lib/utils"
 
 /** 卡面等级:优先百分制(按学期选官方时期表),其次等级制文本,兜底按通过与否。 */
 function letterOf(item: PendingGrade): GradeLetter {
-  const num = item.numericScore ?? (item.score !== undefined ? Number(item.score) : NaN);
-  if (Number.isFinite(num)) return letterOfScore(num, item.semester);
+  const num = item.numericScore ?? (item.score !== undefined ? Number(item.score) : NaN)
+  if (Number.isFinite(num)) return letterOfScore(num, item.semester)
   return (
     letterOfGradeLevel(item.gradeLevel) ??
     letterOfGradeLevel(item.score) ??
     (item.isPass ? "C" : "F")
-  );
+  )
 }
 
-const TIER_STYLE: Record<
-  GachaTier,
-  { ring: string; text: string; aura: string }
-> = {
+const TIER_STYLE: Record<GachaTier, { ring: string; text: string; aura: string }> = {
   aplus: {
     ring: "",
     text: "",
@@ -60,19 +54,19 @@ const TIER_STYLE: Record<
     text: "text-red-400",
     aura: "bg-red-500/40",
   },
-};
+}
 
-const SPRING = { type: "spring", stiffness: 260, damping: 26 } as const;
-const FLIP_SPRING = { type: "spring", stiffness: 200, damping: 22 } as const;
+const SPRING = { type: "spring", stiffness: 260, damping: 26 } as const
+const FLIP_SPRING = { type: "spring", stiffness: 200, damping: 22 } as const
 
 /** 翻卡庆祝:A+ 彩虹撒花,A 系金色撒花,其余不撒。 */
 function fireTierConfetti(tier: GachaTier, el: HTMLElement | null) {
-  if (!el || (tier !== "aplus" && tier !== "a")) return;
-  const rect = el.getBoundingClientRect();
+  if (!el || (tier !== "aplus" && tier !== "a")) return
+  const rect = el.getBoundingClientRect()
   const origin = {
     x: (rect.left + rect.width / 2) / window.innerWidth,
     y: (rect.top + rect.height / 2) / window.innerHeight,
-  };
+  }
   if (tier === "aplus") {
     confetti({
       particleCount: 140,
@@ -80,8 +74,8 @@ function fireTierConfetti(tier: GachaTier, el: HTMLElement | null) {
       startVelocity: 38,
       origin,
       zIndex: 80,
-    });
-    return;
+    })
+    return
   }
   confetti({
     particleCount: 90,
@@ -90,7 +84,7 @@ function fireTierConfetti(tier: GachaTier, el: HTMLElement | null) {
     origin,
     colors: ["#fbbf24", "#f59e0b", "#fde68a", "#ffffff"],
     zIndex: 80,
-  });
+  })
 }
 
 function GachaCard({
@@ -99,16 +93,16 @@ function GachaCard({
   flipped,
   onFlip,
 }: {
-  item: PendingGrade;
-  index: number;
-  flipped: boolean;
-  onFlip: (el: HTMLElement | null) => void;
+  item: PendingGrade
+  index: number
+  flipped: boolean
+  onFlip: (el: HTMLElement | null) => void
 }) {
-  const { t } = useTranslation();
-  const letter = letterOf(item);
-  const tier = tierOfLetter(letter);
-  const style = TIER_STYLE[tier];
-  const scoreText = item.score || item.gradeLevel || "—";
+  const { t } = useTranslation()
+  const letter = letterOf(item)
+  const tier = tierOfLetter(letter)
+  const style = TIER_STYLE[tier]
+  const scoreText = item.score || item.gradeLevel || "—"
 
   return (
     <motion.button
@@ -133,7 +127,7 @@ function GachaCard({
           className={cn(
             "absolute inset-0 rounded-xl blur-2xl transition-opacity duration-700",
             style.aura,
-            flipped ? "opacity-100" : "opacity-0",
+            flipped ? "opacity-100" : "opacity-0"
           )}
         />
       )}
@@ -151,8 +145,8 @@ function GachaCard({
         {/* 卡面:A+ 用旋转色相的彩虹描边,其余用静态色环 */}
         <div
           className={cn(
-            "absolute inset-0 overflow-hidden rounded-xl bg-card [backface-visibility:hidden] [transform:rotateY(180deg)]",
-            tier === "aplus" ? "p-[2px]" : cn("border-2", style.ring),
+            "absolute inset-0 [transform:rotateY(180deg)] overflow-hidden rounded-xl bg-card [backface-visibility:hidden]",
+            tier === "aplus" ? "p-[2px]" : cn("border-2", style.ring)
           )}
         >
           {tier === "aplus" && (
@@ -163,36 +157,38 @@ function GachaCard({
               transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
             />
           )}
-          <div className={cn(
-            "relative flex h-full w-full flex-col items-center justify-center gap-1.5 bg-card px-3 text-center",
-            tier === "aplus" && "rounded-[12px]",
-          )}>
+          <div
+            className={cn(
+              "relative flex h-full w-full flex-col items-center justify-center gap-1.5 bg-card px-3 text-center",
+              tier === "aplus" && "rounded-[12px]"
+            )}
+          >
             <span
               className={cn(
                 "flex items-center gap-0.5 text-sm font-bold tracking-[0.2em]",
                 tier === "aplus"
                   ? "bg-gradient-to-r from-amber-300 via-fuchsia-400 to-sky-400 bg-clip-text text-transparent"
-                  : style.text,
+                  : style.text
               )}
             >
               {tier === "aplus" && <Sparkles className="size-3.5 text-fuchsia-400" />}
               {letter}
             </span>
-            <span className="line-clamp-2 text-sm leading-snug font-medium">
-              {item.courseName}
-            </span>
+            <span className="line-clamp-2 text-sm leading-snug font-medium">{item.courseName}</span>
             <motion.span
               className="text-3xl font-bold tabular-nums"
               animate={flipped ? { scale: [1.5, 1], opacity: [0, 1] } : undefined}
-              transition={{ type: "spring", stiffness: 320, damping: 18, delay: 0.25 }}
+              transition={{
+                type: "spring",
+                stiffness: 320,
+                damping: 18,
+                delay: 0.25,
+              }}
             >
               {scoreText}
             </motion.span>
             <span className="text-xs text-muted-foreground">
-              {[
-                item.credit ? t("gacha.credit", { credit: item.credit }) : "",
-                item.semester ?? "",
-              ]
+              {[item.credit ? t("gacha.credit", { credit: item.credit }) : "", item.semester ?? ""]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
@@ -200,7 +196,7 @@ function GachaCard({
         </div>
       </motion.div>
     </motion.button>
-  );
+  )
 }
 
 export function GradeGachaModal({
@@ -208,52 +204,50 @@ export function GradeGachaModal({
   onClose,
   playItems,
 }: {
-  open: boolean;
-  onClose: () => void;
+  open: boolean
+  onClose: () => void
   /** 玩耍模式:直接传入要抽的卡(不读 store、不动基线)。 */
-  playItems?: PendingGrade[];
+  playItems?: PendingGrade[]
 }) {
-  const { t } = useTranslation();
-  const storePending = useGradeGachaStore((s) => s.pending);
-  const commitPending = useGradeGachaStore((s) => s.commitPending);
-  const pending = playItems ?? storePending;
-  const isPlay = playItems !== undefined;
-  const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
+  const { t } = useTranslation()
+  const storePending = useGradeGachaStore((s) => s.pending)
+  const commitPending = useGradeGachaStore((s) => s.commitPending)
+  const pending = playItems ?? storePending
+  const isPlay = playItems !== undefined
+  const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set())
 
   useEffect(() => {
-    if (open) setFlipped(new Set());
-  }, [open]);
+    if (open) setFlipped(new Set())
+  }, [open])
 
-  const allFlipped = pending.length > 0 && pending.every((p) => flipped.has(p.key));
+  const allFlipped = pending.length > 0 && pending.every((p) => flipped.has(p.key))
 
   function flip(key: string, el: HTMLElement | null) {
-    setFlipped((prev) => new Set(prev).add(key));
-    const item = pending.find((p) => p.key === key);
+    setFlipped((prev) => new Set(prev).add(key))
+    const item = pending.find((p) => p.key === key)
     // 弹簧回正(约 0.4s)后再撒花,正对卡面
     if (item) {
-      setTimeout(() => fireTierConfetti(tierOfLetter(letterOf(item)), el), 400);
+      setTimeout(() => fireTierConfetti(tierOfLetter(letterOf(item)), el), 400)
     }
   }
 
   function flipAll() {
-    setFlipped(new Set(pending.map((p) => p.key)));
+    setFlipped(new Set(pending.map((p) => p.key)))
     // 与逐张翻转一致:A/A+ 在弹簧回正后撒花
     setTimeout(() => {
       for (const item of pending) {
         fireTierConfetti(
           tierOfLetter(letterOf(item)),
-          document.querySelector<HTMLElement>(
-            `[data-card-key="${CSS.escape(item.key)}"]`,
-          ),
-        );
+          document.querySelector<HTMLElement>(`[data-card-key="${CSS.escape(item.key)}"]`)
+        )
       }
-    }, 400);
+    }, 400)
   }
 
   /** 真实模式任意关闭路径都视为收下;玩耍模式不动基线。 */
   function close() {
-    if (!isPlay) commitPending();
-    onClose();
+    if (!isPlay) commitPending()
+    onClose()
   }
 
   return (
@@ -284,12 +278,7 @@ export function GradeGachaModal({
                   : t("gacha.subtitle", { count: String(pending.length) })}
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={close}
-              aria-label={t("gacha.skip")}
-            >
+            <Button variant="ghost" size="icon" onClick={close} aria-label={t("gacha.skip")}>
               <X className="size-5" />
             </Button>
           </motion.header>
@@ -332,5 +321,5 @@ export function GradeGachaModal({
         </motion.div>
       )}
     </AnimatePresence>
-  );
+  )
 }

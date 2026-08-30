@@ -1,21 +1,21 @@
-"use client";
+"use client"
 
-import { useEffect } from "react";
-import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { useStudentInfo } from "@/providers/use-student-info";
+import { useEffect } from "react"
+import { toast } from "sonner"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useStudentInfo } from "@/providers/use-student-info"
 
 export default function StudentPage() {
-  const { t } = useTranslation();
-  const { data: student, isLoading, isError, error } = useStudentInfo();
+  const { t } = useTranslation()
+  const { data: student, isLoading, isError, error } = useStudentInfo()
 
   useEffect(() => {
     if (isError && error) {
-      toast.error(error.message);
+      toast.error(error.message)
     }
-  }, [isError, error]);
+  }, [isError, error])
 
   if (isLoading) {
     return (
@@ -27,7 +27,7 @@ export default function StudentPage() {
           ))}
         </div>
       </div>
-    );
+    )
   }
 
   const fields = [
@@ -41,14 +41,26 @@ export default function StudentPage() {
     { label: t("student.fields.major"), value: student?.major },
     { label: t("student.fields.className"), value: student?.className },
     { label: t("student.fields.gradeLevel"), value: student?.gradeLevel },
-    { label: t("student.fields.enrollmentDate"), value: student?.enrollmentDate },
-    { label: t("student.fields.expectedGraduation"), value: student?.expectedGraduation },
-    { label: t("student.fields.educationLevel"), value: student?.educationLevel },
+    {
+      label: t("student.fields.enrollmentDate"),
+      value: student?.enrollmentDate,
+    },
+    {
+      label: t("student.fields.expectedGraduation"),
+      value: student?.expectedGraduation,
+    },
+    {
+      label: t("student.fields.educationLevel"),
+      value: student?.educationLevel,
+    },
     { label: t("student.fields.campus"), value: student?.campus },
     { label: t("student.fields.studentStatus"), value: student?.studentStatus },
     { label: t("student.fields.studyDuration"), value: student?.studyDuration },
-    { label: t("student.fields.foreignLanguage"), value: student?.foreignLanguage },
-  ];
+    {
+      label: t("student.fields.foreignLanguage"),
+      value: student?.foreignLanguage,
+    },
+  ]
 
   return (
     <div className="flex flex-col gap-6">
@@ -69,5 +81,5 @@ export default function StudentPage() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

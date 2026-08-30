@@ -1,11 +1,11 @@
-"use client";
+"use client"
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
-import { useAuthStore } from "@/lib/stores/auth";
-import { useSettingsStore } from "@/lib/stores/settings";
-import { useTranslation } from "@/lib/i18n/use-translation";
+import { useCallback, useEffect, useState } from "react"
+import { useRouter, usePathname } from "next/navigation"
+import Link from "next/link"
+import { useAuthStore } from "@/lib/stores/auth"
+import { useSettingsStore } from "@/lib/stores/settings"
+import { useTranslation } from "@/lib/i18n/use-translation"
 import {
   Sidebar,
   SidebarContent,
@@ -21,18 +21,18 @@ import {
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,
-} from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+} from "@/components/ui/sidebar"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { toast } from "sonner";
-import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service";
-import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit";
+} from "@/components/ui/dropdown-menu"
+import { toast } from "sonner"
+import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service"
+import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
 import {
   BookOpen,
   Calendar,
@@ -50,80 +50,80 @@ import {
   LogOut,
   Settings,
   User,
-} from "lucide-react";
-import { MobileBottomNav } from "@/components/mobile-bottom-nav";
-import { MobileTopBar } from "@/components/mobile-top-bar";
-import { RefreshIndicator } from "@/components/refresh-indicator";
-import { StaleIndicator } from "@/components/stale-indicator";
-import { EXTRA_FEATURES } from "@/lib/extras/registry";
-import { UpdateDialog } from "@/components/update-dialog";
-import { APP_VERSION, APP_BUILD } from "@/lib/version";
-import { useStoredMediaUrl } from "@/lib/storage/media";
-import { loadAvatarImage } from "@/lib/storage/avatar";
+} from "lucide-react"
+import { MobileBottomNav } from "@/components/mobile-bottom-nav"
+import { MobileTopBar } from "@/components/mobile-top-bar"
+import { RefreshIndicator } from "@/components/refresh-indicator"
+import { StaleIndicator } from "@/components/stale-indicator"
+import { EXTRA_FEATURES } from "@/lib/extras/registry"
+import { UpdateDialog } from "@/components/update-dialog"
+import { APP_VERSION, APP_BUILD } from "@/lib/version"
+import { useStoredMediaUrl } from "@/lib/storage/media"
+import { loadAvatarImage } from "@/lib/storage/avatar"
 
-const SIDEBAR_WIDTH_KEY = "dashboard-sidebar-width";
-const DEFAULT_SIDEBAR_WIDTH = 288; // 18rem
-const MIN_SIDEBAR_WIDTH = 208; // 13rem
-const MAX_SIDEBAR_WIDTH = 384; // 24rem
+const SIDEBAR_WIDTH_KEY = "dashboard-sidebar-width"
+const DEFAULT_SIDEBAR_WIDTH = 288 // 18rem
+const MIN_SIDEBAR_WIDTH = 208 // 13rem
+const MAX_SIDEBAR_WIDTH = 384 // 24rem
 
 function SidebarResizeHandle() {
-  const { state, setOpen, isMobile } = useSidebar();
+  const { state, setOpen, isMobile } = useSidebar()
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       // 折叠态（图标栏）下拖拽先展开，再继续调宽
-      const needExpand = state === "collapsed";
-      if (needExpand) setOpen(true);
+      const needExpand = state === "collapsed"
+      if (needExpand) setOpen(true)
 
-      const handle = event.currentTarget;
-      const wrapper = handle.closest<HTMLElement>("[data-slot=sidebar-wrapper]");
-      const gap = wrapper?.querySelector<HTMLElement>("[data-slot=sidebar-gap]");
-      const container = wrapper?.querySelector<HTMLElement>("[data-slot=sidebar-container]");
-      if (!wrapper) return;
+      const handle = event.currentTarget
+      const wrapper = handle.closest<HTMLElement>("[data-slot=sidebar-wrapper]")
+      const gap = wrapper?.querySelector<HTMLElement>("[data-slot=sidebar-gap]")
+      const container = wrapper?.querySelector<HTMLElement>("[data-slot=sidebar-container]")
+      if (!wrapper) return
 
-      const startX = event.clientX;
+      const startX = event.clientX
       const startWidth = needExpand
         ? DEFAULT_SIDEBAR_WIDTH
-        : (gap?.getBoundingClientRect().width ?? DEFAULT_SIDEBAR_WIDTH);
+        : (gap?.getBoundingClientRect().width ?? DEFAULT_SIDEBAR_WIDTH)
 
       // 拖拽期间禁用宽度过渡，避免拖动延迟
-      gap?.classList.add("transition-none!");
-      container?.classList.add("transition-none!");
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
+      gap?.classList.add("transition-none!")
+      container?.classList.add("transition-none!")
+      document.body.style.cursor = "col-resize"
+      document.body.style.userSelect = "none"
 
       const onPointerMove = (e: PointerEvent) => {
         const width = Math.min(
           MAX_SIDEBAR_WIDTH,
-          Math.max(MIN_SIDEBAR_WIDTH, Math.round(startWidth + e.clientX - startX)),
-        );
-        wrapper.style.setProperty("--sidebar-width", `${width}px`);
-      };
+          Math.max(MIN_SIDEBAR_WIDTH, Math.round(startWidth + e.clientX - startX))
+        )
+        wrapper.style.setProperty("--sidebar-width", `${width}px`)
+      }
 
       const onPointerUp = () => {
-        document.removeEventListener("pointermove", onPointerMove);
-        document.removeEventListener("pointerup", onPointerUp);
-        document.removeEventListener("pointercancel", onPointerUp);
-        gap?.classList.remove("transition-none!");
-        container?.classList.remove("transition-none!");
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-        const finalWidth = gap?.getBoundingClientRect().width ?? startWidth;
+        document.removeEventListener("pointermove", onPointerMove)
+        document.removeEventListener("pointerup", onPointerUp)
+        document.removeEventListener("pointercancel", onPointerUp)
+        gap?.classList.remove("transition-none!")
+        container?.classList.remove("transition-none!")
+        document.body.style.cursor = ""
+        document.body.style.userSelect = ""
+        const finalWidth = gap?.getBoundingClientRect().width ?? startWidth
         try {
-          localStorage.setItem(SIDEBAR_WIDTH_KEY, String(Math.round(finalWidth)));
+          localStorage.setItem(SIDEBAR_WIDTH_KEY, String(Math.round(finalWidth)))
         } catch {
           // localStorage unavailable
         }
-      };
+      }
 
-      document.addEventListener("pointermove", onPointerMove);
-      document.addEventListener("pointerup", onPointerUp);
-      document.addEventListener("pointercancel", onPointerUp);
+      document.addEventListener("pointermove", onPointerMove)
+      document.addEventListener("pointerup", onPointerUp)
+      document.addEventListener("pointercancel", onPointerUp)
     },
-    [state, setOpen],
-  );
+    [state, setOpen]
+  )
 
-  if (isMobile) return null;
+  if (isMobile) return null
 
   return (
     <div
@@ -134,71 +134,87 @@ function SidebarResizeHandle() {
       onDoubleClick={() => setOpen(false)}
       className="absolute inset-y-0 -right-2 z-20 hidden w-4 cursor-col-resize touch-none justify-center after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent after:transition-colors hover:after:bg-sidebar-border md:flex"
     />
-  );
+  )
 }
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const router = useRouter();
-  const rawPathname = usePathname();
-  const pathname = rawPathname.replace(/\/$/, "");
-  const { isAuthenticated, hasHydrated, username } = useAuthStore();
-  const { t } = useTranslation();
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const rawPathname = usePathname()
+  const pathname = rawPathname.replace(/\/$/, "")
+  const { isAuthenticated, hasHydrated, username } = useAuthStore()
+  const { t } = useTranslation()
 
-  const backgroundImage = useSettingsStore((s) => s.backgroundImage);
-  const avatarImage = useSettingsStore((s) => s.avatarImage);
-  const hasBackground = !!backgroundImage;
-  const avatarUrl = useStoredMediaUrl(avatarImage, loadAvatarImage);
+  const backgroundImage = useSettingsStore((s) => s.backgroundImage)
+  const avatarImage = useSettingsStore((s) => s.avatarImage)
+  const hasBackground = !!backgroundImage
+  const avatarUrl = useStoredMediaUrl(avatarImage, loadAvatarImage)
 
   // 侧边栏宽度：挂载后从 localStorage 恢复（此前已由 hasHydrated 门控，不会闪烁）
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH)
   // 折叠状态：sidebar.tsx 会写入 sidebar_state cookie，这里在挂载时恢复
   const [defaultSidebarOpen] = useState(
-    () => !document.cookie.split("; ").includes("sidebar_state=false"),
-  );
+    () => !document.cookie.split("; ").includes("sidebar_state=false")
+  )
   useEffect(() => {
     try {
-      const stored = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+      const stored = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY))
       if (Number.isFinite(stored) && stored > 0) {
-        setSidebarWidth(Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, stored)));
+        setSidebarWidth(Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, stored)))
       }
     } catch {
       // localStorage unavailable
     }
-  }, []);
+  }, [])
 
   // Ctrl/Cmd+B 折叠/展开侧边栏
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
-        if (!window.matchMedia("(min-width: 768px)").matches) return;
-        e.preventDefault();
-        document.querySelector<HTMLElement>("[data-sidebar=trigger]")?.click();
+        if (!window.matchMedia("(min-width: 768px)").matches) return
+        e.preventDefault()
+        document.querySelector<HTMLElement>("[data-sidebar=trigger]")?.click()
       }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
 
   const navGroups = [
     {
       label: t("app.nav"),
       items: [
         { title: t("app.overview"), url: "/dashboard", icon: LayoutDashboard },
-        { title: t("app.grades"), url: "/dashboard/grades", icon: GraduationCap },
-        { title: t("app.schedule"), url: "/dashboard/schedule", icon: Calendar },
+        {
+          title: t("app.grades"),
+          url: "/dashboard/grades",
+          icon: GraduationCap,
+        },
+        {
+          title: t("app.schedule"),
+          url: "/dashboard/schedule",
+          icon: Calendar,
+        },
       ],
     },
     {
       label: t("me.sectionAcademic"),
       items: [
         { title: t("app.exams"), url: "/dashboard/exams", icon: FileText },
-        { title: t("app.makeupExams"), url: "/dashboard/makeup-exams", icon: FilePenLine },
-        { title: t("app.trainingPlan"), url: "/dashboard/training-plan", icon: BookOpen },
-        { title: t("app.evaluation"), url: "/dashboard/evaluation", icon: ClipboardCheck },
+        {
+          title: t("app.makeupExams"),
+          url: "/dashboard/makeup-exams",
+          icon: FilePenLine,
+        },
+        {
+          title: t("app.trainingPlan"),
+          url: "/dashboard/training-plan",
+          icon: BookOpen,
+        },
+        {
+          title: t("app.evaluation"),
+          url: "/dashboard/evaluation",
+          icon: ClipboardCheck,
+        },
       ],
     },
     {
@@ -206,8 +222,16 @@ export default function DashboardLayout({
       items: [
         { title: t("app.labor"), url: "/dashboard/labor", icon: Hammer },
         { title: t("app.credits"), url: "/dashboard/credits", icon: Lightbulb },
-        { title: t("app.comprehensive"), url: "/dashboard/comprehensive", icon: Gauge },
-        { title: t("app.schoolSchedule"), url: "/dashboard/school-schedule", icon: CalendarDays },
+        {
+          title: t("app.comprehensive"),
+          url: "/dashboard/comprehensive",
+          icon: Gauge,
+        },
+        {
+          title: t("app.schoolSchedule"),
+          url: "/dashboard/school-schedule",
+          icon: CalendarDays,
+        },
       ],
     },
     // 玩具箱：与教务无关的第三方功能（lib/extras/registry.ts）
@@ -219,11 +243,13 @@ export default function DashboardLayout({
         icon: f.nav.icon,
       })),
     },
-  ];
+  ]
 
   const titleByPath: Record<string, string> = {
     ...Object.fromEntries(
-      EXTRA_FEATURES.flatMap((f) => Object.entries(f.titleKeys).map(([path, key]) => [path, t(key)])),
+      EXTRA_FEATURES.flatMap((f) =>
+        Object.entries(f.titleKeys).map(([path, key]) => [path, t(key)])
+      )
     ),
     "/dashboard": t("app.overview"),
     "/dashboard/grades": t("app.grades"),
@@ -242,66 +268,76 @@ export default function DashboardLayout({
     "/dashboard/me/settings": t("settings.title"),
     "/dashboard/me/avatar": t("app.avatarSettings"),
     "/dashboard/me/about": t("about.title"),
-  };
-  const pageTitle = titleByPath[pathname] ?? t("app.name");
+  }
+  const pageTitle = titleByPath[pathname] ?? t("app.name")
 
-  const primaryPaths = new Set(["/dashboard", "/dashboard/schedule", "/dashboard/grades", "/dashboard/me"]);
-  const showBack = !primaryPaths.has(pathname);
+  const primaryPaths = new Set([
+    "/dashboard",
+    "/dashboard/schedule",
+    "/dashboard/grades",
+    "/dashboard/me",
+  ])
+  const showBack = !primaryPaths.has(pathname)
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated) {
-      router.replace("/login");
+      router.replace("/login")
     }
-  }, [hasHydrated, isAuthenticated, router]);
+  }, [hasHydrated, isAuthenticated, router])
 
   async function handleLogout() {
-    await logoutActiveProvider();
-    toast.success(t("app.logout"));
-    router.replace("/login");
+    await logoutActiveProvider()
+    toast.success(t("app.logout"))
+    router.replace("/login")
   }
 
   async function handleRelogin() {
-    const limit = checkRateLimit();
+    const limit = checkRateLimit()
     if (!limit.allowed) {
       toast.error(
         rateLimitMessage(
           limit,
           t,
           "autoLogin.errorRateLimitWindow",
-          "autoLogin.errorRateLimitInterval",
-        ),
-      );
-      return;
+          "autoLogin.errorRateLimitInterval"
+        )
+      )
+      return
     }
-    recordLoginAttempt();
+    recordLoginAttempt()
 
     try {
-      const success = await reloginActiveProvider();
+      const success = await reloginActiveProvider()
       if (success) {
-        toast.success(t("login.loginSuccess"));
-        return;
+        toast.success(t("login.loginSuccess"))
+        return
       }
     } catch {
       // fall through
     }
-    await logoutActiveProvider();
-    router.replace("/login");
+    await logoutActiveProvider()
+    router.replace("/login")
   }
 
   if (!hasHydrated) {
     return (
       <div className="flex min-h-svh items-center justify-center">
-        <div className="text-muted-foreground" suppressHydrationWarning>{t("app.updating")}</div>
+        <div className="text-muted-foreground" suppressHydrationWarning>
+          {t("app.updating")}
+        </div>
       </div>
-    );
+    )
   }
 
   if (!isAuthenticated) {
-    return null;
+    return null
   }
 
   return (
-    <SidebarProvider defaultOpen={defaultSidebarOpen} style={{ "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}>
+    <SidebarProvider
+      defaultOpen={defaultSidebarOpen}
+      style={{ "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}
+    >
       <UpdateDialog />
       <Sidebar
         collapsible="icon"
@@ -316,7 +352,9 @@ export default function DashboardLayout({
         <SidebarHeader>
           <div className="flex items-center gap-2 px-2 py-3 transition-all duration-200 ease-linear group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
             <GraduationCap className="size-6 shrink-0 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]" />
-            <span className="font-semibold group-data-[collapsible=icon]:hidden">{t("app.name")}</span>
+            <span className="font-semibold group-data-[collapsible=icon]:hidden">
+              {t("app.name")}
+            </span>
           </div>
         </SidebarHeader>
         <SidebarContent className="gap-0">
@@ -368,19 +406,21 @@ export default function DashboardLayout({
         <SidebarFooter>
           <button
             onClick={() => router.push("/dashboard/me/about")}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             <Info className="size-3.5 shrink-0" />
-            <span className="group-data-[collapsible=icon]:hidden">v{APP_VERSION} ({APP_BUILD})</span>
+            <span className="group-data-[collapsible=icon]:hidden">
+              v{APP_VERSION} ({APP_BUILD})
+            </span>
           </button>
         </SidebarFooter>
       </Sidebar>
-      <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] pb-[calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))] md:overflow-auto md:pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom))] md:pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
+      <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] pb-[calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))] md:overflow-auto md:pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] md:pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom))]">
         <MobileTopBar title={pageTitle} showBack={showBack} />
         <header className="hidden items-center justify-between gap-4 border-b px-6 py-4 md:flex">
           <div className="flex items-center gap-3">
             <SidebarTrigger aria-label={t("app.toggleSidebar")} title={t("app.toggleSidebar")} />
-            <h1 className="text-lg font-semibold animate-in fade-in slide-in-from-left-2 duration-300">
+            <h1 className="animate-in text-lg font-semibold duration-300 fade-in slide-in-from-left-2">
               {pageTitle}
             </h1>
             <RefreshIndicator />
@@ -422,12 +462,14 @@ export default function DashboardLayout({
             </DropdownMenu>
           </div>
         </header>
-        <div key={pathname} className="flex flex-1 flex-col p-4 animate-in fade-in slide-in-from-bottom-2 duration-500 md:p-8">
+        <div
+          key={pathname}
+          className="flex flex-1 animate-in flex-col p-4 duration-500 fade-in slide-in-from-bottom-2 md:p-8"
+        >
           {children}
         </div>
       </main>
       <MobileBottomNav />
-
     </SidebarProvider>
-  );
+  )
 }

@@ -2,8 +2,8 @@
  * @fileoverview Capability declaration utilities for AcademicProvider.
  */
 
-import { ProviderError, ProviderErrorCode } from "./errors";
-import type { AcademicCapabilities, AcademicProvider } from "./types";
+import { ProviderError, ProviderErrorCode } from "./errors"
+import type { AcademicCapabilities, AcademicProvider } from "./types"
 
 export const ALL_CAPABILITIES: AcademicCapabilities = {
   auth: true,
@@ -29,7 +29,7 @@ export const ALL_CAPABILITIES: AcademicCapabilities = {
   classPeriods: true,
   termCalendar: true,
   mobileSignin: true,
-};
+}
 
 export const NO_CAPABILITIES: AcademicCapabilities = {
   auth: false,
@@ -55,33 +55,31 @@ export const NO_CAPABILITIES: AcademicCapabilities = {
   classPeriods: false,
   termCalendar: false,
   mobileSignin: false,
-};
+}
 
 export function hasCapability(
   capabilities: AcademicCapabilities,
-  key: keyof AcademicCapabilities,
+  key: keyof AcademicCapabilities
 ): boolean {
-  return capabilities[key] === true;
+  return capabilities[key] === true
 }
 
 export function assertCapability(
   provider: Pick<AcademicProvider, "id" | "capabilities">,
-  key: keyof AcademicCapabilities,
+  key: keyof AcademicCapabilities
 ): void {
   if (!hasCapability(provider.capabilities, key)) {
     throw new ProviderError(
       ProviderErrorCode.FEATURE_NOT_SUPPORTED,
       `Provider "${provider.id}" does not support ${key}`,
       undefined,
-      501,
-    );
+      501
+    )
   }
 }
 
-export function getEnabledCapabilities(
-  capabilities: AcademicCapabilities,
-): string[] {
+export function getEnabledCapabilities(capabilities: AcademicCapabilities): string[] {
   return (Object.keys(capabilities) as (keyof AcademicCapabilities)[]).filter(
-    (key) => capabilities[key] === true,
-  );
+    (key) => capabilities[key] === true
+  )
 }

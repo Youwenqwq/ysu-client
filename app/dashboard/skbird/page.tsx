@@ -1,27 +1,33 @@
-"use client";
+"use client"
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { Bird, Search, Settings, User, Bell, X } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
-import { SkbirdError, SKBIRD_ERRNO_TOKEN_INVALID } from "@/lib/extras/skbird/client";
-import { getSkbirdClient, useSkbirdStore } from "@/lib/extras/skbird/store";
-import type { SkbirdCategory, SkbirdThread } from "@/lib/extras/skbird/types";
-import { SkbirdThreadCard } from "@/components/skbird/thread-card";
-import { useLoadMoreSentinel } from "@/components/skbird/use-load-more-sentinel";
+import { useCallback, useEffect, useRef, useState } from "react"
+import Link from "next/link"
+import { Bird, Search, Settings, User, Bell, X } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
+import { SkbirdError, SKBIRD_ERRNO_TOKEN_INVALID } from "@/lib/extras/skbird/client"
+import { getSkbirdClient, useSkbirdStore } from "@/lib/extras/skbird/store"
+import type { SkbirdCategory, SkbirdThread } from "@/lib/extras/skbird/types"
+import { SkbirdThreadCard } from "@/components/skbird/thread-card"
+import { useLoadMoreSentinel } from "@/components/skbird/use-load-more-sentinel"
 
-type FeedTab = "hot" | "latest" | "top" | "reward";
+type FeedTab = "hot" | "latest" | "top" | "reward"
 /** 时间游标分页的 tab（from_time = 末条 postTime） */
-const CURSOR_TABS: Record<string, true> = { latest: true, reward: true };
+const CURSOR_TABS: Record<string, true> = { latest: true, reward: true }
 
 /** 搜索时间范围（值来自 /thread/v2/searchoptions 的 range_options，文档已固定） */
 const SEARCH_RANGES = [
@@ -33,120 +39,131 @@ const SEARCH_RANGES = [
   { value: "6m", labelKey: "skbird.range6m" },
   { value: "1y", labelKey: "skbird.range1y" },
   { value: "2y", labelKey: "skbird.range2y" },
-] as const;
+] as const
 
 export default function SkbirdPage() {
-  const { t } = useTranslation();
-  const token = useSkbirdStore((s) => s.token);
-  const hasHydrated = useSkbirdStore((s) => s.hasHydrated);
+  const { t } = useTranslation()
+  const token = useSkbirdStore((s) => s.token)
+  const hasHydrated = useSkbirdStore((s) => s.hasHydrated)
 
-  const [tab, setTab] = useState<FeedTab>("hot");
-  const [wd, setWd] = useState("");
-  const [submittedWd, setSubmittedWd] = useState("");
-  const [cateId, setCateId] = useState("latest");
-  const [categories, setCategories] = useState<SkbirdCategory[]>([]);
-  const [threads, setThreads] = useState<SkbirdThread[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [unread, setUnread] = useState(0);
-  const [range, setRange] = useState("all");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const cursorRef = useRef("0");
-  const searchPageRef = useRef(1);
-  const busyRef = useRef(false);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [tab, setTab] = useState<FeedTab>("hot")
+  const [wd, setWd] = useState("")
+  const [submittedWd, setSubmittedWd] = useState("")
+  const [cateId, setCateId] = useState("latest")
+  const [categories, setCategories] = useState<SkbirdCategory[]>([])
+  const [threads, setThreads] = useState<SkbirdThread[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [unread, setUnread] = useState(0)
+  const [range, setRange] = useState("all")
+  const [searchOpen, setSearchOpen] = useState(false)
+  const cursorRef = useRef("0")
+  const searchPageRef = useRef(1)
+  const busyRef = useRef(false)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
 
   // 移动端搜索展开时自动聚焦
   useEffect(() => {
-    if (searchOpen) searchInputRef.current?.focus();
-  }, [searchOpen]);
+    if (searchOpen) searchInputRef.current?.focus()
+  }, [searchOpen])
 
   const mapError = useCallback(
     (e: unknown) =>
       e instanceof SkbirdError && e.errno === SKBIRD_ERRNO_TOKEN_INVALID
         ? t("skbird.tokenExpired")
-        : t("skbird.loadFailed", { message: e instanceof Error ? e.message : String(e) }),
-    [t],
-  );
+        : t("skbird.loadFailed", {
+            message: e instanceof Error ? e.message : String(e),
+          }),
+    [t]
+  )
 
   const fetchPage = useCallback(
     async (append: boolean): Promise<void> => {
-      const client = getSkbirdClient();
-      if (!client || busyRef.current) return;
-      busyRef.current = true;
-      if (append) setLoadingMore(true);
-      else setLoading(true);
-      setError(null);
+      const client = getSkbirdClient()
+      if (!client || busyRef.current) return
+      busyRef.current = true
+      if (append) setLoadingMore(true)
+      else setLoading(true)
+      setError(null)
       try {
-        let list: SkbirdThread[];
+        let list: SkbirdThread[]
         if (submittedWd) {
-          const page = append ? searchPageRef.current + 1 : 1;
-          list = await client.search(submittedWd, page, range === "all" ? "" : range);
-          searchPageRef.current = page;
-          setHasMore(list.length > 0);
+          const page = append ? searchPageRef.current + 1 : 1
+          list = await client.search(submittedWd, page, range === "all" ? "" : range)
+          searchPageRef.current = page
+          setHasMore(list.length > 0)
         } else if (tab === "hot") {
-          list = await client.hot();
-          setHasMore(false);
+          list = await client.hot()
+          setHasMore(false)
         } else if (tab === "top") {
-          list = await client.toplist();
-          setHasMore(false);
+          list = await client.toplist()
+          setHasMore(false)
         } else {
-          const fromTime = append ? cursorRef.current : "0";
+          const fromTime = append ? cursorRef.current : "0"
           list =
             tab === "reward"
               ? await client.rewardList(fromTime)
-              : await client.latest(fromTime, cateId);
-          cursorRef.current = list.length > 0 ? String(list[list.length - 1]!.postTime) : "0";
-          setHasMore(list.length > 0);
+              : await client.latest(fromTime, cateId)
+          cursorRef.current = list.length > 0 ? String(list[list.length - 1]!.postTime) : "0"
+          setHasMore(list.length > 0)
         }
-        setThreads((prev) => (append ? [...prev, ...list] : list));
+        setThreads((prev) => (append ? [...prev, ...list] : list))
       } catch (e) {
-        setError(mapError(e));
+        setError(mapError(e))
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
-        busyRef.current = false;
+        setLoading(false)
+        setLoadingMore(false)
+        busyRef.current = false
       }
     },
-    [tab, cateId, submittedWd, range, mapError],
-  );
+    [tab, cateId, submittedWd, range, mapError]
+  )
 
   // 首屏与条件变化时重新加载
   useEffect(() => {
     if (hasHydrated && token) {
-      cursorRef.current = "0";
-      searchPageRef.current = 1;
-      void fetchPage(false);
+      cursorRef.current = "0"
+      searchPageRef.current = 1
+      void fetchPage(false)
     }
-  }, [hasHydrated, token, fetchPage]);
+  }, [hasHydrated, token, fetchPage])
 
   // 分类列表与未读数：进入页面后各拉一次，失败静默
   useEffect(() => {
-    const client = getSkbirdClient();
-    if (!hasHydrated || !client) return;
-    client.categories().then(setCategories).catch(() => {});
+    const client = getSkbirdClient()
+    if (!hasHydrated || !client) return
+    client
+      .categories()
+      .then(setCategories)
+      .catch(() => {})
     client
       .unreadNum()
       .then((u) => setUnread(u.count + u.imCount))
-      .catch(() => {});
-  }, [hasHydrated, token]);
+      .catch(() => {})
+  }, [hasHydrated, token])
 
-  const canLoadMore = ((CURSOR_TABS[tab] && !submittedWd) || !!submittedWd) && hasMore;
+  const canLoadMore = ((CURSOR_TABS[tab] && !submittedWd) || !!submittedWd) && hasMore
   const sentinelRef = useLoadMoreSentinel(
     () => void fetchPage(true),
-    canLoadMore && !loading && !error,
-  );
+    canLoadMore && !loading && !error
+  )
 
   // 移动端功能入口注入顶栏右侧（与成绩/日程页同一模式）；桌面端仍走工具栏内按钮
   useMobileHeaderRight(
     <div className="flex items-center gap-0.5">
-      <Button asChild size="icon-sm" variant="ghost" aria-label={t("skbird.messagesTitle")} className="relative">
+      <Button
+        asChild
+        size="icon-sm"
+        variant="ghost"
+        aria-label={t("skbird.messagesTitle")}
+        className="relative"
+      >
         <Link href="/dashboard/skbird/messages">
           <Bell className="size-4" />
           {unread > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive" />
+            <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-destructive" />
           ) : null}
         </Link>
       </Button>
@@ -161,8 +178,8 @@ export default function SkbirdPage() {
         </Link>
       </Button>
     </div>,
-    [unread, t],
-  );
+    [unread, t]
+  )
 
   if (hasHydrated && !token) {
     return (
@@ -180,7 +197,7 @@ export default function SkbirdPage() {
           </Button>
         </Empty>
       </div>
-    );
+    )
   }
 
   return (
@@ -190,15 +207,15 @@ export default function SkbirdPage() {
         <div
           className={cn(
             "shrink-0 transition-all duration-300",
-            searchOpen && "max-sm:w-0 max-sm:overflow-hidden max-sm:opacity-0",
+            searchOpen && "max-sm:w-0 max-sm:overflow-hidden max-sm:opacity-0"
           )}
         >
           <Tabs
             value={submittedWd ? "" : tab}
             onValueChange={(v) => {
-              setSubmittedWd("");
-              setWd("");
-              setTab(v as FeedTab);
+              setSubmittedWd("")
+              setWd("")
+              setTab(v as FeedTab)
             }}
           >
             <TabsList>
@@ -230,11 +247,11 @@ export default function SkbirdPage() {
             "flex items-center gap-2 transition-all duration-300",
             searchOpen
               ? "max-sm:flex-1"
-              : "sm:ml-auto max-sm:pointer-events-none max-sm:w-0 max-sm:overflow-hidden max-sm:opacity-0",
+              : "max-sm:pointer-events-none max-sm:w-0 max-sm:overflow-hidden max-sm:opacity-0 sm:ml-auto"
           )}
           onSubmit={(e) => {
-            e.preventDefault();
-            setSubmittedWd(wd.trim());
+            e.preventDefault()
+            setSubmittedWd(wd.trim())
           }}
         >
           {wd || submittedWd ? (
@@ -258,13 +275,18 @@ export default function SkbirdPage() {
             onBlur={(e) => {
               // 失焦恢复 tab 栏；焦点在表单内流转（如点提交/筛选）不算失焦
               if (!wd && !e.currentTarget.form?.contains(e.relatedTarget as Node | null)) {
-                setSearchOpen(false);
+                setSearchOpen(false)
               }
             }}
             placeholder={t("skbird.searchPlaceholder")}
-            className="w-40 sm:w-56 max-sm:min-w-0 max-sm:flex-1"
+            className="w-40 max-sm:min-w-0 max-sm:flex-1 sm:w-56"
           />
-          <Button type="submit" size="icon" variant="outline" aria-label={t("skbird.searchPlaceholder")}>
+          <Button
+            type="submit"
+            size="icon"
+            variant="outline"
+            aria-label={t("skbird.searchPlaceholder")}
+          >
             <Search className="size-4" />
           </Button>
           <Button
@@ -281,11 +303,17 @@ export default function SkbirdPage() {
 
         {/* 功能入口：桌面端显示；移动端已注入顶栏 */}
         <div className="flex items-center max-sm:hidden">
-          <Button asChild size="icon" variant="ghost" aria-label={t("skbird.messagesTitle")} className="relative">
+          <Button
+            asChild
+            size="icon"
+            variant="ghost"
+            aria-label={t("skbird.messagesTitle")}
+            className="relative"
+          >
             <Link href="/dashboard/skbird/messages">
               <Bell className="size-4" />
               {unread > 0 ? (
-                <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive" />
+                <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-destructive" />
               ) : null}
             </Link>
           </Button>
@@ -304,18 +332,24 @@ export default function SkbirdPage() {
 
       {!submittedWd && tab === "latest" && categories.length > 0 ? (
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {[{ cateId: "latest", name: t("skbird.allCategories"), summary: "", iconPath: "" }, ...categories].map(
-            (c) => (
-              <Badge
-                key={c.cateId}
-                variant={cateId === c.cateId ? "default" : "outline"}
-                className="shrink-0 cursor-pointer"
-                onClick={() => setCateId(c.cateId)}
-              >
-                {c.name}
-              </Badge>
-            ),
-          )}
+          {[
+            {
+              cateId: "latest",
+              name: t("skbird.allCategories"),
+              summary: "",
+              iconPath: "",
+            },
+            ...categories,
+          ].map((c) => (
+            <Badge
+              key={c.cateId}
+              variant={cateId === c.cateId ? "default" : "outline"}
+              className="shrink-0 cursor-pointer"
+              onClick={() => setCateId(c.cateId)}
+            >
+              {c.name}
+            </Badge>
+          ))}
         </div>
       ) : null}
 
@@ -356,12 +390,14 @@ export default function SkbirdPage() {
                   {t("skbird.loadingMore")}
                 </p>
               ) : !hasMore ? (
-                <p className="py-2 text-center text-xs text-muted-foreground">{t("skbird.noMore")}</p>
+                <p className="py-2 text-center text-xs text-muted-foreground">
+                  {t("skbird.noMore")}
+                </p>
               ) : null}
             </>
           ) : null}
         </>
       )}
     </div>
-  );
+  )
 }

@@ -6,10 +6,7 @@ type LocalizedManifest = MetadataRoute.Manifest & {
   name_localized?: Record<string, string>
   short_name_localized?: Record<string, string>
   description_localized?: Record<string, string>
-  shortcuts_localized?: Record<
-    string,
-    NonNullable<MetadataRoute.Manifest["shortcuts"]>
-  >
+  shortcuts_localized?: Record<string, NonNullable<MetadataRoute.Manifest["shortcuts"]>>
 }
 
 export default function manifest(): LocalizedManifest {

@@ -1,63 +1,63 @@
-"use client";
+"use client"
 
-import { useProvider } from "../use-provider";
+import { useProvider } from "../use-provider"
 import type {
   EvaluationDetail,
   EvaluationDetailQuery,
   EvaluationTask,
   EvaluationType,
   TermQueryOptions,
-} from "../types";
-import { useProviderQuery, type ProviderQueryResult } from "./use-provider-query";
+} from "../types"
+import { useProviderQuery, type ProviderQueryResult } from "./use-provider-query"
 
 export function useEvaluationTypes(
-  options?: TermQueryOptions,
+  options?: TermQueryOptions
 ): ProviderQueryResult<EvaluationType[]> {
-  const provider = useProvider();
+  const provider = useProvider()
   return useProviderQuery(
     "evaluation",
     "evaluation-types",
     () => provider.getEvaluationTypes(options),
-    options,
-  );
+    options
+  )
 }
 
 export function useEvaluationTasks(
-  options?: TermQueryOptions,
+  options?: TermQueryOptions
 ): ProviderQueryResult<EvaluationTask[]> {
-  const provider = useProvider();
+  const provider = useProvider()
   return useProviderQuery(
     "evaluation",
     "evaluation-tasks",
     () => provider.getEvaluationTasks(options),
-    options,
-  );
+    options
+  )
 }
 
 export function usePendingEvaluations(
   evalType: string | undefined,
-  options?: TermQueryOptions,
+  options?: TermQueryOptions
 ): ProviderQueryResult<EvaluationTask[]> {
-  const provider = useProvider();
+  const provider = useProvider()
   return useProviderQuery(
     "evaluation",
     "pending-evaluations",
     () => (evalType ? provider.getPendingEvaluations(evalType, options) : Promise.resolve([])),
-    { evalType, ...options },
-  );
+    { evalType, ...options }
+  )
 }
 
 export function useEvaluationDetail(
-  query: EvaluationDetailQuery | undefined,
+  query: EvaluationDetailQuery | undefined
 ): ProviderQueryResult<EvaluationDetail> {
-  const provider = useProvider();
+  const provider = useProvider()
   return useProviderQuery(
     "evaluation",
     "evaluation-detail",
     () => {
-      if (!query) throw new Error("evaluation detail query is required");
-      return provider.getEvaluationDetail(query);
+      if (!query) throw new Error("evaluation detail query is required")
+      return provider.getEvaluationDetail(query)
     },
-    query,
-  );
+    query
+  )
 }

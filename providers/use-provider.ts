@@ -1,18 +1,18 @@
-import { useProviderContext } from "./provider-context";
-import type { AcademicCapabilities, AcademicProvider } from "./types";
+import { useProviderContext } from "./provider-context"
+import type { AcademicCapabilities, AcademicProvider } from "./types"
 
 export function useProvider(): AcademicProvider {
-  return useProviderContext().provider;
+  return useProviderContext().provider
 }
 
 export function useProviderReady(): boolean {
-  return useProviderContext().isReady;
+  return useProviderContext().isReady
 }
 
 export function useProviderCapabilities(): AcademicCapabilities {
-  return useProviderContext().provider.capabilities;
+  return useProviderContext().provider.capabilities
 }
 
 export function useHasCapability(capability: keyof AcademicCapabilities): boolean {
-  return useProviderContext().provider.capabilities[capability] === true;
+  return useProviderContext().provider.capabilities[capability] === true
 }

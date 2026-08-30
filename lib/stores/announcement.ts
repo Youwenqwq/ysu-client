@@ -1,11 +1,11 @@
-import { create } from "zustand";
-import type { AnnouncementInfo } from "@/lib/announcement";
+import { create } from "zustand"
+import type { AnnouncementInfo } from "@/lib/announcement"
 
 interface AnnouncementState {
-  announcementInfo: AnnouncementInfo | null;
-  showDialog: boolean;
-  setAnnouncementInfo: (info: AnnouncementInfo | null) => void;
-  setShowDialog: (open: boolean) => void;
+  announcementInfo: AnnouncementInfo | null
+  showDialog: boolean
+  setAnnouncementInfo: (info: AnnouncementInfo | null) => void
+  setShowDialog: (open: boolean) => void
 }
 
 export const useAnnouncementStore = create<AnnouncementState>((set) => ({
@@ -13,4 +13,4 @@ export const useAnnouncementStore = create<AnnouncementState>((set) => ({
   showDialog: false,
   setAnnouncementInfo: (announcementInfo) => set({ announcementInfo }),
   setShowDialog: (showDialog) => set({ showDialog }),
-}));
+}))

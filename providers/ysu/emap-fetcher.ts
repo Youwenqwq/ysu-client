@@ -4,14 +4,9 @@
  * Wraps lib/jwxt.ts functions with withJWXT() helper that persists
  * JWXT session after successful calls and maps errors to ProviderError.
  */
-import { persistJWXTSession } from "./session";
-import {
-  NotLoggedInError,
-  JWXTBusinessError,
-  JWXTProtocolError,
-  JWXTError,
-} from "./protocol/jwxt";
-import { ProviderError, ProviderErrorCode, wrapError } from "../errors";
+import { persistJWXTSession } from "./session"
+import { NotLoggedInError, JWXTBusinessError, JWXTProtocolError, JWXTError } from "./protocol/jwxt"
+import { ProviderError, ProviderErrorCode, wrapError } from "../errors"
 import type {
   StudentInfo as JWXTStudentInfo,
   Grade as JWXTGrade,
@@ -37,7 +32,7 @@ import type {
   EvaluationTask as JWXTEvaluationTask,
   EvaluationDetail as JWXTEvaluationDetail,
   EvaluationAnswer as JWXTEvaluationAnswer,
-} from "./protocol/jwxt";
+} from "./protocol/jwxt"
 import {
   queryStudentInfo as _queryStudentInfo,
   queryGrades as _queryGrades,
@@ -73,233 +68,230 @@ import {
   getEvaluationDetail as _getEvaluationDetail,
   calculateEvaluationScore as _calculateEvaluationScore,
   submitEvaluation as _submitEvaluation,
-} from "./protocol/jwxt";
+} from "./protocol/jwxt"
 
 function mapJWXTError(e: unknown): ProviderError {
   if (e instanceof NotLoggedInError) {
-    return new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, e.message, e, 401);
+    return new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, e.message, e, 401)
   }
   if (e instanceof JWXTBusinessError) {
-    return new ProviderError(
-      ProviderErrorCode.BACKEND_BUSINESS_ERROR,
-      e.msg ?? e.message,
-      e,
-      400,
-    );
+    return new ProviderError(ProviderErrorCode.BACKEND_BUSINESS_ERROR, e.msg ?? e.message, e, 400)
   }
   if (e instanceof JWXTProtocolError) {
-    return new ProviderError(ProviderErrorCode.BACKEND_PROTOCOL_ERROR, e.message, e, 500);
+    return new ProviderError(ProviderErrorCode.BACKEND_PROTOCOL_ERROR, e.message, e, 500)
   }
   if (e instanceof JWXTError) {
-    return new ProviderError(ProviderErrorCode.BACKEND_PROTOCOL_ERROR, e.message, e, 500);
+    return new ProviderError(ProviderErrorCode.BACKEND_PROTOCOL_ERROR, e.message, e, 500)
   }
-  return wrapError(e);
+  return wrapError(e)
 }
 
 async function withJWXT<T>(fn: () => Promise<T>): Promise<T> {
   try {
-    const result = await fn();
+    const result = await fn()
     persistJWXTSession().catch((e) => {
-      console.warn("Failed to persist JWXT session", e);
-    });
-    return result;
+      console.warn("Failed to persist JWXT session", e)
+    })
+    return result
   } catch (e) {
-    throw mapJWXTError(e);
+    throw mapJWXTError(e)
   }
 }
 
 export async function queryStudentInfo(): Promise<JWXTStudentInfo> {
-  return withJWXT(() => _queryStudentInfo());
+  return withJWXT(() => _queryStudentInfo())
 }
 
 export async function queryGrades(opts?: {
-  term?: string;
-  courseName?: string;
-  pageSize?: number;
-  pageNumber?: number;
+  term?: string
+  courseName?: string
+  pageSize?: number
+  pageNumber?: number
 }): Promise<JWXTGrade[]> {
-  return withJWXT(() => _queryGrades(opts));
+  return withJWXT(() => _queryGrades(opts))
 }
 
 export async function queryGpaStats(opts?: { studentId?: string }): Promise<JWXTGPAStats> {
-  return withJWXT(() => _queryGpaStats(opts));
+  return withJWXT(() => _queryGpaStats(opts))
 }
 
 export async function queryGradeStatistics(opts?: {
-  term?: string;
-  classId?: string;
-  courseCode?: string;
+  term?: string
+  classId?: string
+  courseCode?: string
 }): Promise<JWXTGradeStatistics> {
-  return withJWXT(() => _queryGradeStatistics(opts));
+  return withJWXT(() => _queryGradeStatistics(opts))
 }
 
 export async function queryGradeDistribution(opts?: {
-  term?: string;
-  classId?: string;
-  courseCode?: string;
+  term?: string
+  classId?: string
+  courseCode?: string
 }): Promise<JWXTGradeDistribution[]> {
-  return withJWXT(() => _queryGradeDistribution(opts));
+  return withJWXT(() => _queryGradeDistribution(opts))
 }
 
 export async function queryGradeRanking(opts?: {
-  term?: string;
-  studentId?: string;
-  classId?: string;
-  courseCode?: string;
+  term?: string
+  studentId?: string
+  classId?: string
+  courseCode?: string
 }): Promise<JWXTGradeRanking> {
-  return withJWXT(() => _queryGradeRanking(opts));
+  return withJWXT(() => _queryGradeRanking(opts))
 }
 
 export async function querySchedule(opts?: { term?: string }): Promise<JWXTCourse[]> {
-  return withJWXT(() => _querySchedule(opts));
+  return withJWXT(() => _querySchedule(opts))
 }
 
 export async function queryExperimentalSchedule(opts?: {
-  term?: string;
-  studentId?: string;
-  courseCategory?: string;
+  term?: string
+  studentId?: string
+  courseCategory?: string
 }): Promise<JWXTCourse[]> {
-  return withJWXT(() => _queryScheduleExperimental(opts));
+  return withJWXT(() => _queryScheduleExperimental(opts))
 }
 
 export async function queryUnscheduledCourses(opts?: {
-  term?: string;
-  studentId?: string;
-  courseCategory?: string;
+  term?: string
+  studentId?: string
+  courseCategory?: string
 }): Promise<JWXTCourse[]> {
-  return withJWXT(() => _queryUnscheduledCourses(opts));
+  return withJWXT(() => _queryUnscheduledCourses(opts))
 }
 
 export async function queryClassPeriods(): Promise<JWXTClassPeriod[]> {
-  return withJWXT(() => _queryClassPeriods());
+  return withJWXT(() => _queryClassPeriods())
 }
 
 export async function queryTermCalendar(opts?: { term?: string }): Promise<JWXTTermCalendar> {
-  return withJWXT(() => _queryTermCalendar(opts));
+  return withJWXT(() => _queryTermCalendar(opts))
 }
 
 export async function queryCurrentWeek(opts?: {
-  term?: string;
-  date?: string;
+  term?: string
+  date?: string
 }): Promise<JWXTCurrentWeek> {
-  return withJWXT(() => _queryCurrentWeek(opts));
+  return withJWXT(() => _queryCurrentWeek(opts))
 }
 
 export async function queryExams(opts?: { term?: string }): Promise<JWXTExam[]> {
-  return withJWXT(() => _queryExams(opts));
+  return withJWXT(() => _queryExams(opts))
 }
 
 export async function queryMakeupExamBatches(opts?: {
-  term?: string;
+  term?: string
 }): Promise<JWXTMakeupExamBatch[]> {
-  return withJWXT(() => _queryMakeupExamBatches(opts));
+  return withJWXT(() => _queryMakeupExamBatches(opts))
 }
 
 export async function queryMakeupExamCourses(opts?: {
-  term?: string;
-  batchId?: string;
-  registered?: boolean;
-  pageSize?: number;
+  term?: string
+  batchId?: string
+  registered?: boolean
+  pageSize?: number
 }): Promise<JWXTMakeupExamCourse[]> {
-  return withJWXT(() => _queryMakeupExamCourses(opts));
+  return withJWXT(() => _queryMakeupExamCourses(opts))
 }
 
 export async function signupMakeupExam(args: {
-  taskId: string;
-  batchId: string;
-  studentId?: string;
+  taskId: string
+  batchId: string
+  studentId?: string
 }): Promise<void> {
-  return withJWXT(() => _signupMakeupExam(args));
+  return withJWXT(() => _signupMakeupExam(args))
 }
 
 export async function queryGradeYears(): Promise<JWXTCodeItem[]> {
-  return withJWXT(() => _queryGradeYears());
+  return withJWXT(() => _queryGradeYears())
 }
 
 export async function queryDepartments(): Promise<JWXTCodeItem[]> {
-  return withJWXT(() => _queryDepartments());
+  return withJWXT(() => _queryDepartments())
 }
 
 export async function queryMajors(department?: string): Promise<JWXTMajorInfo[]> {
-  return withJWXT(() => _queryMajors(department));
+  return withJWXT(() => _queryMajors(department))
 }
 
 export async function querySchoolClasses(opts?: {
-  term?: string;
-  grade?: string;
-  department?: string;
-  major?: string;
+  term?: string
+  grade?: string
+  department?: string
+  major?: string
 }): Promise<JWXTSchoolClassInfo[]> {
-  return withJWXT(() => _querySchoolClasses(opts));
+  return withJWXT(() => _querySchoolClasses(opts))
 }
 
 export async function queryClassSchedule(
   classId: string,
-  opts?: { term?: string },
+  opts?: { term?: string }
 ): Promise<JWXTCourse[]> {
-  return withJWXT(() => _queryClassSchedule(classId, opts));
+  return withJWXT(() => _queryClassSchedule(classId, opts))
 }
 
 export async function queryCampuses(): Promise<JWXTCodeItem[]> {
-  return withJWXT(() => _queryCampuses());
+  return withJWXT(() => _queryCampuses())
 }
 
 export async function queryTeachingBuildings(campus?: string): Promise<JWXTCodeItem[]> {
-  return withJWXT(() => _queryTeachingBuildings(campus));
+  return withJWXT(() => _queryTeachingBuildings(campus))
 }
 
 export async function queryClassrooms(opts?: {
-  term?: string;
-  name?: string;
-  campus?: string;
-  building?: string;
+  term?: string
+  name?: string
+  campus?: string
+  building?: string
 }): Promise<JWXTClassroomInfo[]> {
-  return withJWXT(() => _queryClassrooms(opts));
+  return withJWXT(() => _queryClassrooms(opts))
 }
 
 export async function queryClassroomSchedule(
   code: string,
-  opts?: { term?: string },
+  opts?: { term?: string }
 ): Promise<JWXTCourse[]> {
-  return withJWXT(() => _queryClassroomSchedule(code, opts));
+  return withJWXT(() => _queryClassroomSchedule(code, opts))
 }
 
 export async function queryTrainingPlan(opts?: {
-  pageSize?: number;
-  pageNumber?: number;
+  pageSize?: number
+  pageNumber?: number
 }): Promise<JWXTTrainingPlan[]> {
-  return withJWXT(() => _queryTrainingPlan(opts));
+  return withJWXT(() => _queryTrainingPlan(opts))
 }
 
 export async function queryAcademicCompletion(): Promise<JWXTAcademicCompletion> {
-  return withJWXT(() => _queryAcademicCompletion());
+  return withJWXT(() => _queryAcademicCompletion())
 }
 
 export async function recalculateAcademicCompletion(): Promise<JWXTAcademicCompletion> {
-  return withJWXT(() => _recalculateAcademicCompletion());
+  return withJWXT(() => _recalculateAcademicCompletion())
 }
 
 export async function queryAcademicWarnings(): Promise<JWXTAcademicWarning[]> {
-  return withJWXT(() => _queryAcademicWarnings());
+  return withJWXT(() => _queryAcademicWarnings())
 }
 
-export async function queryEvaluationTypes(opts?: { term?: string }): Promise<JWXTEvaluationType[]> {
-  return withJWXT(() => _queryEvaluationTypes(opts));
+export async function queryEvaluationTypes(opts?: {
+  term?: string
+}): Promise<JWXTEvaluationType[]> {
+  return withJWXT(() => _queryEvaluationTypes(opts))
 }
 
 export async function queryPendingEvaluations(
   evalType: string,
-  opts?: { term?: string },
+  opts?: { term?: string }
 ): Promise<JWXTEvaluationTask[]> {
-  return withJWXT(() => _queryPendingEvaluations(evalType, opts));
+  return withJWXT(() => _queryPendingEvaluations(evalType, opts))
 }
 
 export async function queryEvaluationDetail(
   groupNo: string,
   evalType: string,
-  opts?: { sequence?: number },
+  opts?: { sequence?: number }
 ): Promise<JWXTEvaluationDetail> {
-  return withJWXT(() => _getEvaluationDetail(groupNo, evalType, opts));
+  return withJWXT(() => _getEvaluationDetail(groupNo, evalType, opts))
 }
 
 export async function calculateEvaluationScore(
@@ -308,15 +300,13 @@ export async function calculateEvaluationScore(
   evalType: string,
   answers: readonly JWXTEvaluationAnswer[],
   opts?: {
-    teacherRelationId?: string;
-    courseName?: string;
-    teacherName?: string;
-    sequence?: number;
-  },
+    teacherRelationId?: string
+    courseName?: string
+    teacherName?: string
+    sequence?: number
+  }
 ): Promise<Record<string, unknown>> {
-  return withJWXT(() =>
-    _calculateEvaluationScore(groupNo, wjid, evalType, answers, opts),
-  );
+  return withJWXT(() => _calculateEvaluationScore(groupNo, wjid, evalType, answers, opts))
 }
 
 export async function submitEvaluation(
@@ -325,11 +315,11 @@ export async function submitEvaluation(
   evalType: string,
   answers: readonly JWXTEvaluationAnswer[],
   opts?: {
-    teacherRelationId?: string;
-    courseName?: string;
-    teacherName?: string;
-    sequence?: number;
-  },
+    teacherRelationId?: string
+    courseName?: string
+    teacherName?: string
+    sequence?: number
+  }
 ): Promise<void> {
-  return withJWXT(() => _submitEvaluation(groupNo, wjid, evalType, answers, opts));
+  return withJWXT(() => _submitEvaluation(groupNo, wjid, evalType, answers, opts))
 }

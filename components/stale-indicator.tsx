@@ -1,16 +1,16 @@
-"use client";
+"use client"
 
-import { CloudOff } from "lucide-react";
-import { useRefreshStore } from "@/lib/stores/refresh";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { CloudOff } from "lucide-react"
+import { useRefreshStore } from "@/lib/stores/refresh"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { cn } from "@/lib/utils"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 export function StaleIndicator({ className }: { className?: string }) {
-  const stale = useRefreshStore((s) => s.stale);
-  const { t } = useTranslation();
+  const stale = useRefreshStore((s) => s.stale)
+  const { t } = useTranslation()
 
-  if (stale === 0) return null;
+  if (stale === 0) return null
 
   return (
     <Tooltip>
@@ -18,7 +18,7 @@ export function StaleIndicator({ className }: { className?: string }) {
         <span
           className={cn(
             "inline-flex items-center justify-center rounded-md p-1 text-muted-foreground",
-            className,
+            className
           )}
           aria-label={t("app.staleDataTooltip")}
         >
@@ -29,5 +29,5 @@ export function StaleIndicator({ className }: { className?: string }) {
         <p>{t("app.staleDataTooltip")}</p>
       </TooltipContent>
     </Tooltip>
-  );
+  )
 }

@@ -1,11 +1,11 @@
-"use client";
+"use client"
 
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
+import { useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Input } from "@/components/ui/input"
 import {
   ResponsiveModal,
   ResponsiveModalBody,
@@ -13,57 +13,49 @@ import {
   ResponsiveModalDescription,
   ResponsiveModalHeader,
   ResponsiveModalTitle,
-} from "@/components/responsive-modal";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { useProvider } from "@/providers/use-provider";
-import type { SigninActivityDetail, StudentSigninStatus } from "@/providers/types";
-import {
-  CheckCircle2,
-  XCircle,
-  Timer,
-  Fingerprint,
-  Hash,
-  QrCode,
-  RotateCcw,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+} from "@/components/responsive-modal"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useProvider } from "@/providers/use-provider"
+import type { SigninActivityDetail, StudentSigninStatus } from "@/providers/types"
+import { CheckCircle2, XCircle, Timer, Fingerprint, Hash, QrCode, RotateCcw } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface Props {
-  activityId: string | null;
-  signinType: number;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  activityId: string | null
+  signinType: number
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
 export function SigninModal({ activityId, signinType, open, onOpenChange }: Props) {
-  const { t } = useTranslation();
-  const provider = useProvider();
-  const [loading, setLoading] = useState(false);
-  const [detail, setDetail] = useState<SigninActivityDetail | null>(null);
-  const [status, setStatus] = useState<StudentSigninStatus | null>(null);
-  const [signing, setSigning] = useState(false);
+  const { t } = useTranslation()
+  const provider = useProvider()
+  const [loading, setLoading] = useState(false)
+  const [detail, setDetail] = useState<SigninActivityDetail | null>(null)
+  const [status, setStatus] = useState<StudentSigninStatus | null>(null)
+  const [signing, setSigning] = useState(false)
   const [result, setResult] = useState<{
-    success: boolean;
-    rank?: number;
-    attendanceStatus?: number;
-  } | null>(null);
-  const [countdown, setCountdown] = useState(0);
-  const [code, setCode] = useState("");
-  const codeInputRef = useRef<HTMLInputElement>(null);
+    success: boolean
+    rank?: number
+    attendanceStatus?: number
+  } | null>(null)
+  const [countdown, setCountdown] = useState(0)
+  const [code, setCode] = useState("")
+  const codeInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open || !activityId || !provider.mobile) {
-      setDetail(null);
-      setStatus(null);
-      setResult(null);
-      setCountdown(0);
-      setCode("");
-      return;
+      setDetail(null)
+      setStatus(null)
+      setResult(null)
+      setCountdown(0)
+      setCode("")
+      return
     }
 
     async function load() {
-      if (!activityId || !provider.mobile) return;
-      setLoading(true);
+      if (!activityId || !provider.mobile) return
+      setLoading(true)
       try {
         const [d, s] = await Promise.all([
           provider.mobile.getSigninDetail({
@@ -74,38 +66,38 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
             activityId,
             title: t("activity.signin"),
           }),
-        ]);
-        setDetail(d);
-        setStatus(s);
+        ])
+        setDetail(d)
+        setStatus(s)
         if (d.leftSeconds > 0) {
-          setCountdown(d.leftSeconds);
+          setCountdown(d.leftSeconds)
         }
       } catch (err) {
-        toast.error((err as Error).message || t("activity.loadFailed"));
+        toast.error((err as Error).message || t("activity.loadFailed"))
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     }
-    load();
-  }, [open, activityId, provider.mobile, t]);
+    load()
+  }, [open, activityId, provider.mobile, t])
 
   useEffect(() => {
-    if (countdown <= 0) return;
+    if (countdown <= 0) return
     const timer = setInterval(() => {
       setCountdown((c) => {
         if (c <= 1) {
-          clearInterval(timer);
-          return 0;
+          clearInterval(timer)
+          return 0
         }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [countdown]);
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [countdown])
 
   async function handleSign(codeValue?: string) {
-    if (!activityId || !provider.mobile) return;
-    setSigning(true);
+    if (!activityId || !provider.mobile) return
+    setSigning(true)
     try {
       const res = await provider.mobile.doStudentSign({
         activityId,
@@ -113,51 +105,49 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
         latitude: 0,
         longitude: 0,
         code: codeValue,
-      });
+      })
       if (res.signOrder > 0 || res.signStatus !== 0) {
         setResult({
           success: true,
           rank: res.signOrder,
           attendanceStatus: res.attendanceStatus,
-        });
+        })
       } else {
         setResult({
           success: false,
           attendanceStatus: res.attendanceStatus,
-        });
+        })
       }
     } catch (err) {
-      toast.error((err as Error).message || t("activity.signinFailed"));
+      toast.error((err as Error).message || t("activity.signinFailed"))
     } finally {
-      setSigning(false);
+      setSigning(false)
     }
   }
 
   function handleCodeChange(value: string) {
-    const digits = value.replace(/\D/g, "").slice(0, 4);
-    setCode(digits);
+    const digits = value.replace(/\D/g, "").slice(0, 4)
+    setCode(digits)
     if (digits.length === 4) {
-      void handleSign(digits);
+      void handleSign(digits)
     }
   }
 
   function formatTime(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${String(s).padStart(2, "0")}`;
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${String(s).padStart(2, "0")}`
   }
 
-  const alreadySigned = status && status.signStatus !== 0;
-  const expired = detail && detail.leftSeconds <= 0 && !alreadySigned;
+  const alreadySigned = status && status.signStatus !== 0
+  const expired = detail && detail.leftSeconds <= 0 && !alreadySigned
 
   return (
     <ResponsiveModal open={open} onOpenChange={onOpenChange}>
       <ResponsiveModalContent className="sm:max-w-sm">
         <ResponsiveModalHeader>
           <ResponsiveModalTitle>{t("activity.signinTitle")}</ResponsiveModalTitle>
-          <ResponsiveModalDescription>
-            {t("activity.signinDesc")}
-          </ResponsiveModalDescription>
+          <ResponsiveModalDescription>{t("activity.signinDesc")}</ResponsiveModalDescription>
         </ResponsiveModalHeader>
         <ResponsiveModalBody>
           {loading && (
@@ -171,8 +161,8 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
             <SigninResult
               result={result}
               onRetry={() => {
-                setResult(null);
-                setCode("");
+                setResult(null)
+                setCode("")
               }}
             />
           )}
@@ -205,7 +195,11 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                   {countdown > 0 && (
                     <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                       <Timer className="size-4" />
-                      <span>{t("activity.countdown", { time: formatTime(countdown) })}</span>
+                      <span>
+                        {t("activity.countdown", {
+                          time: formatTime(countdown),
+                        })}
+                      </span>
                     </div>
                   )}
 
@@ -235,7 +229,7 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                               "flex size-12 items-center justify-center rounded-lg border-2 text-xl font-bold transition-colors",
                               code.length > i
                                 ? "border-primary bg-primary/5 text-primary"
-                                : "border-muted bg-muted/30 text-muted-foreground",
+                                : "border-muted bg-muted/30 text-muted-foreground"
                             )}
                           >
                             {code[i] ?? ""}
@@ -263,7 +257,7 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                   {signinType === 3 && (
                     <div className="flex flex-col items-center gap-3">
                       <QrCode className="size-12 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground text-center">
+                      <p className="text-center text-sm text-muted-foreground">
                         {t("activity.scanCodeDesc")}
                       </p>
                       <Input
@@ -278,7 +272,11 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                         onClick={() => handleSign(code)}
                         disabled={signing || !code}
                       >
-                        {signing ? <Spinner data-icon="inline-start" /> : <Hash className="size-4" />}
+                        {signing ? (
+                          <Spinner data-icon="inline-start" />
+                        ) : (
+                          <Hash className="size-4" />
+                        )}
                         {t("activity.signinButton")}
                       </Button>
                     </div>
@@ -290,17 +288,17 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
         </ResponsiveModalBody>
       </ResponsiveModalContent>
     </ResponsiveModal>
-  );
+  )
 }
 
 function SigninResult({
   result,
   onRetry,
 }: {
-  result: { success: boolean; rank?: number; attendanceStatus?: number };
-  onRetry: () => void;
+  result: { success: boolean; rank?: number; attendanceStatus?: number }
+  onRetry: () => void
 }) {
-  const { t } = useTranslation();
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center gap-4 py-4">
       {result.success ? (
@@ -328,5 +326,5 @@ function SigninResult({
         {t("activity.retry")}
       </Button>
     </div>
-  );
+  )
 }

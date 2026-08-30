@@ -1,7 +1,7 @@
-export { useProviderQuery, providerQueryKey } from "./use-provider-query";
-export type { ProviderQueryResult } from "./use-provider-query";
-export { useStudentInfo } from "./use-student-info";
-export type { UseStudentInfoResult } from "./use-student-info";
+export { useProviderQuery, providerQueryKey } from "./use-provider-query"
+export type { ProviderQueryResult } from "./use-provider-query"
+export { useStudentInfo } from "./use-student-info"
+export type { UseStudentInfoResult } from "./use-student-info"
 export {
   useAcademicCompletion,
   useAcademicWarnings,
@@ -43,10 +43,10 @@ export {
   useSchedule,
   useTermCalendar,
   useTrainingPlan,
-} from "./use-academics";
+} from "./use-academics"
 export {
   useEvaluationDetail,
   useEvaluationTasks,
   useEvaluationTypes,
   usePendingEvaluations,
-} from "./use-evaluation";
+} from "./use-evaluation"

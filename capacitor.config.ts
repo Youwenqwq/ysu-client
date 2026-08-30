@@ -1,9 +1,9 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import type { CapacitorConfig } from "@capacitor/cli"
 
 const config: CapacitorConfig = {
-  appId: 'com.youwenqwq.ysuclient',
-  appName: '燕大终端',
-  webDir: 'dist',
+  appId: "com.youwenqwq.ysuclient",
+  appName: "燕大终端",
+  webDir: "dist",
   plugins: {
     CapacitorHttp: {
       enabled: true,
@@ -16,6 +16,6 @@ const config: CapacitorConfig = {
       appReadyTimeout: 15000,
     },
   },
-};
+}
 
-export default config;
+export default config

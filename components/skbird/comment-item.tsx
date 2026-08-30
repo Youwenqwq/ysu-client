@@ -1,41 +1,41 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { ThumbsUp } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { skbirdImageUrl } from "@/lib/extras/skbird/client";
-import { getSkbirdClient } from "@/lib/extras/skbird/store";
-import type { SkbirdComment } from "@/lib/extras/skbird/types";
-import { SkbirdImage } from "./skbird-image";
+import { useState } from "react"
+import { ThumbsUp } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { skbirdImageUrl } from "@/lib/extras/skbird/client"
+import { getSkbirdClient } from "@/lib/extras/skbird/store"
+import type { SkbirdComment } from "@/lib/extras/skbird/types"
+import { SkbirdImage } from "./skbird-image"
 
 export function SkbirdCommentItem({
   comment,
   threadId,
   depth = 0,
 }: {
-  comment: SkbirdComment;
-  threadId: string;
-  depth?: number;
+  comment: SkbirdComment
+  threadId: string
+  depth?: number
 }) {
-  const { t } = useTranslation();
-  const [likeHas, setLikeHas] = useState(comment.likeHas);
-  const [likeCount, setLikeCount] = useState(comment.likeCount);
-  const [pending, setPending] = useState(false);
+  const { t } = useTranslation()
+  const [likeHas, setLikeHas] = useState(comment.likeHas)
+  const [likeCount, setLikeCount] = useState(comment.likeCount)
+  const [pending, setPending] = useState(false)
 
   async function handleLike() {
-    const client = getSkbirdClient();
-    if (!client || pending) return;
-    setPending(true);
-    const next = !likeHas;
+    const client = getSkbirdClient()
+    if (!client || pending) return
+    setPending(true)
+    const next = !likeHas
     try {
-      await client.like(threadId, next ? 1 : 0, comment.commentId);
-      setLikeHas(next);
-      setLikeCount((c) => c + (next ? 1 : -1));
+      await client.like(threadId, next ? 1 : 0, comment.commentId)
+      setLikeHas(next)
+      setLikeCount((c) => c + (next ? 1 : -1))
     } catch {
       // 失败静默：状态不翻转
     } finally {
-      setPending(false);
+      setPending(false)
     }
   }
 
@@ -53,10 +53,12 @@ export function SkbirdCommentItem({
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="truncate">{comment.nickname}</span>
             {comment.isAuthor ? <Badge variant="secondary">{t("skbird.authorBadge")}</Badge> : null}
-            {comment.userLevelTitle ? <Badge variant="outline">{comment.userLevelTitle}</Badge> : null}
+            {comment.userLevelTitle ? (
+              <Badge variant="outline">{comment.userLevelTitle}</Badge>
+            ) : null}
             <span className="ml-auto shrink-0">{comment.postTimeText}</span>
           </div>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{comment.content}</p>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{comment.content}</p>
           <button
             type="button"
             onClick={handleLike}
@@ -78,10 +80,15 @@ export function SkbirdCommentItem({
       {comment.replies.length > 0 ? (
         <div className="mt-3 flex flex-col gap-3">
           {comment.replies.map((r) => (
-            <SkbirdCommentItem key={r.commentId} comment={r} threadId={threadId} depth={depth + 1} />
+            <SkbirdCommentItem
+              key={r.commentId}
+              comment={r}
+              threadId={threadId}
+              depth={depth + 1}
+            />
           ))}
         </div>
       ) : null}
     </div>
-  );
+  )
 }

@@ -1,178 +1,174 @@
-"use client";
+"use client"
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { mutate } from "swr";
-import { toast } from "sonner";
-import { initializeActiveProvider, setActiveProviderSchool } from "@/providers/provider-service";
-import { useProviderContext } from "@/providers/provider-context";
-import { useAuthStore } from "@/lib/stores/auth";
-import { useSettingsStore } from "@/lib/stores/settings";
-import { useUpdateStore } from "@/lib/stores/update";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { isCapacitor } from "@/lib/native/platform";
-import { blurActiveElement } from "@/lib/utils";
-import { initSafeArea } from "@/lib/native/webview-compat";
-import { trackAppLaunch } from "@/lib/analytics";
-import { syncFeedbackReplies } from "@/lib/feedback-check";
-import { AnalyticsPrompt } from "@/components/analytics-prompt";
-import { APP_VERSION } from "@/lib/version";
-import { useAnnouncementStore } from "@/lib/stores/announcement";
-import { checkAnnouncement } from "@/lib/announcement";
-import { AnnouncementDialog } from "@/components/announcement-dialog";
+import { useCallback, useEffect, useRef, useState } from "react"
+import { mutate } from "swr"
+import { toast } from "sonner"
+import { initializeActiveProvider, setActiveProviderSchool } from "@/providers/provider-service"
+import { useProviderContext } from "@/providers/provider-context"
+import { useAuthStore } from "@/lib/stores/auth"
+import { useSettingsStore } from "@/lib/stores/settings"
+import { useUpdateStore } from "@/lib/stores/update"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { isCapacitor } from "@/lib/native/platform"
+import { blurActiveElement } from "@/lib/utils"
+import { initSafeArea } from "@/lib/native/webview-compat"
+import { trackAppLaunch } from "@/lib/analytics"
+import { syncFeedbackReplies } from "@/lib/feedback-check"
+import { AnalyticsPrompt } from "@/components/analytics-prompt"
+import { APP_VERSION } from "@/lib/version"
+import { useAnnouncementStore } from "@/lib/stores/announcement"
+import { checkAnnouncement } from "@/lib/announcement"
+import { AnnouncementDialog } from "@/components/announcement-dialog"
 
 export function SDKProvider({ children }: { children: React.ReactNode }) {
-  const { t, locale } = useTranslation();
-  const localeRef = useRef(locale);
+  const { t, locale } = useTranslation()
+  const localeRef = useRef(locale)
   useEffect(() => {
-    localeRef.current = locale;
-  }, [locale]);
-  const hasHydrated = useAuthStore((s) => s.hasHydrated);
-  const settingsHydrated = useSettingsStore((s) => s.hasHydrated);
-  const schoolId = useSettingsStore((s) => s.schoolId);
-  const updateMirror = useSettingsStore((s) => s.updateMirror);
-  const updateChannel = useSettingsStore((s) => s.updateChannel);
-  const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus);
-  const {
-    markProviderInitializing,
-    markProviderReady,
-    markProviderError,
-  } = useProviderContext();
-  const didNotifyAppReady = useRef(false);
-  const didRunStartupSideEffects = useRef(false);
-  const [showAnalyticsPrompt, setShowAnalyticsPrompt] = useState(false);
+    localeRef.current = locale
+  }, [locale])
+  const hasHydrated = useAuthStore((s) => s.hasHydrated)
+  const settingsHydrated = useSettingsStore((s) => s.hasHydrated)
+  const schoolId = useSettingsStore((s) => s.schoolId)
+  const updateMirror = useSettingsStore((s) => s.updateMirror)
+  const updateChannel = useSettingsStore((s) => s.updateChannel)
+  const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus)
+  const { markProviderInitializing, markProviderReady, markProviderError } = useProviderContext()
+  const didNotifyAppReady = useRef(false)
+  const didRunStartupSideEffects = useRef(false)
+  const [showAnalyticsPrompt, setShowAnalyticsPrompt] = useState(false)
 
   const performUpdateCheck = useCallback(async () => {
-    if (!isCapacitor()) return;
-    const { checkForUpdate } = await import("@/lib/updater");
-    const info = await checkForUpdate(true, updateMirror, updateChannel);
-    const hasUpdate = info.available || info.apkUpdateAvailable;
-    setUpdateStatus(hasUpdate);
+    if (!isCapacitor()) return
+    const { checkForUpdate } = await import("@/lib/updater")
+    const info = await checkForUpdate(true, updateMirror, updateChannel)
+    const hasUpdate = info.available || info.apkUpdateAvailable
+    setUpdateStatus(hasUpdate)
     if (hasUpdate) {
-      const { setUpdateInfo, setShowDialog } = useUpdateStore.getState();
-      setUpdateInfo(info);
-      blurActiveElement();
-      setShowDialog(true);
+      const { setUpdateInfo, setShowDialog } = useUpdateStore.getState()
+      setUpdateInfo(info)
+      blurActiveElement()
+      setShowDialog(true)
     }
-  }, [updateMirror, updateChannel, setUpdateStatus]);
+  }, [updateMirror, updateChannel, setUpdateStatus])
 
   const checkAnnouncementsThenUpdates = useCallback(async () => {
-    const info = await checkAnnouncement();
+    const info = await checkAnnouncement()
     if (info) {
-      const { setAnnouncementInfo, setShowDialog } = useAnnouncementStore.getState();
-      setAnnouncementInfo(info);
-      blurActiveElement();
-      setShowDialog(true);
-      return;
+      const { setAnnouncementInfo, setShowDialog } = useAnnouncementStore.getState()
+      setAnnouncementInfo(info)
+      blurActiveElement()
+      setShowDialog(true)
+      return
     }
-    await performUpdateCheck();
-  }, [performUpdateCheck]);
+    await performUpdateCheck()
+  }, [performUpdateCheck])
 
   // Inject safe area CSS variables on native.
   // The Capacitor SystemBars plugin may report zero values for WebView < 140
   // due to a Chromium bug (crbug.com/40699457). Our native plugin reads the
   // real root-window insets and corrects them.
   useEffect(() => {
-    if (!isCapacitor()) return;
+    if (!isCapacitor()) return
 
     const inject = () => {
-      initSafeArea().catch(() => {});
-    };
+      initSafeArea().catch(() => {})
+    }
 
     // Inject immediately and on every resize (rotation, keyboard, etc.)
-    inject();
-    window.addEventListener("resize", inject);
-    return () => window.removeEventListener("resize", inject);
-  }, []);
+    inject()
+    window.addEventListener("resize", inject)
+    return () => window.removeEventListener("resize", inject)
+  }, [])
 
   useEffect(() => {
-    if (!hasHydrated || !settingsHydrated) return;
+    if (!hasHydrated || !settingsHydrated) return
 
     // Signal the updater plugin that the current bundle loaded successfully.
     // Must run before provider session initialization to maximize the chance it fires within appReadyTimeout.
     if (!didNotifyAppReady.current) {
-      didNotifyAppReady.current = true;
+      didNotifyAppReady.current = true
       if (isCapacitor()) {
         import("@capgo/capacitor-updater").then(({ CapacitorUpdater }) => {
-          CapacitorUpdater.notifyAppReady().catch(() => {});
-        });
+          CapacitorUpdater.notifyAppReady().catch(() => {})
+        })
       }
     }
 
-    let cancelled = false;
-    markProviderInitializing();
-    setActiveProviderSchool(schoolId);
+    let cancelled = false
+    markProviderInitializing()
+    setActiveProviderSchool(schoolId)
 
     initializeActiveProvider()
       .then((provider) => {
-        if (cancelled) return;
-        markProviderReady(provider);
-        mutate((key) => Array.isArray(key) && key[0] === "provider");
+        if (cancelled) return
+        markProviderReady(provider)
+        mutate((key) => Array.isArray(key) && key[0] === "provider")
 
-        if (didRunStartupSideEffects.current) return;
-        didRunStartupSideEffects.current = true;
+        if (didRunStartupSideEffects.current) return
+        didRunStartupSideEffects.current = true
 
         // Show analytics consent prompt if user hasn't made a choice yet
-        const analyticsPromptVersion = useSettingsStore.getState().analyticsPromptVersion;
+        const analyticsPromptVersion = useSettingsStore.getState().analyticsPromptVersion
         if (!analyticsPromptVersion) {
-          blurActiveElement();
-          setShowAnalyticsPrompt(true);
+          blurActiveElement()
+          setShowAnalyticsPrompt(true)
         } else {
           // User already made a choice: check announcements then updates
-          checkAnnouncementsThenUpdates();
+          checkAnnouncementsThenUpdates()
           // Fire-and-forget: anonymous usage stats
-          trackAppLaunch().catch(() => {});
+          trackAppLaunch().catch(() => {})
         }
 
         // Check feedback replies once on startup
-        syncFeedbackReplies().catch(() => {});
+        syncFeedbackReplies().catch(() => {})
 
         // Check WebView compatibility (Capacitor only)
         if (isCapacitor()) {
           import("@/lib/native/webview-compat").then(({ checkWebViewCompat }) => {
-            checkWebViewCompat(localeRef.current);
-          });
+            checkWebViewCompat(localeRef.current)
+          })
         }
 
         // Background: verify auth + warm up WEU tokens after the UI is
         // already visible so the user sees cached data immediately.
-        (async () => {
-          let status = await provider.checkAuthStatus();
+        ;(async () => {
+          let status = await provider.checkAuthStatus()
           if (!status.authenticated) {
             // Cookie restoration may not be immediately effective on
             // Capacitor; wait briefly and retry once before concluding
             // the session is actually expired.
-            await new Promise((r) => setTimeout(r, 800));
-            status = await provider.checkAuthStatus();
+            await new Promise((r) => setTimeout(r, 800))
+            status = await provider.checkAuthStatus()
           }
           if (status.authenticated) {
-            provider.warmup?.().catch(() => {});
+            provider.warmup?.().catch(() => {})
           }
           if (!status.authenticated) {
-            toast.error(t("app.sessionExpired"));
+            toast.error(t("app.sessionExpired"))
           }
         })().catch((err) => {
-          const e = err as Error & { code?: string; status?: number };
+          const e = err as Error & { code?: string; status?: number }
           if (e.code === "AUTH_REQUIRED" || e.status === 401) {
-            toast.error(t("app.sessionExpired"));
+            toast.error(t("app.sessionExpired"))
           }
           // Silently ignore non-auth errors during startup to avoid
           // false alarms caused by transient network issues.
-        });
+        })
       })
       .catch((err) => {
-        if (cancelled) return;
-        markProviderError(err);
-        const e = err as Error & { code?: string; status?: number };
+        if (cancelled) return
+        markProviderError(err)
+        const e = err as Error & { code?: string; status?: number }
         if (e.code === "AUTH_REQUIRED" || e.status === 401) {
-          toast.error(t("app.sessionExpired"));
+          toast.error(t("app.sessionExpired"))
         }
         // Silently ignore non-auth errors during startup to avoid
         // false alarms caused by transient network issues.
-      });
+      })
 
     return () => {
-      cancelled = true;
-    };
+      cancelled = true
+    }
   }, [
     hasHydrated,
     settingsHydrated,
@@ -182,7 +178,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
     markProviderInitializing,
     markProviderReady,
     markProviderError,
-  ]);
+  ])
 
   if (!hasHydrated || !settingsHydrated) {
     return (
@@ -191,7 +187,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
           {t("app.updating")}
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -200,15 +196,15 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
       <AnalyticsPrompt
         open={showAnalyticsPrompt}
         onClose={() => {
-          setShowAnalyticsPrompt(false);
-          useSettingsStore.getState().setAnalyticsPromptVersion(APP_VERSION);
+          setShowAnalyticsPrompt(false)
+          useSettingsStore.getState().setAnalyticsPromptVersion(APP_VERSION)
           // Check announcements then updates after privacy prompt is closed
-          checkAnnouncementsThenUpdates();
+          checkAnnouncementsThenUpdates()
           // Try to track launch if user agreed
-          trackAppLaunch().catch(() => {});
+          trackAppLaunch().catch(() => {})
         }}
       />
       <AnnouncementDialog onDismissed={performUpdateCheck} />
     </>
-  );
+  )
 }

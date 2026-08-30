@@ -1,121 +1,118 @@
-"use client";
+"use client"
 
-import { useRef, useState } from "react";
-import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
+import { useRef, useState } from "react"
+import { toast } from "sonner"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { useSettingsStore, type CardStyle, type BackgroundStyle } from "@/lib/stores/settings"
+import { useTranslation } from "@/lib/i18n/use-translation"
 import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import { useSettingsStore, type CardStyle, type BackgroundStyle } from "@/lib/stores/settings";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { saveBackgroundImage, removeBackgroundImage, loadBackgroundImage } from "@/lib/storage/background";
-import { useStoredMediaUrl } from "@/lib/storage/media";
-import { ImagePlus, Trash2 } from "lucide-react";
+  saveBackgroundImage,
+  removeBackgroundImage,
+  loadBackgroundImage,
+} from "@/lib/storage/background"
+import { useStoredMediaUrl } from "@/lib/storage/media"
+import { ImagePlus, Trash2 } from "lucide-react"
 
 export default function BackgroundSettingsPage() {
-  const { t } = useTranslation();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const backgroundImage = useSettingsStore((s) => s.backgroundImage);
-  const backgroundUrl = useStoredMediaUrl(backgroundImage, loadBackgroundImage);
-  const setBackgroundImage = useSettingsStore((s) => s.setBackgroundImage);
-  const overlayOpacity = useSettingsStore((s) => s.backgroundOverlayOpacity);
-  const setOverlayOpacity = useSettingsStore((s) => s.setBackgroundOverlayOpacity);
-  const backgroundStyle = useSettingsStore((s) => s.backgroundStyle);
-  const setBackgroundStyle = useSettingsStore((s) => s.setBackgroundStyle);
-  const backgroundBlurAmount = useSettingsStore((s) => s.backgroundBlurAmount);
-  const setBackgroundBlurAmount = useSettingsStore((s) => s.setBackgroundBlurAmount);
-  const cardStyle = useSettingsStore((s) => s.cardStyle);
-  const setCardStyle = useSettingsStore((s) => s.setCardStyle);
-  const cardOpacity = useSettingsStore((s) => s.cardOpacity);
-  const setCardOpacity = useSettingsStore((s) => s.setCardOpacity);
+  const backgroundImage = useSettingsStore((s) => s.backgroundImage)
+  const backgroundUrl = useStoredMediaUrl(backgroundImage, loadBackgroundImage)
+  const setBackgroundImage = useSettingsStore((s) => s.setBackgroundImage)
+  const overlayOpacity = useSettingsStore((s) => s.backgroundOverlayOpacity)
+  const setOverlayOpacity = useSettingsStore((s) => s.setBackgroundOverlayOpacity)
+  const backgroundStyle = useSettingsStore((s) => s.backgroundStyle)
+  const setBackgroundStyle = useSettingsStore((s) => s.setBackgroundStyle)
+  const backgroundBlurAmount = useSettingsStore((s) => s.backgroundBlurAmount)
+  const setBackgroundBlurAmount = useSettingsStore((s) => s.setBackgroundBlurAmount)
+  const cardStyle = useSettingsStore((s) => s.cardStyle)
+  const setCardStyle = useSettingsStore((s) => s.setCardStyle)
+  const cardOpacity = useSettingsStore((s) => s.cardOpacity)
+  const setCardOpacity = useSettingsStore((s) => s.setCardOpacity)
 
-  const [localOverlay, setLocalOverlay] = useState(overlayOpacity);
-  const [localBackgroundStyle, setLocalBackgroundStyle] = useState<BackgroundStyle>(backgroundStyle);
-  const [localBlurAmount, setLocalBlurAmount] = useState(backgroundBlurAmount);
-  const [localCardStyle, setLocalCardStyle] = useState<CardStyle>(cardStyle);
-  const [localCardOpacity, setLocalCardOpacity] = useState(cardOpacity);
+  const [localOverlay, setLocalOverlay] = useState(overlayOpacity)
+  const [localBackgroundStyle, setLocalBackgroundStyle] = useState<BackgroundStyle>(backgroundStyle)
+  const [localBlurAmount, setLocalBlurAmount] = useState(backgroundBlurAmount)
+  const [localCardStyle, setLocalCardStyle] = useState<CardStyle>(cardStyle)
+  const [localCardOpacity, setLocalCardOpacity] = useState(cardOpacity)
 
   function handleSelectImage() {
-    fileInputRef.current?.click();
+    fileInputRef.current?.click()
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const file = e.target.files?.[0]
+    if (!file) return
     if (file.size > 10 * 1024 * 1024) {
-      toast.error(t("app.backgroundImageTooLarge"));
-      e.target.value = "";
-      return;
+      toast.error(t("app.backgroundImageTooLarge"))
+      e.target.value = ""
+      return
     }
-    const reader = new FileReader();
+    const reader = new FileReader()
     reader.onload = async () => {
       try {
-        const storedUrl = await saveBackgroundImage(reader.result as string);
-        setBackgroundImage(storedUrl);
+        const storedUrl = await saveBackgroundImage(reader.result as string)
+        setBackgroundImage(storedUrl)
       } catch {
-        toast.error(t("app.networkError"));
+        toast.error(t("app.networkError"))
       }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ""
   }
 
   async function handleRemoveImage() {
-    await removeBackgroundImage();
-    setBackgroundImage("");
+    await removeBackgroundImage()
+    setBackgroundImage("")
   }
 
   function handleOverlayChange(values: number[]) {
-    const v = values[0] ?? 75;
-    setLocalOverlay(v);
-    setOverlayOpacity(v);
+    const v = values[0] ?? 75
+    setLocalOverlay(v)
+    setOverlayOpacity(v)
   }
 
   function handleBackgroundStyleChange(v: string) {
-    const style = v as BackgroundStyle;
-    setLocalBackgroundStyle(style);
-    setBackgroundStyle(style);
+    const style = v as BackgroundStyle
+    setLocalBackgroundStyle(style)
+    setBackgroundStyle(style)
   }
 
   function handleBlurAmountChange(values: number[]) {
-    const v = values[0] ?? 20;
-    setLocalBlurAmount(v);
-    setBackgroundBlurAmount(v);
+    const v = values[0] ?? 20
+    setLocalBlurAmount(v)
+    setBackgroundBlurAmount(v)
   }
 
   function handleCardStyleChange(v: string) {
-    const style = v as CardStyle;
-    setLocalCardStyle(style);
-    setCardStyle(style);
+    const style = v as CardStyle
+    setLocalCardStyle(style)
+    setCardStyle(style)
   }
 
   function handleCardOpacityChange(values: number[]) {
-    const v = values[0] ?? 100;
-    setLocalCardOpacity(v);
-    setCardOpacity(v);
+    const v = values[0] ?? 100
+    setLocalCardOpacity(v)
+    setCardOpacity(v)
   }
 
   function handleReset() {
-    setBackgroundImage("");
-    setOverlayOpacity(75);
-    setBackgroundStyle("overlay");
-    setBackgroundBlurAmount(20);
-    setCardStyle("solid");
-    setCardOpacity(100);
-    setLocalOverlay(75);
-    setLocalBackgroundStyle("overlay");
-    setLocalBlurAmount(20);
-    setLocalCardStyle("solid");
-    setLocalCardOpacity(100);
+    setBackgroundImage("")
+    setOverlayOpacity(75)
+    setBackgroundStyle("overlay")
+    setBackgroundBlurAmount(20)
+    setCardStyle("solid")
+    setCardOpacity(100)
+    setLocalOverlay(75)
+    setLocalBackgroundStyle("overlay")
+    setLocalBlurAmount(20)
+    setLocalCardStyle("solid")
+    setLocalCardOpacity(100)
   }
 
   return (
@@ -183,9 +180,7 @@ export default function BackgroundSettingsPage() {
                 variant="outline"
                 size="sm"
               >
-                <ToggleGroupItem value="overlay">
-                  {t("app.backgroundStyleOverlay")}
-                </ToggleGroupItem>
+                <ToggleGroupItem value="overlay">{t("app.backgroundStyleOverlay")}</ToggleGroupItem>
                 <ToggleGroupItem value="blur-overlay">
                   {t("app.backgroundStyleBlurOverlay")}
                 </ToggleGroupItem>
@@ -231,15 +226,11 @@ export default function BackgroundSettingsPage() {
                 variant="outline"
                 size="sm"
               >
-                <ToggleGroupItem value="solid">
-                  {t("app.cardStyleSolid")}
-                </ToggleGroupItem>
+                <ToggleGroupItem value="solid">{t("app.cardStyleSolid")}</ToggleGroupItem>
                 <ToggleGroupItem value="translucent">
                   {t("app.cardStyleTranslucent")}
                 </ToggleGroupItem>
-                <ToggleGroupItem value="glass">
-                  {t("app.cardStyleGlass")}
-                </ToggleGroupItem>
+                <ToggleGroupItem value="glass">{t("app.cardStyleGlass")}</ToggleGroupItem>
               </ToggleGroup>
             </Field>
 
@@ -269,5 +260,5 @@ export default function BackgroundSettingsPage() {
         </Button>
       </div>
     </div>
-  );
+  )
 }

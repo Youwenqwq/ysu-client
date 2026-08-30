@@ -1,34 +1,34 @@
-"use client";
+"use client"
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import useSWR, { type KeyedMutator, type SWRConfiguration } from "swr";
-import { useAuthStore } from "@/lib/stores/auth";
-import { getSchoolConfigScope } from "@/lib/server-config";
-import { cacheGetStale, cacheKey, cacheSet, DEFAULT_TTL_MS, LONG_TTL_MS } from "@/lib/storage/cache";
-import { useRefreshStore } from "@/lib/stores/refresh";
-import { hasCapability } from "../capabilities";
-import { ProviderError, ProviderErrorCode } from "../errors";
-import { useProvider, useProviderReady } from "../use-provider";
-import type { AcademicCapabilities } from "../types";
+import { useEffect, useMemo, useRef, useState } from "react"
+import useSWR, { type KeyedMutator, type SWRConfiguration } from "swr"
+import { useAuthStore } from "@/lib/stores/auth"
+import { getSchoolConfigScope } from "@/lib/server-config"
+import { cacheGetStale, cacheKey, cacheSet, DEFAULT_TTL_MS, LONG_TTL_MS } from "@/lib/storage/cache"
+import { useRefreshStore } from "@/lib/stores/refresh"
+import { hasCapability } from "../capabilities"
+import { ProviderError, ProviderErrorCode } from "../errors"
+import { useProvider, useProviderReady } from "../use-provider"
+import type { AcademicCapabilities } from "../types"
 
 export interface ProviderQueryResult<T> {
-  data: T | undefined;
-  isLoading: boolean;
-  isValidating: boolean;
-  isError: boolean;
-  error: ProviderError | undefined;
-  mutate: KeyedMutator<T>;
-  isStale: boolean;
+  data: T | undefined
+  isLoading: boolean
+  isValidating: boolean
+  isError: boolean
+  error: ProviderError | undefined
+  mutate: KeyedMutator<T>
+  isStale: boolean
 }
 
 interface ProviderCachePolicy {
-  ttl: number;
-  persist: boolean;
+  ttl: number
+  persist: boolean
 }
 
-const SHORT_TTL_MS = 1000 * 60 * 60 * 12;
-const SIX_HOUR_TTL_MS = 1000 * 60 * 60 * 6;
-const ONE_HOUR_TTL_MS = 1000 * 60 * 60;
+const SHORT_TTL_MS = 1000 * 60 * 60 * 12
+const SIX_HOUR_TTL_MS = 1000 * 60 * 60 * 6
+const ONE_HOUR_TTL_MS = 1000 * 60 * 60
 
 const CACHE_POLICIES: Record<string, ProviderCachePolicy> = {
   "student-info": { ttl: LONG_TTL_MS, persist: true },
@@ -61,20 +61,20 @@ const CACHE_POLICIES: Record<string, ProviderCachePolicy> = {
   "comprehensive-year-scores": { ttl: SIX_HOUR_TTL_MS, persist: true },
   "comprehensive-report-years": { ttl: DEFAULT_TTL_MS, persist: true },
   "comprehensive-report": { ttl: SIX_HOUR_TTL_MS, persist: true },
-};
+}
 
 function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
-  const obj = value as Record<string, unknown>;
+  if (value === null || typeof value !== "object") return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`
+  const obj = value as Record<string, unknown>
   return `{${Object.keys(obj)
     .sort()
     .map((key) => `${JSON.stringify(key)}:${stableStringify(obj[key])}`)
-    .join(",")}}`;
+    .join(",")}}`
 }
 
 function getCachePolicy(feature: string): ProviderCachePolicy {
-  return CACHE_POLICIES[feature] ?? { ttl: DEFAULT_TTL_MS, persist: false };
+  return CACHE_POLICIES[feature] ?? { ttl: DEFAULT_TTL_MS, persist: false }
 }
 
 export function providerQueryKey(
@@ -82,9 +82,16 @@ export function providerQueryKey(
   schoolConfigScope: string,
   username: string | null,
   feature: string,
-  params?: unknown,
+  params?: unknown
 ): readonly unknown[] {
-  return ["provider", providerId, schoolConfigScope, username ?? null, feature, params ?? null] as const;
+  return [
+    "provider",
+    providerId,
+    schoolConfigScope,
+    username ?? null,
+    feature,
+    params ?? null,
+  ] as const
 }
 
 export function providerCacheKey(
@@ -92,7 +99,7 @@ export function providerCacheKey(
   schoolConfigScope: string,
   username: string,
   feature: string,
-  params?: unknown,
+  params?: unknown
 ): string {
   return cacheKey([
     "provider",
@@ -101,7 +108,7 @@ export function providerCacheKey(
     username,
     feature,
     stableStringify(params ?? null),
-  ]);
+  ])
 }
 
 export function useProviderQuery<T>(
@@ -110,12 +117,12 @@ export function useProviderQuery<T>(
   fetcher: () => Promise<T>,
   params?: unknown,
   config?: SWRConfiguration<T, ProviderError>,
-  enabled = true,
+  enabled = true
 ): ProviderQueryResult<T> {
-  const provider = useProvider();
-  const isReady = useProviderReady();
-  const username = useAuthStore((state) => state.username);
-  const schoolConfigScope = getSchoolConfigScope();
+  const provider = useProvider()
+  const isReady = useProviderReady()
+  const username = useAuthStore((state) => state.username)
+  const schoolConfigScope = getSchoolConfigScope()
   const capabilityError = useMemo(
     () =>
       hasCapability(provider.capabilities, capability)
@@ -124,33 +131,31 @@ export function useProviderQuery<T>(
             ProviderErrorCode.FEATURE_NOT_SUPPORTED,
             `Provider "${provider.id}" does not support ${capability}`,
             undefined,
-            501,
+            501
           ),
-    [provider.capabilities, provider.id, capability],
-  );
+    [provider.capabilities, provider.id, capability]
+  )
 
-  const policy = getCachePolicy(feature);
-  const canPersist = enabled && !capabilityError && policy.persist && !!username;
+  const policy = getCachePolicy(feature)
+  const canPersist = enabled && !capabilityError && policy.persist && !!username
   const persistentKey = useMemo(
     () =>
-      username
-        ? providerCacheKey(provider.id, schoolConfigScope, username, feature, params)
-        : null,
-    [provider.id, schoolConfigScope, username, feature, params],
-  );
+      username ? providerCacheKey(provider.id, schoolConfigScope, username, feature, params) : null,
+    [provider.id, schoolConfigScope, username, feature, params]
+  )
   const cached = useMemo(
     () => (canPersist && persistentKey ? cacheGetStale<T>(persistentKey, policy.ttl) : null),
-    [canPersist, persistentKey, policy.ttl],
-  );
-  const [servedStale, setServedStale] = useState(() => cached?.stale ?? false);
+    [canPersist, persistentKey, policy.ttl]
+  )
+  const [servedStale, setServedStale] = useState(() => cached?.stale ?? false)
 
   useEffect(() => {
-    setServedStale(cached?.stale ?? false);
+    setServedStale(cached?.stale ?? false)
     // Only reset from the persistent cache when the query key changes. If a
     // revalidation fails and falls back to a still-valid cache entry, keep the
     // stale marker instead of immediately clearing it on the next render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [persistentKey]);
+  }, [persistentKey])
 
   const swr = useSWR<T, ProviderError>(
     isReady && enabled && !capabilityError
@@ -158,21 +163,21 @@ export function useProviderQuery<T>(
       : null,
     async () => {
       try {
-        const result = await fetcher();
+        const result = await fetcher()
         if (canPersist && persistentKey) {
-          cacheSet(persistentKey, result);
+          cacheSet(persistentKey, result)
         }
-        setServedStale(false);
-        return result;
+        setServedStale(false)
+        return result
       } catch (err) {
         if (canPersist && persistentKey) {
-          const fallback = cacheGetStale<T>(persistentKey, policy.ttl);
+          const fallback = cacheGetStale<T>(persistentKey, policy.ttl)
           if (fallback) {
-            setServedStale(true);
-            return fallback.data;
+            setServedStale(true)
+            return fallback.data
           }
         }
-        throw err;
+        throw err
       }
     },
     {
@@ -181,53 +186,53 @@ export function useProviderQuery<T>(
       dedupingInterval: 5000,
       fallbackData: cached?.data,
       ...config,
-    },
-  );
+    }
+  )
 
-  const { data, error, isLoading, isValidating, mutate } = swr;
-  const hasData = data !== undefined;
-  const isInitialLoading = isLoading && !hasData;
-  const isStale = hasData && servedStale;
-  const contributedRefresh = useRef(false);
-  const contributedStale = useRef(false);
+  const { data, error, isLoading, isValidating, mutate } = swr
+  const hasData = data !== undefined
+  const isInitialLoading = isLoading && !hasData
+  const isStale = hasData && servedStale
+  const contributedRefresh = useRef(false)
+  const contributedStale = useRef(false)
 
   useEffect(() => {
     if (isValidating && data !== undefined) {
       if (!contributedRefresh.current) {
-        contributedRefresh.current = true;
-        useRefreshStore.getState().start();
+        contributedRefresh.current = true
+        useRefreshStore.getState().start()
       }
     } else if (contributedRefresh.current) {
-      contributedRefresh.current = false;
-      useRefreshStore.getState().end();
+      contributedRefresh.current = false
+      useRefreshStore.getState().end()
     }
 
     return () => {
       if (contributedRefresh.current) {
-        contributedRefresh.current = false;
-        useRefreshStore.getState().end();
+        contributedRefresh.current = false
+        useRefreshStore.getState().end()
       }
-    };
-  }, [isValidating, data]);
+    }
+  }, [isValidating, data])
 
   useEffect(() => {
     if (isStale) {
       if (!contributedStale.current) {
-        contributedStale.current = true;
-        useRefreshStore.getState().markStale();
+        contributedStale.current = true
+        useRefreshStore.getState().markStale()
       }
     } else if (contributedStale.current) {
-      contributedStale.current = false;
-      useRefreshStore.getState().markFresh();
+      contributedStale.current = false
+      useRefreshStore.getState().markFresh()
     }
 
     return () => {
       if (contributedStale.current) {
-        contributedStale.current = false;
-        useRefreshStore.getState().markFresh();
+        contributedStale.current = false
+        useRefreshStore.getState().markFresh()
       }
-    };
-  }, [isStale]);
+    }
+  }, [isStale])
 
   return {
     data,
@@ -237,5 +242,5 @@ export function useProviderQuery<T>(
     error: capabilityError ?? error ?? undefined,
     mutate,
     isStale,
-  };
+  }
 }

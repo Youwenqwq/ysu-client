@@ -1,7 +1,7 @@
-import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import { secureStorage } from "../storage/secure";
-import { STORAGE_KEYS } from "../storage/keys";
+import { create } from "zustand"
+import { persist, createJSONStorage } from "zustand/middleware"
+import { secureStorage } from "../storage/secure"
+import { STORAGE_KEYS } from "../storage/keys"
 
 /**
  * Web 端激活态。token 即激活凭证本身（单共享 token 模型），
@@ -10,11 +10,11 @@ import { STORAGE_KEYS } from "../storage/keys";
  * Native（Capacitor）不使用本 store。
  */
 interface ActivationState {
-  token: string | null;
-  hasHydrated: boolean;
-  setToken: (token: string) => void;
-  clearToken: () => void;
-  setHasHydrated: (v: boolean) => void;
+  token: string | null
+  hasHydrated: boolean
+  setToken: (token: string) => void
+  clearToken: () => void
+  setHasHydrated: (v: boolean) => void
 }
 
 export const useActivationStore = create<ActivationState>()(
@@ -30,8 +30,8 @@ export const useActivationStore = create<ActivationState>()(
       name: STORAGE_KEYS.activation,
       storage: createJSONStorage(() => secureStorage),
       onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+        state?.setHasHydrated(true)
       },
-    },
-  ),
-);
+    }
+  )
+)

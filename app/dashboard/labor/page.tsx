@@ -1,48 +1,33 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   EmptyState,
   LoadingCards,
   useErrorToast,
   ValidatingList,
-} from "@/components/academic/list-state";
-import { formatTimeRange } from "@/lib/academic/time";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import {
-  useLaborActivities,
-  useLaborRecords,
-  useLaborSummary,
-} from "@/providers/hooks";
-import { cn } from "@/lib/utils";
-import {
-  Clock,
-  MapPin,
-  ScrollText,
-  User,
-} from "lucide-react";
+} from "@/components/academic/list-state"
+import { formatTimeRange } from "@/lib/academic/time"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useLaborActivities, useLaborRecords, useLaborSummary } from "@/providers/hooks"
+import { cn } from "@/lib/utils"
+import { Clock, MapPin, ScrollText, User } from "lucide-react"
 
 function RecordsPanel() {
-  const { t } = useTranslation();
-  const recordsQuery = useLaborRecords();
-  const records = recordsQuery.data ?? [];
-  useErrorToast(recordsQuery.error);
+  const { t } = useTranslation()
+  const recordsQuery = useLaborRecords()
+  const records = recordsQuery.data ?? []
+  useErrorToast(recordsQuery.error)
 
   if ((recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0) {
-    return <LoadingCards className="h-28" />;
+    return <LoadingCards className="h-28" />
   }
   if (records.length === 0) {
-    return <EmptyState title={t("labor.noRecords")} />;
+    return <EmptyState title={t("labor.noRecords")} />
   }
   return (
     <ValidatingList validating={recordsQuery.isValidating} className="flex flex-col gap-4">
@@ -95,29 +80,23 @@ function RecordsPanel() {
         </Card>
       ))}
     </ValidatingList>
-  );
+  )
 }
 
 function ActivitiesPanel() {
-  const { t } = useTranslation();
-  const activitiesQuery = useLaborActivities();
-  const activities = activitiesQuery.data ?? [];
-  useErrorToast(activitiesQuery.error);
+  const { t } = useTranslation()
+  const activitiesQuery = useLaborActivities()
+  const activities = activitiesQuery.data ?? []
+  useErrorToast(activitiesQuery.error)
 
-  if (
-    (activitiesQuery.isLoading || activitiesQuery.isValidating) &&
-    activities.length === 0
-  ) {
-    return <LoadingCards className="h-28" />;
+  if ((activitiesQuery.isLoading || activitiesQuery.isValidating) && activities.length === 0) {
+    return <LoadingCards className="h-28" />
   }
   if (activities.length === 0) {
-    return <EmptyState title={t("labor.noActivities")} />;
+    return <EmptyState title={t("labor.noActivities")} />
   }
   return (
-    <ValidatingList
-      validating={activitiesQuery.isValidating}
-      className="flex flex-col gap-4"
-    >
+    <ValidatingList validating={activitiesQuery.isValidating} className="flex flex-col gap-4">
       {activities.map((activity, idx) => (
         <Card key={`${activity.name}-${activity.timeStart ?? idx}`}>
           <CardHeader>
@@ -137,9 +116,7 @@ function ActivitiesPanel() {
                     </span>
                   </span>
                 )}
-                {activity.isEnrolled && (
-                  <Badge variant="default">{t("labor.enrolled")}</Badge>
-                )}
+                {activity.isEnrolled && <Badge variant="default">{t("labor.enrolled")}</Badge>}
               </div>
             </div>
           </CardHeader>
@@ -156,8 +133,7 @@ function ActivitiesPanel() {
               <div className="flex items-center gap-2">
                 <Clock className="size-4 shrink-0 text-muted-foreground" />
                 <span>
-                  {t("labor.activityTime")}:{" "}
-                  {formatTimeRange(activity.timeStart, activity.timeEnd)}
+                  {t("labor.activityTime")}: {formatTimeRange(activity.timeStart, activity.timeEnd)}
                 </span>
               </div>
             )}
@@ -177,16 +153,16 @@ function ActivitiesPanel() {
         </Card>
       ))}
     </ValidatingList>
-  );
+  )
 }
 
 export default function LaborPage() {
-  const { t } = useTranslation();
-  const [tab, setTab] = useState<"records" | "activities">("records");
+  const { t } = useTranslation()
+  const [tab, setTab] = useState<"records" | "activities">("records")
 
-  const summaryQuery = useLaborSummary();
-  const summary = summaryQuery.data;
-  useErrorToast(summaryQuery.error);
+  const summaryQuery = useLaborSummary()
+  const summary = summaryQuery.data
+  useErrorToast(summaryQuery.error)
 
   return (
     <div className="flex flex-col gap-6">
@@ -201,13 +177,11 @@ export default function LaborPage() {
             <div
               className={cn(
                 "flex gap-8 transition-opacity",
-                summaryQuery.isValidating && "opacity-50",
+                summaryQuery.isValidating && "opacity-50"
               )}
             >
               <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground">
-                  {t("labor.totalHours")}
-                </span>
+                <span className="text-xs text-muted-foreground">{t("labor.totalHours")}</span>
                 <span className="text-2xl font-semibold tabular-nums">
                   {summary.totalHours ?? "-"}
                   <span className="ml-1 text-sm font-normal text-muted-foreground">
@@ -216,9 +190,7 @@ export default function LaborPage() {
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground">
-                  {t("labor.totalCredits")}
-                </span>
+                <span className="text-xs text-muted-foreground">{t("labor.totalCredits")}</span>
                 <span className="text-2xl font-semibold tabular-nums">
                   {summary.totalCredits ?? "-"}
                 </span>
@@ -242,5 +214,5 @@ export default function LaborPage() {
         </TabsContent>
       </Tabs>
     </div>
-  );
+  )
 }

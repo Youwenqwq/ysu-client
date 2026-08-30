@@ -1,13 +1,13 @@
-import { create } from "zustand";
-import type { UpdateInfo } from "../updater";
+import { create } from "zustand"
+import type { UpdateInfo } from "../updater"
 
 interface UpdateState {
-  hasUpdate: boolean;
-  updateInfo: UpdateInfo | null;
-  showDialog: boolean;
-  setUpdateStatus: (hasUpdate: boolean) => void;
-  setUpdateInfo: (info: UpdateInfo | null) => void;
-  setShowDialog: (open: boolean) => void;
+  hasUpdate: boolean
+  updateInfo: UpdateInfo | null
+  showDialog: boolean
+  setUpdateStatus: (hasUpdate: boolean) => void
+  setUpdateInfo: (info: UpdateInfo | null) => void
+  setShowDialog: (open: boolean) => void
 }
 
 export const useUpdateStore = create<UpdateState>((set) => ({
@@ -17,4 +17,4 @@ export const useUpdateStore = create<UpdateState>((set) => ({
   setUpdateStatus: (hasUpdate) => set({ hasUpdate }),
   setUpdateInfo: (updateInfo) => set({ updateInfo }),
   setShowDialog: (showDialog) => set({ showDialog }),
-}));
+}))

@@ -16,9 +16,13 @@ import { NotifyProvider } from "@/components/notify-provider"
 import { PwaRegister } from "@/components/pwa-register"
 import { PwaUpdatePrompt } from "@/components/pwa-update-prompt"
 import { ProviderProvider } from "@/providers/provider-context"
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans', preload: false })
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  preload: false,
+})
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -31,7 +35,8 @@ export const metadata: Metadata = {
     default: "燕大终端",
     template: "%s · 燕大终端",
   },
-  description: "YSU Terminal — a third-party shadcn/ui client for the Yanshan University academic system.",
+  description:
+    "YSU Terminal — a third-party shadcn/ui client for the Yanshan University academic system.",
   applicationName: "燕大终端",
   authors: [{ name: "ysu-client contributors" }],
   keywords: ["燕大终端", "YSU Terminal", "燕山大学", "YSU", "教务系统"],

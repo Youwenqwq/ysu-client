@@ -1,70 +1,52 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import {
-  FilterDrawer,
-  FilterTrigger,
-} from "@/components/academic/filter-drawer";
-import { useSettingsStore } from "@/lib/stores/settings";
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { compareExamStartTime, formatExamTime, isExamCompleted } from "@/lib/academic/exam-utils";
-import { syncExamsToWidget } from "@/lib/native/widget-bridge";
-import { useExams } from "@/providers/hooks";
-import {
-  CalendarOff,
-  CheckCircle2,
-  Clock,
-  MapPin,
-  Search,
-} from "lucide-react";
+import { useEffect, useState } from "react"
+import { toast } from "sonner"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { FilterDrawer, FilterTrigger } from "@/components/academic/filter-drawer"
+import { useSettingsStore } from "@/lib/stores/settings"
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { compareExamStartTime, formatExamTime, isExamCompleted } from "@/lib/academic/exam-utils"
+import { syncExamsToWidget } from "@/lib/native/widget-bridge"
+import { useExams } from "@/providers/hooks"
+import { CalendarOff, CheckCircle2, Clock, MapPin, Search } from "lucide-react"
 
 export default function ExamsPage() {
-  const { t } = useTranslation();
-  const [term, setTerm] = useState("");
-  const [queriedTerm, setQueriedTerm] = useState("");
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-  const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours);
-  const examsQuery = useExams({ semester: queriedTerm || undefined });
-  const exams = examsQuery.data ?? [];
-  const loading = examsQuery.isLoading || examsQuery.isValidating;
+  const { t } = useTranslation()
+  const [term, setTerm] = useState("")
+  const [queriedTerm, setQueriedTerm] = useState("")
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
+  const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours)
+  const examsQuery = useExams({ semester: queriedTerm || undefined })
+  const exams = examsQuery.data ?? []
+  const loading = examsQuery.isLoading || examsQuery.isValidating
 
   useEffect(() => {
-    if (!examsQuery.data) return;
-    syncExamsToWidget(examsQuery.data, widgetSyncReminderHours).catch(() => {});
-  }, [examsQuery.data, widgetSyncReminderHours]);
+    if (!examsQuery.data) return
+    syncExamsToWidget(examsQuery.data, widgetSyncReminderHours).catch(() => {})
+  }, [examsQuery.data, widgetSyncReminderHours])
 
   useEffect(() => {
-    if (!examsQuery.error) return;
-    toast.error(examsQuery.error.message || t("app.updating"));
-  }, [examsQuery.error, t]);
+    if (!examsQuery.error) return
+    toast.error(examsQuery.error.message || t("app.updating"))
+  }, [examsQuery.error, t])
 
   async function handleQuery() {
-    const nextTerm = term.trim();
-    setFilterDrawerOpen(false);
+    const nextTerm = term.trim()
+    setFilterDrawerOpen(false)
     if (nextTerm === queriedTerm) {
-      await examsQuery.mutate();
-      return;
+      await examsQuery.mutate()
+      return
     }
-    setQueriedTerm(nextTerm);
+    setQueriedTerm(nextTerm)
   }
 
   useMobileHeaderRight(
@@ -72,8 +54,8 @@ export default function ExamsPage() {
       label={queriedTerm || t("exams.termLabel")}
       onClick={() => setFilterDrawerOpen(true)}
     />,
-    [queriedTerm, t],
-  );
+    [queriedTerm, t]
+  )
 
   const renderFilterControls = (idPrefix: string) => (
     <FieldGroup className="flex flex-row flex-wrap items-end gap-3">
@@ -87,18 +69,14 @@ export default function ExamsPage() {
         />
       </Field>
       <Button onClick={handleQuery} disabled={loading}>
-        {loading ? (
-          <Spinner data-icon="inline-start" />
-        ) : (
-          <Search data-icon="inline-start" />
-        )}
+        {loading ? <Spinner data-icon="inline-start" /> : <Search data-icon="inline-start" />}
         {t("exams.query")}
       </Button>
     </FieldGroup>
-  );
+  )
 
-  const upcomingExams = exams.filter((e) => !isExamCompleted(e)).sort(compareExamStartTime);
-  const completedExams = exams.filter((e) => isExamCompleted(e)).sort(compareExamStartTime);
+  const upcomingExams = exams.filter((e) => !isExamCompleted(e)).sort(compareExamStartTime)
+  const completedExams = exams.filter((e) => isExamCompleted(e)).sort(compareExamStartTime)
 
   if (loading && exams.length === 0) {
     return (
@@ -110,7 +88,7 @@ export default function ExamsPage() {
           ))}
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -164,7 +142,9 @@ export default function ExamsPage() {
                       <span>{exam.examLocation}</span>
                     </div>
                     {exam.seatNumber && (
-                      <Badge variant="outline">{t("exams.seatNumber")}: {exam.seatNumber}</Badge>
+                      <Badge variant="outline">
+                        {t("exams.seatNumber")}: {exam.seatNumber}
+                      </Badge>
                     )}
                   </CardContent>
                 </Card>
@@ -174,10 +154,15 @@ export default function ExamsPage() {
 
           {completedExams.length > 0 && (
             <>
-              <h3 className="text-sm font-medium text-muted-foreground">{t("exams.completedExams")}</h3>
+              <h3 className="text-sm font-medium text-muted-foreground">
+                {t("exams.completedExams")}
+              </h3>
               <div className="grid gap-4 md:grid-cols-2">
                 {completedExams.map((exam) => (
-                  <Card key={`${exam.name}-${exam.startAt ?? ""}-${exam.examLocation ?? ""}`} className="opacity-60">
+                  <Card
+                    key={`${exam.name}-${exam.startAt ?? ""}-${exam.examLocation ?? ""}`}
+                    className="opacity-60"
+                  >
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <CardTitle className="text-base">{exam.name}</CardTitle>
@@ -198,7 +183,9 @@ export default function ExamsPage() {
                         <span>{exam.examLocation}</span>
                       </div>
                       {exam.seatNumber && (
-                        <Badge variant="outline">{t("exams.seatNumber")}: {exam.seatNumber}</Badge>
+                        <Badge variant="outline">
+                          {t("exams.seatNumber")}: {exam.seatNumber}
+                        </Badge>
                       )}
                     </CardContent>
                   </Card>
@@ -209,5 +196,5 @@ export default function ExamsPage() {
         </div>
       )}
     </div>
-  );
+  )
 }

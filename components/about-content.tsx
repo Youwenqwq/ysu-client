@@ -1,9 +1,9 @@
-"use client";
+"use client"
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import Image from "next/image";
-import appIcon from "@/public/icons/icon-192.png";
+import { useState, useCallback, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
+import Image from "next/image"
+import appIcon from "@/public/icons/icon-192.png"
 import {
   Code,
   CircleFadingArrowUp,
@@ -15,22 +15,19 @@ import {
   Settings,
   MessageSquare,
   Star,
-} from "lucide-react";
+} from "lucide-react"
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
-import { InstallAppButton } from "@/components/install-app-button";
-import { Separator } from "@/components/ui/separator";
-import { Spinner } from "@/components/ui/spinner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group";
+} from "@/components/ui/accordion"
+import { InstallAppButton } from "@/components/install-app-button"
+import { Separator } from "@/components/ui/separator"
+import { Spinner } from "@/components/ui/spinner"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   Dialog,
   DialogContent,
@@ -38,13 +35,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { isCapacitor } from "@/lib/native/platform";
-import { blurActiveElement } from "@/lib/utils";
-import { useSettingsStore } from "@/lib/stores/settings";
-import { useUpdateStore } from "@/lib/stores/update";
-import { useLongPress } from "@/hooks/use-long-press";
+} from "@/components/ui/dialog"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { isCapacitor } from "@/lib/native/platform"
+import { blurActiveElement } from "@/lib/utils"
+import { useSettingsStore } from "@/lib/stores/settings"
+import { useUpdateStore } from "@/lib/stores/update"
+import { useLongPress } from "@/hooks/use-long-press"
 import {
   APP_VERSION,
   APP_BUILD,
@@ -54,117 +51,114 @@ import {
   APP_WEBSITE,
   APP_OPEN_SOURCE,
   APP_PEOPLE,
-} from "@/lib/version";
-import { UPDATE_MIRRORS, type UpdateChannel } from "@/lib/updater";
+} from "@/lib/version"
+import { UPDATE_MIRRORS, type UpdateChannel } from "@/lib/updater"
 
-type UpdateState = "idle" | "checking" | "up-to-date" | "error";
+type UpdateState = "idle" | "checking" | "up-to-date" | "error"
 
-const DEBUG_TAP_THRESHOLD = 7;
-const DEBUG_TAP_WINDOW_MS = 3000;
+const DEBUG_TAP_THRESHOLD = 7
+const DEBUG_TAP_WINDOW_MS = 3000
 
 export function AboutContent() {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const [state, setState] = useState<UpdateState>("idle");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [showMirrorDialog, setShowMirrorDialog] = useState(false);
-  const [updatePlatform, setUpdatePlatform] = useState<
-    "unsupported" | "native"
-  >("unsupported");
+  const router = useRouter()
+  const { t } = useTranslation()
+  const [state, setState] = useState<UpdateState>("idle")
+  const [errorMsg, setErrorMsg] = useState("")
+  const [showMirrorDialog, setShowMirrorDialog] = useState(false)
+  const [updatePlatform, setUpdatePlatform] = useState<"unsupported" | "native">("unsupported")
 
   useEffect(() => {
     if (isCapacitor()) {
-      setUpdatePlatform("native");
+      setUpdatePlatform("native")
     }
-  }, []);
+  }, [])
 
-  const updateMirror = useSettingsStore((s) => s.updateMirror);
-  const updateChannel = useSettingsStore((s) => s.updateChannel);
-  const setUpdateMirror = useSettingsStore((s) => s.setUpdateMirror);
-  const setUpdateChannel = useSettingsStore((s) => s.setUpdateChannel);
-  const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus);
-  const setUpdateInfo = useUpdateStore((s) => s.setUpdateInfo);
-  const setShowDialog = useUpdateStore((s) => s.setShowDialog);
+  const updateMirror = useSettingsStore((s) => s.updateMirror)
+  const updateChannel = useSettingsStore((s) => s.updateChannel)
+  const setUpdateMirror = useSettingsStore((s) => s.setUpdateMirror)
+  const setUpdateChannel = useSettingsStore((s) => s.setUpdateChannel)
+  const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus)
+  const setUpdateInfo = useUpdateStore((s) => s.setUpdateInfo)
+  const setShowDialog = useUpdateStore((s) => s.setShowDialog)
 
   // Dialog-local state
-  const [dialogPreset, setDialogPreset] = useState("");
-  const [dialogCustomValue, setDialogCustomValue] = useState("");
-  const [dialogChannel, setDialogChannel] = useState<UpdateChannel>("stable");
+  const [dialogPreset, setDialogPreset] = useState("")
+  const [dialogCustomValue, setDialogCustomValue] = useState("")
+  const [dialogChannel, setDialogChannel] = useState<UpdateChannel>("stable")
 
   // Feedback state
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [feedbackTab, setFeedbackTab] = useState<"submit" | "history">("submit");
-  const [feedbackRating, setFeedbackRating] = useState(0);
-  const [feedbackText, setFeedbackText] = useState("");
-  const [feedbackState, setFeedbackState] = useState<"idle" | "submitting" | "success" | "error">("idle");
-  const [refreshingHistory, setRefreshingHistory] = useState(false);
-  const feedbackHistory = useSettingsStore((s) => s.feedbackHistory);
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedbackTab, setFeedbackTab] = useState<"submit" | "history">("submit")
+  const [feedbackRating, setFeedbackRating] = useState(0)
+  const [feedbackText, setFeedbackText] = useState("")
+  const [feedbackState, setFeedbackState] = useState<"idle" | "submitting" | "success" | "error">(
+    "idle"
+  )
+  const [refreshingHistory, setRefreshingHistory] = useState(false)
+  const feedbackHistory = useSettingsStore((s) => s.feedbackHistory)
 
   // Hidden debug trigger
-  const tapTimes = useRef<number[]>([]);
+  const tapTimes = useRef<number[]>([])
   const handleIconClick = useCallback(() => {
-    const now = Date.now();
-    tapTimes.current = tapTimes.current.filter((t) => now - t < DEBUG_TAP_WINDOW_MS);
-    tapTimes.current.push(now);
+    const now = Date.now()
+    tapTimes.current = tapTimes.current.filter((t) => now - t < DEBUG_TAP_WINDOW_MS)
+    tapTimes.current.push(now)
     if (tapTimes.current.length >= DEBUG_TAP_THRESHOLD) {
-      tapTimes.current = [];
-      router.push("/dashboard/me/debug");
+      tapTimes.current = []
+      router.push("/dashboard/me/debug")
     }
-  }, [router]);
+  }, [router])
 
-  const toToggleValue = (mirror: string) =>
-    mirror === "" ? "__direct__" : mirror;
+  const toToggleValue = (mirror: string) => (mirror === "" ? "__direct__" : mirror)
 
   function openMirrorDialog() {
-    const isPreset = UPDATE_MIRRORS.some((m) => m.value === updateMirror);
+    const isPreset = UPDATE_MIRRORS.some((m) => m.value === updateMirror)
     if (isPreset) {
-      setDialogPreset(toToggleValue(updateMirror));
-      setDialogCustomValue("");
+      setDialogPreset(toToggleValue(updateMirror))
+      setDialogCustomValue("")
     } else {
-      setDialogPreset("__custom__");
-      setDialogCustomValue(updateMirror);
+      setDialogPreset("__custom__")
+      setDialogCustomValue(updateMirror)
     }
-    setDialogChannel(updateChannel);
-    setShowMirrorDialog(true);
+    setDialogChannel(updateChannel)
+    setShowMirrorDialog(true)
   }
 
   function confirmMirror() {
     if (dialogPreset === "__custom__") {
-      setUpdateMirror(dialogCustomValue);
+      setUpdateMirror(dialogCustomValue)
     } else {
-      setUpdateMirror(
-        dialogPreset === "__direct__" ? "" : dialogPreset,
-      );
+      setUpdateMirror(dialogPreset === "__direct__" ? "" : dialogPreset)
     }
-    setUpdateChannel(dialogChannel);
-    setShowMirrorDialog(false);
+    setUpdateChannel(dialogChannel)
+    setShowMirrorDialog(false)
   }
 
   const handleCheck = useCallback(async () => {
-    if (updatePlatform !== "native") return;
+    if (updatePlatform !== "native") return
 
-    setState("checking");
+    setState("checking")
     try {
-      const { checkForUpdate } = await import("@/lib/updater");
-      const info = await checkForUpdate(false, updateMirror, updateChannel);
-      const hasUpdate = info.available || info.apkUpdateAvailable;
-      setUpdateStatus(hasUpdate);
+      const { checkForUpdate } = await import("@/lib/updater")
+      const info = await checkForUpdate(false, updateMirror, updateChannel)
+      const hasUpdate = info.available || info.apkUpdateAvailable
+      setUpdateStatus(hasUpdate)
       if (hasUpdate) {
-        setUpdateInfo(info);
-        blurActiveElement();
-        setShowDialog(true);
-        setState("idle");
+        setUpdateInfo(info)
+        blurActiveElement()
+        setShowDialog(true)
+        setState("idle")
       } else {
-        setState("up-to-date");
+        setState("up-to-date")
       }
     } catch (err) {
-      const message = (err as Error).message;
+      const message = (err as Error).message
       if (message === "RATE_LIMIT") {
-        setErrorMsg(t("update.errorRateLimit"));
+        setErrorMsg(t("update.errorRateLimit"))
       } else {
-        setErrorMsg(t("update.errorNetwork"));
+        setErrorMsg(t("update.errorNetwork"))
       }
-      setState("error");
+      setState("error")
     }
   }, [
     setUpdateStatus,
@@ -174,39 +168,39 @@ export function AboutContent() {
     updateMirror,
     updateChannel,
     updatePlatform,
-  ]);
+  ])
 
   const handleReset = useCallback(async () => {
     try {
-      const { resetToBuiltin } = await import("@/lib/updater");
-      await resetToBuiltin();
-      setState("idle");
+      const { resetToBuiltin } = await import("@/lib/updater")
+      await resetToBuiltin()
+      setState("idle")
     } catch {
       // ignore
     }
-  }, []);
+  }, [])
 
   const handleFeedbackSubmit = useCallback(async () => {
-    if (feedbackRating < 1) return;
-    setFeedbackState("submitting");
+    if (feedbackRating < 1) return
+    setFeedbackState("submitting")
     try {
-      const { submitFeedback } = await import("@/lib/feedback");
-      await submitFeedback(feedbackRating, feedbackText);
-      setFeedbackState("success");
+      const { submitFeedback } = await import("@/lib/feedback")
+      await submitFeedback(feedbackRating, feedbackText)
+      setFeedbackState("success")
       setTimeout(() => {
-        setShowFeedback(false);
-        setFeedbackRating(0);
-        setFeedbackText("");
-        setFeedbackState("idle");
-        setFeedbackTab("history");
-      }, 1500);
+        setShowFeedback(false)
+        setFeedbackRating(0)
+        setFeedbackText("")
+        setFeedbackState("idle")
+        setFeedbackTab("history")
+      }, 1500)
     } catch {
-      setFeedbackState("error");
+      setFeedbackState("error")
     }
-  }, [feedbackRating, feedbackText]);
+  }, [feedbackRating, feedbackText])
 
-  const canCheck = updatePlatform !== "unsupported";
-  const canReset = updatePlatform === "native";
+  const canCheck = updatePlatform !== "unsupported"
+  const canReset = updatePlatform === "native"
 
   return (
     <div className="flex flex-1 flex-col">
@@ -283,20 +277,16 @@ export function AboutContent() {
           <button
             type="button"
             onClick={() => {
-              setShowFeedback(true);
-              setFeedbackTab(feedbackHistory.length > 0 ? "history" : "submit");
+              setShowFeedback(true)
+              setFeedbackTab(feedbackHistory.length > 0 ? "history" : "submit")
               // Mark replies as read when user opens the dialog
-              const state = useSettingsStore.getState();
-              const unread = state.feedbackHistory.some(
-                (h) => h.replyText && !h.notifiedAt
-              );
+              const state = useSettingsStore.getState()
+              const unread = state.feedbackHistory.some((h) => h.replyText && !h.notifiedAt)
               if (unread) {
                 const updated = state.feedbackHistory.map((h) =>
-                  h.replyText && !h.notifiedAt
-                    ? { ...h, notifiedAt: Date.now() }
-                    : h
-                );
-                state.setFeedbackHistory(updated);
+                  h.replyText && !h.notifiedAt ? { ...h, notifiedAt: Date.now() } : h
+                )
+                state.setFeedbackHistory(updated)
               }
             }}
             className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
@@ -381,28 +371,22 @@ export function AboutContent() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("update.mirrorSettings")}</DialogTitle>
-            <DialogDescription>
-              {t("update.mirrorSettingsDesc")}
-            </DialogDescription>
+            <DialogDescription>{t("update.mirrorSettingsDesc")}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <ToggleGroup
               type="single"
               value={dialogPreset}
               onValueChange={(v) => {
-                if (!v) return;
-                setDialogPreset(v);
+                if (!v) return
+                setDialogPreset(v)
               }}
               variant="outline"
               size="sm"
               className="flex flex-wrap"
             >
               {UPDATE_MIRRORS.map((m) => (
-                <ToggleGroupItem
-                  key={m.value}
-                  value={toToggleValue(m.value)}
-                  className="text-xs"
-                >
+                <ToggleGroupItem key={m.value} value={toToggleValue(m.value)} className="text-xs">
                   {m.label}
                 </ToggleGroupItem>
               ))}
@@ -422,16 +406,14 @@ export function AboutContent() {
             <div className="flex flex-col gap-2">
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-medium">{t("update.channel")}</span>
-                <span className="text-xs text-muted-foreground">
-                  {t("update.channelDesc")}
-                </span>
+                <span className="text-xs text-muted-foreground">{t("update.channelDesc")}</span>
               </div>
               <ToggleGroup
                 type="single"
                 value={dialogChannel}
                 onValueChange={(v) => {
-                  if (!v) return;
-                  setDialogChannel(v as UpdateChannel);
+                  if (!v) return
+                  setDialogChannel(v as UpdateChannel)
                 }}
                 variant="outline"
                 size="sm"
@@ -450,15 +432,13 @@ export function AboutContent() {
             <>
               <Separator />
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  {t("update.resetToFactory")}
-                </span>
+                <span className="text-sm text-muted-foreground">{t("update.resetToFactory")}</span>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => {
-                    setShowMirrorDialog(false);
-                    handleReset();
+                    setShowMirrorDialog(false)
+                    handleReset()
                   }}
                 >
                   <RotateCcw className="size-3.5" />
@@ -548,7 +528,7 @@ export function AboutContent() {
                       onChange={(e) => setFeedbackText(e.target.value)}
                       placeholder={t("about.feedbackTextPlaceholder")}
                       rows={4}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
                     />
                   </div>
                   {feedbackState === "error" && (
@@ -575,22 +555,22 @@ export function AboutContent() {
           )}
 
           {feedbackTab === "history" && (
-            <div className="flex flex-col gap-3 max-h-[50vh] overflow-y-auto">
+            <div className="flex max-h-[50vh] flex-col gap-3 overflow-y-auto">
               <button
                 type="button"
                 disabled={refreshingHistory}
                 onClick={async () => {
-                  setRefreshingHistory(true);
+                  setRefreshingHistory(true)
                   try {
-                    const { syncFeedbackReplies } = await import("@/lib/feedback-check");
-                    await syncFeedbackReplies(true);
+                    const { syncFeedbackReplies } = await import("@/lib/feedback-check")
+                    await syncFeedbackReplies(true)
                   } catch {
                     // ignore
                   } finally {
-                    setRefreshingHistory(false);
+                    setRefreshingHistory(false)
                   }
                 }}
-                className="self-end text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                className="self-end text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
               >
                 {refreshingHistory ? "..." : t("about.feedbackRefresh")}
               </button>
@@ -601,7 +581,7 @@ export function AboutContent() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-muted-foreground">
+                      <span className="font-mono text-xs text-muted-foreground">
                         #{feedbackHistory.length - idx}
                       </span>
                       <div className="flex gap-0.5">
@@ -628,9 +608,13 @@ export function AboutContent() {
                   {item.replied && item.replyText && (
                     <div className="mt-2 rounded-md bg-muted p-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs font-medium text-muted-foreground">{t("about.feedbackDevReply")}</p>
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {t("about.feedbackDevReply")}
+                        </p>
                         {item.repliedAt && (
-                          <p className="text-[10px] text-muted-foreground">{new Date(item.repliedAt).toLocaleDateString()}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {new Date(item.repliedAt).toLocaleDateString()}
+                          </p>
                         )}
                       </div>
                       <p className="mt-1 text-sm">{item.replyText}</p>
@@ -640,14 +624,16 @@ export function AboutContent() {
                     <p className="mt-2 text-xs text-primary">{t("about.feedbackReplied")}</p>
                   )}
                   <div className="mt-2 flex items-center justify-between">
-                    <p className="text-[10px] font-mono text-muted-foreground/60">ID: {item.id}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground/60">ID: {item.id}</p>
                     {item.deleted && (
                       <button
                         type="button"
                         onClick={() => {
-                          const state = useSettingsStore.getState();
-                          state.setFeedbackIds(state.feedbackIds.filter((fid) => fid !== item.id));
-                          state.setFeedbackHistory(state.feedbackHistory.filter((h) => h.id !== item.id));
+                          const state = useSettingsStore.getState()
+                          state.setFeedbackIds(state.feedbackIds.filter((fid) => fid !== item.id))
+                          state.setFeedbackHistory(
+                            state.feedbackHistory.filter((h) => h.id !== item.id)
+                          )
                         }}
                         className="text-xs text-destructive hover:underline"
                       >
@@ -658,14 +644,16 @@ export function AboutContent() {
                 </div>
               ))}
               {feedbackHistory.length === 0 && (
-                <p className="py-6 text-center text-sm text-muted-foreground">{t("about.feedbackNoHistory")}</p>
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  {t("about.feedbackNoHistory")}
+                </p>
               )}
             </div>
           )}
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }
 
 function UpdateSection({
@@ -679,17 +667,17 @@ function UpdateSection({
   onLongPress,
   t,
 }: {
-  state: UpdateState;
-  errorMsg: string;
-  canReset: boolean;
-  onCheck: () => void;
-  onRetry: () => void;
-  onReset: () => void;
-  onOpenMirror: () => void;
-  onLongPress: () => void;
-  t: (key: string) => string;
+  state: UpdateState
+  errorMsg: string
+  canReset: boolean
+  onCheck: () => void
+  onRetry: () => void
+  onReset: () => void
+  onOpenMirror: () => void
+  onLongPress: () => void
+  t: (key: string) => string
 }) {
-  const longPressHandlers = useLongPress(onLongPress);
+  const longPressHandlers = useLongPress(onLongPress)
 
   switch (state) {
     case "idle":
@@ -701,14 +689,12 @@ function UpdateSection({
           className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
         >
           <CircleFadingArrowUp className="size-5 shrink-0 text-muted-foreground" />
-          <span className="flex-1 text-left text-sm">
-            {t("about.checkUpdate")}
-          </span>
+          <span className="flex-1 text-left text-sm">{t("about.checkUpdate")}</span>
           <span className="text-xs text-muted-foreground">
             {t("about.version")} {APP_VERSION}
           </span>
         </button>
-      );
+      )
 
     case "checking":
       return (
@@ -718,7 +704,7 @@ function UpdateSection({
             {t("update.checking")}
           </span>
         </div>
-      );
+      )
 
     case "up-to-date":
       return (
@@ -731,18 +717,16 @@ function UpdateSection({
             {t("about.version")} {APP_VERSION}
           </span>
         </div>
-      );
+      )
 
     case "error":
       return (
         <div className="flex flex-col gap-2 py-3">
           <div className="flex items-center gap-3">
             <AlertCircle className="size-5 shrink-0 text-destructive" />
-            <span className="flex-1 text-left text-sm text-destructive">
-              {errorMsg}
-            </span>
+            <span className="flex-1 text-left text-sm text-destructive">{errorMsg}</span>
           </div>
-          <div className="flex gap-2 ml-8">
+          <div className="ml-8 flex gap-2">
             <Button size="sm" variant="outline" onClick={onRetry}>
               {t("update.retry")}
             </Button>
@@ -757,6 +741,6 @@ function UpdateSection({
             )}
           </div>
         </div>
-      );
+      )
   }
 }

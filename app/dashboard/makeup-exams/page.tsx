@@ -1,30 +1,24 @@
-"use client";
+"use client"
 
-import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   EmptyState,
   LoadingCards,
   useErrorToast,
   ValidatingList,
-} from "@/components/academic/list-state";
-import { FilterChips } from "@/components/academic/filter-chips";
-import { formatTimeRange } from "@/lib/academic/time";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { useMakeupExamBatches, useMakeupExamCourses } from "@/providers/hooks";
-import { useProvider } from "@/providers/use-provider";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+} from "@/components/academic/list-state"
+import { FilterChips } from "@/components/academic/filter-chips"
+import { formatTimeRange } from "@/lib/academic/time"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useMakeupExamBatches, useMakeupExamCourses } from "@/providers/hooks"
+import { useProvider } from "@/providers/use-provider"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Dialog,
   DialogContent,
@@ -32,62 +26,62 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import type { MakeupExamCourse } from "@/providers/types";
-import { Clock, FilePenLine, School } from "lucide-react";
+} from "@/components/ui/dialog"
+import type { MakeupExamCourse } from "@/providers/types"
+import { Clock, FilePenLine, School } from "lucide-react"
 
 export default function MakeupExamsPage() {
-  const { t } = useTranslation();
-  const provider = useProvider();
-  const [selectedBatchId, setSelectedBatchId] = useState<string>();
-  const [tab, setTab] = useState<"available" | "registered">("available");
-  const [signupTarget, setSignupTarget] = useState<MakeupExamCourse | null>(null);
-  const [signingUp, setSigningUp] = useState(false);
+  const { t } = useTranslation()
+  const provider = useProvider()
+  const [selectedBatchId, setSelectedBatchId] = useState<string>()
+  const [tab, setTab] = useState<"available" | "registered">("available")
+  const [signupTarget, setSignupTarget] = useState<MakeupExamCourse | null>(null)
+  const [signingUp, setSigningUp] = useState(false)
 
-  const batchesQuery = useMakeupExamBatches();
-  const batches = useMemo(() => batchesQuery.data ?? [], [batchesQuery.data]);
+  const batchesQuery = useMakeupExamBatches()
+  const batches = useMemo(() => batchesQuery.data ?? [], [batchesQuery.data])
 
   useEffect(() => {
     if (!selectedBatchId && batches.length > 0) {
-      setSelectedBatchId(batches[0]!.batchId);
+      setSelectedBatchId(batches[0]!.batchId)
     }
-  }, [batches, selectedBatchId]);
+  }, [batches, selectedBatchId])
 
   const coursesQuery = useMakeupExamCourses(
     {
       batchId: selectedBatchId,
       registered: tab === "registered",
     },
-    selectedBatchId !== undefined,
-  );
-  const courses = coursesQuery.data ?? [];
+    selectedBatchId !== undefined
+  )
+  const courses = coursesQuery.data ?? []
 
-  useErrorToast(batchesQuery.error);
-  useErrorToast(coursesQuery.error);
+  useErrorToast(batchesQuery.error)
+  useErrorToast(coursesQuery.error)
 
   async function handleSignupConfirm() {
-    if (!signupTarget?.taskId || !signupTarget?.batchId) return;
-    setSigningUp(true);
+    if (!signupTarget?.taskId || !signupTarget?.batchId) return
+    setSigningUp(true)
     try {
       await provider.signupMakeupExam({
         taskId: signupTarget.taskId,
         batchId: signupTarget.batchId,
-      });
-      toast.success(t("makeupExams.signupSuccess"));
-      setSignupTarget(null);
-      await Promise.all([coursesQuery.mutate(), batchesQuery.mutate()]);
+      })
+      toast.success(t("makeupExams.signupSuccess"))
+      setSignupTarget(null)
+      await Promise.all([coursesQuery.mutate(), batchesQuery.mutate()])
     } catch (e) {
-      toast.error((e as Error).message || t("app.updating"));
+      toast.error((e as Error).message || t("app.updating"))
     } finally {
-      setSigningUp(false);
+      setSigningUp(false)
     }
   }
 
-  const selectedBatch = batches.find((b) => b.batchId === selectedBatchId);
+  const selectedBatch = batches.find((b) => b.batchId === selectedBatchId)
   const loading =
     batchesQuery.isLoading ||
     batchesQuery.isValidating ||
-    (coursesQuery.isLoading && courses.length === 0);
+    (coursesQuery.isLoading && courses.length === 0)
 
   if (batchesQuery.isLoading && batches.length === 0) {
     return (
@@ -96,7 +90,7 @@ export default function MakeupExamsPage() {
         <Skeleton className="h-10" />
         <LoadingCards className="h-28" />
       </div>
-    );
+    )
   }
 
   return (
@@ -139,10 +133,7 @@ export default function MakeupExamsPage() {
       )}
 
       {batches.length > 0 && (
-        <Tabs
-          value={tab}
-          onValueChange={(v) => setTab(v as "available" | "registered")}
-        >
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "available" | "registered")}>
           <TabsList className="w-full">
             <TabsTrigger value="available">{t("makeupExams.availableTab")}</TabsTrigger>
             <TabsTrigger value="registered">{t("makeupExams.registeredTab")}</TabsTrigger>
@@ -156,9 +147,7 @@ export default function MakeupExamsPage() {
         ) : courses.length === 0 ? (
           <EmptyState
             title={
-              tab === "available"
-                ? t("makeupExams.noAvailable")
-                : t("makeupExams.noRegistered")
+              tab === "available" ? t("makeupExams.noAvailable") : t("makeupExams.noRegistered")
             }
           />
         ) : (
@@ -227,7 +216,7 @@ export default function MakeupExamsPage() {
       <Dialog
         open={signupTarget !== null}
         onOpenChange={(open) => {
-          if (!open && !signingUp) setSignupTarget(null);
+          if (!open && !signingUp) setSignupTarget(null)
         }}
       >
         <DialogContent>
@@ -238,11 +227,7 @@ export default function MakeupExamsPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              disabled={signingUp}
-              onClick={() => setSignupTarget(null)}
-            >
+            <Button variant="outline" disabled={signingUp} onClick={() => setSignupTarget(null)}>
               {t("makeupExams.cancel")}
             </Button>
             <Button onClick={handleSignupConfirm} disabled={signingUp}>
@@ -253,5 +238,5 @@ export default function MakeupExamsPage() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

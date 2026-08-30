@@ -1,5 +1,5 @@
-import { AirVent } from "lucide-react";
-import type { ExtraFeature } from "../registry";
+import { AirVent } from "lucide-react"
+import type { ExtraFeature } from "../registry"
 
 export const meterFeature: ExtraFeature = {
   id: "meter",
@@ -7,4 +7,4 @@ export const meterFeature: ExtraFeature = {
   titleKeys: {
     "/dashboard/meter": "meter.title",
   },
-};
+}

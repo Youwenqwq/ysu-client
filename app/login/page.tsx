@@ -1,132 +1,122 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useAuthStore } from "@/lib/stores/auth";
-import { blurActiveElement } from "@/lib/utils";
-import { useSettingsStore } from "@/lib/stores/settings";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { getSchoolId, setSchoolConfig } from "@/lib/server-config";
-import { getSelectableSchools } from "@/providers/supported-schools";
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useAuthStore } from "@/lib/stores/auth"
+import { blurActiveElement } from "@/lib/utils"
+import { useSettingsStore } from "@/lib/stores/settings"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { getSchoolId, setSchoolConfig } from "@/lib/server-config"
+import { getSelectableSchools } from "@/providers/supported-schools"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select"
 import {
   loadRememberedCredentials,
   saveRememberedCredentials,
   clearRememberedCredentials,
-} from "@/lib/storage/secure";
-import { checkRateLimit, rateLimitMessage } from "@/lib/rate-limit";
-import { isCapacitor } from "@/lib/native/platform";
-import { useMFAModalStore } from "@/lib/stores/mfa-modal";
-import { getActiveProvider, setActiveProviderSchool } from "@/providers/provider-service";
+} from "@/lib/storage/secure"
+import { checkRateLimit, rateLimitMessage } from "@/lib/rate-limit"
+import { isCapacitor } from "@/lib/native/platform"
+import { useMFAModalStore } from "@/lib/stores/mfa-modal"
+import { getActiveProvider, setActiveProviderSchool } from "@/providers/provider-service"
 
 export default function LoginPage() {
-  const router = useRouter();
-  const setCredential = useAuthStore((s) => s.setCredential);
-  const setSchoolId = useSettingsStore((s) => s.setSchoolId);
-  const { t } = useTranslation();
+  const router = useRouter()
+  const setCredential = useAuthStore((s) => s.setCredential)
+  const setSchoolId = useSettingsStore((s) => s.setSchoolId)
+  const { t } = useTranslation()
 
-  const schools = getSelectableSchools();
-  const [selectedSchool, setSelectedSchool] = useState(getSchoolId());
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(false);
-  const [captcha, setCaptcha] = useState("");
-  const [captchaUrl, setCaptchaUrl] = useState<string | null>(null);
-  const [needsCaptcha, setNeedsCaptcha] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [countdown, setCountdown] = useState(0);
+  const schools = getSelectableSchools()
+  const [selectedSchool, setSelectedSchool] = useState(getSchoolId())
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [remember, setRemember] = useState(false)
+  const [captcha, setCaptcha] = useState("")
+  const [captchaUrl, setCaptchaUrl] = useState<string | null>(null)
+  const [needsCaptcha, setNeedsCaptcha] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [countdown, setCountdown] = useState(0)
 
   // Web 端 secure-storage 退化为明文 localStorage，刻意不提供"记住密码"，
   // 避免账号密码明文落盘；会话 cookie 的持久化与教务系统本身的安全模型一致。
-  const canRemember = isCapacitor();
+  const canRemember = isCapacitor()
 
   useEffect(() => {
-    if (!isCapacitor()) return;
+    if (!isCapacitor()) return
     loadRememberedCredentials().then((r) => {
       if (r) {
-        setUsername(r.username);
-        setPassword(r.password);
-        setRemember(true);
+        setUsername(r.username)
+        setPassword(r.password)
+        setRemember(true)
       }
-    });
-  }, []);
+    })
+  }, [])
 
   useEffect(() => {
-    if (countdown <= 0) return;
+    if (countdown <= 0) return
     const timer = setInterval(() => {
       setCountdown((c) => {
         if (c <= 1) {
-          clearInterval(timer);
-          return 0;
+          clearInterval(timer)
+          return 0
         }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [countdown]);
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [countdown])
 
   function handleSchoolChange(schoolId: string) {
-    setSelectedSchool(schoolId);
-    setSchoolId(schoolId);
-    setSchoolConfig(schoolId);
-    setActiveProviderSchool(schoolId);
+    setSelectedSchool(schoolId)
+    setSchoolId(schoolId)
+    setSchoolConfig(schoolId)
+    setActiveProviderSchool(schoolId)
   }
 
   function showCaptcha() {
-    setNeedsCaptcha(true);
-    const captchaUrl = getActiveProvider().getCaptchaUrl();
-    setCaptchaUrl(captchaUrl ? `${captchaUrl}?${Date.now()}` : null);
+    setNeedsCaptcha(true)
+    const captchaUrl = getActiveProvider().getCaptchaUrl()
+    setCaptchaUrl(captchaUrl ? `${captchaUrl}?${Date.now()}` : null)
   }
 
   async function syncRememberedLoginPreference() {
-    if (!isCapacitor()) return;
+    if (!isCapacitor()) return
     if (remember) {
-      await saveRememberedCredentials(username, password);
+      await saveRememberedCredentials(username, password)
     } else {
-      await clearRememberedCredentials();
+      await clearRememberedCredentials()
     }
   }
 
   async function prepareFreshLoginSession() {
-    const provider = getActiveProvider();
-    await provider.resetLoginSession();
-    await provider.prepareLogin();
+    const provider = getActiveProvider()
+    await provider.resetLoginSession()
+    await provider.prepareLogin()
   }
 
   async function handleCheckCaptcha() {
-    if (!username) return;
+    if (!username) return
     try {
-      await prepareFreshLoginSession();
-      const captchaNeeded = await getActiveProvider().checkCaptchaNeeded(username);
+      await prepareFreshLoginSession()
+      const captchaNeeded = await getActiveProvider().checkCaptchaNeeded(username)
       if (captchaNeeded) {
-        showCaptcha();
+        showCaptcha()
       } else {
-        setNeedsCaptcha(false);
-        setCaptcha("");
-        setCaptchaUrl(null);
+        setNeedsCaptcha(false)
+        setCaptcha("")
+        setCaptchaUrl(null)
       }
     } catch {
       // ignore
@@ -134,10 +124,10 @@ export default function LoginPage() {
   }
 
   async function doLogin(skipRateLimitCheck: boolean) {
-    setLoading(true);
+    setLoading(true)
     try {
       if (!needsCaptcha) {
-        await prepareFreshLoginSession();
+        await prepareFreshLoginSession()
       }
 
       const res = await getActiveProvider().loginStep1({
@@ -145,28 +135,28 @@ export default function LoginPage() {
         password,
         captcha: needsCaptcha ? captcha : undefined,
         skipRateLimit: skipRateLimitCheck,
-      });
+      })
 
       if (res.authenticated && res.credential) {
-        setCredential(res.credential, username);
-        await syncRememberedLoginPreference();
-        toast.success(t("login.loginSuccess"));
-        const landing = useSettingsStore.getState().defaultLandingPage;
-        router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard");
-        return;
+        setCredential(res.credential, username)
+        await syncRememberedLoginPreference()
+        toast.success(t("login.loginSuccess"))
+        const landing = useSettingsStore.getState().defaultLandingPage
+        router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard")
+        return
       }
 
       if (res.needsMfa) {
-        toast.info(t("login.mfaRequired"));
-        const store = useMFAModalStore.getState();
+        toast.info(t("login.mfaRequired"))
+        const store = useMFAModalStore.getState()
         try {
-          const result = await store.showMFA({ username });
+          const result = await store.showMFA({ username })
           if (result.type === "wechat") {
-            await syncRememberedLoginPreference();
-            toast.success(t("login.loginSuccess"));
-            const landing = useSettingsStore.getState().defaultLandingPage;
-            router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard");
-            return;
+            await syncRememberedLoginPreference()
+            toast.success(t("login.loginSuccess"))
+            const landing = useSettingsStore.getState().defaultLandingPage
+            router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard")
+            return
           }
           await getActiveProvider().submitMfaCode({
             challenge: {
@@ -176,71 +166,66 @@ export default function LoginPage() {
               username,
             },
             code: result.code,
-          });
-          await syncRememberedLoginPreference();
-          toast.success(t("login.loginSuccess"));
-          const landing = useSettingsStore.getState().defaultLandingPage;
-          router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard");
+          })
+          await syncRememberedLoginPreference()
+          toast.success(t("login.loginSuccess"))
+          const landing = useSettingsStore.getState().defaultLandingPage
+          router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard")
         } catch (err) {
           if (err instanceof Error) {
-            toast.error(err.message || t("login.errorMfaVerifyFailed"));
+            toast.error(err.message || t("login.errorMfaVerifyFailed"))
           }
           // 用户取消时 err 为 undefined，静默处理
         }
-        return;
+        return
       }
 
-      toast.error(t("login.errorLoginFailed"));
+      toast.error(t("login.errorLoginFailed"))
     } catch (err) {
-      const e = err as Error & { code?: string; status?: number };
+      const e = err as Error & { code?: string; status?: number }
       if (e.code === "NEED_CAPTCHA" || e.status === 403) {
-        toast.error(t("login.errorCaptchaRequired"));
+        toast.error(t("login.errorCaptchaRequired"))
         if (!needsCaptcha) {
-          showCaptcha();
+          showCaptcha()
         }
       } else {
-        toast.error(e.message || t("login.errorLoginFailed"));
+        toast.error(e.message || t("login.errorLoginFailed"))
       }
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+    e.preventDefault()
     if (!username || !password) {
-      toast.error(t("login.errorMissingCredentials"));
-      return;
+      toast.error(t("login.errorMissingCredentials"))
+      return
     }
     // 登录可能弹出 MFA 对话框；先移走焦点，避免 Chrome aria-hidden/focus 警告
-    blurActiveElement();
+    blurActiveElement()
 
-    const limit = checkRateLimit();
+    const limit = checkRateLimit()
     if (!limit.allowed) {
       toast.error(
-        rateLimitMessage(
-          limit,
-          t,
-          "login.errorRateLimitWindow",
-          "login.errorRateLimitInterval",
-        ),
+        rateLimitMessage(limit, t, "login.errorRateLimitWindow", "login.errorRateLimitInterval"),
         {
           action: {
             label: t("login.skipRateLimit"),
             onClick: () => doLogin(true),
           },
-        },
-      );
-      setCountdown(Math.ceil(limit.retryAfterMs / 1000));
-      return;
+        }
+      )
+      setCountdown(Math.ceil(limit.retryAfterMs / 1000))
+      return
     }
 
-    await doLogin(false);
+    await doLogin(false)
   }
 
   return (
     <div className="flex min-h-svh items-center justify-center p-6">
-      <Card className="w-full max-w-sm animate-in fade-in zoom-in-95 duration-500">
+      <Card className="w-full max-w-sm animate-in duration-500 zoom-in-95 fade-in">
         <CardHeader>
           <CardTitle>{t("login.title")}</CardTitle>
           <CardDescription>{t("login.usernamePlaceholder")}</CardDescription>
@@ -293,10 +278,8 @@ export default function LoginPage() {
                   <img
                     src={captchaUrl}
                     alt="captcha"
-                    className="rounded-md border cursor-pointer transition-opacity hover:opacity-80"
-                    onClick={() =>
-                      showCaptcha()
-                    }
+                    className="cursor-pointer rounded-md border transition-opacity hover:opacity-80"
+                    onClick={() => showCaptcha()}
                   />
                   <Input
                     id="captcha"
@@ -313,7 +296,7 @@ export default function LoginPage() {
                     checked={remember}
                     onCheckedChange={(c) => setRemember(c === true)}
                   />
-                  <FieldLabel htmlFor="remember" className="text-sm font-normal cursor-pointer">
+                  <FieldLabel htmlFor="remember" className="cursor-pointer text-sm font-normal">
                     {t("login.remember")}
                   </FieldLabel>
                 </Field>
@@ -331,5 +314,5 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

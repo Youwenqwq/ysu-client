@@ -1,101 +1,110 @@
-"use client";
+"use client"
 
-import { useEffect, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Spinner } from "@/components/ui/spinner";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
-import { useAuthStore } from "@/lib/stores/auth";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { isCapacitor } from "@/lib/native/platform";
-import { getSchoolConfig, getSchoolId, serverConfig } from "@/lib/server-config";
-import { loadRememberedCredentials } from "@/lib/storage/secure";
-import { useProvider } from "@/providers/use-provider";
-import { useSettingsStore } from "@/lib/stores/settings";
+import { useEffect, useRef, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Spinner } from "@/components/ui/spinner"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
+import { useAuthStore } from "@/lib/stores/auth"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { isCapacitor } from "@/lib/native/platform"
+import { getSchoolConfig, getSchoolId, serverConfig } from "@/lib/server-config"
+import { loadRememberedCredentials } from "@/lib/storage/secure"
+import { useProvider } from "@/providers/use-provider"
+import { useSettingsStore } from "@/lib/stores/settings"
+import { getCustomUserAgent, normalizeCustomUserAgent } from "@/lib/custom-user-agent"
+import { startNativePolling, stopNativePolling } from "@/lib/native/notify"
+import { NotifyPlugin } from "@/lib/native/notify-plugin"
 import {
-  getCustomUserAgent,
-  normalizeCustomUserAgent,
-} from "@/lib/custom-user-agent";
-import { startNativePolling, stopNativePolling } from "@/lib/native/notify";
-import { NotifyPlugin } from "@/lib/native/notify-plugin";
-import { RefreshCw, Trash2, Bug, Bell, Play, Send, Smartphone, Shield, Power, Save, RotateCcw } from "lucide-react";
-import { toast } from "sonner";
-import { clearAllCache } from "@/lib/storage/cache";
-import { Switch } from "@/components/ui/switch";
+  RefreshCw,
+  Trash2,
+  Bug,
+  Bell,
+  Play,
+  Send,
+  Smartphone,
+  Shield,
+  Power,
+  Save,
+  RotateCcw,
+} from "lucide-react"
+import { toast } from "sonner"
+import { clearAllCache } from "@/lib/storage/cache"
+import { Switch } from "@/components/ui/switch"
 
 interface DiagnosticResult {
   school: {
-    id: string;
-    name: string;
-    nameEn: string;
-    cerBaseUrl: string;
-    jwxtBaseUrl: string;
-    hasMobile: boolean;
-    hasLabSchedule: boolean;
-    hasMfa: boolean;
-  };
+    id: string
+    name: string
+    nameEn: string
+    cerBaseUrl: string
+    jwxtBaseUrl: string
+    hasMobile: boolean
+    hasLabSchedule: boolean
+    hasMfa: boolean
+  }
   platform: {
-    name: string;
-    userAgent: string;
-    requestUserAgent: string;
-    screen: string;
-    viewport: string;
-    capacitorPlatform?: string;
-  };
+    name: string
+    userAgent: string
+    requestUserAgent: string
+    screen: string
+    viewport: string
+    capacitorPlatform?: string
+  }
   authStore: {
-    credentialExists: boolean;
-    username: string | null;
-    isAuthenticated: boolean;
-    hasHydrated: boolean;
-    academicSessionExists: boolean;
-  };
+    credentialExists: boolean
+    username: string | null
+    isAuthenticated: boolean
+    hasHydrated: boolean
+    academicSessionExists: boolean
+  }
   authCookies: {
-    cookieCount: number;
-    cookies: { name: string; domain: string; path: string }[];
-  };
+    cookieCount: number
+    cookies: { name: string; domain: string; path: string }[]
+  }
   academicCookies: {
-    cookieCount: number;
-    cookies: { name: string; domain: string; path: string }[];
-  };
+    cookieCount: number
+    cookies: { name: string; domain: string; path: string }[]
+  }
   secureStorage: {
-    authTokenExists: boolean;
-    rememberMeExists: boolean;
-  };
+    authTokenExists: boolean
+    rememberMeExists: boolean
+  }
   apiTests: {
-    authSession: { ok: boolean | null; error?: string };
-    studentInfo: { ok: boolean | null; error?: string };
-    schedule: { ok: boolean | null; error?: string };
-    currentWeek: { ok: boolean | null; error?: string };
-    mobileAuth: { ok: boolean | null; error?: string };
-  };
+    authSession: { ok: boolean | null; error?: string }
+    studentInfo: { ok: boolean | null; error?: string }
+    schedule: { ok: boolean | null; error?: string }
+    currentWeek: { ok: boolean | null; error?: string }
+    mobileAuth: { ok: boolean | null; error?: string }
+  }
 }
 
 export default function DebugPage() {
-  const { t } = useTranslation();
-  const provider = useProvider();
-  const credential = useAuthStore((s) => s.credential);
-  const username = useAuthStore((s) => s.username);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const hasHydrated = useAuthStore((s) => s.hasHydrated);
-  const jwxtSession = useAuthStore((s) => s.jwxtSession);
+  const { t } = useTranslation()
+  const provider = useProvider()
+  const credential = useAuthStore((s) => s.credential)
+  const username = useAuthStore((s) => s.username)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const hasHydrated = useAuthStore((s) => s.hasHydrated)
+  const jwxtSession = useAuthStore((s) => s.jwxtSession)
 
-  const [diag, setDiag] = useState<DiagnosticResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [nativeTestLog, setNativeTestLog] = useState<string[]>([]);
-  const [nativePermGranted, setNativePermGranted] = useState<boolean | null>(null);
-  const [cachedGradeCount, setCachedGradeCount] = useState<number | null>(null);
-  const [cachedExamCount, setCachedExamCount] = useState<number | null>(null);
+  const [diag, setDiag] = useState<DiagnosticResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [nativeTestLog, setNativeTestLog] = useState<string[]>([])
+  const [nativePermGranted, setNativePermGranted] = useState<boolean | null>(null)
+  const [cachedGradeCount, setCachedGradeCount] = useState<number | null>(null)
+  const [cachedExamCount, setCachedExamCount] = useState<number | null>(null)
 
-  const customUserAgent = useSettingsStore((s) => s.customUserAgent);
-  const setCustomUserAgent = useSettingsStore((s) => s.setCustomUserAgent);
-  const customUserAgentEnabled = useSettingsStore((s) => s.customUserAgentEnabled);
-  const setCustomUserAgentEnabled = useSettingsStore((s) => s.setCustomUserAgentEnabled);
-  const notifyEnabled = useSettingsStore((s) => s.notifyEnabled);
-  const notifyCheckInterval = useSettingsStore((s) => s.notifyCheckInterval);
-  const notifyGrades = useSettingsStore((s) => s.notifyGrades);
-  const notifyExams = useSettingsStore((s) => s.notifyExams);
+  const customUserAgent = useSettingsStore((s) => s.customUserAgent)
+  const setCustomUserAgent = useSettingsStore((s) => s.setCustomUserAgent)
+  const customUserAgentEnabled = useSettingsStore((s) => s.customUserAgentEnabled)
+  const setCustomUserAgentEnabled = useSettingsStore((s) => s.setCustomUserAgentEnabled)
+  const notifyEnabled = useSettingsStore((s) => s.notifyEnabled)
+  const notifyCheckInterval = useSettingsStore((s) => s.notifyCheckInterval)
+  const notifyGrades = useSettingsStore((s) => s.notifyGrades)
+  const notifyExams = useSettingsStore((s) => s.notifyExams)
   const diagnosticLabels = provider.diagnostics?.labels ?? {
     authSystem: t("debug.authSystem"),
     academicSystem: t("debug.academicSystem"),
@@ -105,57 +114,63 @@ export default function DebugPage() {
     authSession: t("debug.authSession"),
     academicSession: t("debug.academicSession"),
     mobileAuth: t("debug.mobileAuth"),
-  };
-  const [uaDraft, setUaDraft] = useState(customUserAgent);
+  }
+  const [uaDraft, setUaDraft] = useState(customUserAgent)
 
   useEffect(() => {
-    setUaDraft(customUserAgent);
-  }, [customUserAgent]);
+    setUaDraft(customUserAgent)
+  }, [customUserAgent])
 
   function logNative(msg: string) {
-    setNativeTestLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+    setNativeTestLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
   }
 
   useEffect(() => {
-    if (!isCapacitor()) return;
-    NotifyPlugin.getCachedGrades().then(({ gradesJson }) => {
-      const parsed = gradesJson ? JSON.parse(gradesJson) : [];
-      setCachedGradeCount(parsed.length);
-    }).catch(() => {});
-    NotifyPlugin.getCachedExams().then(({ examsJson }) => {
-      const parsed = examsJson ? JSON.parse(examsJson) : [];
-      setCachedExamCount(parsed.length);
-    }).catch(() => {});
-  }, []);
+    if (!isCapacitor()) return
+    NotifyPlugin.getCachedGrades()
+      .then(({ gradesJson }) => {
+        const parsed = gradesJson ? JSON.parse(gradesJson) : []
+        setCachedGradeCount(parsed.length)
+      })
+      .catch(() => {})
+    NotifyPlugin.getCachedExams()
+      .then(({ examsJson }) => {
+        const parsed = examsJson ? JSON.parse(examsJson) : []
+        setCachedExamCount(parsed.length)
+      })
+      .catch(() => {})
+  }, [])
 
   async function runDiagnostics() {
-    setLoading(true);
+    setLoading(true)
     try {
-      const platformName = isCapacitor() ? "Capacitor" : "Web (dev)";
-      const screenInfo = typeof window !== "undefined"
-        ? `${Math.round(window.screen.width * window.devicePixelRatio)}x${Math.round(window.screen.height * window.devicePixelRatio)}`
-        : "N/A";
-      const viewportInfo = typeof window !== "undefined"
-        ? `${window.screen.width}x${window.screen.height} (screen) / ${window.innerWidth}x${window.innerHeight} (viewport)`
-        : "N/A";
-      let capacitorPlatform: string | undefined;
+      const platformName = isCapacitor() ? "Capacitor" : "Web (dev)"
+      const screenInfo =
+        typeof window !== "undefined"
+          ? `${Math.round(window.screen.width * window.devicePixelRatio)}x${Math.round(window.screen.height * window.devicePixelRatio)}`
+          : "N/A"
+      const viewportInfo =
+        typeof window !== "undefined"
+          ? `${window.screen.width}x${window.screen.height} (screen) / ${window.innerWidth}x${window.innerHeight} (viewport)`
+          : "N/A"
+      let capacitorPlatform: string | undefined
       if (isCapacitor()) {
         try {
-          const { Capacitor } = await import("@capacitor/core");
-          capacitorPlatform = Capacitor.getPlatform();
+          const { Capacitor } = await import("@capacitor/core")
+          capacitorPlatform = Capacitor.getPlatform()
         } catch {
           // ignore
         }
       }
 
-      const diagnostics = provider.diagnostics;
-      const authCookies = diagnostics ? await diagnostics.getAuthCookies() : [];
-      const academicCookies = diagnostics ? await diagnostics.getAcademicCookies() : [];
+      const diagnostics = provider.diagnostics
+      const authCookies = diagnostics ? await diagnostics.getAuthCookies() : []
+      const academicCookies = diagnostics ? await diagnostics.getAcademicCookies() : []
 
-      const authToken = await provider.nativeNotification?.getAuthToken();
-      const rememberMe = await loadRememberedCredentials();
+      const authToken = await provider.nativeNotification?.getAuthToken()
+      const rememberMe = await loadRememberedCredentials()
 
-      const schoolConfig = getSchoolConfig();
+      const schoolConfig = getSchoolConfig()
       const result: DiagnosticResult = {
         school: {
           id: getSchoolId(),
@@ -209,228 +224,270 @@ export default function DebugPage() {
           currentWeek: { ok: null },
           mobileAuth: { ok: null },
         },
-      };
+      }
 
       // API tests (sequential to avoid overwhelming the server)
       if (credential) {
         try {
           result.apiTests.authSession = diagnostics
             ? { ok: await diagnostics.checkAuth() }
-            : { ok: null, error: "Provider diagnostics unavailable" };
+            : { ok: null, error: "Provider diagnostics unavailable" }
         } catch (e) {
-          result.apiTests.authSession = { ok: false, error: (e as Error).message };
+          result.apiTests.authSession = {
+            ok: false,
+            error: (e as Error).message,
+          }
         }
 
         try {
-          await provider.getStudentInfo();
-          result.apiTests.studentInfo = { ok: true };
+          await provider.getStudentInfo()
+          result.apiTests.studentInfo = { ok: true }
         } catch (e) {
-          result.apiTests.studentInfo = { ok: false, error: (e as Error).message };
+          result.apiTests.studentInfo = {
+            ok: false,
+            error: (e as Error).message,
+          }
         }
 
         try {
-          await provider.getSchedule({ courseCategory: "all", includeLabSchedule: true });
-          result.apiTests.schedule = { ok: true };
+          await provider.getSchedule({
+            courseCategory: "all",
+            includeLabSchedule: true,
+          })
+          result.apiTests.schedule = { ok: true }
         } catch (e) {
-          result.apiTests.schedule = { ok: false, error: (e as Error).message };
+          result.apiTests.schedule = { ok: false, error: (e as Error).message }
         }
 
         try {
-          await provider.getCurrentWeek();
-          result.apiTests.currentWeek = { ok: true };
+          await provider.getCurrentWeek()
+          result.apiTests.currentWeek = { ok: true }
         } catch (e) {
-          result.apiTests.currentWeek = { ok: false, error: (e as Error).message };
+          result.apiTests.currentWeek = {
+            ok: false,
+            error: (e as Error).message,
+          }
         }
 
         // Mobile auth test: run the full mobile authorization flow
         try {
           if (diagnostics?.ensureMobileAuthorized) {
-            await diagnostics.ensureMobileAuthorized();
-            result.apiTests.mobileAuth = { ok: true };
+            await diagnostics.ensureMobileAuthorized()
+            result.apiTests.mobileAuth = { ok: true }
           } else {
-            result.apiTests.mobileAuth = { ok: null, error: "Provider mobile diagnostics unavailable" };
+            result.apiTests.mobileAuth = {
+              ok: null,
+              error: "Provider mobile diagnostics unavailable",
+            }
           }
         } catch (e) {
-          result.apiTests.mobileAuth = { ok: false, error: (e as Error).message };
+          result.apiTests.mobileAuth = {
+            ok: false,
+            error: (e as Error).message,
+          }
         }
       }
 
-      setDiag(result);
+      setDiag(result)
     } catch (err) {
-      toast.error((err as Error).message || t("debug.diagnosticsFailed"));
+      toast.error((err as Error).message || t("debug.diagnosticsFailed"))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
-  const runDiagnosticsRef = useRef(runDiagnostics);
+  const runDiagnosticsRef = useRef(runDiagnostics)
   useEffect(() => {
-    runDiagnosticsRef.current = runDiagnostics;
-  });
+    runDiagnosticsRef.current = runDiagnostics
+  })
 
   useEffect(() => {
-    runDiagnosticsRef.current();
-  }, []);
+    runDiagnosticsRef.current()
+  }, [])
 
   function handleClearCache() {
-    clearAllCache();
-    toast.success(t("debug.cacheCleared"));
-    runDiagnostics();
+    clearAllCache()
+    toast.success(t("debug.cacheCleared"))
+    runDiagnostics()
   }
 
   function handleClearAcademicSession() {
-    provider.diagnostics?.resetAcademicSession();
-    toast.success(t("debug.academicSessionCleared"));
-    runDiagnostics();
+    provider.diagnostics?.resetAcademicSession()
+    toast.success(t("debug.academicSessionCleared"))
+    runDiagnostics()
   }
 
   // ─── Native Plugin Debug ─────────────────────────────────────────────── //
 
   async function handleNativeCheckPermission() {
     if (!isCapacitor()) {
-      logNative("非 Capacitor 平台，跳过");
-      return;
+      logNative("非 Capacitor 平台，跳过")
+      return
     }
     try {
-      const result = await NotifyPlugin.checkPermissions();
-      setNativePermGranted(result.granted);
-      logNative(`checkPermissions: granted=${result.granted}`);
+      const result = await NotifyPlugin.checkPermissions()
+      setNativePermGranted(result.granted)
+      logNative(`checkPermissions: granted=${result.granted}`)
     } catch (e) {
-      logNative(`checkPermissions 失败: ${(e as Error).message}`);
+      logNative(`checkPermissions 失败: ${(e as Error).message}`)
     }
   }
 
   async function handleNativeRequestPermission() {
     if (!isCapacitor()) {
-      logNative("非 Capacitor 平台，跳过");
-      return;
+      logNative("非 Capacitor 平台，跳过")
+      return
     }
     try {
-      const result = await NotifyPlugin.requestPermissions();
-      setNativePermGranted(result.granted);
-      logNative(`requestPermissions: granted=${result.granted}`);
+      const result = await NotifyPlugin.requestPermissions()
+      setNativePermGranted(result.granted)
+      logNative(`requestPermissions: granted=${result.granted}`)
     } catch (e) {
-      logNative(`requestPermissions 失败: ${(e as Error).message}`);
+      logNative(`requestPermissions 失败: ${(e as Error).message}`)
     }
   }
 
   async function handleNativeSetAuthToken() {
     if (!isCapacitor()) {
-      logNative("非 Capacitor 平台，跳过");
-      return;
+      logNative("非 Capacitor 平台，跳过")
+      return
     }
     try {
       // 诊断：从当前 provider 读取认证 token
-      const providerToken = await provider.nativeNotification?.getAuthToken();
-      logNative(`provider auth token (${diagnosticLabels.authToken}): ${providerToken ? "存在" : "无"}`);
+      const providerToken = await provider.nativeNotification?.getAuthToken()
+      logNative(
+        `provider auth token (${diagnosticLabels.authToken}): ${providerToken ? "存在" : "无"}`
+      )
 
       // 诊断：从 CapacitorCookies 读取
-      const { CapacitorCookies } = await import("@capacitor/core");
-      const authCookieUrl = provider.diagnostics?.getAuthCookieUrl?.();
-      const cookies = authCookieUrl
-        ? await CapacitorCookies.getCookies({ url: authCookieUrl })
-        : {};
-      logNative(`CapacitorCookies: ${JSON.stringify(cookies)}`);
+      const { CapacitorCookies } = await import("@capacitor/core")
+      const authCookieUrl = provider.diagnostics?.getAuthCookieUrl?.()
+      const cookies = authCookieUrl ? await CapacitorCookies.getCookies({ url: authCookieUrl }) : {}
+      logNative(`CapacitorCookies: ${JSON.stringify(cookies)}`)
 
       // 诊断：从 JS cookie jar 读取
-      const authCookies = provider.diagnostics
-        ? await provider.diagnostics.getAuthCookies()
-        : [];
-      const cookieToken = authCookies.find((c) => c.value)?.value;
-      logNative(`JS auth cookie token: ${cookieToken ? `存在(len=${cookieToken.length})` : "无"}`);
+      const authCookies = provider.diagnostics ? await provider.diagnostics.getAuthCookies() : []
+      const cookieToken = authCookies.find((c) => c.value)?.value
+      logNative(`JS auth cookie token: ${cookieToken ? `存在(len=${cookieToken.length})` : "无"}`)
 
       // 诊断：直接同步认证 token 到原生通知插件
-      const authToken = providerToken ?? cookieToken;
+      const authToken = providerToken ?? cookieToken
       if (authToken) {
-        logNative(`直接同步认证 token, len=${authToken.length}`);
-        await NotifyPlugin.setCastgc({ castgc: authToken });
-        logNative("认证 token 同步完成");
+        logNative(`直接同步认证 token, len=${authToken.length}`)
+        await NotifyPlugin.setCastgc({ castgc: authToken })
+        logNative("认证 token 同步完成")
       } else {
-        logNative("跳过认证 token 同步: token 为空");
+        logNative("跳过认证 token 同步: token 为空")
       }
     } catch (e) {
-      logNative(`sync auth token failed: ${(e as Error).message}`);
+      logNative(`sync auth token failed: ${(e as Error).message}`)
     }
   }
 
   async function handleNativeStartPolling() {
     if (!isCapacitor()) {
-      logNative("非 Capacitor 平台，跳过");
-      return;
+      logNative("非 Capacitor 平台，跳过")
+      return
     }
     try {
-      await startNativePolling(provider.nativeNotification, provider.id);
-      logNative(`startNativePolling: 已启动 (interval=${notifyCheckInterval}min, grades=${notifyGrades}, exams=${notifyExams})`);
+      await startNativePolling(provider.nativeNotification, provider.id)
+      logNative(
+        `startNativePolling: 已启动 (interval=${notifyCheckInterval}min, grades=${notifyGrades}, exams=${notifyExams})`
+      )
     } catch (e) {
-      logNative(`startNativePolling 失败: ${(e as Error).message}`);
+      logNative(`startNativePolling 失败: ${(e as Error).message}`)
     }
   }
 
   async function handleNativeStopPolling() {
     if (!isCapacitor()) {
-      logNative("非 Capacitor 平台，跳过");
-      return;
+      logNative("非 Capacitor 平台，跳过")
+      return
     }
     try {
-      await stopNativePolling();
-      logNative("stopNativePolling: 已停止");
+      await stopNativePolling()
+      logNative("stopNativePolling: 已停止")
     } catch (e) {
-      logNative(`stopNativePolling 失败: ${(e as Error).message}`);
+      logNative(`stopNativePolling 失败: ${(e as Error).message}`)
     }
   }
 
   async function handleNativeRunWorker() {
     if (!isCapacitor()) {
-      logNative("非 Capacitor 平台，跳过");
-      return;
+      logNative("非 Capacitor 平台，跳过")
+      return
     }
     try {
-      logNative("正在直接触发 Worker...");
-      await NotifyPlugin.executeOnce();
-      logNative("Worker 已触发，稍后查看通知栏");
+      logNative("正在直接触发 Worker...")
+      await NotifyPlugin.executeOnce()
+      logNative("Worker 已触发，稍后查看通知栏")
     } catch (e) {
-      logNative(`触发 Worker 失败: ${(e as Error).message}`);
+      logNative(`触发 Worker 失败: ${(e as Error).message}`)
     }
   }
 
   function handleNativeClearLog() {
-    setNativeTestLog([]);
+    setNativeTestLog([])
   }
 
   function handleToggleCustomUserAgent(enabled: boolean) {
-    setCustomUserAgentEnabled(enabled);
+    setCustomUserAgentEnabled(enabled)
   }
 
   function handleSaveUserAgent() {
-    setCustomUserAgent(normalizeCustomUserAgent(uaDraft));
-    toast.success(t("debug.userAgentSaved"));
-    runDiagnostics();
+    setCustomUserAgent(normalizeCustomUserAgent(uaDraft))
+    toast.success(t("debug.userAgentSaved"))
+    runDiagnostics()
   }
 
   function handleResetUserAgent() {
-    setCustomUserAgent("");
-    setCustomUserAgentEnabled(false);
-    setUaDraft("");
-    toast.success(t("debug.userAgentReset"));
-    runDiagnostics();
+    setCustomUserAgent("")
+    setCustomUserAgentEnabled(false)
+    setUaDraft("")
+    toast.success(t("debug.userAgentReset"))
+    runDiagnostics()
   }
 
   function statusBadge(value: boolean | null | { ok: boolean | null; error?: string }) {
     if (typeof value === "boolean") {
-      if (value === true) return <Badge variant="default" className="text-[10px]">OK</Badge>;
-      if (value === false) return <Badge variant="destructive" className="text-[10px]">FAIL</Badge>;
+      if (value === true)
+        return (
+          <Badge variant="default" className="text-[10px]">
+            OK
+          </Badge>
+        )
+      if (value === false)
+        return (
+          <Badge variant="destructive" className="text-[10px]">
+            FAIL
+          </Badge>
+        )
     }
     if (typeof value === "object" && value !== null) {
-      if (value.ok === true) return <Badge variant="default" className="text-[10px]">OK</Badge>;
-      if (value.ok === false) return <Badge variant="destructive" className="text-[10px]">FAIL</Badge>;
+      if (value.ok === true)
+        return (
+          <Badge variant="default" className="text-[10px]">
+            OK
+          </Badge>
+        )
+      if (value.ok === false)
+        return (
+          <Badge variant="destructive" className="text-[10px]">
+            FAIL
+          </Badge>
+        )
     }
-    return <Badge variant="secondary" className="text-[10px]">N/A</Badge>;
+    return (
+      <Badge variant="secondary" className="text-[10px]">
+        N/A
+      </Badge>
+    )
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold flex items-center gap-2">
+        <h1 className="flex items-center gap-2 text-lg font-semibold">
           <Bug className="size-5" />
           Debug
         </h1>
@@ -474,18 +531,24 @@ export default function DebugPage() {
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="text-muted-foreground">{t("debug.platformUserAgent")}</span>
-                <span className="break-all text-[10px] font-mono text-muted-foreground">{diag.platform.userAgent}</span>
+                <span className="font-mono text-[10px] break-all text-muted-foreground">
+                  {diag.platform.userAgent}
+                </span>
               </div>
               <div className="flex flex-col gap-2 pt-2">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">{t("debug.requestUserAgent")}</span>
                   {customUserAgentEnabled ? (
-                    <Badge variant="secondary" className="text-[10px]">{t("debug.customUserAgent")}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {t("debug.customUserAgent")}
+                    </Badge>
                   ) : (
-                    <Badge variant="outline" className="text-[10px]">{t("debug.defaultUserAgent")}</Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      {t("debug.defaultUserAgent")}
+                    </Badge>
                   )}
                 </div>
-                <span className="break-all text-[10px] font-mono text-muted-foreground">
+                <span className="font-mono text-[10px] break-all text-muted-foreground">
                   {diag.platform.requestUserAgent}
                 </span>
                 <div className="flex items-center justify-between">
@@ -502,15 +565,15 @@ export default function DebugPage() {
                       value={uaDraft}
                       onChange={(event) => setUaDraft(event.target.value)}
                       placeholder={t("debug.emptyUserAgentPlaceholder")}
-                      className="min-h-20 text-[11px] font-mono"
+                      className="min-h-20 font-mono text-[11px]"
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <Button variant="outline" size="sm" onClick={handleResetUserAgent}>
-                        <RotateCcw className="size-3.5 mr-1" />
+                        <RotateCcw className="mr-1 size-3.5" />
                         {t("debug.resetUserAgent")}
                       </Button>
                       <Button size="sm" onClick={handleSaveUserAgent}>
-                        <Save className="size-3.5 mr-1" />
+                        <Save className="mr-1 size-3.5" />
                         {t("debug.saveUserAgent")}
                       </Button>
                     </div>
@@ -531,7 +594,9 @@ export default function DebugPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">{t("debug.schoolName")}</span>
-                <span className="font-mono text-xs">{diag.school.name} ({diag.school.nameEn})</span>
+                <span className="font-mono text-xs">
+                  {diag.school.name} ({diag.school.nameEn})
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">{diagnosticLabels.authSystem} URL</span>
@@ -606,11 +671,23 @@ export default function DebugPage() {
             </CardHeader>
             <CardContent className="flex flex-col gap-1.5 text-sm">
               {[
-                { label: diagnosticLabels.authSession, test: diag.apiTests.authSession },
-                { label: t("debug.studentInfo"), test: diag.apiTests.studentInfo },
+                {
+                  label: diagnosticLabels.authSession,
+                  test: diag.apiTests.authSession,
+                },
+                {
+                  label: t("debug.studentInfo"),
+                  test: diag.apiTests.studentInfo,
+                },
                 { label: t("debug.schedule"), test: diag.apiTests.schedule },
-                { label: t("debug.currentWeek"), test: diag.apiTests.currentWeek },
-                { label: diagnosticLabels.mobileAuth, test: diag.apiTests.mobileAuth },
+                {
+                  label: t("debug.currentWeek"),
+                  test: diag.apiTests.currentWeek,
+                },
+                {
+                  label: diagnosticLabels.mobileAuth,
+                  test: diag.apiTests.mobileAuth,
+                },
               ].map((item) => (
                 <div key={item.label} className="flex flex-col gap-0.5">
                   <div className="flex items-center justify-between">
@@ -618,7 +695,7 @@ export default function DebugPage() {
                     {statusBadge(item.test)}
                   </div>
                   {item.test.error && (
-                    <span className="text-xs text-destructive break-all font-mono">
+                    <span className="font-mono text-xs break-all text-destructive">
                       {item.test.error}
                     </span>
                   )}
@@ -629,7 +706,9 @@ export default function DebugPage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{diagnosticLabels.authCookies} ({diag.authCookies.cookieCount})</CardTitle>
+              <CardTitle className="text-sm">
+                {diagnosticLabels.authCookies} ({diag.authCookies.cookieCount})
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-32 rounded-md border bg-muted/30 p-2">
@@ -638,8 +717,9 @@ export default function DebugPage() {
                 ) : (
                   <ul className="flex flex-col gap-1">
                     {diag.authCookies.cookies.map((c, i) => (
-                      <li key={i} className="text-xs font-mono">
-                        {c.name} @ {c.domain}{c.path}
+                      <li key={i} className="font-mono text-xs">
+                        {c.name} @ {c.domain}
+                        {c.path}
                       </li>
                     ))}
                   </ul>
@@ -650,7 +730,9 @@ export default function DebugPage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{diagnosticLabels.academicCookies} ({diag.academicCookies.cookieCount})</CardTitle>
+              <CardTitle className="text-sm">
+                {diagnosticLabels.academicCookies} ({diag.academicCookies.cookieCount})
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-32 rounded-md border bg-muted/30 p-2">
@@ -659,8 +741,9 @@ export default function DebugPage() {
                 ) : (
                   <ul className="flex flex-col gap-1">
                     {diag.academicCookies.cookies.map((c, i) => (
-                      <li key={i} className="text-xs font-mono">
-                        {c.name} @ {c.domain}{c.path}
+                      <li key={i} className="font-mono text-xs">
+                        {c.name} @ {c.domain}
+                        {c.path}
                       </li>
                     ))}
                   </ul>
@@ -672,7 +755,7 @@ export default function DebugPage() {
           {/* ── Notification Debug ─────────────────────────────── */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-sm">
                 <Bell className="size-4" />
                 通知模块状态
               </CardTitle>
@@ -716,7 +799,7 @@ export default function DebugPage() {
           {/* ── Native Plugin Debug ─────────────────────────────── */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-sm">
                 <Smartphone className="size-4" />
                 原生插件测试
               </CardTitle>
@@ -724,31 +807,31 @@ export default function DebugPage() {
             <CardContent className="flex flex-col gap-2">
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" size="sm" onClick={handleNativeCheckPermission}>
-                  <Shield className="size-3.5 mr-1" />
+                  <Shield className="mr-1 size-3.5" />
                   检查权限
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleNativeRequestPermission}>
-                  <Shield className="size-3.5 mr-1" />
+                  <Shield className="mr-1 size-3.5" />
                   请求权限
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleNativeSetAuthToken}>
-                  <Send className="size-3.5 mr-1" />
+                  <Send className="mr-1 size-3.5" />
                   同步认证 token
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleNativeStartPolling}>
-                  <Power className="size-3.5 mr-1" />
+                  <Power className="mr-1 size-3.5" />
                   启动轮询
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleNativeStopPolling}>
-                  <Power className="size-3.5 mr-1" />
+                  <Power className="mr-1 size-3.5" />
                   停止轮询
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleNativeRunWorker}>
-                  <Play className="size-3.5 mr-1" />
+                  <Play className="mr-1 size-3.5" />
                   立即执行
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleNativeClearLog}>
-                  <Trash2 className="size-3.5 mr-1" />
+                  <Trash2 className="mr-1 size-3.5" />
                   清空日志
                 </Button>
               </div>
@@ -766,7 +849,7 @@ export default function DebugPage() {
 
               {nativeTestLog.length > 0 && (
                 <ScrollArea className="h-48 rounded-md border bg-muted/30 p-2">
-                  <pre className="text-[10px] font-mono whitespace-pre-wrap">
+                  <pre className="font-mono text-[10px] whitespace-pre-wrap">
                     {nativeTestLog.join("\n")}
                   </pre>
                 </ScrollArea>
@@ -776,16 +859,16 @@ export default function DebugPage() {
 
           <div className="flex flex-col gap-2">
             <Button variant="destructive" onClick={handleClearCache} className="w-full">
-              <Trash2 className="size-4 mr-2" />
+              <Trash2 className="mr-2 size-4" />
               {t("debug.clearCache")}
             </Button>
             <Button variant="outline" onClick={handleClearAcademicSession} className="w-full">
-              <Trash2 className="size-4 mr-2" />
+              <Trash2 className="mr-2 size-4" />
               {t("debug.clearAcademicSession")}
             </Button>
           </div>
         </>
       )}
     </div>
-  );
+  )
 }

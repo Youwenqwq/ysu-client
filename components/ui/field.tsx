@@ -51,23 +51,20 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-const fieldVariants = cva(
-  "group/field flex w-full gap-2 data-[invalid=true]:text-destructive",
-  {
-    variants: {
-      orientation: {
-        vertical: "flex-col *:w-full [&>.sr-only]:w-auto",
-        horizontal:
-          "flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
-        responsive:
-          "flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
-      },
+const fieldVariants = cva("group/field flex w-full gap-2 data-[invalid=true]:text-destructive", {
+  variants: {
+    orientation: {
+      vertical: "flex-col *:w-full [&>.sr-only]:w-auto",
+      horizontal:
+        "flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+      responsive:
+        "flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
     },
-    defaultVariants: {
-      orientation: "vertical",
-    },
-  }
-)
+  },
+  defaultVariants: {
+    orientation: "vertical",
+  },
+})
 
 function Field({
   className,
@@ -89,20 +86,13 @@ function FieldContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="field-content"
-      className={cn(
-        "group/field-content flex flex-1 flex-col gap-0.5 leading-snug",
-        className
-      )}
+      className={cn("group/field-content flex flex-1 flex-col gap-0.5 leading-snug", className)}
       {...props}
     />
   )
 }
 
-function FieldLabel({
-  className,
-  htmlFor,
-  ...props
-}: React.ComponentProps<typeof Label>) {
+function FieldLabel({ className, htmlFor, ...props }: React.ComponentProps<typeof Label>) {
   const classes = cn(
     "group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50 has-data-checked:border-primary/30 has-data-checked:bg-primary/5 has-[>[data-slot=field]]:rounded-lg has-[>[data-slot=field]]:border *:data-[slot=field]:p-2.5 dark:has-data-checked:border-primary/20 dark:has-data-checked:bg-primary/10",
     "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col",
@@ -112,24 +102,17 @@ function FieldLabel({
   // 浏览器 "A <label> isn't associated with a form field" 警告
   // （适用于标注 ToggleGroup/Slider/ResponsiveSelect 等非原生表单控件的场景）。
   if (!htmlFor) {
-    const { ref: _, ...rest } = props;
-    void _;
+    const { ref: _, ...rest } = props
+    void _
     return (
       <div
         data-slot="field-label"
         className={classes}
         {...(rest as React.HTMLAttributes<HTMLDivElement>)}
       />
-    );
+    )
   }
-  return (
-    <Label
-      data-slot="field-label"
-      className={classes}
-      htmlFor={htmlFor}
-      {...props}
-    />
-  )
+  return <Label data-slot="field-label" className={classes} htmlFor={htmlFor} {...props} />
 }
 
 function FieldTitle({ className, ...props }: React.ComponentProps<"div">) {
@@ -207,9 +190,7 @@ function FieldError({
       return null
     }
 
-    const uniqueErrors = [
-      ...new Map(errors.map((error) => [error?.message, error])).values(),
-    ]
+    const uniqueErrors = [...new Map(errors.map((error) => [error?.message, error])).values()]
 
     if (uniqueErrors?.length == 1) {
       return uniqueErrors[0]?.message
@@ -217,10 +198,7 @@ function FieldError({
 
     return (
       <ul className="ml-4 flex list-disc flex-col gap-1">
-        {uniqueErrors.map(
-          (error, index) =>
-            error?.message && <li key={index}>{error.message}</li>
-        )}
+        {uniqueErrors.map((error, index) => error?.message && <li key={index}>{error.message}</li>)}
       </ul>
     )
   }, [children, errors])

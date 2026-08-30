@@ -5,10 +5,7 @@ import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
 
-function Drawer({
-  onOpenChange,
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) {
+function Drawer({ onOpenChange, ...props }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
   // Blur the active element on close so vaul does not flip aria-hidden onto
   // a still-focused descendant (Chrome a11y warning).
   const handleOpenChange = React.useCallback(
@@ -21,18 +18,10 @@ function Drawer({
     },
     [onOpenChange]
   )
-  return (
-    <DrawerPrimitive.Root
-      data-slot="drawer"
-      {...props}
-      onOpenChange={handleOpenChange}
-    />
-  )
+  return <DrawerPrimitive.Root data-slot="drawer" {...props} onOpenChange={handleOpenChange} />
 }
 
-function DrawerTrigger({
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Trigger>) {
+function DrawerTrigger({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Trigger>) {
   return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />
 }
 
@@ -52,23 +41,15 @@ function DrawerNested({
     [onOpenChange]
   )
   return (
-    <DrawerPrimitive.NestedRoot
-      data-slot="drawer"
-      {...props}
-      onOpenChange={handleOpenChange}
-    />
+    <DrawerPrimitive.NestedRoot data-slot="drawer" {...props} onOpenChange={handleOpenChange} />
   )
 }
 
-function DrawerPortal({
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Portal>) {
+function DrawerPortal({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Portal>) {
   return <DrawerPrimitive.Portal data-slot="drawer-portal" {...props} />
 }
 
-function DrawerClose({
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Close>) {
+function DrawerClose({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Close>) {
   return <DrawerPrimitive.Close data-slot="drawer-close" {...props} />
 }
 
@@ -134,17 +115,11 @@ function DrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function DrawerTitle({
-  className,
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Title>) {
+function DrawerTitle({ className, ...props }: React.ComponentProps<typeof DrawerPrimitive.Title>) {
   return (
     <DrawerPrimitive.Title
       data-slot="drawer-title"
-      className={cn(
-        "font-heading text-base font-medium text-foreground",
-        className
-      )}
+      className={cn("font-heading text-base font-medium text-foreground", className)}
       {...props}
     />
   )

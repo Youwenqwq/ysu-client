@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "sonner"
 import {
   loginStep1,
   submitMFACode,
@@ -8,58 +8,55 @@ import {
   prepareLogin,
   getJar,
   NeedCaptchaError,
-} from "./protocol/cas";
-import { resetJWXT } from "./protocol/jwxt";
-import { initializeSession } from "./session";
-import { useAuthStore } from "@/lib/stores/auth";
-import { useMFAModalStore } from "@/lib/stores/mfa-modal";
-import { getText } from "@/lib/i18n/get-text";
-import { loadRememberedCredentials } from "@/lib/storage/secure";
-import { isYSUMfaMethod } from "./types";
+} from "./protocol/cas"
+import { resetJWXT } from "./protocol/jwxt"
+import { initializeSession } from "./session"
+import { useAuthStore } from "@/lib/stores/auth"
+import { useMFAModalStore } from "@/lib/stores/mfa-modal"
+import { getText } from "@/lib/i18n/get-text"
+import { loadRememberedCredentials } from "@/lib/storage/secure"
+import { isYSUMfaMethod } from "./types"
 
-let inflightAutoLogin: Promise<boolean> | null = null;
+let inflightAutoLogin: Promise<boolean> | null = null
 
 export async function reloginYSU(): Promise<boolean> {
-  if (inflightAutoLogin) return inflightAutoLogin;
+  if (inflightAutoLogin) return inflightAutoLogin
 
-  const remembered = await loadRememberedCredentials();
-  if (!remembered) return false;
+  const remembered = await loadRememberedCredentials()
+  if (!remembered) return false
 
   inflightAutoLogin = (async () => {
     try {
-      resetCAS();
-      resetJWXT();
-      await prepareLogin();
+      resetCAS()
+      resetJWXT()
+      await prepareLogin()
 
       if (await checkCaptchaNeeded(remembered.username)) {
-        toast.error(getText("autoLogin.captchaRequired"));
-        return false;
+        toast.error(getText("autoLogin.captchaRequired"))
+        return false
       }
 
-      const step1 = await loginStep1(
-        remembered.username,
-        remembered.password,
-      );
+      const step1 = await loginStep1(remembered.username, remembered.password)
 
       if (step1.authenticated) {
-        const credential = await CASCredential.fromJar(getJar());
-        const json = credential.toJSON();
-        useAuthStore.getState().setCredential(json, remembered.username);
-        await initializeSession();
-        return true;
+        const credential = await CASCredential.fromJar(getJar())
+        const json = credential.toJSON()
+        useAuthStore.getState().setCredential(json, remembered.username)
+        await initializeSession()
+        return true
       }
 
       if (step1.needsMfa) {
-        const store = useMFAModalStore.getState();
+        const store = useMFAModalStore.getState()
 
         try {
-          const result = await store.showMFA({ username: remembered.username });
+          const result = await store.showMFA({ username: remembered.username })
           if (result.type === "wechat") {
-            await initializeSession();
-            return true;
+            await initializeSession()
+            return true
           }
           if (!isYSUMfaMethod(result.method)) {
-            return false;
+            return false
           }
           const credential = await submitMFACode(
             {
@@ -69,27 +66,27 @@ export async function reloginYSU(): Promise<boolean> {
               username: remembered.username,
               raw: {},
             },
-            result.code,
-          );
-          const json = credential.toJSON();
-          useAuthStore.getState().setCredential(json, remembered.username);
-          await initializeSession();
-          return true;
+            result.code
+          )
+          const json = credential.toJSON()
+          useAuthStore.getState().setCredential(json, remembered.username)
+          await initializeSession()
+          return true
         } catch {
-          return false;
+          return false
         }
       }
 
-      return false;
+      return false
     } catch (err) {
       if (err instanceof NeedCaptchaError) {
-        toast.error(getText("autoLogin.captchaRequired"));
+        toast.error(getText("autoLogin.captchaRequired"))
       }
-      return false;
+      return false
     } finally {
-      inflightAutoLogin = null;
+      inflightAutoLogin = null
     }
-  })();
+  })()
 
-  return inflightAutoLogin;
+  return inflightAutoLogin
 }

@@ -1,5 +1,5 @@
-import { Bird } from "lucide-react";
-import type { ExtraFeature } from "../registry";
+import { Bird } from "lucide-react"
+import type { ExtraFeature } from "../registry"
 
 export const skbirdFeature: ExtraFeature = {
   id: "skbird",
@@ -11,4 +11,4 @@ export const skbirdFeature: ExtraFeature = {
     "/dashboard/skbird/me": "skbird.meTitle",
     "/dashboard/skbird/messages": "skbird.messagesTitle",
   },
-};
+}

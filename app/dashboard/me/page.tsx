@@ -1,13 +1,13 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { toast } from "sonner";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { toast } from "sonner"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   BookOpen,
   CalendarDays,
@@ -22,41 +22,41 @@ import {
   Settings,
   Sun,
   Moon,
-} from "lucide-react";
-import { useAuthStore } from "@/lib/stores/auth";
-import { useSettingsStore } from "@/lib/stores/settings";
-import { cn } from "@/lib/utils";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
-import { useStoredMediaUrl } from "@/lib/storage/media";
-import { loadAvatarImage } from "@/lib/storage/avatar";
-import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service";
-import { useStudentInfo } from "@/providers/hooks";
-import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit";
-import { useTheme } from "next-themes";
-import { APP_VERSION, APP_BUILD } from "@/lib/version";
-import { EXTRA_FEATURES } from "@/lib/extras/registry";
+} from "lucide-react"
+import { useAuthStore } from "@/lib/stores/auth"
+import { useSettingsStore } from "@/lib/stores/settings"
+import { cn } from "@/lib/utils"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
+import { useStoredMediaUrl } from "@/lib/storage/media"
+import { loadAvatarImage } from "@/lib/storage/avatar"
+import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service"
+import { useStudentInfo } from "@/providers/hooks"
+import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
+import { useTheme } from "next-themes"
+import { APP_VERSION, APP_BUILD } from "@/lib/version"
+import { EXTRA_FEATURES } from "@/lib/extras/registry"
 
 export default function MePage() {
-  const router = useRouter();
-  const username = useAuthStore((s) => s.username);
-  const { t } = useTranslation();
-  const { theme, setTheme, systemTheme } = useTheme();
+  const router = useRouter()
+  const username = useAuthStore((s) => s.username)
+  const { t } = useTranslation()
+  const { theme, setTheme, systemTheme } = useTheme()
 
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(false)
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => setMounted(true), [])
 
-  const student = useStudentInfo();
+  const student = useStudentInfo()
 
-  const isSystem = theme === "system";
-  const effectiveTheme = isSystem ? systemTheme : theme;
+  const isSystem = theme === "system"
+  const effectiveTheme = isSystem ? systemTheme : theme
 
   function handleThemeToggle() {
     if (isSystem) {
-      setTheme("light");
+      setTheme("light")
     } else {
-      setTheme(theme === "light" ? "dark" : "light");
+      setTheme(theme === "light" ? "dark" : "light")
     }
   }
 
@@ -68,111 +68,126 @@ export default function MePage() {
         onClick={handleThemeToggle}
         aria-label={t("app.theme")}
       >
-        {effectiveTheme === "dark" ? (
-          <Moon className="size-4" />
-        ) : (
-          <Sun className="size-4" />
-        )}
+        {effectiveTheme === "dark" ? <Moon className="size-4" /> : <Sun className="size-4" />}
       </Button>
     ) : null,
     [mounted, effectiveTheme, t]
-  );
+  )
 
   async function handleRelogin() {
-    const limit = checkRateLimit();
+    const limit = checkRateLimit()
     if (!limit.allowed) {
       toast.error(
         rateLimitMessage(
           limit,
           t,
           "autoLogin.errorRateLimitWindow",
-          "autoLogin.errorRateLimitInterval",
-        ),
-      );
-      return;
+          "autoLogin.errorRateLimitInterval"
+        )
+      )
+      return
     }
-    recordLoginAttempt();
+    recordLoginAttempt()
 
     try {
-      const success = await reloginActiveProvider();
+      const success = await reloginActiveProvider()
       if (success) {
-        toast.success(t("login.loginSuccess"));
-        return;
+        toast.success(t("login.loginSuccess"))
+        return
       }
     } catch {
       // fall through
     }
-    await logoutActiveProvider();
-    router.replace("/login");
+    await logoutActiveProvider()
+    router.replace("/login")
   }
 
-  const avatarImage = useSettingsStore((s) => s.avatarImage);
-  const avatarUrl = useStoredMediaUrl(avatarImage, loadAvatarImage);
+  const avatarImage = useSettingsStore((s) => s.avatarImage)
+  const avatarUrl = useStoredMediaUrl(avatarImage, loadAvatarImage)
 
-
-  const displayName = student.data?.name || username || t("me.profileFallback");
-  const initials = (student.data?.name || username || "U").slice(-2);
+  const displayName = student.data?.name || username || t("me.profileFallback")
+  const initials = (student.data?.name || username || "U").slice(-2)
 
   const academicItems = [
     { href: "/dashboard/exams", label: t("app.exams"), icon: FileText },
-    { href: "/dashboard/makeup-exams", label: t("app.makeupExams"), icon: FilePenLine },
-    { href: "/dashboard/training-plan", label: t("app.trainingPlan"), icon: BookOpen },
-    { href: "/dashboard/evaluation", label: t("app.evaluation"), icon: ClipboardCheck },
-  ];
+    {
+      href: "/dashboard/makeup-exams",
+      label: t("app.makeupExams"),
+      icon: FilePenLine,
+    },
+    {
+      href: "/dashboard/training-plan",
+      label: t("app.trainingPlan"),
+      icon: BookOpen,
+    },
+    {
+      href: "/dashboard/evaluation",
+      label: t("app.evaluation"),
+      icon: ClipboardCheck,
+    },
+  ]
 
   const platformItems = [
     { href: "/dashboard/labor", label: t("app.labor"), icon: Hammer },
     { href: "/dashboard/credits", label: t("app.credits"), icon: Lightbulb },
-    { href: "/dashboard/comprehensive", label: t("app.comprehensive"), icon: Gauge },
-    { href: "/dashboard/school-schedule", label: t("app.schoolSchedule"), icon: CalendarDays },
-  ];
+    {
+      href: "/dashboard/comprehensive",
+      label: t("app.comprehensive"),
+      icon: Gauge,
+    },
+    {
+      href: "/dashboard/school-schedule",
+      label: t("app.schoolSchedule"),
+      icon: CalendarDays,
+    },
+  ]
 
   // 玩具箱入口（移动端经"我的"页进入；桌面端走侧边栏）
   const extraItems = EXTRA_FEATURES.map((f) => ({
     href: f.nav.url,
     label: t(f.nav.titleKey),
     icon: f.nav.icon,
-  }));
+  }))
 
   return (
     <div className="flex flex-col gap-4">
       <Link href="/dashboard/me/student" className="block">
         <Card className="transition-colors hover:bg-muted/40 active:bg-muted/60">
           <CardContent className="flex items-center gap-4 py-5">
-          <Avatar className="size-14">
-            {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
-            <AvatarFallback className="text-lg">{initials}</AvatarFallback>
-          </Avatar>
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            {student.isLoading && !student.data ? (
-              <>
-                <Skeleton className="h-5 w-24" />
-                <Skeleton className="h-4 w-32" />
-              </>
-            ) : (
-              <>
-                <span className="truncate text-base font-semibold">{displayName}</span>
-                {student.data?.studentId && (
-                  <span className="truncate text-sm text-muted-foreground">
-                    {student.data.studentId}
-                  </span>
-                )}
-                {student.data?.department && (
-                  <span className="truncate text-xs text-muted-foreground md:hidden">
-                    {student.data.department}
-                  </span>
-                )}
-                {(student.data?.department || student.data?.major) && (
-                  <span className="hidden truncate text-xs text-muted-foreground md:inline">
-                    {[student.data.department, student.data.major].filter(Boolean).join(" · ")}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-          <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
-        </CardContent>
-      </Card>
+            <Avatar className="size-14">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
+              <AvatarFallback className="text-lg">{initials}</AvatarFallback>
+            </Avatar>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              {student.isLoading && !student.data ? (
+                <>
+                  <Skeleton className="h-5 w-24" />
+                  <Skeleton className="h-4 w-32" />
+                </>
+              ) : (
+                <>
+                  <span className="truncate text-base font-semibold">{displayName}</span>
+                  {student.data?.studentId && (
+                    <span className="truncate text-sm text-muted-foreground">
+                      {student.data.studentId}
+                    </span>
+                  )}
+                  {student.data?.department && (
+                    <span className="truncate text-xs text-muted-foreground md:hidden">
+                      {student.data.department}
+                    </span>
+                  )}
+                  {(student.data?.department || student.data?.major) && (
+                    <span className="hidden truncate text-xs text-muted-foreground md:inline">
+                      {[student.data.department, student.data.major].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+            <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+          </CardContent>
+        </Card>
       </Link>
 
       <Section title={t("me.sectionAcademic")}>
@@ -191,7 +206,13 @@ export default function MePage() {
 
       <Section title={t("me.sectionPreferences")}>
         <LinkCard
-          items={[{ href: "/dashboard/me/settings", label: t("me.settings"), icon: Settings }]}
+          items={[
+            {
+              href: "/dashboard/me/settings",
+              label: t("me.settings"),
+              icon: Settings,
+            },
+          ]}
         />
       </Section>
 
@@ -225,24 +246,24 @@ export default function MePage() {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <h2 className="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
         {title}
       </h2>
       {children}
     </section>
-  );
+  )
 }
 
 interface NavItem {
-  href: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  href: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
 }
 
 /** 分隔线列表行卡片：muted 图标 + 标签 + ChevronRight。 */
@@ -256,7 +277,7 @@ function LinkCard({ items }: { items: ReadonlyArray<NavItem> }) {
             href={item.href}
             className={cn(
               "flex items-center gap-3 py-3 transition-colors active:bg-muted/60",
-              idx > 0 && "border-t border-border",
+              idx > 0 && "border-t border-border"
             )}
           >
             <item.icon className="size-5 shrink-0 text-muted-foreground" />
@@ -266,5 +287,5 @@ function LinkCard({ items }: { items: ReadonlyArray<NavItem> }) {
         ))}
       </CardContent>
     </Card>
-  );
+  )
 }

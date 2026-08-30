@@ -1,25 +1,20 @@
-"use client";
+"use client"
 
-import { useMemo, useRef, useState } from "react";
-import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+import { useMemo, useRef, useState } from "react"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import {
   Drawer,
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
   DrawerTitle,
-} from "@/components/ui/drawer";
-import { CalendarOff, Layers } from "lucide-react";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { cn } from "@/lib/utils";
-import type { ClassPeriod, Course, CurrentWeek } from "@/providers/types";
-import type { ExamBlock } from "./exam-blocks";
-import { formatExamTime } from "@/lib/academic/exam-utils";
+} from "@/components/ui/drawer"
+import { CalendarOff, Layers } from "lucide-react"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { cn } from "@/lib/utils"
+import type { ClassPeriod, Course, CurrentWeek } from "@/providers/types"
+import type { ExamBlock } from "./exam-blocks"
+import { formatExamTime } from "@/lib/academic/exam-utils"
 import {
   computeMergedBlocks,
   buildSectionTimeMap,
@@ -28,30 +23,30 @@ import {
   periodEndTime,
   periodStartTime,
   type ScheduleBlock,
-} from "./schedule-utils";
-import { COURSE_BG_CLASSES, courseColorIndex } from "./course-color";
-import { ActivityModal } from "./activity-modal";
-import { SigninModal } from "./signin-modal";
+} from "./schedule-utils"
+import { COURSE_BG_CLASSES, courseColorIndex } from "./course-color"
+import { ActivityModal } from "./activity-modal"
+import { SigninModal } from "./signin-modal"
 
 interface Props {
-  courses: Course[];
-  examBlocks?: ExamBlock[];
-  periods: ClassPeriod[];
-  currentWeekday: number;
-  currentWeek: CurrentWeek | null;
-  selectedWeek: number;
-  termStartDate?: string;
-  nowMinutes: number;
-  compact?: boolean;
-  onPrevWeek?: () => void;
-  onNextWeek?: () => void;
+  courses: Course[]
+  examBlocks?: ExamBlock[]
+  periods: ClassPeriod[]
+  currentWeekday: number
+  currentWeek: CurrentWeek | null
+  selectedWeek: number
+  termStartDate?: string
+  nowMinutes: number
+  compact?: boolean
+  onPrevWeek?: () => void
+  onNextWeek?: () => void
 }
 
-const DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
-const LUNCH_AFTER = 4;
-const DINNER_AFTER = 8;
+const DAYS = [1, 2, 3, 4, 5, 6, 7] as const
+const LUNCH_AFTER = 4
+const DINNER_AFTER = 8
 
-type OverlapState = { day: number; section: number; courses: Course[] } | null;
+type OverlapState = { day: number; section: number; courses: Course[] } | null
 
 export function ScheduleMobile({
   courses,
@@ -66,89 +61,94 @@ export function ScheduleMobile({
   onPrevWeek,
   onNextWeek,
 }: Props) {
-  const { t } = useTranslation();
-  const [overlapDrawer, setOverlapDrawer] = useState<OverlapState>(null);
-  const [examDrawer, setExamDrawer] = useState<ExamBlock | null>(null);
-  const [activityCourse, setActivityCourse] = useState<Course | null>(null);
-  const [activityOpen, setActivityOpen] = useState(false);
-  const [signinActivityId, setSigninActivityId] = useState<string | null>(null);
-  const [signinType, setSigninType] = useState(1);
-  const [signinOpen, setSigninOpen] = useState(false);
-  const touchStart = useRef<{ x: number; y: number; time: number } | null>(null);
+  const { t } = useTranslation()
+  const [overlapDrawer, setOverlapDrawer] = useState<OverlapState>(null)
+  const [examDrawer, setExamDrawer] = useState<ExamBlock | null>(null)
+  const [activityCourse, setActivityCourse] = useState<Course | null>(null)
+  const [activityOpen, setActivityOpen] = useState(false)
+  const [signinActivityId, setSigninActivityId] = useState<string | null>(null)
+  const [signinType, setSigninType] = useState(1)
+  const [signinOpen, setSigninOpen] = useState(false)
+  const touchStart = useRef<{ x: number; y: number; time: number } | null>(null)
 
   function handleTouchStart(e: React.TouchEvent) {
-    const t = e.touches[0];
-    if (!t) return;
-    touchStart.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+    const t = e.touches[0]
+    if (!t) return
+    touchStart.current = { x: t.clientX, y: t.clientY, time: Date.now() }
   }
 
   function handleTouchEnd(e: React.TouchEvent) {
-    const start = touchStart.current;
-    touchStart.current = null;
-    if (!start) return;
-    const end = e.changedTouches[0];
-    if (!end) return;
-    const dx = end.clientX - start.x;
-    const dy = end.clientY - start.y;
-    const dt = Date.now() - start.time;
-    if (dt > 600) return;
-    if (Math.abs(dx) < 50) return;
-    if (Math.abs(dx) <= Math.abs(dy)) return;
+    const start = touchStart.current
+    touchStart.current = null
+    if (!start) return
+    const end = e.changedTouches[0]
+    if (!end) return
+    const dx = end.clientX - start.x
+    const dy = end.clientY - start.y
+    const dt = Date.now() - start.time
+    if (dt > 600) return
+    if (Math.abs(dx) < 50) return
+    if (Math.abs(dx) <= Math.abs(dy)) return
     if (dx > 0) {
-      onPrevWeek?.();
+      onPrevWeek?.()
     } else {
-      onNextWeek?.();
+      onNextWeek?.()
     }
   }
 
   const weekDates = useMemo(
     () => computeWeekDateLabels(currentWeek, selectedWeek, termStartDate),
-    [currentWeek, selectedWeek, termStartDate],
-  );
+    [currentWeek, selectedWeek, termStartDate]
+  )
 
-  const isCurrentWeek = currentWeek?.week === selectedWeek;
-  const timeMap = useMemo(() => buildSectionTimeMap(periods), [periods]);
+  const isCurrentWeek = currentWeek?.week === selectedWeek
+  const timeMap = useMemo(() => buildSectionTimeMap(periods), [periods])
 
   const isBlockCurrent = (block: ScheduleBlock): boolean => {
-    if (!isCurrentWeek || block.day !== currentWeek?.weekday) return false;
-    if (block.courses.length !== 1) return false;
-    return isCourseCurrent(block.courses[0], nowMinutes, timeMap);
-  };
+    if (!isCurrentWeek || block.day !== currentWeek?.weekday) return false
+    if (block.courses.length !== 1) return false
+    return isCourseCurrent(block.courses[0], nowMinutes, timeMap)
+  }
 
   const { sectionToRow, totalRows, lunchRow, dinnerRow } = useMemo(() => {
-    const map = new Map<number, number>();
-    let row = 2;
-    let lunch: number | null = null;
-    let dinner: number | null = null;
-    const sectionSet = new Set(periods.map((p) => p.section));
+    const map = new Map<number, number>()
+    let row = 2
+    let lunch: number | null = null
+    let dinner: number | null = null
+    const sectionSet = new Set(periods.map((p) => p.section))
     for (const p of periods) {
       if (p.section === LUNCH_AFTER + 1 && sectionSet.has(LUNCH_AFTER)) {
-        lunch = row;
-        row++;
+        lunch = row
+        row++
       }
       if (p.section === DINNER_AFTER + 1 && sectionSet.has(DINNER_AFTER)) {
-        dinner = row;
-        row++;
+        dinner = row
+        row++
       }
-      map.set(p.section, row);
-      row++;
+      map.set(p.section, row)
+      row++
     }
-    return { sectionToRow: map, totalRows: row - 1, lunchRow: lunch, dinnerRow: dinner };
-  }, [periods]);
+    return {
+      sectionToRow: map,
+      totalRows: row - 1,
+      lunchRow: lunch,
+      dinnerRow: dinner,
+    }
+  }, [periods])
 
   const gridTemplateRows = useMemo(() => {
-    const sizes: string[] = ["auto"];
+    const sizes: string[] = ["auto"]
     for (let r = 2; r <= totalRows; r++) {
       if (r === lunchRow || r === dinnerRow) {
-        sizes.push(compact ? "0px" : "18px");
+        sizes.push(compact ? "0px" : "18px")
       } else {
-        sizes.push(compact ? "minmax(36px, 1fr)" : "minmax(52px, 1fr)");
+        sizes.push(compact ? "minmax(36px, 1fr)" : "minmax(52px, 1fr)")
       }
     }
-    return sizes.join(" ");
-  }, [totalRows, lunchRow, dinnerRow, compact]);
+    return sizes.join(" ")
+  }, [totalRows, lunchRow, dinnerRow, compact])
 
-  const blocks = useMemo(() => computeMergedBlocks(courses, periods), [courses, periods]);
+  const blocks = useMemo(() => computeMergedBlocks(courses, periods), [courses, periods])
 
   // 课程为空但本周有考试时仍渲染网格，避免考试块被空态吞掉
   if (courses.length === 0 && examBlocks.length === 0) {
@@ -167,17 +167,17 @@ export function ScheduleMobile({
           </EmptyHeader>
         </Empty>
       </div>
-    );
+    )
   }
 
   function blockStyle(block: { day: number; start: number; end: number }) {
-    const startRow = sectionToRow.get(block.start);
-    const endRow = sectionToRow.get(block.end);
-    if (!startRow || !endRow) return { display: "none" as const };
+    const startRow = sectionToRow.get(block.start)
+    const endRow = sectionToRow.get(block.end)
+    if (!startRow || !endRow) return { display: "none" as const }
     return {
       gridRow: `${startRow} / ${endRow + 1}`,
       gridColumn: `${block.day + 1}`,
-    };
+    }
   }
 
   return (
@@ -186,15 +186,15 @@ export function ScheduleMobile({
         key={selectedWeek}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="grid flex-1 w-full select-none animate-in fade-in duration-200"
+        className="grid w-full flex-1 animate-in duration-200 select-none fade-in"
         style={{
           gridTemplateColumns: compact
-              ? "minmax(28px, 0.4fr) repeat(7, minmax(0, 1fr))"
-              : "minmax(36px, 0.6fr) repeat(7, minmax(0, 1fr))",
+            ? "minmax(28px, 0.4fr) repeat(7, minmax(0, 1fr))"
+            : "minmax(36px, 0.6fr) repeat(7, minmax(0, 1fr))",
           gridTemplateRows,
         }}
       >
-        <div className="border-b border-r border-border" />
+        <div className="border-r border-b border-border" />
 
         {DAYS.map((d, idx) => (
           <div
@@ -205,19 +205,17 @@ export function ScheduleMobile({
               idx < 6 && "border-r",
               isCurrentWeek && d === currentWeekday
                 ? "bg-primary/5 text-primary"
-                : "text-muted-foreground",
+                : "text-muted-foreground"
             )}
           >
             <span className="text-[11px]">{t(`dashboard.weekdayShort.${d}`)}</span>
-            {weekDates[d - 1] && (
-              <span className="text-[9px] opacity-70">{weekDates[d - 1]}</span>
-            )}
+            {weekDates[d - 1] && <span className="text-[9px] opacity-70">{weekDates[d - 1]}</span>}
           </div>
         ))}
 
         {periods.map((p) => {
-          const row = sectionToRow.get(p.section);
-          if (!row) return null;
+          const row = sectionToRow.get(p.section)
+          if (!row) return null
           return (
             <div
               key={p.section}
@@ -228,7 +226,7 @@ export function ScheduleMobile({
               {!compact && periodStartTime(p) && <span>{periodStartTime(p)}</span>}
               {!compact && periodEndTime(p) && <span>{periodEndTime(p)}</span>}
             </div>
-          );
+          )
         })}
 
         {lunchRow !== null && !compact && (
@@ -251,50 +249,52 @@ export function ScheduleMobile({
 
         {DAYS.flatMap((d) =>
           periods.map((p) => {
-            const row = sectionToRow.get(p.section);
-            if (!row) return null;
+            const row = sectionToRow.get(p.section)
+            if (!row) return null
             return (
               <div
                 key={`cell-${d}-${p.section}`}
                 className={cn(
                   "border-b border-border",
                   d < 7 && "border-r",
-                  isCurrentWeek && d === currentWeekday && "bg-primary/5",
+                  isCurrentWeek && d === currentWeekday && "bg-primary/5"
                 )}
                 style={{ gridRow: row, gridColumn: d + 1 }}
               />
-            );
-          }),
+            )
+          })
         )}
 
         {blocks.map((block, idx) => {
           if (block.courses.length === 1) {
-            const c = block.courses[0];
-            const colorIdx = courseColorIndex(c);
+            const c = block.courses[0]
+            const colorIdx = courseColorIndex(c)
             return (
               <button
                 key={`block-${idx}`}
                 type="button"
                 onClick={(e) => {
-                  e.currentTarget.blur();
-                  setActivityCourse(c);
-                  setActivityOpen(true);
+                  e.currentTarget.blur()
+                  setActivityCourse(c)
+                  setActivityOpen(true)
                 }}
                 className={cn(
                   "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1 text-left transition-opacity active:opacity-60",
                   COURSE_BG_CLASSES[colorIdx],
-                  isBlockCurrent(block) && "ring-1 ring-primary",
+                  isBlockCurrent(block) && "ring-1 ring-primary"
                 )}
                 style={blockStyle(block)}
               >
-                <span className="line-clamp-4 text-[10.5px] font-medium leading-tight text-foreground">
+                <span className="line-clamp-4 text-[10.5px] leading-tight font-medium text-foreground">
                   {c.name}
                 </span>
                 {c.classroom && (
-                  <span className={cn(
-                    "text-[9px] leading-tight text-foreground/70",
-                    compact ? "line-clamp-3" : "line-clamp-2",
-                  )}>
+                  <span
+                    className={cn(
+                      "text-[9px] leading-tight text-foreground/70",
+                      compact ? "line-clamp-3" : "line-clamp-2"
+                    )}
+                  >
                     {c.classroom}
                   </span>
                 )}
@@ -304,42 +304,44 @@ export function ScheduleMobile({
                   </span>
                 )}
               </button>
-            );
+            )
           }
           return (
             <button
               key={`block-${idx}`}
               type="button"
               onClick={(e) => {
-                e.currentTarget.blur();
-                setOverlapDrawer({ day: block.day, section: block.start, courses: block.courses });
+                e.currentTarget.blur()
+                setOverlapDrawer({
+                  day: block.day,
+                  section: block.start,
+                  courses: block.courses,
+                })
               }}
               className="relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60"
               style={blockStyle(block)}
             >
               <Layers className="size-3 text-muted-foreground" />
-              <span className="text-xs font-semibold text-foreground">
-                {block.courses.length}
-              </span>
+              <span className="text-xs font-semibold text-foreground">{block.courses.length}</span>
               <span className="text-[9px] text-muted-foreground">{t("schedule.overlap")}</span>
             </button>
-          );
+          )
         })}
         {examBlocks.map((block, idx) => (
           <button
             key={`exam-${idx}`}
             type="button"
             onClick={(e) => {
-              e.currentTarget.blur();
-              setExamDrawer(block);
+              e.currentTarget.blur()
+              setExamDrawer(block)
             }}
             className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md border border-amber-500/50 bg-amber-500/15 p-1 text-left transition-opacity active:opacity-60"
             style={blockStyle(block)}
           >
-            <span className="line-clamp-1 text-[9px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+            <span className="line-clamp-1 text-[9px] font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
               {t("schedule.examTag")}
             </span>
-            <span className="line-clamp-3 text-[10.5px] font-medium leading-tight text-foreground">
+            <span className="line-clamp-3 text-[10.5px] leading-tight font-medium text-foreground">
               {block.exam.name}
             </span>
             {block.exam.examLocation && !compact && (
@@ -394,26 +396,28 @@ export function ScheduleMobile({
             </DrawerTitle>
             <DrawerDescription>
               {overlapDrawer
-                ? t("schedule.overlapCourses", { count: overlapDrawer.courses.length })
+                ? t("schedule.overlapCourses", {
+                    count: overlapDrawer.courses.length,
+                  })
                 : ""}
             </DrawerDescription>
           </DrawerHeader>
           <div className="flex flex-col gap-2 px-4 pb-6">
             {overlapDrawer?.courses.map((c, i) => {
-              const colorIdx = courseColorIndex(c);
+              const colorIdx = courseColorIndex(c)
               return (
                 <button
                   key={i}
                   type="button"
                   onClick={(e) => {
-                    e.currentTarget.blur();
-                    setOverlapDrawer(null);
-                    setActivityCourse(c);
-                    setActivityOpen(true);
+                    e.currentTarget.blur()
+                    setOverlapDrawer(null)
+                    setActivityCourse(c)
+                    setActivityOpen(true)
                   }}
                   className={cn(
                     "flex flex-col gap-1 rounded-lg p-3 text-left transition-opacity active:opacity-60",
-                    COURSE_BG_CLASSES[colorIdx],
+                    COURSE_BG_CLASSES[colorIdx]
                   )}
                 >
                   <span className="text-sm font-medium text-foreground">{c.name}</span>
@@ -423,7 +427,7 @@ export function ScheduleMobile({
                     </span>
                   )}
                 </button>
-              );
+              )
             })}
           </div>
         </DrawerContent>
@@ -435,9 +439,9 @@ export function ScheduleMobile({
         open={activityOpen}
         onOpenChange={setActivityOpen}
         onSigninActivity={(id, type) => {
-          setSigninActivityId(id);
-          setSigninType(type);
-          setSigninOpen(true);
+          setSigninActivityId(id)
+          setSigninType(type)
+          setSigninOpen(true)
         }}
       />
 
@@ -448,5 +452,5 @@ export function ScheduleMobile({
         onOpenChange={setSigninOpen}
       />
     </>
-  );
+  )
 }

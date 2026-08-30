@@ -112,7 +112,8 @@ export const zh = {
     autoStart: "自启动",
     autoStartDesc: "允许自启动以确保后台通知不被系统杀死",
     autoStartDialogTitle: "开启自启动",
-    autoStartDialogContent: "请前往系统设置，搜索\"自启动\"，找到本应用并开启。不同品牌手机的路径可能不同，通常在 设置 → 应用 → 自启动管理 中。",
+    autoStartDialogContent:
+      '请前往系统设置，搜索"自启动"，找到本应用并开启。不同品牌手机的路径可能不同，通常在 设置 → 应用 → 自启动管理 中。',
     notifyNetworkError: "网络错误提醒",
     notifyNetworkErrorDesc: "通知检查失败时推送网络错误提醒",
     notifyContentTitle: "成绩/考试通知",
@@ -175,7 +176,8 @@ export const zh = {
   },
   analyticsPrompt: {
     title: "匿名统计",
-    content: "是否参与匿名使用统计？数据仅包含 App 版本、屏幕分辨率和设备平台信息（User-Agent），用于帮助开发者适配机型，调试 Bug。不包含任何个人身份，设备唯一标识或教务数据。可随时在设置中关闭。",
+    content:
+      "是否参与匿名使用统计？数据仅包含 App 版本、屏幕分辨率和设备平台信息（User-Agent），用于帮助开发者适配机型，调试 Bug。不包含任何个人身份，设备唯一标识或教务数据。可随时在设置中关闭。",
     agree: "好的！",
     decline: "还是算了...",
   },
@@ -913,7 +915,7 @@ export const zh = {
     updatedAt: "更新于 {time}",
     dayUseTooltip: "{date} 用电 {use} 度",
   },
-} as const;
+} as const
 
 export const en = {
   app: {
@@ -1029,13 +1031,15 @@ export const en = {
     autoStart: "Auto-start",
     autoStartDesc: "Allow auto-start to prevent the system from killing background notifications",
     autoStartDialogTitle: "Enable Auto-start",
-    autoStartDialogContent: "Please go to system settings, search for \"Auto-start\", find this app and enable it. The path varies by brand, usually in Settings → Apps → Auto-start management.",
+    autoStartDialogContent:
+      'Please go to system settings, search for "Auto-start", find this app and enable it. The path varies by brand, usually in Settings → Apps → Auto-start management.',
     notifyNetworkError: "Network Error Alert",
     notifyNetworkErrorDesc: "Push notification when check fails due to network error",
     notifyContentTitle: "Grade/Exam Notifications",
     classReminderTitle: "Class Reminder",
     classReminderEnabled: "Enable class reminder",
-    classReminderHint: "Note: Open the app at least once per reservation cycle to refresh reminder data",
+    classReminderHint:
+      "Note: Open the app at least once per reservation cycle to refresh reminder data",
     classReminderMinutes: "Reminder time",
     classReminderDays: "Days ahead",
     minutes: "minutes",
@@ -1050,7 +1054,8 @@ export const en = {
     serverConfigUpdated: "Server address updated, please re-login",
     analyticsTitle: "Anonymous Analytics",
     analyticsEnabled: "Participate in Anonymous Analytics",
-    analyticsDesc: "Help developers understand platform information without including identifying information or private data.",
+    analyticsDesc:
+      "Help developers understand platform information without including identifying information or private data.",
   },
   about: {
     title: "About",
@@ -1059,7 +1064,8 @@ export const en = {
     copyright: "Copyright",
     license: "License",
     disclaimer: "Disclaimer",
-    disclaimerText: "This app is a third-party client. It is not developed by Yanshan University and has no affiliation with it.",
+    disclaimerText:
+      "This app is a third-party client. It is not developed by Yanshan University and has no affiliation with it.",
     credits: "Credits",
     github: "Source Code",
     website: "Project Website",
@@ -1092,7 +1098,8 @@ export const en = {
   },
   analyticsPrompt: {
     title: "Anonymous Analytics",
-    content: "Participate in anonymous usage statistics? Data includes only app version, screen resolution, and device platform (User-Agent). No personal or academic data is collected. You can disable this in Settings at any time.",
+    content:
+      "Participate in anonymous usage statistics? Data includes only app version, screen resolution, and device platform (User-Agent). No personal or academic data is collected. You can disable this in Settings at any time.",
     agree: "Agree",
     decline: "Decline",
   },
@@ -1196,7 +1203,8 @@ export const en = {
     mfaRequired: "MFA verification required",
     loginSuccess: "Logged in",
     errorRateLimitInterval: "Too many login attempts. Please try again in {seconds}s",
-    errorRateLimitWindow: "Login limit reached (3 per 15 min). Please try again in {minutes}:{seconds}",
+    errorRateLimitWindow:
+      "Login limit reached (3 per 15 min). Please try again in {minutes}:{seconds}",
     retryAfter: "Retry in {seconds}s",
     skipRateLimit: "Login anyway",
   },
@@ -1205,7 +1213,8 @@ export const en = {
     mfaDescription: "Enter the verification code to complete login",
     captchaRequired: "Captcha required, cannot auto-login",
     errorRateLimitInterval: "Too many login attempts. Please try again in {seconds}s",
-    errorRateLimitWindow: "Login limit reached (3 per 15 min). Please try again in {minutes}:{seconds}",
+    errorRateLimitWindow:
+      "Login limit reached (3 per 15 min). Please try again in {minutes}:{seconds}",
   },
   logout: {
     confirm: "Are you sure you want to log out?",
@@ -1341,11 +1350,12 @@ export const en = {
     batchSuccess: "Batch done: {success} success, {failed} failed",
     noActiveTasks: "No active tasks for auto-evaluation",
     fillSuccess: "Auto-filled max score answers",
-    autoFillSkipped: "{count} question(s) have all options at 0 points and were skipped. Please fill manually:",
+    autoFillSkipped:
+      "{count} question(s) have all options at 0 points and were skipped. Please fill manually:",
     batchSelectTitle: "Batch Auto-Fill",
     batchSelectDesc: "Select tasks to auto-evaluate (active tasks only)",
     batchTextAnswerLabel: "Text Answer",
-    batchTextAnswerPlaceholder: "Leave empty for default \"优秀\"",
+    batchTextAnswerPlaceholder: 'Leave empty for default "优秀"',
     selectAll: "Select All",
     deselectAll: "Deselect All",
     selectedCount: "{count} selected",
@@ -1357,7 +1367,8 @@ export const en = {
     batchPhaseFill: "Auto-filling and calculating scores...",
     batchPhaseSubmit: "Submitting evaluations...",
     batchPreviewTitle: "Preview Results",
-    batchPreviewDesc: "Please review the results below. They will be submitted in batch after confirmation.",
+    batchPreviewDesc:
+      "Please review the results below. They will be submitted in batch after confirmation.",
     batchAbort: "Abort",
     batchContinue: "Confirm & Submit",
     batchTaskStatusPending: "Pending",
@@ -1526,7 +1537,8 @@ export const en = {
     registeredCount: "{count} registered",
     signup: "Sign up",
     signupTitle: "Confirm signup",
-    signupDesc: "Sign up for the makeup exam of {name}? You can find it under Registered afterwards.",
+    signupDesc:
+      "Sign up for the makeup exam of {name}? You can find it under Registered afterwards.",
     signupSuccess: "Signed up",
     cancel: "Cancel",
   },
@@ -1712,8 +1724,10 @@ export const en = {
     toggleVisibility: "Show/hide GPA",
     encourageA: "Even the wind softens its step, not wanting to disturb this quiet brightness.",
     encourageB: "You can hear your own rhythm now. It sounds lovely.",
-    encourageC: "When your steps slow down, you just happen to catch the low hum of the wind. Beautiful.",
-    encourageLow: "A seed, before it breaks through the soil, hears no wind either. It is quietly gathering itself.",
+    encourageC:
+      "When your steps slow down, you just happen to catch the low hum of the wind. Beautiful.",
+    encourageLow:
+      "A seed, before it breaks through the soil, hears no wind either. It is quietly gathering itself.",
     electiveEarned: "Ele. Credits",
     degreeEarned: "Deg. Credits",
     requiredFailed: "Req. Failed",
@@ -1790,7 +1804,8 @@ export const en = {
     authorBadge: "OP",
     authorLiked: "OP liked",
     noToken: "Skbird token not configured",
-    noTokenHint: "Token must be captured from the Skbird app (X-Sc-Token); reconfigure when expired",
+    noTokenHint:
+      "Token must be captured from the Skbird app (X-Sc-Token); reconfigure when expired",
     goSettings: "Configure",
     tokenLabel: "Token",
     deviceIdLabel: "Device ID",
@@ -1830,9 +1845,9 @@ export const en = {
     updatedAt: "Updated {time}",
     dayUseTooltip: "{date}: {use} kWh",
   },
-};
+}
 
-export type Locale = "zh" | "en";
+export type Locale = "zh" | "en"
 
-type DeepStringify<T> = T extends string ? string : { [K in keyof T]: DeepStringify<T[K]> };
-export type Dictionary = DeepStringify<typeof zh>;
+type DeepStringify<T> = T extends string ? string : { [K in keyof T]: DeepStringify<T[K]> }
+export type Dictionary = DeepStringify<typeof zh>

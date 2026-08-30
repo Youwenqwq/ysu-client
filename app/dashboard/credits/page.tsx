@@ -1,33 +1,23 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   EmptyState as SharedEmptyState,
   LoadingCards,
   useErrorToast,
   ValidatingList,
-} from "@/components/academic/list-state";
-import { FilterChips } from "@/components/academic/filter-chips";
-import {
-  FilterDrawer,
-  FilterOptionList,
-  FilterTrigger,
-} from "@/components/academic/filter-drawer";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
+} from "@/components/academic/list-state"
+import { FilterChips } from "@/components/academic/filter-chips"
+import { FilterDrawer, FilterOptionList, FilterTrigger } from "@/components/academic/filter-drawer"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
 import {
   useCreditBatches,
   useCreditCompetitions,
@@ -35,25 +25,25 @@ import {
   useCreditLibraryActivities,
   useCreditRecords,
   useCreditSummary,
-} from "@/providers/hooks";
+} from "@/providers/hooks"
 import type {
   CatalogPage,
   CatalogQueryOptions,
   Competition,
   CreditRecord,
   LibraryActivity,
-} from "@/providers/types";
-import type { ProviderQueryResult } from "@/providers/hooks";
-import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
+} from "@/providers/types"
+import type { ProviderQueryResult } from "@/providers/hooks"
+import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react"
 
 function DeclarationsPanel() {
-  const { t } = useTranslation();
-  const query = useCreditDeclarations();
-  const declarations = query.data ?? [];
-  useErrorToast(query.error);
+  const { t } = useTranslation()
+  const query = useCreditDeclarations()
+  const declarations = query.data ?? []
+  useErrorToast(query.error)
 
-  if (query.isLoading && declarations.length === 0) return <LoadingCards />;
-  if (declarations.length === 0) return <SharedEmptyState title={t("credits.noDeclarations")} />;
+  if (query.isLoading && declarations.length === 0) return <LoadingCards />
+  if (declarations.length === 0) return <SharedEmptyState title={t("credits.noDeclarations")} />
 
   return (
     <div className="flex flex-col gap-4">
@@ -90,12 +80,12 @@ function DeclarationsPanel() {
         </Card>
       ))}
     </div>
-  );
+  )
 }
 
 /** 认定记录卡：实际分值提到右侧大字位，与成绩页数字层级对齐。 */
 function RecordCard({ record }: { record: CreditRecord }) {
-  const { t } = useTranslation();
+  const { t } = useTranslation()
   return (
     <Card>
       <CardHeader>
@@ -108,9 +98,7 @@ function RecordCard({ record }: { record: CreditRecord }) {
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             {record.actualScore !== undefined && (
-              <span className="text-lg font-semibold tabular-nums">
-                {record.actualScore}
-              </span>
+              <span className="text-lg font-semibold tabular-nums">{record.actualScore}</span>
             )}
             <div className="flex gap-1">
               {record.grade && <Badge variant="default">{record.grade}</Badge>}
@@ -132,7 +120,7 @@ function RecordCard({ record }: { record: CreditRecord }) {
         )}
       </CardContent>
     </Card>
-  );
+  )
 }
 
 /** “全部批次”模式下按批次分组，默认只展开第一组，避免一次渲染全部历史记录。 */
@@ -141,11 +129,11 @@ function RecordGroup({
   records,
   defaultOpen,
 }: {
-  title: string;
-  records: CreditRecord[];
-  defaultOpen: boolean;
+  title: string
+  records: CreditRecord[]
+  defaultOpen: boolean
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(defaultOpen)
   return (
     <section className="flex flex-col gap-2">
       <button
@@ -169,41 +157,41 @@ function RecordGroup({
         </div>
       )}
     </section>
-  );
+  )
 }
 
 function RecordsPanel() {
-  const { t } = useTranslation();
+  const { t } = useTranslation()
   /** undefined = 服务端当前批次；"all" = 遍历全部批次；否则为 batchId */
-  const [batch, setBatch] = useState<string | undefined>(undefined);
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const [batch, setBatch] = useState<string | undefined>(undefined)
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
 
-  const batchesQuery = useCreditBatches();
-  const batches = batchesQuery.data ?? [];
+  const batchesQuery = useCreditBatches()
+  const batches = batchesQuery.data ?? []
 
   const recordsQuery = useCreditRecords(
-    batch === "all" ? { all: true } : batch ? { batchId: batch } : undefined,
-  );
-  const records = recordsQuery.data ?? [];
+    batch === "all" ? { all: true } : batch ? { batchId: batch } : undefined
+  )
+  const records = recordsQuery.data ?? []
 
-  useErrorToast(batchesQuery.error);
-  useErrorToast(recordsQuery.error);
+  useErrorToast(batchesQuery.error)
+  useErrorToast(recordsQuery.error)
 
-  const CURRENT = "__current";
+  const CURRENT = "__current"
   const chips = [
     { value: CURRENT, label: batches[0]?.name ?? t("credits.batch") },
     { value: "all", label: t("credits.allBatches") },
     ...batches.slice(1).map((b) => ({ value: b.batchId, label: b.name })),
-  ];
-  const activeValue = batch ?? CURRENT;
-  const activeLabel = chips.find((c) => c.value === activeValue)?.label ?? t("credits.batch");
+  ]
+  const activeValue = batch ?? CURRENT
+  const activeLabel = chips.find((c) => c.value === activeValue)?.label ?? t("credits.batch")
 
   useMobileHeaderRight(
     batches.length > 0 ? (
       <FilterTrigger label={activeLabel} onClick={() => setFilterDrawerOpen(true)} />
     ) : null,
-    [activeLabel, batches.length],
-  );
+    [activeLabel, batches.length]
+  )
 
   return (
     <div className="flex flex-col gap-4">
@@ -226,8 +214,8 @@ function RecordsPanel() {
           items={chips}
           value={activeValue}
           onChange={(v) => {
-            setBatch(v === CURRENT ? undefined : v);
-            setFilterDrawerOpen(false);
+            setBatch(v === CURRENT ? undefined : v)
+            setFilterDrawerOpen(false)
           }}
         />
       </FilterDrawer>
@@ -237,41 +225,39 @@ function RecordsPanel() {
       ) : records.length === 0 ? (
         <SharedEmptyState title={t("credits.noRecords")} />
       ) : (
-        <ValidatingList
-          validating={recordsQuery.isValidating}
-          className="flex flex-col gap-4"
-        >
-          {batch === "all" ? (
-            Object.entries(
-              records.reduce<Record<string, CreditRecord[]>>((groups, record) => {
-                const key = record.batch || t("credits.unknownBatch");
-                (groups[key] ??= []).push(record);
-                return groups;
-              }, {}),
-            ).map(([batchName, list], gi) => (
-              <RecordGroup
-                key={batchName}
-                title={batchName}
-                records={list}
-                defaultOpen={gi === 0}
-              />
-            ))
-          ) : (
-            records.map((record, idx) => (
-              <RecordCard key={`${record.itemName}-${record.batch ?? ""}-${idx}`} record={record} />
-            ))
-          )}
+        <ValidatingList validating={recordsQuery.isValidating} className="flex flex-col gap-4">
+          {batch === "all"
+            ? Object.entries(
+                records.reduce<Record<string, CreditRecord[]>>((groups, record) => {
+                  const key = record.batch || t("credits.unknownBatch")
+                  ;(groups[key] ??= []).push(record)
+                  return groups
+                }, {})
+              ).map(([batchName, list], gi) => (
+                <RecordGroup
+                  key={batchName}
+                  title={batchName}
+                  records={list}
+                  defaultOpen={gi === 0}
+                />
+              ))
+            : records.map((record, idx) => (
+                <RecordCard
+                  key={`${record.itemName}-${record.batch ?? ""}-${idx}`}
+                  record={record}
+                />
+              ))}
         </ValidatingList>
       )}
     </div>
-  );
+  )
 }
 
 interface CatalogItem {
-  key: string;
-  title: string;
-  subtitle: string;
-  badge?: string;
+  key: string
+  title: string
+  subtitle: string
+  badge?: string
 }
 
 function CatalogPanel<T>({
@@ -279,28 +265,26 @@ function CatalogPanel<T>({
   noDataKey,
   mapItems,
 }: {
-  useCatalogQuery: (
-    opts?: CatalogQueryOptions,
-  ) => ProviderQueryResult<CatalogPage<T>>;
-  noDataKey: string;
-  mapItems: (items: T[]) => CatalogItem[];
+  useCatalogQuery: (opts?: CatalogQueryOptions) => ProviderQueryResult<CatalogPage<T>>
+  noDataKey: string
+  mapItems: (items: T[]) => CatalogItem[]
 }) {
-  const { t } = useTranslation();
-  const [keyword, setKeyword] = useState("");
-  const [search, setSearch] = useState("");
-  const [pageIndex, setPageIndex] = useState(1);
+  const { t } = useTranslation()
+  const [keyword, setKeyword] = useState("")
+  const [search, setSearch] = useState("")
+  const [pageIndex, setPageIndex] = useState(1)
 
-  const query = useCatalogQuery({ keyword: search, pageIndex });
-  useErrorToast(query.error);
+  const query = useCatalogQuery({ keyword: search, pageIndex })
+  useErrorToast(query.error)
 
-  const items = query.data ? mapItems(query.data.items) : [];
-  const totalPages = query.data?.totalPages ?? 1;
-  const current = query.data?.pageIndex ?? pageIndex;
-  const loading = query.isLoading || query.isValidating;
+  const items = query.data ? mapItems(query.data.items) : []
+  const totalPages = query.data?.totalPages ?? 1
+  const current = query.data?.pageIndex ?? pageIndex
+  const loading = query.isLoading || query.isValidating
 
   function handleSearch() {
-    setPageIndex(1);
-    setSearch(keyword.trim());
+    setPageIndex(1)
+    setSearch(keyword.trim())
   }
 
   return (
@@ -312,7 +296,7 @@ function CatalogPanel<T>({
           onChange={(e) => setKeyword(e.target.value)}
           placeholder={t("credits.searchPlaceholder")}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleSearch();
+            if (e.key === "Enter") handleSearch()
           }}
         />
         <Button onClick={handleSearch} disabled={loading}>
@@ -368,16 +352,16 @@ function CatalogPanel<T>({
         </>
       )}
     </div>
-  );
+  )
 }
 
 export default function CreditsPage() {
-  const { t } = useTranslation();
-  const [tab, setTab] = useState("records");
+  const { t } = useTranslation()
+  const [tab, setTab] = useState("records")
 
-  const summaryQuery = useCreditSummary();
-  const summary = summaryQuery.data;
-  useErrorToast(summaryQuery.error);
+  const summaryQuery = useCreditSummary()
+  const summary = summaryQuery.data
+  useErrorToast(summaryQuery.error)
 
   return (
     <div className="flex flex-col gap-6">
@@ -391,9 +375,7 @@ export default function CreditsPage() {
           ) : summary ? (
             <div className="flex gap-8">
               <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground">
-                  {t("credits.totalCredits")}
-                </span>
+                <span className="text-xs text-muted-foreground">{t("credits.totalCredits")}</span>
                 <span className="text-2xl font-semibold">{summary.totalCredits ?? "-"}</span>
               </div>
               <div className="flex flex-col">
@@ -427,9 +409,7 @@ export default function CreditsPage() {
               items.map((c) => ({
                 key: c.code || c.name,
                 title: c.name,
-                subtitle: [c.code, c.categoryMajor, c.categoryMinor]
-                  .filter(Boolean)
-                  .join(" · "),
+                subtitle: [c.code, c.categoryMajor, c.categoryMinor].filter(Boolean).join(" · "),
                 badge: c.isEnabled === false ? t("credits.disabled") : undefined,
               }))
             }
@@ -450,5 +430,5 @@ export default function CreditsPage() {
         </TabsContent>
       </Tabs>
     </div>
-  );
+  )
 }

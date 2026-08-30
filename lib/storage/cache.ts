@@ -1,26 +1,26 @@
 /** 缓存版本 —— 数据结构变更时递增，旧版本缓存将被自动丢弃。 */
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 1
 
 /** 缓存键前缀 */
-import { toast } from "sonner";
-import { getText } from "../i18n/get-text";
-import { STORAGE_KEYS } from "./keys";
+import { toast } from "sonner"
+import { getText } from "../i18n/get-text"
+import { STORAGE_KEYS } from "./keys"
 
-const CACHE_PREFIX = STORAGE_KEYS.cachePrefix;
-const LEGACY_CACHE_PREFIX = STORAGE_KEYS.legacyCachePrefix;
+const CACHE_PREFIX = STORAGE_KEYS.cachePrefix
+const LEGACY_CACHE_PREFIX = STORAGE_KEYS.legacyCachePrefix
 
 /** 默认 TTL: 24 小时 */
-export const DEFAULT_TTL_MS = 1000 * 60 * 60 * 24;
+export const DEFAULT_TTL_MS = 1000 * 60 * 60 * 24
 
 /** 学生信息等基本不变的数据: 7 天 */
-export const LONG_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+export const LONG_TTL_MS = 1000 * 60 * 60 * 24 * 7
 
-let quotaErrorShown = false;
+let quotaErrorShown = false
 
 interface CacheEntry<T> {
-  v: number;
-  data: T;
-  ts: number;
+  v: number
+  data: T
+  ts: number
 }
 
 /**
@@ -28,18 +28,18 @@ interface CacheEntry<T> {
  * 同时压缩键名长度节省配额。
  */
 function hashPart(part: string): string {
-  if (part.length < 80) return part;
-  let hash = 0;
+  if (part.length < 80) return part
+  let hash = 0
   for (let i = 0; i < part.length; i++) {
-    const char = part.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash |= 0;
+    const char = part.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash |= 0
   }
-  return `h${Math.abs(hash).toString(36)}`;
+  return `h${Math.abs(hash).toString(36)}`
 }
 
 export function cacheKey(parts: string[]): string {
-  return parts.map(hashPart).join("|");
+  return parts.map(hashPart).join("|")
 }
 
 /**
@@ -48,40 +48,40 @@ export function cacheKey(parts: string[]): string {
  */
 export function cacheGetStale<T>(
   key: string,
-  ttl = DEFAULT_TTL_MS,
+  ttl = DEFAULT_TTL_MS
 ): { data: T; stale: boolean } | null {
-  const currentKey = `${CACHE_PREFIX}${key}`;
-  const legacyKey = `${LEGACY_CACHE_PREFIX}${key}`;
+  const currentKey = `${CACHE_PREFIX}${key}`
+  const legacyKey = `${LEGACY_CACHE_PREFIX}${key}`
   try {
-    const raw = localStorage.getItem(currentKey) ?? localStorage.getItem(legacyKey);
-    if (!raw) return null;
-    const entry: CacheEntry<T> = JSON.parse(raw);
+    const raw = localStorage.getItem(currentKey) ?? localStorage.getItem(legacyKey)
+    if (!raw) return null
+    const entry: CacheEntry<T> = JSON.parse(raw)
     if (entry.v !== CACHE_VERSION) {
-      localStorage.removeItem(currentKey);
-      localStorage.removeItem(legacyKey);
-      return null;
+      localStorage.removeItem(currentKey)
+      localStorage.removeItem(legacyKey)
+      return null
     }
     if (!localStorage.getItem(currentKey)) {
-      localStorage.setItem(currentKey, raw);
-      localStorage.removeItem(legacyKey);
+      localStorage.setItem(currentKey, raw)
+      localStorage.removeItem(legacyKey)
     }
-    const stale = Date.now() - entry.ts > ttl;
-    return { data: entry.data, stale };
+    const stale = Date.now() - entry.ts > ttl
+    return { data: entry.data, stale }
   } catch {
-    return null;
+    return null
   }
 }
 
 export function cacheSet<T>(key: string, data: T): void {
   try {
-    const entry: CacheEntry<T> = { v: CACHE_VERSION, data, ts: Date.now() };
-    localStorage.setItem(`${CACHE_PREFIX}${key}`, JSON.stringify(entry));
+    const entry: CacheEntry<T> = { v: CACHE_VERSION, data, ts: Date.now() }
+    localStorage.setItem(`${CACHE_PREFIX}${key}`, JSON.stringify(entry))
   } catch {
     if (!quotaErrorShown) {
-      quotaErrorShown = true;
+      quotaErrorShown = true
       toast.error(getText("app.cacheStorageFull"), {
         description: getText("app.cacheStorageFullDesc"),
-      });
+      })
     }
   }
 }
@@ -90,18 +90,15 @@ export function cacheSet<T>(key: string, data: T): void {
 
 export function clearAllCache(): void {
   try {
-    const keysToRemove: string[] = [];
+    const keysToRemove: string[] = []
     for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (
-        key &&
-        (key.startsWith(CACHE_PREFIX) || key.startsWith(LEGACY_CACHE_PREFIX))
-      ) {
-        keysToRemove.push(key);
+      const key = localStorage.key(i)
+      if (key && (key.startsWith(CACHE_PREFIX) || key.startsWith(LEGACY_CACHE_PREFIX))) {
+        keysToRemove.push(key)
       }
     }
     for (const key of keysToRemove) {
-      localStorage.removeItem(key);
+      localStorage.removeItem(key)
     }
   } catch {
     // ignore
@@ -115,41 +112,41 @@ export function clearAllCache(): void {
  */
 export function cleanStaleCacheVersions(): void {
   try {
-    const groups = new Map<string, { key: string; ts: number }[]>();
+    const groups = new Map<string, { key: string; ts: number }[]>()
 
     for (let i = 0; i < localStorage.length; i++) {
-      const fullKey = localStorage.key(i);
-      if (!fullKey || !fullKey.startsWith(CACHE_PREFIX)) continue;
-      const unprefixed = fullKey.slice(CACHE_PREFIX.length);
+      const fullKey = localStorage.key(i)
+      if (!fullKey || !fullKey.startsWith(CACHE_PREFIX)) continue
+      const unprefixed = fullKey.slice(CACHE_PREFIX.length)
       // Provider query caches are already scoped by provider + username + feature.
       // Treating all keys that start with "provider" as one legacy cache family
       // would delete unrelated entries such as schedule/class-periods/current-week
       // during app startup, making cold-start cache reads appear ineffective.
-      if (unprefixed.startsWith("provider|")) continue;
-      const prefix = unprefixed.split("|", 1)[0];
-      if (!prefix) continue;
+      if (unprefixed.startsWith("provider|")) continue
+      const prefix = unprefixed.split("|", 1)[0]
+      if (!prefix) continue
 
-      let ts = 0;
+      let ts = 0
       try {
-        const raw = localStorage.getItem(fullKey);
+        const raw = localStorage.getItem(fullKey)
         if (raw) {
-          const entry = JSON.parse(raw);
-          ts = entry.ts ?? 0;
+          const entry = JSON.parse(raw)
+          ts = entry.ts ?? 0
         }
       } catch {
         // 损坏的条目按 ts=0 处理，优先被淘汰
       }
 
-      if (!groups.has(prefix)) groups.set(prefix, []);
-      groups.get(prefix)!.push({ key: fullKey, ts });
+      if (!groups.has(prefix)) groups.set(prefix, [])
+      groups.get(prefix)!.push({ key: fullKey, ts })
     }
 
     for (const [, entries] of groups) {
-      if (entries.length <= 1) continue;
+      if (entries.length <= 1) continue
       // 按时间戳降序排列，保留第一个（最新的），删除其余
-      entries.sort((a, b) => b.ts - a.ts);
+      entries.sort((a, b) => b.ts - a.ts)
       for (let i = 1; i < entries.length; i++) {
-        localStorage.removeItem(entries[i].key);
+        localStorage.removeItem(entries[i].key)
       }
     }
   } catch {

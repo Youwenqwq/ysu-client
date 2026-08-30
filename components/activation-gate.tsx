@@ -1,19 +1,13 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { useActivationStore } from "@/lib/stores/activation";
-import { isCapacitor } from "@/lib/native/platform";
-import { getActivateUrl } from "@/lib/cookie";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useState } from "react"
+import { useActivationStore } from "@/lib/stores/activation"
+import { isCapacitor } from "@/lib/native/platform"
+import { getActivateUrl } from "@/lib/cookie"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 /**
  * Web 端激活门禁（体验层；真正的强制在 /api/proxy 的 X-Activation 校验）。
@@ -22,45 +16,45 @@ import {
  * token 被轮换后 proxy 返回 403 会清除本地凭证，本组件随之回落到激活页。
  */
 export function ActivationGate({ children }: { children: React.ReactNode }) {
-  const { t } = useTranslation();
-  const token = useActivationStore((s) => s.token);
-  const hasHydrated = useActivationStore((s) => s.hasHydrated);
-  const setToken = useActivationStore((s) => s.setToken);
-  const [input, setInput] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<"invalid" | "network" | null>(null);
+  const { t } = useTranslation()
+  const token = useActivationStore((s) => s.token)
+  const hasHydrated = useActivationStore((s) => s.hasHydrated)
+  const setToken = useActivationStore((s) => s.setToken)
+  const [input, setInput] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<"invalid" | "network" | null>(null)
 
   if (isCapacitor() || process.env.NODE_ENV !== "production") {
-    return <>{children}</>;
+    return <>{children}</>
   }
   // 水合完成前不渲染，避免已激活用户看到激活页闪烁
-  if (!hasHydrated) return null;
-  if (token) return <>{children}</>;
+  if (!hasHydrated) return null
+  if (token) return <>{children}</>
 
   const submit = async () => {
-    const value = input.trim();
-    if (!value || submitting) return;
-    setSubmitting(true);
-    setError(null);
+    const value = input.trim()
+    if (!value || submitting) return
+    setSubmitting(true)
+    setError(null)
     try {
       const res = await fetch(getActivateUrl(), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ token: value }),
-      });
+      })
       if (res.ok) {
-        setToken(value);
+        setToken(value)
       } else if (res.status === 401) {
-        setError("invalid");
+        setError("invalid")
       } else {
-        setError("network");
+        setError("network")
       }
     } catch {
-      setError("network");
+      setError("network")
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
+  }
 
   return (
     <div className="flex min-h-dvh items-center justify-center p-4">
@@ -73,8 +67,8 @@ export function ActivationGate({ children }: { children: React.ReactNode }) {
           <form
             className="flex flex-col gap-3"
             onSubmit={(e) => {
-              e.preventDefault();
-              void submit();
+              e.preventDefault()
+              void submit()
             }}
           >
             <Input
@@ -87,9 +81,7 @@ export function ActivationGate({ children }: { children: React.ReactNode }) {
             />
             {error && (
               <p className="text-sm text-destructive">
-                {error === "invalid"
-                  ? t("activation.invalid")
-                  : t("activation.networkError")}
+                {error === "invalid" ? t("activation.invalid") : t("activation.networkError")}
               </p>
             )}
             <Button type="submit" disabled={submitting || !input.trim()}>
@@ -99,5 +91,5 @@ export function ActivationGate({ children }: { children: React.ReactNode }) {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

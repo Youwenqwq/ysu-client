@@ -22,43 +22,43 @@ export enum ProviderErrorCode {
 }
 
 export class ProviderError extends Error {
-  readonly code: ProviderErrorCode;
-  readonly cause?: unknown;
-  readonly status?: number;
-  readonly details?: unknown;
+  readonly code: ProviderErrorCode
+  readonly cause?: unknown
+  readonly status?: number
+  readonly details?: unknown
 
   constructor(
     code: ProviderErrorCode,
     message: string,
     cause?: unknown,
     status?: number,
-    details?: unknown,
+    details?: unknown
   ) {
-    super(message, { cause });
-    this.name = "ProviderError";
-    this.code = code;
-    this.cause = cause;
-    this.status = status;
-    this.details = details;
+    super(message, { cause })
+    this.name = "ProviderError"
+    this.code = code
+    this.cause = cause
+    this.status = status
+    this.details = details
   }
 }
 
 export function isProviderError(error: unknown): error is ProviderError {
-  return error instanceof ProviderError;
+  return error instanceof ProviderError
 }
 
 export function wrapError(error: unknown): ProviderError {
   if (isProviderError(error)) {
-    return error;
+    return error
   }
 
   if (error instanceof Error) {
-    return new ProviderError(ProviderErrorCode.UNKNOWN, error.message, error);
+    return new ProviderError(ProviderErrorCode.UNKNOWN, error.message, error)
   }
 
   return new ProviderError(
     ProviderErrorCode.UNKNOWN,
     typeof error === "string" ? error : "An unknown error occurred",
-    error,
-  );
+    error
+  )
 }

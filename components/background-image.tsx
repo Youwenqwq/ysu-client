@@ -1,33 +1,33 @@
-"use client";
+"use client"
 
-import { useEffect } from "react";
-import { useSettingsStore } from "@/lib/stores/settings";
-import { useStoredMediaUrl } from "@/lib/storage/media";
-import { loadBackgroundImage } from "@/lib/storage/background";
+import { useEffect } from "react"
+import { useSettingsStore } from "@/lib/stores/settings"
+import { useStoredMediaUrl } from "@/lib/storage/media"
+import { loadBackgroundImage } from "@/lib/storage/background"
 
 export function BackgroundImage() {
-  const backgroundImage = useSettingsStore((s) => s.backgroundImage);
-  const backgroundUrl = useStoredMediaUrl(backgroundImage, loadBackgroundImage);
-  const overlayOpacity = useSettingsStore((s) => s.backgroundOverlayOpacity);
-  const backgroundStyle = useSettingsStore((s) => s.backgroundStyle);
-  const backgroundBlurAmount = useSettingsStore((s) => s.backgroundBlurAmount);
-  const cardStyle = useSettingsStore((s) => s.cardStyle);
-  const cardOpacity = useSettingsStore((s) => s.cardOpacity);
+  const backgroundImage = useSettingsStore((s) => s.backgroundImage)
+  const backgroundUrl = useStoredMediaUrl(backgroundImage, loadBackgroundImage)
+  const overlayOpacity = useSettingsStore((s) => s.backgroundOverlayOpacity)
+  const backgroundStyle = useSettingsStore((s) => s.backgroundStyle)
+  const backgroundBlurAmount = useSettingsStore((s) => s.backgroundBlurAmount)
+  const cardStyle = useSettingsStore((s) => s.cardStyle)
+  const cardOpacity = useSettingsStore((s) => s.cardOpacity)
 
   useEffect(() => {
     if (!backgroundImage || cardStyle === "solid") {
-      document.documentElement.style.setProperty("--card-bg-opacity", "1");
+      document.documentElement.style.setProperty("--card-bg-opacity", "1")
     } else if (cardStyle === "translucent") {
-      document.documentElement.style.setProperty("--card-bg-opacity", String(cardOpacity / 100));
+      document.documentElement.style.setProperty("--card-bg-opacity", String(cardOpacity / 100))
     } else {
-      document.documentElement.style.setProperty("--card-bg-opacity", "0.7");
+      document.documentElement.style.setProperty("--card-bg-opacity", "0.7")
     }
     return () => {
-      document.documentElement.style.setProperty("--card-bg-opacity", "1");
-    };
-  }, [backgroundImage, cardStyle, cardOpacity]);
+      document.documentElement.style.setProperty("--card-bg-opacity", "1")
+    }
+  }, [backgroundImage, cardStyle, cardOpacity])
 
-  if (!backgroundUrl) return null;
+  if (!backgroundUrl) return null
 
   const cardStyleCss =
     cardStyle === "translucent"
@@ -39,9 +39,9 @@ export function BackgroundImage() {
             -webkit-backdrop-filter: blur(12px);
             border-color: color-mix(in oklch, var(--border) 60%, transparent) !important;
           }`
-        : "";
+        : ""
 
-  const blurPx = `${backgroundBlurAmount}px`;
+  const blurPx = `${backgroundBlurAmount}px`
   const overlayStyle: React.CSSProperties =
     backgroundStyle === "blur-overlay"
       ? {
@@ -51,7 +51,7 @@ export function BackgroundImage() {
         }
       : {
           backgroundColor: `color-mix(in oklch, var(--background) ${overlayOpacity}%, transparent)`,
-        };
+        }
 
   return (
     <>
@@ -69,5 +69,5 @@ export function BackgroundImage() {
       </div>
       {cardStyleCss && <style>{cardStyleCss}</style>}
     </>
-  );
+  )
 }

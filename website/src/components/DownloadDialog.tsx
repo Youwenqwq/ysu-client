@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Download, AlertTriangle, X } from 'lucide-react';
+import { useState, useEffect } from "react"
+import { Download, AlertTriangle, X } from "lucide-react"
 
 interface DownloadDialogProps {
-  downloadText: string;
-  disclaimerTitle: string;
-  disclaimerContent: string;
-  agreeText: string;
-  cancelText: string;
+  downloadText: string
+  disclaimerTitle: string
+  disclaimerContent: string
+  agreeText: string
+  cancelText: string
 }
 
 export default function DownloadDialog({
@@ -16,35 +16,35 @@ export default function DownloadDialog({
   agreeText,
   cancelText,
 }: DownloadDialogProps) {
-  const [open, setOpen] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [animate, setAnimate] = useState(false);
+  const [open, setOpen] = useState(false)
+  const [visible, setVisible] = useState(false)
+  const [animate, setAnimate] = useState(false)
 
   useEffect(() => {
     if (open) {
-      setAnimate(false);
-      setVisible(true);
-      const timer = setTimeout(() => setAnimate(true), 20);
-      return () => clearTimeout(timer);
+      setAnimate(false)
+      setVisible(true)
+      const timer = setTimeout(() => setAnimate(true), 20)
+      return () => clearTimeout(timer)
     } else {
-      setAnimate(false);
-      const timer = setTimeout(() => setVisible(false), 200);
-      return () => clearTimeout(timer);
+      setAnimate(false)
+      const timer = setTimeout(() => setVisible(false), 200)
+      return () => clearTimeout(timer)
     }
-  }, [open]);
+  }, [open])
 
   const handleOpen = () => {
-    setOpen(true);
-  };
+    setOpen(true)
+  }
 
   const handleClose = () => {
-    setOpen(false);
-  };
+    setOpen(false)
+  }
 
   const handleAgree = () => {
-    setOpen(false);
-    window.open('/updates/app-release.apk', '_blank');
-  };
+    setOpen(false)
+    window.open("/updates/app-release.apk", "_blank")
+  }
 
   return (
     <>
@@ -52,24 +52,24 @@ export default function DownloadDialog({
         onClick={handleOpen}
         className="inline-flex items-center gap-2 rounded-xl bg-primary px-8 py-4 text-base font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:scale-105 hover:shadow-xl"
       >
-        <Download className="w-5 h-5" />
+        <Download className="h-5 w-5" />
         {downloadText}
       </button>
 
       {visible && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200 ${animate ? 'opacity-100' : 'opacity-0'}`}
+            className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200 ${animate ? "opacity-100" : "opacity-0"}`}
             onClick={handleClose}
           />
           <div
-            className={`relative w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl transition-all duration-200 ease-out ${animate ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-2'}`}
+            className={`relative w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl transition-all duration-200 ease-out ${animate ? "translate-y-0 scale-100 opacity-100" : "translate-y-2 scale-95 opacity-0"}`}
           >
             <button
               onClick={handleClose}
-              className="absolute right-4 top-4 rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="absolute top-4 right-4 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              <X className="w-5 h-5" />
+              <X className="h-5 w-5" />
             </button>
 
             <div className="flex items-center gap-3">
@@ -80,7 +80,7 @@ export default function DownloadDialog({
             </div>
 
             <div className="mt-4 max-h-64 overflow-y-auto rounded-xl border border-border bg-muted/50 p-4">
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+              <p className="text-sm leading-relaxed whitespace-pre-line text-muted-foreground">
                 {disclaimerContent}
               </p>
             </div>
@@ -104,5 +104,5 @@ export default function DownloadDialog({
         </div>
       )}
     </>
-  );
+  )
 }

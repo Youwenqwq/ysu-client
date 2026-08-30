@@ -1,32 +1,32 @@
-import { useState } from 'react';
-import { X } from 'lucide-react';
-import useEmblaCarousel from 'embla-carousel-react';
+import { useState } from "react"
+import { X } from "lucide-react"
+import useEmblaCarousel from "embla-carousel-react"
 
 interface Shot {
-  label: string;
-  src: string;
-  srcDark: string;
+  label: string
+  src: string
+  srcDark: string
 }
 
 interface ScreenshotViewerProps {
-  images: Shot[];
+  images: Shot[]
 }
 
 export default function ScreenshotViewer({ images }: ScreenshotViewerProps) {
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
   const [emblaRef] = useEmblaCarousel({
-    align: 'start',
+    align: "start",
     containScroll: false,
-  });
+  })
 
   return (
     <>
-      <div className="overflow-hidden touch-pan-x" ref={emblaRef}>
+      <div className="touch-pan-x overflow-hidden" ref={emblaRef}>
         <div className="flex gap-6">
           {images.map((shot, i) => (
             <div
               key={i}
-              className="flex-shrink-0 w-64 sm:w-72 cursor-pointer"
+              className="w-64 flex-shrink-0 cursor-pointer sm:w-72"
               onClick={() => setOpenIndex(i)}
             >
               <div className="p-2">
@@ -58,12 +58,12 @@ export default function ScreenshotViewer({ images }: ScreenshotViewerProps) {
         >
           <button
             onClick={(e) => {
-              e.stopPropagation();
-              setOpenIndex(null);
+              e.stopPropagation()
+              setOpenIndex(null)
             }}
-            className="absolute right-4 top-4 rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+            className="absolute top-4 right-4 rounded-lg p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
           >
-            <X className="w-6 h-6" />
+            <X className="h-6 w-6" />
           </button>
           <img
             src={images[openIndex].src}
@@ -80,5 +80,5 @@ export default function ScreenshotViewer({ images }: ScreenshotViewerProps) {
         </div>
       )}
     </>
-  );
+  )
 }

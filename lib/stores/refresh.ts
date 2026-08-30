@@ -1,14 +1,14 @@
-"use client";
+"use client"
 
-import { create } from "zustand";
+import { create } from "zustand"
 
 interface RefreshState {
-  count: number;
-  stale: number;
-  start: () => void;
-  end: () => void;
-  markStale: () => void;
-  markFresh: () => void;
+  count: number
+  stale: number
+  start: () => void
+  end: () => void
+  markStale: () => void
+  markFresh: () => void
 }
 
 export const useRefreshStore = create<RefreshState>((set) => ({
@@ -18,4 +18,4 @@ export const useRefreshStore = create<RefreshState>((set) => ({
   end: () => set((s) => ({ count: Math.max(0, s.count - 1) })),
   markStale: () => set((s) => ({ stale: s.stale + 1 })),
   markFresh: () => set((s) => ({ stale: Math.max(0, s.stale - 1) })),
-}));
+}))

@@ -1,31 +1,31 @@
-import { casUrls, getSchoolConfig, serverConfig } from "@/lib/server-config";
-import { loadCASTGC } from "@/lib/storage/secure";
-import type { ProviderNativeNotification } from "../types";
+import { casUrls, getSchoolConfig, serverConfig } from "@/lib/server-config"
+import { loadCASTGC } from "@/lib/storage/secure"
+import type { ProviderNativeNotification } from "../types"
 
 export interface NativeFieldMappings {
-  grade: Record<string, string[]>;
-  exam: Record<string, string[]>;
+  grade: Record<string, string[]>
+  exam: Record<string, string[]>
 }
 
 export interface NativeApiPath {
-  appId: string;
-  path: string;
+  appId: string
+  path: string
 }
 
 export interface NativeServerConfig {
-  cerBaseUrl: string;
-  jwxtBaseUrl: string;
-  fieldMappings: NativeFieldMappings;
+  cerBaseUrl: string
+  jwxtBaseUrl: string
+  fieldMappings: NativeFieldMappings
   apiPaths: {
-    grades: NativeApiPath;
-    exams: NativeApiPath;
-    currentTerm: NativeApiPath;
-  };
-  configVersion: number;
+    grades: NativeApiPath
+    exams: NativeApiPath
+    currentTerm: NativeApiPath
+  }
+  configVersion: number
 }
 
 export function buildNativeServerConfig(): NativeServerConfig {
-  const config = getSchoolConfig();
+  const config = getSchoolConfig()
   return {
     cerBaseUrl: serverConfig.cerBaseUrl,
     jwxtBaseUrl: serverConfig.jwxtBaseUrl,
@@ -75,11 +75,11 @@ export function buildNativeServerConfig(): NativeServerConfig {
       },
     },
     configVersion: 2,
-  };
+  }
 }
 
 export const ysuNativeNotification: ProviderNativeNotification = {
   getServerConfig: buildNativeServerConfig,
   getAuthToken: loadCASTGC,
   getAuthCookieUrl: () => casUrls.authLogin,
-};
+}

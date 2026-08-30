@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import {
   Dialog,
@@ -7,33 +7,38 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { useSettingsStore } from "@/lib/stores/settings";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { BarChart3 } from "lucide-react";
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { useSettingsStore } from "@/lib/stores/settings"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { BarChart3 } from "lucide-react"
 
 interface AnalyticsPromptProps {
-  open: boolean;
-  onClose: () => void;
+  open: boolean
+  onClose: () => void
 }
 
 export function AnalyticsPrompt({ open, onClose }: AnalyticsPromptProps) {
-  const { t } = useTranslation();
-  const setAnalyticsConsent = useSettingsStore((s) => s.setAnalyticsConsent);
+  const { t } = useTranslation()
+  const setAnalyticsConsent = useSettingsStore((s) => s.setAnalyticsConsent)
 
   function handleAgree() {
-    setAnalyticsConsent(true);
-    onClose();
+    setAnalyticsConsent(true)
+    onClose()
   }
 
   function handleDecline() {
-    setAnalyticsConsent(false);
-    onClose();
+    setAnalyticsConsent(false)
+    onClose()
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) handleDecline(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) handleDecline()
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <div className="flex items-center gap-2">
@@ -52,5 +57,5 @@ export function AnalyticsPrompt({ open, onClose }: AnalyticsPromptProps) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

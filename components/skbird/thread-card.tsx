@@ -1,18 +1,18 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { BadgeCheck, Eye, MessageSquare, ThumbsUp } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { skbirdImageUrl } from "@/lib/extras/skbird/client";
-import { isCertThread, type SkbirdThread } from "@/lib/extras/skbird/types";
-import { SkbirdImage } from "./skbird-image";
+import Link from "next/link"
+import { BadgeCheck, Eye, MessageSquare, ThumbsUp } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { skbirdImageUrl } from "@/lib/extras/skbird/client"
+import { isCertThread, type SkbirdThread } from "@/lib/extras/skbird/types"
+import { SkbirdImage } from "./skbird-image"
 
 export function SkbirdThreadCard({ thread }: { thread: SkbirdThread }) {
-  const { t } = useTranslation();
-  const cert = isCertThread(thread);
-  const hidden = cert && !thread.title && !thread.content;
+  const { t } = useTranslation()
+  const cert = isCertThread(thread)
+  const hidden = cert && !thread.title && !thread.content
 
   return (
     <Link href={`/dashboard/skbird/thread/?id=${thread.threadId}`} className="block">
@@ -27,7 +27,9 @@ export function SkbirdThreadCard({ thread }: { thread: SkbirdThread }) {
               />
             ) : null}
             <span className="truncate">{thread.nickname}</span>
-            {thread.userLevelTitle ? <Badge variant="outline">{thread.userLevelTitle}</Badge> : null}
+            {thread.userLevelTitle ? (
+              <Badge variant="outline">{thread.userLevelTitle}</Badge>
+            ) : null}
             <span className="ml-auto shrink-0">{thread.postTimeText}</span>
           </div>
 
@@ -39,7 +41,7 @@ export function SkbirdThreadCard({ thread }: { thread: SkbirdThread }) {
           ) : (
             <>
               <div className="flex items-center gap-2">
-                <span className="font-medium leading-snug">{thread.title}</span>
+                <span className="leading-snug font-medium">{thread.title}</span>
                 {cert ? <Badge variant="secondary">{t("skbird.certBadge")}</Badge> : null}
               </div>
               {thread.content ? (
@@ -84,5 +86,5 @@ export function SkbirdThreadCard({ thread }: { thread: SkbirdThread }) {
         </CardContent>
       </Card>
     </Link>
-  );
+  )
 }

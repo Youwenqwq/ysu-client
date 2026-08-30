@@ -1,72 +1,73 @@
-"use client";
+"use client"
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import {
-  SkbirdError,
-  skbirdImageUrl,
-  SKBIRD_ERRNO_TOKEN_INVALID,
-} from "@/lib/extras/skbird/client";
-import { getSkbirdClient, useSkbirdStore } from "@/lib/extras/skbird/store";
-import type { SkbirdMessage, SkbirdUnread } from "@/lib/extras/skbird/types";
-import { SkbirdImage } from "@/components/skbird/skbird-image";
-import { useLoadMoreSentinel } from "@/components/skbird/use-load-more-sentinel";
+import { useCallback, useEffect, useRef, useState } from "react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { SkbirdError, skbirdImageUrl, SKBIRD_ERRNO_TOKEN_INVALID } from "@/lib/extras/skbird/client"
+import { getSkbirdClient, useSkbirdStore } from "@/lib/extras/skbird/store"
+import type { SkbirdMessage, SkbirdUnread } from "@/lib/extras/skbird/types"
+import { SkbirdImage } from "@/components/skbird/skbird-image"
+import { useLoadMoreSentinel } from "@/components/skbird/use-load-more-sentinel"
 
 export default function SkbirdMessagesPage() {
-  const { t } = useTranslation();
-  const hasHydrated = useSkbirdStore((s) => s.hasHydrated);
-  const token = useSkbirdStore((s) => s.token);
+  const { t } = useTranslation()
+  const hasHydrated = useSkbirdStore((s) => s.hasHydrated)
+  const token = useSkbirdStore((s) => s.token)
 
-  const [messages, setMessages] = useState<SkbirdMessage[]>([]);
-  const [unread, setUnread] = useState<SkbirdUnread | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const cursorRef = useRef("0");
-  const busyRef = useRef(false);
+  const [messages, setMessages] = useState<SkbirdMessage[]>([])
+  const [unread, setUnread] = useState<SkbirdUnread | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const cursorRef = useRef("0")
+  const busyRef = useRef(false)
 
   const load = useCallback(
     async (append: boolean) => {
-      const client = getSkbirdClient();
-      if (!client || busyRef.current) return;
-      busyRef.current = true;
-      if (append) setLoadingMore(true);
-      else setLoading(true);
+      const client = getSkbirdClient()
+      if (!client || busyRef.current) return
+      busyRef.current = true
+      if (append) setLoadingMore(true)
+      else setLoading(true)
       try {
-        const fromTime = append ? cursorRef.current : "0";
-        const list = await client.messages(fromTime);
-        cursorRef.current = list.length > 0 ? String(list[list.length - 1]!.time) : "0";
-        setHasMore(list.length > 0);
-        setMessages((prev) => (append ? [...prev, ...list] : list));
+        const fromTime = append ? cursorRef.current : "0"
+        const list = await client.messages(fromTime)
+        cursorRef.current = list.length > 0 ? String(list[list.length - 1]!.time) : "0"
+        setHasMore(list.length > 0)
+        setMessages((prev) => (append ? [...prev, ...list] : list))
       } catch (e) {
         setError(
           e instanceof SkbirdError && e.errno === SKBIRD_ERRNO_TOKEN_INVALID
             ? t("skbird.tokenExpired")
-            : t("skbird.loadFailed", { message: e instanceof Error ? e.message : String(e) }),
-        );
+            : t("skbird.loadFailed", {
+                message: e instanceof Error ? e.message : String(e),
+              })
+        )
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
-        busyRef.current = false;
+        setLoading(false)
+        setLoadingMore(false)
+        busyRef.current = false
       }
     },
-    [t],
-  );
+    [t]
+  )
 
-  const sentinelRef = useLoadMoreSentinel(() => void load(true), hasMore && !loading && !error);
+  const sentinelRef = useLoadMoreSentinel(() => void load(true), hasMore && !loading && !error)
 
   useEffect(() => {
-    const client = getSkbirdClient();
-    if (!hasHydrated || !client) return;
-    void load(false);
-    client.unreadNum().then(setUnread).catch(() => {});
-  }, [hasHydrated, token, load]);
+    const client = getSkbirdClient()
+    if (!hasHydrated || !client) return
+    void load(false)
+    client
+      .unreadNum()
+      .then(setUnread)
+      .catch(() => {})
+  }, [hasHydrated, token, load])
 
   if (hasHydrated && !token) {
     return (
@@ -80,7 +81,7 @@ export default function SkbirdMessagesPage() {
           </Button>
         </Empty>
       </div>
-    );
+    )
   }
 
   return (
@@ -146,7 +147,9 @@ export default function SkbirdMessagesPage() {
                     </div>
                     {m.title ? <div className="text-sm font-medium">{m.title}</div> : null}
                     {m.content ? (
-                      <p className="whitespace-pre-wrap text-sm text-muted-foreground">{m.content}</p>
+                      <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                        {m.content}
+                      </p>
                     ) : null}
                   </div>
                 </CardContent>
@@ -164,5 +167,5 @@ export default function SkbirdMessagesPage() {
         </>
       )}
     </div>
-  );
+  )
 }

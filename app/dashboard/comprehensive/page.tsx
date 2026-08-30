@@ -1,30 +1,20 @@
-"use client";
+"use client"
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useEffect, useMemo, useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   EmptyState,
   LoadingCards,
   useErrorToast,
   ValidatingList,
-} from "@/components/academic/list-state";
-import { FilterChips } from "@/components/academic/filter-chips";
-import {
-  FilterDrawer,
-  FilterOptionList,
-  FilterTrigger,
-} from "@/components/academic/filter-drawer";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
+} from "@/components/academic/list-state"
+import { FilterChips } from "@/components/academic/filter-chips"
+import { FilterDrawer, FilterOptionList, FilterTrigger } from "@/components/academic/filter-drawer"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
 import {
   useComprehensiveIndicators,
   useComprehensiveRadar,
@@ -33,36 +23,32 @@ import {
   useComprehensiveResult,
   useComprehensiveTerms,
   useComprehensiveYearScores,
-} from "@/providers/hooks";
+} from "@/providers/hooks"
 
 function ResultPanel({ year, term }: { year: string; term: string }) {
-  const { t } = useTranslation();
-  const opts = useMemo(() => ({ year, term }), [year, term]);
-  const resultQuery = useComprehensiveResult(opts);
-  const indicatorsQuery = useComprehensiveIndicators(opts);
-  const result = resultQuery.data;
-  const indicators = indicatorsQuery.data ?? [];
+  const { t } = useTranslation()
+  const opts = useMemo(() => ({ year, term }), [year, term])
+  const resultQuery = useComprehensiveResult(opts)
+  const indicatorsQuery = useComprehensiveIndicators(opts)
+  const result = resultQuery.data
+  const indicators = indicatorsQuery.data ?? []
 
-  useErrorToast(resultQuery.error);
-  useErrorToast(indicatorsQuery.error);
+  useErrorToast(resultQuery.error)
+  useErrorToast(indicatorsQuery.error)
 
-  if (resultQuery.isLoading && !result) return <LoadingCards />;
-  if (!result) return <EmptyState title={t("comprehensive.noResult")} />;
+  if (resultQuery.isLoading && !result) return <LoadingCards />
+  if (!result) return <EmptyState title={t("comprehensive.noResult")} />
 
   return (
     <div className="flex flex-col gap-4">
       <Card>
         <CardContent className="flex gap-8 py-5">
           <div className="flex flex-col">
-            <span className="text-xs text-muted-foreground">
-              {t("comprehensive.totalScore")}
-            </span>
+            <span className="text-xs text-muted-foreground">{t("comprehensive.totalScore")}</span>
             <span className="text-2xl font-semibold tabular-nums">{result.totalScore || "-"}</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-xs text-muted-foreground">
-              {t("comprehensive.classRank")}
-            </span>
+            <span className="text-xs text-muted-foreground">{t("comprehensive.classRank")}</span>
             <span className="text-2xl font-semibold tabular-nums">
               {result.classRank || "-"}
               <span className="text-sm font-normal text-muted-foreground">
@@ -72,9 +58,7 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
             </span>
           </div>
           <div className="flex flex-col">
-            <span className="text-xs text-muted-foreground">
-              {t("comprehensive.gradeRank")}
-            </span>
+            <span className="text-xs text-muted-foreground">{t("comprehensive.gradeRank")}</span>
             <span className="text-2xl font-semibold tabular-nums">
               {result.gradeRank || "-"}
               <span className="text-sm font-normal text-muted-foreground">
@@ -92,56 +76,56 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
             {t("comprehensive.indicatorsTitle")}
           </h3>
           {indicators.map((ind, idx) => {
-            const rank = result.indicators.find((i) => i.name === ind.name)?.rank;
+            const rank = result.indicators.find((i) => i.name === ind.name)?.rank
             return (
-            <Card key={`${ind.name}-${idx}`}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <CardTitle className="text-base">{ind.name}</CardTitle>
-                    <CardDescription>
-                      {[
-                        rank ? `${t("comprehensive.rank")}: ${rank}` : "",
-                        ind.maxScore ? `${t("comprehensive.maxScore")}: ${ind.maxScore}` : "",
-                        ind.proportion ? `${t("comprehensive.proportion")}: ${ind.proportion}` : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </CardDescription>
+              <Card key={`${ind.name}-${idx}`}>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <CardTitle className="text-base">{ind.name}</CardTitle>
+                      <CardDescription>
+                        {[
+                          rank ? `${t("comprehensive.rank")}: ${rank}` : "",
+                          ind.maxScore ? `${t("comprehensive.maxScore")}: ${ind.maxScore}` : "",
+                          ind.proportion
+                            ? `${t("comprehensive.proportion")}: ${ind.proportion}`
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </CardDescription>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-lg font-semibold tabular-nums">{ind.score || "-"}</span>
+                      {ind.categoryDisplay && (
+                        <Badge variant="outline">{ind.categoryDisplay}</Badge>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-lg font-semibold tabular-nums">
-                      {ind.score || "-"}
-                    </span>
-                    {ind.categoryDisplay && (
-                      <Badge variant="outline">{ind.categoryDisplay}</Badge>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              {ind.description && (
-                <CardContent className="text-sm text-muted-foreground">
-                  {ind.description}
-                </CardContent>
-              )}
-            </Card>
-            );
+                </CardHeader>
+                {ind.description && (
+                  <CardContent className="text-sm text-muted-foreground">
+                    {ind.description}
+                  </CardContent>
+                )}
+              </Card>
+            )
           })}
         </>
       )}
     </div>
-  );
+  )
 }
 
 function RadarPanel({ year, term }: { year: string; term: string }) {
-  const { t } = useTranslation();
-  const opts = useMemo(() => ({ year, term }), [year, term]);
-  const radarQuery = useComprehensiveRadar(opts);
-  const items = radarQuery.data ?? [];
-  useErrorToast(radarQuery.error);
+  const { t } = useTranslation()
+  const opts = useMemo(() => ({ year, term }), [year, term])
+  const radarQuery = useComprehensiveRadar(opts)
+  const items = radarQuery.data ?? []
+  useErrorToast(radarQuery.error)
 
-  if (radarQuery.isLoading && items.length === 0) return <LoadingCards />;
-  if (items.length === 0) return <EmptyState title={t("comprehensive.noRadar")} />;
+  if (radarQuery.isLoading && items.length === 0) return <LoadingCards />
+  if (items.length === 0) return <EmptyState title={t("comprehensive.noRadar")} />
 
   return (
     <ValidatingList validating={radarQuery.isValidating}>
@@ -158,10 +142,10 @@ function RadarPanel({ year, term }: { year: string; term: string }) {
             </span>
           </div>
           {items.map((item, idx) => {
-            const personal = parseFloat(item.personal) || 0;
-            const average = parseFloat(item.average) || 0;
-            const max = parseFloat(item.maxScore) || 0;
-            const pct = (v: number) => (max > 0 ? Math.min(100, (v / max) * 100) : 0);
+            const personal = parseFloat(item.personal) || 0
+            const average = parseFloat(item.average) || 0
+            const max = parseFloat(item.maxScore) || 0
+            const pct = (v: number) => (max > 0 ? Math.min(100, (v / max) * 100) : 0)
             return (
               <div key={`${item.name}-${idx}`} className="flex flex-col gap-1.5">
                 <div className="flex items-baseline justify-between gap-2">
@@ -169,7 +153,8 @@ function RadarPanel({ year, term }: { year: string; term: string }) {
                   <span className="text-sm font-semibold tabular-nums">
                     {item.personal || "-"}
                     <span className="text-xs font-normal text-muted-foreground">
-                      {" "}/ {item.maxScore || "-"}
+                      {" "}
+                      / {item.maxScore || "-"}
                     </span>
                   </span>
                 </div>
@@ -189,22 +174,22 @@ function RadarPanel({ year, term }: { year: string; term: string }) {
                   {t("comprehensive.average")}: {item.average || "-"}
                 </span>
               </div>
-            );
+            )
           })}
         </CardContent>
       </Card>
     </ValidatingList>
-  );
+  )
 }
 
 function YearsPanel() {
-  const { t } = useTranslation();
-  const query = useComprehensiveYearScores();
-  const items = query.data ?? [];
-  useErrorToast(query.error);
+  const { t } = useTranslation()
+  const query = useComprehensiveYearScores()
+  const items = query.data ?? []
+  useErrorToast(query.error)
 
-  if (query.isLoading && items.length === 0) return <LoadingCards />;
-  if (items.length === 0) return <EmptyState title={t("comprehensive.noYearScores")} />;
+  if (query.isLoading && items.length === 0) return <LoadingCards />
+  if (items.length === 0) return <EmptyState title={t("comprehensive.noYearScores")} />
 
   return (
     <ValidatingList validating={query.isValidating}>
@@ -221,41 +206,42 @@ function YearsPanel() {
                 {[item.yearDisplay, item.termDisplay].filter(Boolean).join(" ") ||
                   `${item.year}-${item.term}`}
               </span>
-              <span className="text-base font-semibold tabular-nums">
-                {item.score || "-"}
-              </span>
+              <span className="text-base font-semibold tabular-nums">{item.score || "-"}</span>
             </div>
           ))}
         </CardContent>
       </Card>
     </ValidatingList>
-  );
+  )
 }
 
 function ReportPanel() {
-  const { t } = useTranslation();
-  const [year, setYear] = useState<string | undefined>(undefined);
+  const { t } = useTranslation()
+  const [year, setYear] = useState<string | undefined>(undefined)
 
-  const yearsQuery = useComprehensiveReportYears();
-  const years = useMemo(() => yearsQuery.data?.years ?? [], [yearsQuery.data]);
+  const yearsQuery = useComprehensiveReportYears()
+  const years = useMemo(() => yearsQuery.data?.years ?? [], [yearsQuery.data])
 
   useEffect(() => {
     if (year === undefined && yearsQuery.data) {
-      setYear(yearsQuery.data.defaultYear || years[0]?.year);
+      setYear(yearsQuery.data.defaultYear || years[0]?.year)
     }
-  }, [yearsQuery.data, years, year]);
+  }, [yearsQuery.data, years, year])
 
-  const reportQuery = useComprehensiveReport(year ? { year } : undefined, year !== undefined);
-  const entries = reportQuery.data?.entries ?? [];
+  const reportQuery = useComprehensiveReport(year ? { year } : undefined, year !== undefined)
+  const entries = reportQuery.data?.entries ?? []
 
-  useErrorToast(yearsQuery.error);
-  useErrorToast(reportQuery.error);
+  useErrorToast(yearsQuery.error)
+  useErrorToast(reportQuery.error)
 
   return (
     <div className="flex flex-col gap-4">
       {years.length > 0 && (
         <FilterChips
-          items={years.map((y) => ({ value: y.year, label: y.yearDisplay || y.year }))}
+          items={years.map((y) => ({
+            value: y.year,
+            label: y.yearDisplay || y.year,
+          }))}
           value={year}
           onChange={setYear}
         />
@@ -294,36 +280,35 @@ function ReportPanel() {
         </ValidatingList>
       )}
     </div>
-  );
+  )
 }
 
 export default function ComprehensivePage() {
-  const { t } = useTranslation();
-  const [tab, setTab] = useState("result");
-  const [selected, setSelected] = useState<{ year: string; term: string }>();
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const { t } = useTranslation()
+  const [tab, setTab] = useState("result")
+  const [selected, setSelected] = useState<{ year: string; term: string }>()
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
 
-  const termsQuery = useComprehensiveTerms();
-  const terms = useMemo(() => termsQuery.data ?? [], [termsQuery.data]);
+  const termsQuery = useComprehensiveTerms()
+  const terms = useMemo(() => termsQuery.data ?? [], [termsQuery.data])
 
   useEffect(() => {
     if (!selected && terms.length > 0) {
-      setSelected({ year: terms[0]!.year, term: terms[0]!.term });
+      setSelected({ year: terms[0]!.year, term: terms[0]!.term })
     }
-  }, [terms, selected]);
+  }, [terms, selected])
 
-  useErrorToast(termsQuery.error);
+  useErrorToast(termsQuery.error)
 
   const termLabel = (item: (typeof terms)[number]) =>
-    [item.yearDisplay, item.termDisplay].filter(Boolean).join(" ") ||
-    `${item.year}-${item.term}`;
+    [item.yearDisplay, item.termDisplay].filter(Boolean).join(" ") || `${item.year}-${item.term}`
   const selectedItem = terms.find(
-    (x) => selected && x.year === selected.year && x.term === selected.term,
-  );
+    (x) => selected && x.year === selected.year && x.term === selected.term
+  )
   const termItems = terms.map((item) => ({
     value: `${item.year}-${item.term}`,
     label: termLabel(item),
-  }));
+  }))
 
   // 年学期筛选只作用于成绩/指标对比两个面板
   useMobileHeaderRight(
@@ -333,8 +318,8 @@ export default function ComprehensivePage() {
         onClick={() => setFilterDrawerOpen(true)}
       />
     ) : null,
-    [tab, selectedItem, terms, t],
-  );
+    [tab, selectedItem, terms, t]
+  )
 
   if (termsQuery.isLoading && terms.length === 0) {
     return (
@@ -342,7 +327,7 @@ export default function ComprehensivePage() {
         <Skeleton className="h-10" />
         <LoadingCards />
       </div>
-    );
+    )
   }
 
   return (
@@ -355,8 +340,8 @@ export default function ComprehensivePage() {
             items={termItems}
             value={selected ? `${selected.year}-${selected.term}` : undefined}
             onChange={(v) => {
-              const item = terms.find((x) => `${x.year}-${x.term}` === v);
-              if (item) setSelected({ year: item.year, term: item.term });
+              const item = terms.find((x) => `${x.year}-${x.term}` === v)
+              if (item) setSelected({ year: item.year, term: item.term })
             }}
           />
         </div>
@@ -371,9 +356,9 @@ export default function ComprehensivePage() {
           items={termItems}
           value={selected ? `${selected.year}-${selected.term}` : undefined}
           onChange={(v) => {
-            const item = terms.find((x) => `${x.year}-${x.term}` === v);
-            if (item) setSelected({ year: item.year, term: item.term });
-            setFilterDrawerOpen(false);
+            const item = terms.find((x) => `${x.year}-${x.term}` === v)
+            if (item) setSelected({ year: item.year, term: item.term })
+            setFilterDrawerOpen(false)
           }}
         />
       </FilterDrawer>
@@ -400,5 +385,5 @@ export default function ComprehensivePage() {
         </TabsContent>
       </Tabs>
     </div>
-  );
+  )
 }

@@ -1,56 +1,60 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { useTranslation } from "@/lib/i18n/use-translation";
-import {
-  SkbirdError,
-  skbirdImageUrl,
-  SKBIRD_ERRNO_TOKEN_INVALID,
-} from "@/lib/extras/skbird/client";
-import { getSkbirdClient, useSkbirdStore } from "@/lib/extras/skbird/store";
-import type { SkbirdLikeStat, SkbirdUser, SkbirdUserStats } from "@/lib/extras/skbird/types";
-import { SkbirdImage } from "@/components/skbird/skbird-image";
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { SkbirdError, skbirdImageUrl, SKBIRD_ERRNO_TOKEN_INVALID } from "@/lib/extras/skbird/client"
+import { getSkbirdClient, useSkbirdStore } from "@/lib/extras/skbird/store"
+import type { SkbirdLikeStat, SkbirdUser, SkbirdUserStats } from "@/lib/extras/skbird/types"
+import { SkbirdImage } from "@/components/skbird/skbird-image"
 
 export default function SkbirdMePage() {
-  const { t } = useTranslation();
-  const hasHydrated = useSkbirdStore((s) => s.hasHydrated);
-  const token = useSkbirdStore((s) => s.token);
+  const { t } = useTranslation()
+  const hasHydrated = useSkbirdStore((s) => s.hasHydrated)
+  const token = useSkbirdStore((s) => s.token)
 
-  const [user, setUser] = useState<SkbirdUser | null>(null);
-  const [stats, setStats] = useState<SkbirdUserStats | null>(null);
-  const [likeStat, setLikeStat] = useState<SkbirdLikeStat | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<SkbirdUser | null>(null)
+  const [stats, setStats] = useState<SkbirdUserStats | null>(null)
+  const [likeStat, setLikeStat] = useState<SkbirdLikeStat | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const client = getSkbirdClient();
-    if (!hasHydrated || !client) return;
-    let cancelled = false;
+    const client = getSkbirdClient()
+    if (!hasHydrated || !client) return
+    let cancelled = false
     client
       .userInfo()
       .then((d) => {
-        if (!cancelled) setUser(d);
+        if (!cancelled) setUser(d)
       })
       .catch((e) => {
-        if (cancelled) return;
+        if (cancelled) return
         setError(
           e instanceof SkbirdError && e.errno === SKBIRD_ERRNO_TOKEN_INVALID
             ? t("skbird.tokenExpired")
-            : t("skbird.loadFailed", { message: e instanceof Error ? e.message : String(e) }),
-        );
-      });
+            : t("skbird.loadFailed", {
+                message: e instanceof Error ? e.message : String(e),
+              })
+        )
+      })
     // 附属信息失败静默：主信息卡可用即可
-    client.userStats().then((d) => !cancelled && setStats(d)).catch(() => {});
-    client.likeStat().then((d) => !cancelled && setLikeStat(d)).catch(() => {});
+    client
+      .userStats()
+      .then((d) => !cancelled && setStats(d))
+      .catch(() => {})
+    client
+      .likeStat()
+      .then((d) => !cancelled && setLikeStat(d))
+      .catch(() => {})
     return () => {
-      cancelled = true;
-    };
-  }, [hasHydrated, token, t]);
+      cancelled = true
+    }
+  }, [hasHydrated, token, t])
 
   if (hasHydrated && !token) {
     return (
@@ -64,7 +68,7 @@ export default function SkbirdMePage() {
           </Button>
         </Empty>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -79,7 +83,7 @@ export default function SkbirdMePage() {
           </Button>
         </Empty>
       </div>
-    );
+    )
   }
 
   return (
@@ -149,5 +153,5 @@ export default function SkbirdMePage() {
         </Card>
       ) : null}
     </div>
-  );
+  )
 }

@@ -11,736 +11,740 @@ import {
   cookieEntryFromJSON,
   fetchWithJar,
   headerSingle,
-} from "@/lib/cookie";
-import { authorize, getCredentialApplied } from "./cas";
+} from "@/lib/cookie"
+import { authorize, getCredentialApplied } from "./cas"
 import {
   serverConfig,
   jwxtUrls,
   getJwxtCookieDomain,
   getSchoolConfig,
   onSchoolConfigChanged,
-} from "@/lib/server-config";
+} from "@/lib/server-config"
 
 // Cached school config references for performance
-let _appIds: Readonly<Record<string, string>> = getSchoolConfig().jwxt.appIds;
-let _apiPaths: Readonly<Record<string, string>> = getSchoolConfig().jwxt.apiPaths;
+let _appIds: Readonly<Record<string, string>> = getSchoolConfig().jwxt.appIds
+let _apiPaths: Readonly<Record<string, string>> = getSchoolConfig().jwxt.apiPaths
 
 function refreshSchoolConfigCache(): void {
-  const config = getSchoolConfig();
-  _appIds = config.jwxt.appIds;
-  _apiPaths = config.jwxt.apiPaths;
+  const config = getSchoolConfig()
+  _appIds = config.jwxt.appIds
+  _apiPaths = config.jwxt.apiPaths
 }
 
 // Register callback to refresh cache when school config changes
-onSchoolConfigChanged(refreshSchoolConfigCache);
-
+onSchoolConfigChanged(refreshSchoolConfigCache)
 
 // ─── Types ────────────────────────────────────────────────────────────── //
 
 export interface Course {
-  readonly name: string;
-  readonly code: string;
-  readonly teacher: string;
-  readonly classroom: string;
-  readonly weekDay: number;
-  readonly startSection: number;
-  readonly endSection: number;
-  readonly weeks: string;
-  readonly weekList: number[];
-  readonly credit: string;
-  readonly courseType: string;
-  readonly classId: string;
-  readonly syxzdm: string;
-  readonly scheduleId: string;
-  readonly classType: string;
-  readonly raw: Record<string, unknown>;
+  readonly name: string
+  readonly code: string
+  readonly teacher: string
+  readonly classroom: string
+  readonly weekDay: number
+  readonly startSection: number
+  readonly endSection: number
+  readonly weeks: string
+  readonly weekList: number[]
+  readonly credit: string
+  readonly courseType: string
+  readonly classId: string
+  readonly syxzdm: string
+  readonly scheduleId: string
+  readonly classType: string
+  readonly raw: Record<string, unknown>
 }
 
 export interface ClassPeriod {
-  readonly name: string;
-  readonly section: number;
-  readonly startTime: string;
-  readonly endTime: string;
-  readonly startMinute?: number;
-  readonly endMinute?: number;
-  readonly isInUse: boolean;
-  readonly raw: Record<string, unknown>;
+  readonly name: string
+  readonly section: number
+  readonly startTime: string
+  readonly endTime: string
+  readonly startMinute?: number
+  readonly endMinute?: number
+  readonly isInUse: boolean
+  readonly raw: Record<string, unknown>
 }
 
 export interface TermCalendar {
-  readonly term: string;
-  readonly startDate: string;
-  readonly totalWeeks: number;
-  readonly teachingWeeks: number;
-  readonly isInUse: boolean;
-  readonly raw: Record<string, unknown>;
+  readonly term: string
+  readonly startDate: string
+  readonly totalWeeks: number
+  readonly teachingWeeks: number
+  readonly isInUse: boolean
+  readonly raw: Record<string, unknown>
 }
 
 export interface CurrentWeek {
-  readonly week: number;
-  readonly weekday: number;
-  readonly term: string;
-  readonly date: string;
-  readonly weekStartDate?: string;
-  readonly weekEndDate?: string;
-  readonly weekDates?: readonly string[];
-  readonly raw: Record<string, unknown>;
+  readonly week: number
+  readonly weekday: number
+  readonly term: string
+  readonly date: string
+  readonly weekStartDate?: string
+  readonly weekEndDate?: string
+  readonly weekDates?: readonly string[]
+  readonly raw: Record<string, unknown>
 }
 
-export type ExamStatus = 'upcoming' | 'completed' | 'unknown';
+export type ExamStatus = "upcoming" | "completed" | "unknown"
 
 export interface Exam {
-  readonly name: string;
-  readonly examName: string;
-  readonly startAt: string;
-  readonly endAt: string;
-  readonly startTimestamp?: number;
-  readonly endTimestamp?: number;
-  readonly status?: ExamStatus;
-  readonly timeText: string;
-  readonly examLocation: string;
-  readonly seatNumber: string;
-  readonly raw: Record<string, unknown>;
+  readonly name: string
+  readonly examName: string
+  readonly startAt: string
+  readonly endAt: string
+  readonly startTimestamp?: number
+  readonly endTimestamp?: number
+  readonly status?: ExamStatus
+  readonly timeText: string
+  readonly examLocation: string
+  readonly seatNumber: string
+  readonly raw: Record<string, unknown>
 }
 
 export interface Grade {
-  readonly courseName: string;
-  readonly courseCode: string;
-  readonly classId: string;
-  readonly score: string;
-  readonly numericScore?: number;
-  readonly gradeLevel: string;
-  readonly gradePoint: string;
-  readonly numericGradePoint?: number;
-  readonly credit: string;
-  readonly numericCredit?: number;
-  readonly hours: string;
-  readonly term: string;
-  readonly courseType: string;
-  readonly courseCategory: string;
-  readonly examType: string;
-  readonly studyMode: string;
-  readonly isMajor: boolean;
-  readonly isRetake: string;
-  readonly gradeLevelType: string;
-  readonly department: string;
-  readonly isPass: boolean;
-  readonly isValid: boolean;
-  readonly specialReason: string;
-  readonly isDegreeCourse: boolean;
-  readonly projectName: string;
-  readonly raw: Record<string, unknown>;
+  readonly courseName: string
+  readonly courseCode: string
+  readonly classId: string
+  readonly score: string
+  readonly numericScore?: number
+  readonly gradeLevel: string
+  readonly gradePoint: string
+  readonly numericGradePoint?: number
+  readonly credit: string
+  readonly numericCredit?: number
+  readonly hours: string
+  readonly term: string
+  readonly courseType: string
+  readonly courseCategory: string
+  readonly examType: string
+  readonly studyMode: string
+  readonly isMajor: boolean
+  readonly isRetake: string
+  readonly gradeLevelType: string
+  readonly department: string
+  readonly isPass: boolean
+  readonly isValid: boolean
+  readonly specialReason: string
+  readonly isDegreeCourse: boolean
+  readonly projectName: string
+  readonly raw: Record<string, unknown>
 }
 
 export interface GradeStatistics {
-  readonly scope: string;
-  readonly term: string;
-  readonly classId: string;
-  readonly courseCode: string;
-  readonly highestScore: number;
-  readonly lowestScore: number;
-  readonly averageScore: number;
-  readonly raw: Record<string, unknown>;
+  readonly scope: string
+  readonly term: string
+  readonly classId: string
+  readonly courseCode: string
+  readonly highestScore: number
+  readonly lowestScore: number
+  readonly averageScore: number
+  readonly raw: Record<string, unknown>
 }
 
 export interface GradeDistribution {
-  readonly scope: string;
-  readonly term: string;
-  readonly classId: string;
-  readonly courseCode: string;
-  readonly levelCode: string;
-  readonly levelName: string;
-  readonly count: number;
-  readonly raw: Record<string, unknown>;
+  readonly scope: string
+  readonly term: string
+  readonly classId: string
+  readonly courseCode: string
+  readonly levelCode: string
+  readonly levelName: string
+  readonly count: number
+  readonly raw: Record<string, unknown>
 }
 
 export interface GradeRanking {
-  readonly scope: string;
-  readonly term: string;
-  readonly studentId: string;
-  readonly classId: string;
-  readonly courseCode: string;
-  readonly score: number;
-  readonly rank: number;
-  readonly total: number;
-  readonly rankingType: string;
-  readonly raw: Record<string, unknown>;
+  readonly scope: string
+  readonly term: string
+  readonly studentId: string
+  readonly classId: string
+  readonly courseCode: string
+  readonly score: number
+  readonly rank: number
+  readonly total: number
+  readonly rankingType: string
+  readonly raw: Record<string, unknown>
 }
 
 export interface GPAStats {
-  readonly planName: string;
-  readonly studyType: string;
-  readonly requiredCreditEarned: string;
-  readonly numericRequiredCreditEarned?: number;
-  readonly electiveCreditEarned: string;
-  readonly numericElectiveCreditEarned?: number;
-  readonly degreeCreditEarned: string;
-  readonly numericDegreeCreditEarned?: number;
-  readonly requiredCreditFailed: string;
-  readonly numericRequiredCreditFailed?: number;
-  readonly gpaInitial: string;
-  readonly numericGpaInitial?: number;
-  readonly gpaHighest: string;
-  readonly numericGpaHighest?: number;
-  readonly requiredGpaHighest: string;
-  readonly numericRequiredGpaHighest?: number;
-  readonly degreeGpaInitial: string;
-  readonly numericDegreeGpaInitial?: number;
-  readonly degreeGpaHighest: string;
-  readonly numericDegreeGpaHighest?: number;
-  readonly weightedAvg: string;
-  readonly numericWeightedAvg?: number;
-  readonly arithmeticAvg: string;
-  readonly numericArithmeticAvg?: number;
-  readonly degreeWeightedAvg: string;
-  readonly numericDegreeWeightedAvg?: number;
-  readonly raw: Record<string, unknown>;
+  readonly planName: string
+  readonly studyType: string
+  readonly requiredCreditEarned: string
+  readonly numericRequiredCreditEarned?: number
+  readonly electiveCreditEarned: string
+  readonly numericElectiveCreditEarned?: number
+  readonly degreeCreditEarned: string
+  readonly numericDegreeCreditEarned?: number
+  readonly requiredCreditFailed: string
+  readonly numericRequiredCreditFailed?: number
+  readonly gpaInitial: string
+  readonly numericGpaInitial?: number
+  readonly gpaHighest: string
+  readonly numericGpaHighest?: number
+  readonly requiredGpaHighest: string
+  readonly numericRequiredGpaHighest?: number
+  readonly degreeGpaInitial: string
+  readonly numericDegreeGpaInitial?: number
+  readonly degreeGpaHighest: string
+  readonly numericDegreeGpaHighest?: number
+  readonly weightedAvg: string
+  readonly numericWeightedAvg?: number
+  readonly arithmeticAvg: string
+  readonly numericArithmeticAvg?: number
+  readonly degreeWeightedAvg: string
+  readonly numericDegreeWeightedAvg?: number
+  readonly raw: Record<string, unknown>
 }
 
 export interface StudentInfo {
-  readonly name: string;
-  readonly namePinyin: string;
-  readonly studentId: string;
-  readonly gender: string;
-  readonly nation: string;
-  readonly nationality: string;
-  readonly department: string;
-  readonly major: string;
-  readonly className: string;
-  readonly gradeLevel: string;
-  readonly enrollmentDate: string;
-  readonly expectedGraduation: string;
-  readonly educationLevel: string;
-  readonly campus: string;
-  readonly studentStatus: string;
-  readonly discipline: string;
-  readonly studyDuration: string;
-  readonly foreignLanguage: string;
-  readonly raw: Record<string, unknown>;
+  readonly name: string
+  readonly namePinyin: string
+  readonly studentId: string
+  readonly gender: string
+  readonly nation: string
+  readonly nationality: string
+  readonly department: string
+  readonly major: string
+  readonly className: string
+  readonly gradeLevel: string
+  readonly enrollmentDate: string
+  readonly expectedGraduation: string
+  readonly educationLevel: string
+  readonly campus: string
+  readonly studentStatus: string
+  readonly discipline: string
+  readonly studyDuration: string
+  readonly foreignLanguage: string
+  readonly raw: Record<string, unknown>
 }
 
 export interface TrainingPlan {
-  readonly courseName: string;
-  readonly courseCode: string;
-  readonly credit: string;
-  readonly courseType: string;
-  readonly required: boolean;
-  readonly term: string;
-  readonly courseGroup: string;
-  readonly raw: Record<string, unknown>;
+  readonly courseName: string
+  readonly courseCode: string
+  readonly credit: string
+  readonly courseType: string
+  readonly required: boolean
+  readonly term: string
+  readonly courseGroup: string
+  readonly raw: Record<string, unknown>
 }
 
 export interface AcademicWarning {
-  readonly warningType: string;
-  readonly warningLevel: string;
-  readonly description: string;
-  readonly term: string;
-  readonly raw: Record<string, unknown>;
+  readonly warningType: string
+  readonly warningLevel: string
+  readonly description: string
+  readonly term: string
+  readonly raw: Record<string, unknown>
 }
 
 export interface AcademicCompletion {
-  readonly planName: string;
-  readonly totalRequired: string;
-  readonly numericTotalRequired?: number;
-  readonly completed: string;
-  readonly numericCompleted?: number;
-  readonly elective: string;
-  readonly numericElective?: number;
-  readonly passed: boolean;
+  readonly planName: string
+  readonly totalRequired: string
+  readonly numericTotalRequired?: number
+  readonly completed: string
+  readonly numericCompleted?: number
+  readonly elective: string
+  readonly numericElective?: number
+  readonly passed: boolean
   /** 数据上次计算时间（CZSJ，本地 ISO） */
-  readonly lastCalculatedAt: string;
-  readonly raw: Record<string, unknown>;
+  readonly lastCalculatedAt: string
+  readonly raw: Record<string, unknown>
 }
 
 export interface EvaluationType {
-  readonly name: string;
-  readonly code: string;
-  readonly count: number;
-  readonly raw: Record<string, unknown>;
+  readonly name: string
+  readonly code: string
+  readonly count: number
+  readonly raw: Record<string, unknown>
 }
 
-export type EvaluationTaskStatus = 'not_started' | 'active' | 'ended' | 'unknown';
+export type EvaluationTaskStatus = "not_started" | "active" | "ended" | "unknown"
 
 export interface EvaluationTask {
-  readonly wid: string;
-  readonly wjid: string;
-  readonly name: string;
-  readonly courseName: string;
-  readonly teacherName: string;
-  readonly teacherId: string;
-  readonly term: string;
-  readonly termName: string;
-  readonly evalType: string;
-  readonly evalTypeName: string;
-  readonly category: string;
-  readonly categoryName: string;
-  readonly startTime: string;
-  readonly endTime: string;
-  readonly startAt?: string;
-  readonly endAt?: string;
-  readonly startTimestamp?: number;
-  readonly endTimestamp?: number;
-  readonly status?: EvaluationTaskStatus;
-  readonly sequence: number;
-  readonly className: string;
-  readonly groupNo: string;
-  readonly raw: Record<string, unknown>;
+  readonly wid: string
+  readonly wjid: string
+  readonly name: string
+  readonly courseName: string
+  readonly teacherName: string
+  readonly teacherId: string
+  readonly term: string
+  readonly termName: string
+  readonly evalType: string
+  readonly evalTypeName: string
+  readonly category: string
+  readonly categoryName: string
+  readonly startTime: string
+  readonly endTime: string
+  readonly startAt?: string
+  readonly endAt?: string
+  readonly startTimestamp?: number
+  readonly endTimestamp?: number
+  readonly status?: EvaluationTaskStatus
+  readonly sequence: number
+  readonly className: string
+  readonly groupNo: string
+  readonly raw: Record<string, unknown>
 }
 
 export interface QuestionOption {
-  readonly wid: string;
-  readonly text: string;
-  readonly score: number;
-  readonly scoreRatio: number;
-  readonly questionId: string;
-  readonly raw: Record<string, unknown>;
+  readonly wid: string
+  readonly text: string
+  readonly score: number
+  readonly scoreRatio: number
+  readonly questionId: string
+  readonly raw: Record<string, unknown>
 }
 
 export interface Question {
-  readonly tmid: string;
-  readonly wjid: string;
-  readonly text: string;
-  readonly questionType: string;
-  readonly maxScore: number;
-  readonly order: number;
-  readonly options: readonly QuestionOption[];
-  readonly raw: Record<string, unknown>;
+  readonly tmid: string
+  readonly wjid: string
+  readonly text: string
+  readonly questionType: string
+  readonly maxScore: number
+  readonly order: number
+  readonly options: readonly QuestionOption[]
+  readonly raw: Record<string, unknown>
 }
 
 export interface EvaluationDetail {
-  readonly wjid: string;
-  readonly name: string;
-  readonly deadline: string;
-  readonly questions: readonly Question[];
-  readonly teachers: readonly Record<string, unknown>[];
-  readonly raw: Record<string, unknown>;
+  readonly wjid: string
+  readonly name: string
+  readonly deadline: string
+  readonly questions: readonly Question[]
+  readonly teachers: readonly Record<string, unknown>[]
+  readonly raw: Record<string, unknown>
 }
 
 export interface EvaluationAnswer {
-  readonly tmid: string;
-  readonly questionType: string;
-  readonly optionIds: readonly string[];
-  readonly text: string;
+  readonly tmid: string
+  readonly questionType: string
+  readonly optionIds: readonly string[]
+  readonly text: string
 }
 
 export interface MakeupExamBatch {
-  readonly name: string;
-  readonly batchId: string;
-  readonly term: string;
+  readonly name: string
+  readonly batchId: string
+  readonly term: string
   /** 本地教务时间，ISO 格式 YYYY-MM-DDTHH:mm:ss。 */
-  readonly signupStart: string;
-  readonly signupEnd: string;
-  readonly availableCount: number;
-  readonly registeredCount: number;
-  readonly raw: Record<string, unknown>;
+  readonly signupStart: string
+  readonly signupEnd: string
+  readonly availableCount: number
+  readonly registeredCount: number
+  readonly raw: Record<string, unknown>
 }
 
 export interface MakeupExamCourse {
-  readonly name: string;
-  readonly code: string;
-  readonly credit: string;
-  readonly hours: string;
-  readonly examSeq: string;
-  readonly department: string;
-  readonly status: string;
-  readonly isAvailable: boolean;
-  readonly signupStart: string;
-  readonly signupEnd: string;
-  readonly batchId: string;
-  readonly taskId: string;
-  readonly note: string;
-  readonly raw: Record<string, unknown>;
+  readonly name: string
+  readonly code: string
+  readonly credit: string
+  readonly hours: string
+  readonly examSeq: string
+  readonly department: string
+  readonly status: string
+  readonly isAvailable: boolean
+  readonly signupStart: string
+  readonly signupEnd: string
+  readonly batchId: string
+  readonly taskId: string
+  readonly note: string
+  readonly raw: Record<string, unknown>
 }
 
 /** 代码表条目（年级、院系等字典数据）。 */
 export interface CodeItem {
-  readonly id: string;
-  readonly name: string;
-  readonly raw: Record<string, unknown>;
+  readonly id: string
+  readonly name: string
+  readonly raw: Record<string, unknown>
 }
 
 /** 专业代码表条目。 */
 export interface MajorInfo {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
   /** 所属院系代码（otherFields.YXDM）。 */
-  readonly department: string;
-  readonly raw: Record<string, unknown>;
+  readonly department: string
+  readonly raw: Record<string, unknown>
 }
 
 /** 全校班级列表条目（bjcx）。 */
 export interface SchoolClassInfo {
-  readonly classId: string;
-  readonly className: string;
-  readonly grade: string;
-  readonly gradeDisplay: string;
-  readonly department: string;
-  readonly departmentDisplay: string;
-  readonly major: string;
-  readonly majorDisplay: string;
-  readonly isScheduled: boolean;
-  readonly studentCount: number;
-  readonly raw: Record<string, unknown>;
+  readonly classId: string
+  readonly className: string
+  readonly grade: string
+  readonly gradeDisplay: string
+  readonly department: string
+  readonly departmentDisplay: string
+  readonly major: string
+  readonly majorDisplay: string
+  readonly isScheduled: boolean
+  readonly studentCount: number
+  readonly raw: Record<string, unknown>
 }
 
 /** 全校教室列表条目（jscx）。 */
 export interface ClassroomInfo {
-  readonly name: string;
-  readonly code: string;
-  readonly campus: string;
-  readonly campusDisplay: string;
-  readonly building: string;
-  readonly buildingDisplay: string;
-  readonly examSeats: number;
-  readonly classSeats: number;
-  readonly typeDisplay: string;
-  readonly floor: number;
-  readonly isScheduled: boolean;
-  readonly raw: Record<string, unknown>;
+  readonly name: string
+  readonly code: string
+  readonly campus: string
+  readonly campusDisplay: string
+  readonly building: string
+  readonly buildingDisplay: string
+  readonly examSeats: number
+  readonly classSeats: number
+  readonly typeDisplay: string
+  readonly floor: number
+  readonly isScheduled: boolean
+  readonly raw: Record<string, unknown>
 }
 
 // ─── Exceptions ───────────────────────────────────────────────────────── //
 
 export class JWXTError extends Error {
   constructor(message?: string) {
-    super(message);
-    this.name = 'JWXTError';
+    super(message)
+    this.name = "JWXTError"
   }
 }
 
 export class NotLoggedInError extends JWXTError {
   constructor(message?: string) {
-    super(message);
-    this.name = 'NotLoggedInError';
+    super(message)
+    this.name = "NotLoggedInError"
   }
 }
 
 export class JWXTProtocolError extends JWXTError {
   constructor(message?: string) {
-    super(message);
-    this.name = 'JWXTProtocolError';
+    super(message)
+    this.name = "JWXTProtocolError"
   }
 }
 
 export class JWXTBusinessError extends JWXTError {
-  readonly code: string | number | null;
-  readonly msg: string | null;
-  readonly url: string;
+  readonly code: string | number | null
+  readonly msg: string | null
+  readonly url: string
 
   constructor(code: string | number | null, msg: string | null, url: string) {
-    super(`EMAP business error from ${url}: code=${code} msg=${msg}`);
-    this.name = 'JWXTBusinessError';
-    this.code = code;
-    this.msg = msg;
-    this.url = url;
+    super(`EMAP business error from ${url}: code=${code} msg=${msg}`)
+    this.name = "JWXTBusinessError"
+    this.code = code
+    this.msg = msg
+    this.url = url
   }
 }
 
 // ─── JWXTSession ──────────────────────────────────────────────────────── //
 
 function isJwxtCookie(e: CookieEntry): boolean {
-  return (
-    e.domain.length > 0 &&
-    e.domain.includes(getJwxtCookieDomain()) &&
-    e.name !== '_WEU'
-  );
+  return e.domain.length > 0 && e.domain.includes(getJwxtCookieDomain()) && e.name !== "_WEU"
 }
 
 export class JWXTSession {
   constructor(public readonly cookies: readonly CookieEntry[]) {}
 
   static async fromJar(jar: SimpleCookieJar): Promise<JWXTSession> {
-    return new JWXTSession(await collectCookies(jar, isJwxtCookie));
+    return new JWXTSession(await collectCookies(jar, isJwxtCookie))
   }
 
   async apply(jar: SimpleCookieJar): Promise<void> {
-    await installCookies(jar, this.cookies);
+    await installCookies(jar, this.cookies)
   }
 
   isEmpty(): boolean {
-    return this.cookies.length === 0;
+    return this.cookies.length === 0
   }
 
   toJSON(): string {
-    return JSON.stringify({ cookies: this.cookies.map((c) => ({ ...c })) });
+    return JSON.stringify({ cookies: this.cookies.map((c) => ({ ...c })) })
   }
 
   static fromJSON(s: string): JWXTSession {
-    const data: unknown = JSON.parse(s);
-    if (data === null || typeof data !== 'object' || !('cookies' in data)) {
-      throw new Error("invalid JWXTSession JSON: missing 'cookies'");
+    const data: unknown = JSON.parse(s)
+    if (data === null || typeof data !== "object" || !("cookies" in data)) {
+      throw new Error("invalid JWXTSession JSON: missing 'cookies'")
     }
-    const rawCookies = (data as { cookies: unknown }).cookies;
+    const rawCookies = (data as { cookies: unknown }).cookies
     if (!Array.isArray(rawCookies)) {
-      throw new Error("invalid JWXTSession JSON: 'cookies' must be a list");
+      throw new Error("invalid JWXTSession JSON: 'cookies' must be a list")
     }
     const entries: CookieEntry[] = rawCookies.map((item) => {
-      if (item === null || typeof item !== 'object') {
-        throw new TypeError(`invalid cookie entry: ${JSON.stringify(item)}`);
+      if (item === null || typeof item !== "object") {
+        throw new TypeError(`invalid cookie entry: ${JSON.stringify(item)}`)
       }
-      return cookieEntryFromJSON(item as Record<string, unknown>);
-    });
-    return new JWXTSession(entries);
+      return cookieEntryFromJSON(item as Record<string, unknown>)
+    })
+    return new JWXTSession(entries)
   }
 }
 
 // ─── Module state ─────────────────────────────────────────────────────── //
 
-let jwxtJar = new SimpleCookieJar();
-let timeoutMs = 30_000;
-let hydrationDone: Promise<void> = Promise.resolve();
+let jwxtJar = new SimpleCookieJar()
+let timeoutMs = 30_000
+let hydrationDone: Promise<void> = Promise.resolve()
 
 /** Per-app WEU cookie entries, keyed by appId value. */
-const weuStore = new Map<string, CookieEntry>();
+const weuStore = new Map<string, CookieEntry>()
 
 /**
  * Keeps the process-wide native _WEU cookie pinned to one app while allowing
  * requests for that app to run concurrently. Queued apps are served in order.
  */
 class WeuRequestGate {
-  private activeKey: string | null = null;
-  private activeCount = 0;
-  private queue: Array<{ key: string; resolve: () => void }> = [];
+  private activeKey: string | null = null
+  private activeCount = 0
+  private queue: Array<{ key: string; resolve: () => void }> = []
 
   async acquire(key: string): Promise<void> {
     if (this.activeKey === null) {
-      this.activeKey = key;
-      this.activeCount = 1;
-      return;
+      this.activeKey = key
+      this.activeCount = 1
+      return
     }
 
     // Once another app is waiting, queue all arrivals to prevent starvation.
     if (this.activeKey === key && this.queue.length === 0) {
-      this.activeCount += 1;
-      return;
+      this.activeCount += 1
+      return
     }
 
     return new Promise<void>((resolve) => {
-      this.queue.push({ key, resolve });
-    });
+      this.queue.push({ key, resolve })
+    })
   }
 
   release(key: string): void {
     if (this.activeKey !== key || this.activeCount === 0) {
-      throw new Error(`cannot release inactive WEU request gate key: ${key}`);
+      throw new Error(`cannot release inactive WEU request gate key: ${key}`)
     }
 
-    this.activeCount -= 1;
-    if (this.activeCount > 0) return;
+    this.activeCount -= 1
+    if (this.activeCount > 0) return
 
-    const first = this.queue.shift();
+    const first = this.queue.shift()
     if (!first) {
-      this.activeKey = null;
-      return;
+      this.activeKey = null
+      return
     }
 
-    const nextBatch = [first];
+    const nextBatch = [first]
     while (this.queue[0]?.key === first.key) {
-      nextBatch.push(this.queue.shift()!);
+      nextBatch.push(this.queue.shift()!)
     }
-    this.activeKey = first.key;
-    this.activeCount = nextBatch.length;
-    for (const waiter of nextBatch) waiter.resolve();
+    this.activeKey = first.key
+    this.activeCount = nextBatch.length
+    for (const waiter of nextBatch) waiter.resolve()
   }
 }
 
-const weuRequestGate = new WeuRequestGate();
+const weuRequestGate = new WeuRequestGate()
 
 export function getJar(): SimpleCookieJar {
-  return jwxtJar;
+  return jwxtJar
 }
 
 export function setJar(jar: SimpleCookieJar): void {
-  jwxtJar = jar;
+  jwxtJar = jar
 }
 
 export function setTimeoutMs(ms: number): void {
-  timeoutMs = ms;
+  timeoutMs = ms
 }
 
 export async function restoreSession(session: JWXTSession): Promise<void> {
-  hydrationDone = session.apply(jwxtJar);
-  await hydrationDone;
+  hydrationDone = session.apply(jwxtJar)
+  await hydrationDone
 }
 
-let cachedStudentInfo: StudentInfo | null = null;
-let inflightStudentInfo: Promise<StudentInfo> | null = null;
+let cachedStudentInfo: StudentInfo | null = null
+let inflightStudentInfo: Promise<StudentInfo> | null = null
 
 export function resetJWXT(): void {
-  jwxtJar = new SimpleCookieJar();
-  hydrationDone = Promise.resolve();
-  authorized = false;
-  inflightAuth = null;
-  inflightReauth = null;
-  sessionGeneration += 1;
-  ensuredWeuApps.clear();
-  inflightWeu.clear();
-  weuStore.clear();
-  currentTermCache.clear();
-  inflightCurrentTerm.clear();
-  cachedMakeupTerm = null;
-  inflightMakeupTerm = null;
-  inflightMakeupBatches.clear();
-  cachedStudentInfo = null;
-  inflightStudentInfo = null;
-  cachedCurrentWeek = null;
-  inflightCurrentWeek.clear();
+  jwxtJar = new SimpleCookieJar()
+  hydrationDone = Promise.resolve()
+  authorized = false
+  inflightAuth = null
+  inflightReauth = null
+  sessionGeneration += 1
+  ensuredWeuApps.clear()
+  inflightWeu.clear()
+  weuStore.clear()
+  currentTermCache.clear()
+  inflightCurrentTerm.clear()
+  cachedMakeupTerm = null
+  inflightMakeupTerm = null
+  inflightMakeupBatches.clear()
+  cachedStudentInfo = null
+  inflightStudentInfo = null
+  cachedCurrentWeek = null
+  inflightCurrentWeek.clear()
 }
 
 /** 将当前 JWXT jar 中的会话持久化到 auth-store（包含 mobile auth token）。 */
 // ─── Internal helpers ─────────────────────────────────────────────────── //
 
-const TRUTHY_TOKENS: ReadonlySet<string> = new Set(['1', '是', 'true', 'True']);
+const TRUTHY_TOKENS: ReadonlySet<string> = new Set(["1", "是", "true", "True"])
 
 function toBool(val: unknown): boolean {
-  if (val === null || val === undefined) return false;
-  return TRUTHY_TOKENS.has(String(val));
+  if (val === null || val === undefined) return false
+  return TRUTHY_TOKENS.has(String(val))
 }
 
 function buildApiUrl(path: string): string {
   // 以 / 开头的路径视为站内绝对路径（如代码表 /jwapp/code/...）
-  if (path.startsWith('/')) {
-    return `${jwxtUrls.jwxtBase}${path}`;
+  if (path.startsWith("/")) {
+    return `${jwxtUrls.jwxtBase}${path}`
   }
-  return `${jwxtUrls.appBase}/${path}`;
+  return `${jwxtUrls.appBase}/${path}`
 }
 
 function extractRows(datas: unknown, key: string): unknown[] {
-  if (datas === null || typeof datas !== 'object') return [];
-  const node = (datas as Record<string, unknown>)[key];
-  if (node === null || node === undefined) return [];
-  if (Array.isArray(node)) return node;
-  if (typeof node === 'object') {
-    const rows = (node as Record<string, unknown>)['rows'];
-    return Array.isArray(rows) ? rows : [];
+  if (datas === null || typeof datas !== "object") return []
+  const node = (datas as Record<string, unknown>)[key]
+  if (node === null || node === undefined) return []
+  if (Array.isArray(node)) return node
+  if (typeof node === "object") {
+    const rows = (node as Record<string, unknown>)["rows"]
+    return Array.isArray(rows) ? rows : []
   }
-  return [];
+  return []
 }
 
 function rawStr(raw: Record<string, unknown>, ...keys: readonly string[]): string {
   for (const k of keys) {
-    const v = raw[k];
-    if (v !== undefined && v !== null && v !== '' && v !== 0 && v !== false) {
-      return String(v);
+    const v = raw[k]
+    if (v !== undefined && v !== null && v !== "" && v !== 0 && v !== false) {
+      return String(v)
     }
   }
-  return '';
+  return ""
 }
 
 function cleanText(value: string): string {
   return value
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
 }
 
 function pad2(value: string): string {
-  return value.padStart(2, '0');
+  return value.padStart(2, "0")
 }
 
 function normalizeDate(value: string): string {
-  const match = cleanText(value).match(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
-  if (!match) return '';
-  return `${match[1]}-${pad2(match[2])}-${pad2(match[3])}`;
+  const match = cleanText(value).match(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/)
+  if (!match) return ""
+  return `${match[1]}-${pad2(match[2])}-${pad2(match[3])}`
 }
 
 function normalizeTime(value: string): string {
-  const match = cleanText(value).match(/(\d{1,2}):(\d{2})/);
-  if (!match) return '';
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return '';
-  return `${pad2(match[1])}:${match[2]}`;
+  const match = cleanText(value).match(/(\d{1,2}):(\d{2})/)
+  if (!match) return ""
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return ""
+  return `${pad2(match[1])}:${match[2]}`
 }
 
 function combineLocalDateTime(date: string, time: string): string {
-  return date && time ? `${date}T${time}:00` : '';
+  return date && time ? `${date}T${time}:00` : ""
 }
 
 function normalizeLocalDateTime(value: string): string {
-  const text = cleanText(value);
-  const date = normalizeDate(text);
-  if (!date) return '';
-  const time = normalizeTime(text) || '00:00';
-  const secondsMatch = text.match(/\d{1,2}:\d{2}:(\d{2})/);
-  const seconds = secondsMatch ? secondsMatch[1] : '00';
-  return `${date}T${time}:${seconds}`;
+  const text = cleanText(value)
+  const date = normalizeDate(text)
+  if (!date) return ""
+  const time = normalizeTime(text) || "00:00"
+  const secondsMatch = text.match(/\d{1,2}:\d{2}:(\d{2})/)
+  const seconds = secondsMatch ? secondsMatch[1] : "00"
+  return `${date}T${time}:${seconds}`
 }
 
 function localDateTimeTimestamp(value: string): number | undefined {
-  if (!value) return undefined;
-  const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) ? timestamp : undefined;
+  if (!value) return undefined
+  const timestamp = new Date(value).getTime()
+  return Number.isFinite(timestamp) ? timestamp : undefined
 }
 
 function timeToMinute(value: string): number | undefined {
-  const time = normalizeTime(value);
-  if (!time) return undefined;
-  const [hour, minute] = time.split(':').map(Number);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return undefined;
-  return hour * 60 + minute;
+  const time = normalizeTime(value)
+  if (!time) return undefined
+  const [hour, minute] = time.split(":").map(Number)
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return undefined
+  return hour * 60 + minute
 }
 
 function formatDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
 }
 
-function calculateWeekDates(date: string, weekday: number): { weekStartDate?: string; weekEndDate?: string; weekDates?: string[] } {
-  if (!date || weekday < 1 || weekday > 7) return {};
-  const base = new Date(date);
-  if (Number.isNaN(base.getTime())) return {};
-  const monday = new Date(base);
-  monday.setDate(base.getDate() - (weekday - 1));
+function calculateWeekDates(
+  date: string,
+  weekday: number
+): { weekStartDate?: string; weekEndDate?: string; weekDates?: string[] } {
+  if (!date || weekday < 1 || weekday > 7) return {}
+  const base = new Date(date)
+  if (Number.isNaN(base.getTime())) return {}
+  const monday = new Date(base)
+  monday.setDate(base.getDate() - (weekday - 1))
   const weekDates = Array.from({ length: 7 }, (_, idx) => {
-    const dt = new Date(monday);
-    dt.setDate(monday.getDate() + idx);
-    return formatDate(dt);
-  });
+    const dt = new Date(monday)
+    dt.setDate(monday.getDate() + idx)
+    return formatDate(dt)
+  })
   return {
     weekStartDate: weekDates[0],
     weekEndDate: weekDates[6],
     weekDates,
-  };
+  }
 }
 
-function evaluationTaskStatus(startTimestamp?: number, endTimestamp?: number): EvaluationTaskStatus {
-  const now = Date.now();
-  if (startTimestamp !== undefined && now < startTimestamp) return 'not_started';
-  if (endTimestamp !== undefined && now > endTimestamp) return 'ended';
-  if (startTimestamp !== undefined || endTimestamp !== undefined) return 'active';
-  return 'unknown';
+function evaluationTaskStatus(
+  startTimestamp?: number,
+  endTimestamp?: number
+): EvaluationTaskStatus {
+  const now = Date.now()
+  if (startTimestamp !== undefined && now < startTimestamp) return "not_started"
+  if (endTimestamp !== undefined && now > endTimestamp) return "ended"
+  if (startTimestamp !== undefined || endTimestamp !== undefined) return "active"
+  return "unknown"
 }
 
 function examStatus(startTimestamp?: number, endTimestamp?: number): ExamStatus {
-  const now = Date.now();
-  const effectiveEnd = endTimestamp ?? startTimestamp;
-  if (effectiveEnd === undefined) return 'unknown';
-  return effectiveEnd < now ? 'completed' : 'upcoming';
+  const now = Date.now()
+  const effectiveEnd = endTimestamp ?? startTimestamp
+  if (effectiveEnd === undefined) return "unknown"
+  return effectiveEnd < now ? "completed" : "upcoming"
 }
 
 function parseExamDateTimes(raw: Record<string, unknown>): {
-  startAt: string;
-  endAt: string;
-  startTimestamp?: number;
-  endTimestamp?: number;
-  status?: ExamStatus;
-  timeText: string;
+  startAt: string
+  endAt: string
+  startTimestamp?: number
+  endTimestamp?: number
+  status?: ExamStatus
+  timeText: string
 } {
-  const date = normalizeDate(rawStr(raw, 'KSRQ'));
-  const displayText = cleanText(rawStr(raw, 'KSSJMS'));
-  const displayTimes = Array.from(displayText.matchAll(/\d{1,2}:\d{2}/g), (m) => normalizeTime(m[0])).filter(Boolean);
-  const startTime = normalizeTime(rawStr(raw, 'KSSJ')) || displayTimes[0] || '';
-  const endTime = normalizeTime(rawStr(raw, 'JSSJ')) || displayTimes[1] || '';
-  const timeText = displayText || (startTime && endTime ? `${startTime}-${endTime}` : startTime || endTime);
+  const date = normalizeDate(rawStr(raw, "KSRQ"))
+  const displayText = cleanText(rawStr(raw, "KSSJMS"))
+  const displayTimes = Array.from(displayText.matchAll(/\d{1,2}:\d{2}/g), (m) =>
+    normalizeTime(m[0])
+  ).filter(Boolean)
+  const startTime = normalizeTime(rawStr(raw, "KSSJ")) || displayTimes[0] || ""
+  const endTime = normalizeTime(rawStr(raw, "JSSJ")) || displayTimes[1] || ""
+  const timeText =
+    displayText || (startTime && endTime ? `${startTime}-${endTime}` : startTime || endTime)
 
-  const startAt = combineLocalDateTime(date, startTime);
-  const endAt = combineLocalDateTime(date, endTime);
-  const startTimestamp = localDateTimeTimestamp(startAt);
-  const endTimestamp = localDateTimeTimestamp(endAt);
+  const startAt = combineLocalDateTime(date, startTime)
+  const endAt = combineLocalDateTime(date, endTime)
+  const startTimestamp = localDateTimeTimestamp(startAt)
+  const endTimestamp = localDateTimeTimestamp(endAt)
 
   return {
     startAt,
@@ -749,307 +753,306 @@ function parseExamDateTimes(raw: Record<string, unknown>): {
     endTimestamp,
     status: examStatus(startTimestamp, endTimestamp),
     timeText,
-  };
+  }
 }
 
 function rawNum(raw: Record<string, unknown>, ...keys: readonly string[]): number {
   for (const k of keys) {
-    const v = raw[k];
-    if (v === undefined || v === null || v === '') continue;
-    const n = typeof v === 'number' ? v : Number(v);
-    if (Number.isFinite(n) && n !== 0) return n;
+    const v = raw[k]
+    if (v === undefined || v === null || v === "") continue
+    const n = typeof v === "number" ? v : Number(v)
+    if (Number.isFinite(n) && n !== 0) return n
   }
   for (const k of keys) {
-    const v = raw[k];
-    if (v === undefined || v === null || v === '') continue;
-    const n = typeof v === 'number' ? v : Number(v);
-    if (Number.isFinite(n)) return n;
+    const v = raw[k]
+    if (v === undefined || v === null || v === "") continue
+    const n = typeof v === "number" ? v : Number(v)
+    if (Number.isFinite(n)) return n
   }
-  return 0;
+  return 0
 }
 
-function rawOptionalNum(raw: Record<string, unknown>, ...keys: readonly string[]): number | undefined {
+function rawOptionalNum(
+  raw: Record<string, unknown>,
+  ...keys: readonly string[]
+): number | undefined {
   for (const k of keys) {
-    const v = raw[k];
-    if (v === undefined || v === null || v === '') continue;
-    const n = typeof v === 'number' ? v : Number(v);
-    if (Number.isFinite(n)) return n;
+    const v = raw[k]
+    if (v === undefined || v === null || v === "") continue
+    const n = typeof v === "number" ? v : Number(v)
+    if (Number.isFinite(n)) return n
   }
-  return undefined;
+  return undefined
 }
 
 function rawInt(raw: Record<string, unknown>, ...keys: readonly string[]): number {
-  return Math.trunc(rawNum(raw, ...keys));
+  return Math.trunc(rawNum(raw, ...keys))
 }
 
 function parseWeekList(weeksStr: string): number[] {
-  const result = new Set<number>();
-  if (!weeksStr) return [];
-  const cleaned = weeksStr.replace(/[周第\s]/g, '');
-  const parts = cleaned.split(/[,，]/);
+  const result = new Set<number>()
+  if (!weeksStr) return []
+  const cleaned = weeksStr.replace(/[周第\s]/g, "")
+  const parts = cleaned.split(/[,，]/)
   for (const part of parts) {
-    if (part.includes('-')) {
-      const [start, end] = part.split('-').map((s) => parseInt(s, 10));
+    if (part.includes("-")) {
+      const [start, end] = part.split("-").map((s) => parseInt(s, 10))
       if (!isNaN(start) && !isNaN(end)) {
-        for (let w = start; w <= end; w++) result.add(w);
+        for (let w = start; w <= end; w++) result.add(w)
       }
     } else {
-      const n = parseInt(part, 10);
-      if (!isNaN(n)) result.add(n);
+      const n = parseInt(part, 10)
+      if (!isNaN(n)) result.add(n)
     }
   }
-  return Array.from(result).sort((a, b) => a - b);
+  return Array.from(result).sort((a, b) => a - b)
 }
 
 const TJLX_TO_SCOPE: Readonly<Record<string, string>> = {
-  '01': 'class',
-  '02': 'course',
-};
+  "01": "class",
+  "02": "course",
+}
 
 const COURSE_CATEGORY_TO_KBLB: Readonly<Record<string, string>> = {
-  all: '0',
-  theory: '1',
-  experiment: '2',
-};
+  all: "0",
+  theory: "1",
+  experiment: "2",
+}
 
 function buildGradeStatsRequest(opts: {
-  term: string;
-  classId?: string;
-  courseCode?: string;
+  term: string
+  classId?: string
+  courseCode?: string
 }): Record<string, string> {
-  const { term, classId, courseCode } = opts;
+  const { term, classId, courseCode } = opts
   if ((classId === undefined) === (courseCode === undefined)) {
-    throw new Error('classId 与 courseCode 须仅提供其一');
+    throw new Error("classId 与 courseCode 须仅提供其一")
   }
   if (classId !== undefined) {
-    return { JXBID: classId, XNXQDM: term, TJLX: '01' };
+    return { JXBID: classId, XNXQDM: term, TJLX: "01" }
   }
-  return { JXBID: '*', KCH: String(courseCode), XNXQDM: term, TJLX: '02' };
+  return { JXBID: "*", KCH: String(courseCode), XNXQDM: term, TJLX: "02" }
 }
 
 async function emapPost(
   url: string,
   data: Record<string, string>,
   appId?: string,
-  referer?: string,
+  referer?: string
 ): Promise<Record<string, unknown>> {
   const doRequest = async (): Promise<Awaited<ReturnType<typeof fetchWithJar>>> => {
     try {
       return await fetchWithJar(jwxtJar, {
-        method: 'POST',
+        method: "POST",
         url,
         body: new URLSearchParams(data),
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-          'X-Requested-With': 'XMLHttpRequest',
-          Accept: 'application/json, text/javascript, */*; q=0.01',
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          "X-Requested-With": "XMLHttpRequest",
+          Accept: "application/json, text/javascript, */*; q=0.01",
           ...(referer ? { Referer: referer } : {}),
         },
-        redirect: 'follow',
+        redirect: "follow",
         timeoutMs,
-      });
+      })
     } catch (e) {
-      throw new JWXTProtocolError(`request failed for ${url}: ${(e as Error).message}`);
+      throw new JWXTProtocolError(`request failed for ${url}: ${(e as Error).message}`)
     }
-  };
+  }
 
-  let resp: Awaited<ReturnType<typeof fetchWithJar>>;
+  let resp: Awaited<ReturnType<typeof fetchWithJar>>
 
   if (appId) {
     // Pin the shared native _WEU cookie to this app for the full request cycle.
-    await weuRequestGate.acquire(appId);
+    await weuRequestGate.acquire(appId)
     try {
-      const entry = weuStore.get(appId);
+      const entry = weuStore.get(appId)
       if (entry) {
         // Remove any existing _WEU cookie(s) from the jar.
-        const allCookies = await jwxtJar.getAllCookies();
+        const allCookies = await jwxtJar.getAllCookies()
         for (const c of allCookies) {
-          if (c.name === '_WEU') {
-            await jwxtJar.removeCookie(c.domain, c.path, '_WEU');
+          if (c.name === "_WEU") {
+            await jwxtJar.removeCookie(c.domain, c.path, "_WEU")
           }
         }
         // Install the correct per-app _WEU.
-        const host = entry.domain.replace(/^\./, '') || 'localhost';
+        const host = entry.domain.replace(/^\./, "") || "localhost"
         await jwxtJar.setCookie(
           `_WEU=${entry.value}; Domain=${entry.domain}; Path=${entry.path}`,
           `https://${host}${entry.path}`,
-          { ignoreError: true },
-        );
+          { ignoreError: true }
+        )
       }
-      resp = await doRequest();
+      resp = await doRequest()
       // Retry pjapp 404 with a known-good route cookie.
       if (resp.status === 404 && appId === _appIds.pjapp) {
-        const goodRoute = getSchoolConfig().jwxt.pjappGoodRoute;
+        const goodRoute = getSchoolConfig().jwxt.pjappGoodRoute
         if (goodRoute) {
-          const domain = new URL(serverConfig.jwxtBaseUrl).hostname;
+          const domain = new URL(serverConfig.jwxtBaseUrl).hostname
           await jwxtJar.setCookie(
             `route=${goodRoute}; Domain=.${domain}; Path=/`,
             serverConfig.jwxtBaseUrl,
-            { ignoreError: true },
-          );
-          resp = await doRequest();
+            { ignoreError: true }
+          )
+          resp = await doRequest()
         }
       }
     } finally {
-      weuRequestGate.release(appId);
+      weuRequestGate.release(appId)
     }
   } else {
-    resp = await doRequest();
+    resp = await doRequest()
   }
 
   if (resp.status === 401 || resp.status === 403) {
-    throw new NotLoggedInError(`HTTP ${resp.status} from ${url}`);
+    throw new NotLoggedInError(`HTTP ${resp.status} from ${url}`)
   }
   if (resp.status >= 400) {
-    throw new JWXTProtocolError(`HTTP ${resp.status} from ${url}`);
+    throw new JWXTProtocolError(`HTTP ${resp.status} from ${url}`)
   }
 
-  const contentType = headerSingle(resp.headers, 'content-type') ?? '';
-  const text = await resp.text();
-  if (contentType.includes('text/html') && text.includes('authserver/login')) {
-    throw new NotLoggedInError('session expired, redirected to CAS login page');
+  const contentType = headerSingle(resp.headers, "content-type") ?? ""
+  const text = await resp.text()
+  if (contentType.includes("text/html") && text.includes("authserver/login")) {
+    throw new NotLoggedInError("session expired, redirected to CAS login page")
   }
 
-  let result: Record<string, unknown>;
+  let result: Record<string, unknown>
   try {
-    result = JSON.parse(text) as Record<string, unknown>;
+    result = JSON.parse(text) as Record<string, unknown>
   } catch {
-    throw new JWXTProtocolError(`non-JSON response from ${url}: ${JSON.stringify(text.slice(0, 200))}`);
+    throw new JWXTProtocolError(
+      `non-JSON response from ${url}: ${JSON.stringify(text.slice(0, 200))}`
+    )
   }
 
-  const code = result['code'];
-  if (code !== '0' && code !== 0) {
-    const msg = typeof result['msg'] === 'string' ? result['msg'] : null;
-    const codeVal = typeof code === 'string' || typeof code === 'number' ? code : null;
-    throw new JWXTBusinessError(codeVal, msg, url);
+  const code = result["code"]
+  if (code !== "0" && code !== 0) {
+    const msg = typeof result["msg"] === "string" ? result["msg"] : null
+    const codeVal = typeof code === "string" || typeof code === "number" ? code : null
+    throw new JWXTBusinessError(codeVal, msg, url)
   }
 
-  const datas = result['datas'];
-  if (datas === undefined || datas === null || typeof datas !== 'object') {
-    throw new JWXTProtocolError(`response missing 'datas' from ${url}`);
+  const datas = result["datas"]
+  if (datas === undefined || datas === null || typeof datas !== "object") {
+    throw new JWXTProtocolError(`response missing 'datas' from ${url}`)
   }
-  return datas as Record<string, unknown>;
+  return datas as Record<string, unknown>
 }
 
-let inflightAuth: Promise<unknown> | null = null;
-let inflightReauth: Promise<void> | null = null;
-let authorized = false;
-let sessionGeneration = 0;
+let inflightAuth: Promise<unknown> | null = null
+let inflightReauth: Promise<void> | null = null
+let authorized = false
+let sessionGeneration = 0
 
 async function ensureAuthorized(): Promise<void> {
-  if (authorized) return;
-  await getCredentialApplied();
-  await hydrationDone;
-  const cookies = await jwxtJar.getAllCookies();
+  if (authorized) return
+  await getCredentialApplied()
+  await hydrationDone
+  const cookies = await jwxtJar.getAllCookies()
   for (const c of cookies) {
     if (c.domain && c.domain.includes(getJwxtCookieDomain())) {
-      authorized = true;
-      return;
+      authorized = true
+      return
     }
   }
   if (inflightAuth) {
-    await inflightAuth;
-    return;
+    await inflightAuth
+    return
   }
-  inflightAuth = authorize(jwxtUrls.portal, jwxtJar);
+  inflightAuth = authorize(jwxtUrls.portal, jwxtJar)
   try {
-    await inflightAuth;
-    authorized = true;
+    await inflightAuth
+    authorized = true
   } finally {
-    inflightAuth = null;
+    inflightAuth = null
   }
 }
 
 async function reauthorize(failedGeneration: number): Promise<void> {
-  if (sessionGeneration !== failedGeneration) return;
+  if (sessionGeneration !== failedGeneration) return
   if (inflightReauth) {
-    await inflightReauth;
-    return;
+    await inflightReauth
+    return
   }
 
-  const targetJar = jwxtJar;
+  const targetJar = jwxtJar
   const promise = (async () => {
-    authorized = false;
-    const all = await targetJar.getAllCookies();
+    authorized = false
+    const all = await targetJar.getAllCookies()
     for (const c of all) {
       if (c.domain && c.domain.includes(getJwxtCookieDomain())) {
-        await targetJar.removeCookie(c.domain, c.path ?? '/', c.name);
+        await targetJar.removeCookie(c.domain, c.path ?? "/", c.name)
       }
     }
-    await authorize(jwxtUrls.portal, targetJar);
-    if (sessionGeneration !== failedGeneration || jwxtJar !== targetJar) return;
+    await authorize(jwxtUrls.portal, targetJar)
+    if (sessionGeneration !== failedGeneration || jwxtJar !== targetJar) return
 
-    sessionGeneration += 1;
-    authorized = true;
-    ensuredWeuApps.clear();
-    inflightWeu.clear();
-    weuStore.clear();
-  })();
-  inflightReauth = promise;
+    sessionGeneration += 1
+    authorized = true
+    ensuredWeuApps.clear()
+    inflightWeu.clear()
+    weuStore.clear()
+  })()
+  inflightReauth = promise
   try {
-    await promise;
+    await promise
   } finally {
-    if (inflightReauth === promise) inflightReauth = null;
+    if (inflightReauth === promise) inflightReauth = null
   }
 }
 
-const ensuredWeuApps = new Set<string>();
-const inflightWeu = new Map<string, Promise<void>>();
+const ensuredWeuApps = new Set<string>()
+const inflightWeu = new Map<string, Promise<void>>()
 
 async function ensureWeu(appId: string): Promise<void> {
-  if (ensuredWeuApps.has(appId)) return;
-  const existing = inflightWeu.get(appId);
+  if (ensuredWeuApps.has(appId)) return
+  const existing = inflightWeu.get(appId)
   if (existing) {
-    await existing;
-    return;
+    await existing
+    return
   }
 
-  const requestGeneration = sessionGeneration;
-  const requestJar = jwxtJar;
+  const requestGeneration = sessionGeneration
+  const requestJar = jwxtJar
   const promise = (async () => {
-    const url = `${jwxtUrls.appShow}?id=${encodeURIComponent(appId)}`;
+    const url = `${jwxtUrls.appShow}?id=${encodeURIComponent(appId)}`
     try {
       // Use a temporary jar to avoid clobbering other apps' _WEU in the shared jar.
-      const tempJar = new SimpleCookieJar();
-      const sessionCookies = await collectCookies(
-        requestJar,
-        (e) => e.name !== '_WEU',
-      );
-      await installCookies(tempJar, sessionCookies);
+      const tempJar = new SimpleCookieJar()
+      const sessionCookies = await collectCookies(requestJar, (e) => e.name !== "_WEU")
+      await installCookies(tempJar, sessionCookies)
 
       await fetchWithJar(tempJar, {
-        method: 'GET',
+        method: "GET",
         url,
         headers: {
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
-        redirect: 'manual',
+        redirect: "manual",
         timeoutMs,
-      });
+      })
 
       // Extract _WEU from the temp jar and store it per-app.
-      const tempCookies = await collectCookies(
-        tempJar,
-        (e) => e.name === '_WEU',
-      );
+      const tempCookies = await collectCookies(tempJar, (e) => e.name === "_WEU")
       if (
         tempCookies.length > 0 &&
         sessionGeneration === requestGeneration &&
         jwxtJar === requestJar
       ) {
-        weuStore.set(appId, tempCookies[0]!);
-        ensuredWeuApps.add(appId);
+        weuStore.set(appId, tempCookies[0]!)
+        ensuredWeuApps.add(appId)
       }
     } catch {
       // appShow may fail; WEU will be retried on next call.
     }
-  })();
+  })()
 
-  inflightWeu.set(appId, promise);
+  inflightWeu.set(appId, promise)
   try {
-    await promise;
+    await promise
   } finally {
-    if (inflightWeu.get(appId) === promise) inflightWeu.delete(appId);
+    if (inflightWeu.get(appId) === promise) inflightWeu.delete(appId)
   }
 }
 
@@ -1063,521 +1066,521 @@ export async function warmupWEU(): Promise<void> {
     _appIds.pjapp,
     _appIds.bkbl,
     _appIds.kcbcx,
-  ];
-  if (_appIds.wdkb_sy) apps.push(_appIds.wdkb_sy);
-  await Promise.all(apps.map((id) => ensureWeu(id).catch(() => {})));
+  ]
+  if (_appIds.wdkb_sy) apps.push(_appIds.wdkb_sy)
+  await Promise.all(apps.map((id) => ensureWeu(id).catch(() => {})))
 }
 
 async function post(
   path: string,
   data: Record<string, string> = {},
   appId?: string,
-  referer?: string,
+  referer?: string
 ): Promise<Record<string, unknown>> {
-  const url = buildApiUrl(path);
-  return emapPost(url, data, appId, referer);
+  const url = buildApiUrl(path)
+  return emapPost(url, data, appId, referer)
 }
 
-const currentTermCache = new Map<string, string>();
-const inflightCurrentTerm = new Map<string, Promise<string>>();
+const currentTermCache = new Map<string, string>()
+const inflightCurrentTerm = new Map<string, Promise<string>>()
 
-let cachedCurrentWeek: { key: string; value: CurrentWeek } | null = null;
-const inflightCurrentWeek = new Map<
-  string,
-  { marker: symbol; promise: Promise<CurrentWeek> }
->();
+let cachedCurrentWeek: { key: string; value: CurrentWeek } | null = null
+const inflightCurrentWeek = new Map<string, { marker: symbol; promise: Promise<CurrentWeek> }>()
 
-async function getCurrentTerm(
-  appId: string,
-  pathKey: string,
-): Promise<string> {
-  const cacheKey = `${appId}|${pathKey}`;
-  const cached = currentTermCache.get(cacheKey);
-  if (cached) return cached;
-  const inflight = inflightCurrentTerm.get(cacheKey);
-  if (inflight) return inflight;
+async function getCurrentTerm(appId: string, pathKey: string): Promise<string> {
+  const cacheKey = `${appId}|${pathKey}`
+  const cached = currentTermCache.get(cacheKey)
+  if (cached) return cached
+  const inflight = inflightCurrentTerm.get(cacheKey)
+  if (inflight) return inflight
 
   const promise = (async () => {
     try {
-      await ensureWeu(appId);
-      const datas = await post(_apiPaths[pathKey]!, {}, appId);
-      const segments = pathKey.split('_');
-      const tail = segments[segments.length - 1]!;
-      const rows = extractRows(datas, tail);
+      await ensureWeu(appId)
+      const datas = await post(_apiPaths[pathKey]!, {}, appId)
+      const segments = pathKey.split("_")
+      const tail = segments[segments.length - 1]!
+      const rows = extractRows(datas, tail)
       if (rows.length === 0) {
-        throw new JWXTProtocolError('current term query returned empty result');
+        throw new JWXTProtocolError("current term query returned empty result")
       }
-      const first = rows[0] as Record<string, unknown>;
-      const raw = first['DM'];
-      const term = typeof raw === 'string' ? raw : String(raw ?? '');
+      const first = rows[0] as Record<string, unknown>
+      const raw = first["DM"]
+      const term = typeof raw === "string" ? raw : String(raw ?? "")
       if (!term) {
-        throw new JWXTProtocolError('current term query returned empty DM');
+        throw new JWXTProtocolError("current term query returned empty DM")
       }
-      currentTermCache.set(cacheKey, term);
-      return term;
+      currentTermCache.set(cacheKey, term)
+      return term
     } finally {
-      inflightCurrentTerm.delete(cacheKey);
+      inflightCurrentTerm.delete(cacheKey)
     }
-  })();
+  })()
 
-  inflightCurrentTerm.set(cacheKey, promise);
-  return promise;
+  inflightCurrentTerm.set(cacheKey, promise)
+  return promise
 }
 
 async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
-  await ensureAuthorized();
-  const requestGeneration = sessionGeneration;
+  await ensureAuthorized()
+  const requestGeneration = sessionGeneration
   try {
-    return await fn();
+    return await fn()
   } catch (e) {
     if (e instanceof NotLoggedInError) {
-      await reauthorize(requestGeneration);
-      return await fn();
+      await reauthorize(requestGeneration)
+      return await fn()
     }
-    throw e;
+    throw e
   }
 }
 
 // ─── Public: Student Info ─────────────────────────────────────────────── //
 
 export async function queryStudentInfo(): Promise<StudentInfo> {
-  if (cachedStudentInfo) return cachedStudentInfo;
-  if (inflightStudentInfo) return inflightStudentInfo;
+  if (cachedStudentInfo) return cachedStudentInfo
+  if (inflightStudentInfo) return inflightStudentInfo
 
   inflightStudentInfo = (async () => {
     try {
       return await runWithReauth(async () => {
-        await ensureWeu(_appIds.xsjbxxgl);
+        await ensureWeu(_appIds.xsjbxxgl)
         const data = {
-          querySetting: '[]',
-          pageSize: '12',
-          pageNumber: '1',
-        };
-        const datas = await post(_apiPaths.xsjbxx, data, _appIds.xsjbxxgl);
-        const rows = extractRows(datas, 'cxxsjbxxlb');
-        if (rows.length === 0) {
-          throw new JWXTProtocolError('queryStudentInfo returned empty result');
+          querySetting: "[]",
+          pageSize: "12",
+          pageNumber: "1",
         }
-        const info = parseStudentInfo(rows[0] as Record<string, unknown>);
-        cachedStudentInfo = info;
-        return info;
-      });
+        const datas = await post(_apiPaths.xsjbxx, data, _appIds.xsjbxxgl)
+        const rows = extractRows(datas, "cxxsjbxxlb")
+        if (rows.length === 0) {
+          throw new JWXTProtocolError("queryStudentInfo returned empty result")
+        }
+        const info = parseStudentInfo(rows[0] as Record<string, unknown>)
+        cachedStudentInfo = info
+        return info
+      })
     } finally {
-      inflightStudentInfo = null;
+      inflightStudentInfo = null
     }
-  })();
+  })()
 
-  return inflightStudentInfo;
+  return inflightStudentInfo
 }
 
 // ─── Public: Grades ───────────────────────────────────────────────────── //
 
 export async function queryGrades(opts?: {
-  term?: string;
-  courseName?: string;
-  pageSize?: number;
-  pageNumber?: number;
+  term?: string
+  courseName?: string
+  pageSize?: number
+  pageNumber?: number
 }): Promise<Grade[]> {
-  const term = opts?.term;
-  const courseName = opts?.courseName;
-  const pageSize = opts?.pageSize ?? 999;
-  const pageNumber = opts?.pageNumber ?? 1;
+  const term = opts?.term
+  const courseName = opts?.courseName
+  const pageSize = opts?.pageSize ?? 999
+  const pageNumber = opts?.pageNumber ?? 1
 
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.cjcx);
+    await ensureWeu(_appIds.cjcx)
 
-    const query: Array<Record<string, unknown>> = [];
+    const query: Array<Record<string, unknown>> = []
     if (term) {
       query.push({
-        name: 'XNXQDM',
+        name: "XNXQDM",
         value: term,
-        linkOpt: 'and',
-        builder: 'm_value_equal',
-      });
+        linkOpt: "and",
+        builder: "m_value_equal",
+      })
     }
     if (courseName) {
       query.push({
-        name: 'XSKCM',
+        name: "XSKCM",
         value: courseName,
-        linkOpt: 'and',
-        builder: 'include',
-      });
+        linkOpt: "and",
+        builder: "include",
+      })
     }
     query.push(
       {
-        name: 'SFYX',
-        caption: '是否有效',
-        linkOpt: 'AND',
-        builderList: 'cbl_m_List',
-        builder: 'm_value_equal',
-        value: '1',
-        value_display: '是',
+        name: "SFYX",
+        caption: "是否有效",
+        linkOpt: "AND",
+        builderList: "cbl_m_List",
+        builder: "m_value_equal",
+        value: "1",
+        value_display: "是",
       },
       {
-        name: 'SHOWMAXCJ',
-        caption: '显示最高成绩',
-        linkOpt: 'AND',
-        builderList: 'cbl_String',
-        builder: 'equal',
+        name: "SHOWMAXCJ",
+        caption: "显示最高成绩",
+        linkOpt: "AND",
+        builderList: "cbl_String",
+        builder: "equal",
         value: 0,
-        value_display: '否',
+        value_display: "否",
       },
       {
-        name: 'BY1',
-        caption: '备用1',
-        linkOpt: 'AND',
-        builderList: 'cbl_m_List',
-        builder: 'equal',
-        value: '1',
-      },
-    );
+        name: "BY1",
+        caption: "备用1",
+        linkOpt: "AND",
+        builderList: "cbl_m_List",
+        builder: "equal",
+        value: "1",
+      }
+    )
 
     const data = {
       querySetting: JSON.stringify(query),
       pageSize: String(pageSize),
       pageNumber: String(pageNumber),
-      '*order': '-XNXQDM,-KCH,-KXH',
-    };
-    const datas = await post(_apiPaths.cjcx, data, _appIds.cjcx);
-    const rows = extractRows(datas, 'xscjcx');
-    return rows.map((r) => parseGrade(r as Record<string, unknown>));
-  });
+      "*order": "-XNXQDM,-KCH,-KXH",
+    }
+    const datas = await post(_apiPaths.cjcx, data, _appIds.cjcx)
+    const rows = extractRows(datas, "xscjcx")
+    return rows.map((r) => parseGrade(r as Record<string, unknown>))
+  })
 }
 
 export async function queryGpaStats(opts?: { studentId?: string }): Promise<GPAStats> {
   return runWithReauth(async () => {
-    let studentId = opts?.studentId;
+    let studentId = opts?.studentId
     if (studentId === undefined) {
-      const info = await queryStudentInfo();
-      studentId = info.studentId;
+      const info = await queryStudentInfo()
+      studentId = info.studentId
     }
 
-    await ensureWeu(_appIds.cjcx);
+    await ensureWeu(_appIds.cjcx)
 
-    const data: Record<string, string> = {};
-    for (let i = 1; i <= 6; i++) data[`XH${i}`] = studentId;
+    const data: Record<string, string> = {}
+    for (let i = 1; i <= 6; i++) data[`XH${i}`] = studentId
 
-    const datas = await post(_apiPaths.cjcx_gpa, data, _appIds.cjcx);
-    const rows = extractRows(datas, 'cxzxfaxfjd');
+    const datas = await post(_apiPaths.cjcx_gpa, data, _appIds.cjcx)
+    const rows = extractRows(datas, "cxzxfaxfjd")
     if (rows.length === 0) {
-      throw new JWXTProtocolError('queryGpaStats returned empty result');
+      throw new JWXTProtocolError("queryGpaStats returned empty result")
     }
-    return parseGpaStats(rows[0] as Record<string, unknown>);
-  });
+    return parseGpaStats(rows[0] as Record<string, unknown>)
+  })
 }
 
 export async function queryGradeStatistics(opts?: {
-  term?: string;
-  classId?: string;
-  courseCode?: string;
+  term?: string
+  classId?: string
+  courseCode?: string
 }): Promise<GradeStatistics> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.cjcx);
-    let term = opts?.term;
+    await ensureWeu(_appIds.cjcx)
+    let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq');
+      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const payload = buildGradeStatsRequest({
       term,
       classId: opts?.classId,
       courseCode: opts?.courseCode,
-    });
-    const datas = await post(_apiPaths.jxbcjtjcx, payload, _appIds.cjcx);
-    const rows = extractRows(datas, 'jxbcjtjcx');
+    })
+    const datas = await post(_apiPaths.jxbcjtjcx, payload, _appIds.cjcx)
+    const rows = extractRows(datas, "jxbcjtjcx")
     if (rows.length === 0) {
-      throw new JWXTProtocolError('queryGradeStatistics returned empty result');
+      throw new JWXTProtocolError("queryGradeStatistics returned empty result")
     }
-    return parseGradeStatistics(rows[0] as Record<string, unknown>);
-  });
+    return parseGradeStatistics(rows[0] as Record<string, unknown>)
+  })
 }
 
 export async function queryGradeDistribution(opts?: {
-  term?: string;
-  classId?: string;
-  courseCode?: string;
+  term?: string
+  classId?: string
+  courseCode?: string
 }): Promise<GradeDistribution[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.cjcx);
-    let term = opts?.term;
+    await ensureWeu(_appIds.cjcx)
+    let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq');
+      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const payload: Record<string, string> = buildGradeStatsRequest({
       term,
       classId: opts?.classId,
       courseCode: opts?.courseCode,
-    });
-    payload['*order'] = '+DJDM';
-    const datas = await post(_apiPaths.jxbcjfbcx, payload, _appIds.cjcx);
-    const rows = extractRows(datas, 'jxbcjfbcx');
-    return rows.map((r) => parseGradeDistribution(r as Record<string, unknown>));
-  });
+    })
+    payload["*order"] = "+DJDM"
+    const datas = await post(_apiPaths.jxbcjfbcx, payload, _appIds.cjcx)
+    const rows = extractRows(datas, "jxbcjfbcx")
+    return rows.map((r) => parseGradeDistribution(r as Record<string, unknown>))
+  })
 }
 
 export async function queryGradeRanking(opts?: {
-  term?: string;
-  studentId?: string;
-  classId?: string;
-  courseCode?: string;
+  term?: string
+  studentId?: string
+  classId?: string
+  courseCode?: string
 }): Promise<GradeRanking> {
   return runWithReauth(async () => {
-    let studentId = opts?.studentId;
+    let studentId = opts?.studentId
     if (studentId === undefined) {
-      const info = await queryStudentInfo();
-      studentId = info.studentId;
+      const info = await queryStudentInfo()
+      studentId = info.studentId
     }
 
-    await ensureWeu(_appIds.cjcx);
+    await ensureWeu(_appIds.cjcx)
 
-    let term = opts?.term;
+    let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq');
+      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const payload: Record<string, string> = buildGradeStatsRequest({
       term,
       classId: opts?.classId,
       courseCode: opts?.courseCode,
-    });
-    payload['XH'] = studentId;
-    const datas = await post(_apiPaths.jxbxspmcx, payload, _appIds.cjcx);
-    const rows = extractRows(datas, 'jxbxspmcx');
+    })
+    payload["XH"] = studentId
+    const datas = await post(_apiPaths.jxbxspmcx, payload, _appIds.cjcx)
+    const rows = extractRows(datas, "jxbxspmcx")
     if (rows.length === 0) {
-      throw new JWXTProtocolError('queryGradeRanking returned empty result');
+      throw new JWXTProtocolError("queryGradeRanking returned empty result")
     }
-    return parseGradeRanking(rows[0] as Record<string, unknown>);
-  });
+    return parseGradeRanking(rows[0] as Record<string, unknown>)
+  })
 }
 
 // ─── Public: Schedule ─────────────────────────────────────────────────── //
 
 export async function querySchedule(opts?: { term?: string }): Promise<Course[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.wdkb);
-    let term = opts?.term;
+    await ensureWeu(_appIds.wdkb)
+    let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq');
+      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
-    const datas = await post(_apiPaths.wdkb, { XNXQDM: term }, _appIds.wdkb);
-    const rows = extractRows(datas, 'cxxszhxqkb');
-    return rows.map((r) => parseCourse(r as Record<string, unknown>));
-  });
+    const datas = await post(_apiPaths.wdkb, { XNXQDM: term }, _appIds.wdkb)
+    const rows = extractRows(datas, "cxxszhxqkb")
+    return rows.map((r) => parseCourse(r as Record<string, unknown>))
+  })
 }
 
 export async function queryScheduleExperimental(opts?: {
-  term?: string;
-  studentId?: string;
-  courseCategory?: string;
+  term?: string
+  studentId?: string
+  courseCategory?: string
 }): Promise<Course[]> {
   if (!_appIds.wdkb_sy || !_apiPaths.wdkb_sy) {
-    return querySchedule({ term: opts?.term });
+    return querySchedule({ term: opts?.term })
   }
   return queryCoursesByKblb({
-    pathKey: 'wdkb_sy',
-    rowKey: 'cxxskb',
+    pathKey: "wdkb_sy",
+    rowKey: "cxxskb",
     term: opts?.term,
     studentId: opts?.studentId,
-    courseCategory: opts?.courseCategory ?? 'all',
-  });
+    courseCategory: opts?.courseCategory ?? "all",
+  })
 }
 
 export async function queryUnscheduledCourses(opts?: {
-  term?: string;
-  studentId?: string;
-  courseCategory?: string;
+  term?: string
+  studentId?: string
+  courseCategory?: string
 }): Promise<Course[]> {
   if (!_appIds.wdkb_sy || !_apiPaths.wdkb_sy_unscheduled) {
-    return [];
+    return []
   }
   return queryCoursesByKblb({
-    pathKey: 'wdkb_sy_unscheduled',
-    rowKey: 'cxxsllsywpk',
+    pathKey: "wdkb_sy_unscheduled",
+    rowKey: "cxxsllsywpk",
     term: opts?.term,
     studentId: opts?.studentId,
-    courseCategory: opts?.courseCategory ?? 'all',
-  });
+    courseCategory: opts?.courseCategory ?? "all",
+  })
 }
 
 async function queryCoursesByKblb(args: {
-  pathKey: 'wdkb_sy' | 'wdkb_sy_unscheduled';
-  rowKey: string;
-  term: string | undefined;
-  studentId: string | undefined;
-  courseCategory: string;
+  pathKey: "wdkb_sy" | "wdkb_sy_unscheduled"
+  rowKey: string
+  term: string | undefined
+  studentId: string | undefined
+  courseCategory: string
 }): Promise<Course[]> {
-  const { pathKey, rowKey, courseCategory } = args;
+  const { pathKey, rowKey, courseCategory } = args
   return runWithReauth(async () => {
-    let term = args.term;
+    let term = args.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq');
+      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
-    let studentId = args.studentId;
+    let studentId = args.studentId
     if (studentId === undefined) {
-      const info = await queryStudentInfo();
-      studentId = info.studentId;
+      const info = await queryStudentInfo()
+      studentId = info.studentId
     }
 
-    await ensureWeu(_appIds.wdkb_sy);
+    await ensureWeu(_appIds.wdkb_sy)
 
-    const kblb = COURSE_CATEGORY_TO_KBLB[courseCategory] ?? '0';
-    const datas = await post(_apiPaths[pathKey]!, {
-      XNXQDM: term,
-      XH: studentId,
-      KBLB: kblb,
-    }, _appIds.wdkb_sy);
-    const rows = extractRows(datas, rowKey);
-    return rows.map((r) => parseCourse(r as Record<string, unknown>));
-  });
+    const kblb = COURSE_CATEGORY_TO_KBLB[courseCategory] ?? "0"
+    const datas = await post(
+      _apiPaths[pathKey]!,
+      {
+        XNXQDM: term,
+        XH: studentId,
+        KBLB: kblb,
+      },
+      _appIds.wdkb_sy
+    )
+    const rows = extractRows(datas, rowKey)
+    return rows.map((r) => parseCourse(r as Record<string, unknown>))
+  })
 }
 
 export async function queryClassPeriods(): Promise<ClassPeriod[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.wdkb);
-    const datas = await post(_apiPaths.jc, {}, _appIds.wdkb);
-    const rows = extractRows(datas, 'jc');
-    return rows.map((r) => parseClassPeriod(r as Record<string, unknown>));
-  });
+    await ensureWeu(_appIds.wdkb)
+    const datas = await post(_apiPaths.jc, {}, _appIds.wdkb)
+    const rows = extractRows(datas, "jc")
+    return rows.map((r) => parseClassPeriod(r as Record<string, unknown>))
+  })
 }
 
 export async function queryTermCalendar(opts?: { term?: string }): Promise<TermCalendar> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.wdkb);
-    let term = opts?.term;
+    await ensureWeu(_appIds.wdkb)
+    let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq');
+      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
-    const { xn, xq } = splitTerm(term);
-    const datas = await post(_apiPaths.cxxljc, { XN: xn, XQ: xq }, _appIds.wdkb);
-    const rows = extractRows(datas, 'cxxljc');
+    const { xn, xq } = splitTerm(term)
+    const datas = await post(_apiPaths.cxxljc, { XN: xn, XQ: xq }, _appIds.wdkb)
+    const rows = extractRows(datas, "cxxljc")
     if (rows.length === 0) {
-      throw new JWXTProtocolError('queryTermCalendar returned empty result');
+      throw new JWXTProtocolError("queryTermCalendar returned empty result")
     }
-    return parseTermCalendar(rows[0] as Record<string, unknown>);
-  });
+    return parseTermCalendar(rows[0] as Record<string, unknown>)
+  })
 }
 
 export async function queryCurrentWeek(opts?: {
-  term?: string;
-  date?: string;
+  term?: string
+  date?: string
 }): Promise<CurrentWeek> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.wdkb);
-    let term = opts?.term;
+    await ensureWeu(_appIds.wdkb)
+    let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq');
+      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
-    const date = opts?.date ?? todayDate();
-    const cacheKey = `${term}|${date}`;
-    if (cachedCurrentWeek?.key === cacheKey) return cachedCurrentWeek.value;
-    const inflight = inflightCurrentWeek.get(cacheKey);
-    if (inflight) return inflight.promise;
+    const date = opts?.date ?? todayDate()
+    const cacheKey = `${term}|${date}`
+    if (cachedCurrentWeek?.key === cacheKey) return cachedCurrentWeek.value
+    const inflight = inflightCurrentWeek.get(cacheKey)
+    if (inflight) return inflight.promise
 
-    const marker = Symbol(cacheKey);
+    const marker = Symbol(cacheKey)
     const promise = (async () => {
       try {
-        const { xn, xq } = splitTerm(term!);
-        const datas = await post(_apiPaths.dqzc, { XN: xn, XQ: xq, RQ: date }, _appIds.wdkb);
-        const rows = extractRows(datas, 'dqzc');
+        const { xn, xq } = splitTerm(term!)
+        const datas = await post(_apiPaths.dqzc, { XN: xn, XQ: xq, RQ: date }, _appIds.wdkb)
+        const rows = extractRows(datas, "dqzc")
         if (rows.length === 0) {
-          throw new JWXTProtocolError('queryCurrentWeek returned empty result');
+          throw new JWXTProtocolError("queryCurrentWeek returned empty result")
         }
-        const result = parseCurrentWeek(rows[0] as Record<string, unknown>);
-        cachedCurrentWeek = { key: cacheKey, value: result };
-        return result;
+        const result = parseCurrentWeek(rows[0] as Record<string, unknown>)
+        cachedCurrentWeek = { key: cacheKey, value: result }
+        return result
       } finally {
         if (inflightCurrentWeek.get(cacheKey)?.marker === marker) {
-          inflightCurrentWeek.delete(cacheKey);
+          inflightCurrentWeek.delete(cacheKey)
         }
       }
-    })();
+    })()
 
-    inflightCurrentWeek.set(cacheKey, { marker, promise });
-    return promise;
-  });
+    inflightCurrentWeek.set(cacheKey, { marker, promise })
+    return promise
+  })
 }
 
 // ─── Public: Exams ────────────────────────────────────────────────────── //
 
 export async function queryExams(opts?: { term?: string }): Promise<Exam[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.studentWdksapApp);
-    let term = opts?.term;
+    await ensureWeu(_appIds.studentWdksapApp)
+    let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq');
+      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const param: Record<string, unknown> = {
       XNXQDM: term,
-      '*order': '-KSRQ,-KSSJMS',
-    };
-    const datas = await post(_apiPaths.wdksap, {
-      requestParamStr: JSON.stringify(param),
-    }, _appIds.studentWdksapApp);
-    const rows = extractRows(datas, 'cxxsksap');
-    return rows.map((r) => parseExam(r as Record<string, unknown>));
-  });
+      "*order": "-KSRQ,-KSSJMS",
+    }
+    const datas = await post(
+      _apiPaths.wdksap,
+      {
+        requestParamStr: JSON.stringify(param),
+      },
+      _appIds.studentWdksapApp
+    )
+    const rows = extractRows(datas, "cxxsksap")
+    return rows.map((r) => parseExam(r as Record<string, unknown>))
+  })
 }
 
 // ─── Public: Makeup Exams (bkbl) ────────────────────────────────────── //
 
-let cachedMakeupTerm: string | null = null;
-let inflightMakeupTerm: Promise<string> | null = null;
+let cachedMakeupTerm: string | null = null
+let inflightMakeupTerm: Promise<string> | null = null
 const inflightMakeupBatches = new Map<
   string,
   { marker: symbol; promise: Promise<MakeupExamBatch[]> }
->();
+>()
 
 /** 查询补考报名的学年学期（系统参数 BKBMXNXQ，与当前学期可能不同）。 */
 async function getMakeupTerm(): Promise<string> {
-  if (cachedMakeupTerm) return cachedMakeupTerm;
-  if (inflightMakeupTerm) return inflightMakeupTerm;
+  if (cachedMakeupTerm) return cachedMakeupTerm
+  if (inflightMakeupTerm) return inflightMakeupTerm
 
   inflightMakeupTerm = (async () => {
     try {
-      await ensureWeu(_appIds.bkbl);
-      const datas = await post(_apiPaths.bkxtcs, { CSDM: 'KW', ZCSDM: 'BKBMXNXQ' }, _appIds.bkbl);
-      const rows = extractRows(datas, 'cxxtcs');
+      await ensureWeu(_appIds.bkbl)
+      const datas = await post(_apiPaths.bkxtcs, { CSDM: "KW", ZCSDM: "BKBMXNXQ" }, _appIds.bkbl)
+      const rows = extractRows(datas, "cxxtcs")
       if (rows.length === 0) {
-        throw new JWXTProtocolError('makeup term query returned empty result');
+        throw new JWXTProtocolError("makeup term query returned empty result")
       }
-      const term = rawStr(rows[0] as Record<string, unknown>, 'CSZA');
+      const term = rawStr(rows[0] as Record<string, unknown>, "CSZA")
       if (!term) {
-        throw new JWXTProtocolError('makeup term query returned empty CSZA');
+        throw new JWXTProtocolError("makeup term query returned empty CSZA")
       }
-      cachedMakeupTerm = term;
-      return term;
+      cachedMakeupTerm = term
+      return term
     } finally {
-      inflightMakeupTerm = null;
+      inflightMakeupTerm = null
     }
-  })();
+  })()
 
-  return inflightMakeupTerm;
+  return inflightMakeupTerm
 }
 
 /** 查询补考考试批次（cxbkkspc）。term 缺省时使用系统参数配置的补考报名学期。 */
-export async function queryMakeupExamBatches(opts?: {
-  term?: string;
-}): Promise<MakeupExamBatch[]> {
+export async function queryMakeupExamBatches(opts?: { term?: string }): Promise<MakeupExamBatch[]> {
   return runWithReauth(async () => {
-    const term = opts?.term ?? await getMakeupTerm();
-    const inflight = inflightMakeupBatches.get(term);
-    if (inflight) return inflight.promise;
+    const term = opts?.term ?? (await getMakeupTerm())
+    const inflight = inflightMakeupBatches.get(term)
+    if (inflight) return inflight.promise
 
-    const marker = Symbol(term);
+    const marker = Symbol(term)
     const promise = (async () => {
       try {
-        await ensureWeu(_appIds.bkbl);
-        const datas = await post(_apiPaths.bkkspc, { XNXQDM: term }, _appIds.bkbl);
-        const rows = extractRows(datas, 'cxbkkspc');
-        return rows.map((r) => parseMakeupBatch(r as Record<string, unknown>));
+        await ensureWeu(_appIds.bkbl)
+        const datas = await post(_apiPaths.bkkspc, { XNXQDM: term }, _appIds.bkbl)
+        const rows = extractRows(datas, "cxbkkspc")
+        return rows.map((r) => parseMakeupBatch(r as Record<string, unknown>))
       } finally {
         if (inflightMakeupBatches.get(term)?.marker === marker) {
-          inflightMakeupBatches.delete(term);
+          inflightMakeupBatches.delete(term)
         }
       }
-    })();
+    })()
 
-    inflightMakeupBatches.set(term, { marker, promise });
-    return promise;
-  });
+    inflightMakeupBatches.set(term, { marker, promise })
+    return promise
+  })
 }
 
 /**
@@ -1586,41 +1589,65 @@ export async function queryMakeupExamBatches(opts?: {
  * batchId 缺省时取当前批次的第一个。
  */
 export async function queryMakeupExamCourses(opts?: {
-  term?: string;
-  batchId?: string;
-  registered?: boolean;
-  pageSize?: number;
+  term?: string
+  batchId?: string
+  registered?: boolean
+  pageSize?: number
 }): Promise<MakeupExamCourse[]> {
   return runWithReauth(async () => {
-    const term = opts?.term ?? await getMakeupTerm();
-    let batchId = opts?.batchId;
+    const term = opts?.term ?? (await getMakeupTerm())
+    let batchId = opts?.batchId
     if (!batchId) {
-      const batches = await queryMakeupExamBatches({ term });
-      batchId = batches[0]?.batchId ?? '';
+      const batches = await queryMakeupExamBatches({ term })
+      batchId = batches[0]?.batchId ?? ""
     }
-    await ensureWeu(_appIds.bkbl);
+    await ensureWeu(_appIds.bkbl)
 
     const query: Array<Record<string, string>> = [
-      { name: 'XNXQDM', value: term, builder: 'equal', linkOpt: 'and' },
-    ];
+      { name: "XNXQDM", value: term, builder: "equal", linkOpt: "and" },
+    ]
     if (batchId) {
-      query.push({ name: 'KSDM', value: batchId, builder: 'equal', linkOpt: 'and' });
+      query.push({
+        name: "KSDM",
+        value: batchId,
+        builder: "equal",
+        linkOpt: "and",
+      })
     }
     if (opts?.registered) {
-      query.push({ name: 'KSBMZTDM', value: '02', builder: 'm_value_equal', linkOpt: 'and' });
+      query.push({
+        name: "KSBMZTDM",
+        value: "02",
+        builder: "m_value_equal",
+        linkOpt: "and",
+      })
     } else {
-      query.push({ name: 'SFKBM', value: '1', builder: 'equal', linkOpt: 'and' });
-      query.push({ name: 'KSBMZTDM', value: '02', builder: 'notEqual', linkOpt: 'and' });
+      query.push({
+        name: "SFKBM",
+        value: "1",
+        builder: "equal",
+        linkOpt: "and",
+      })
+      query.push({
+        name: "KSBMZTDM",
+        value: "02",
+        builder: "notEqual",
+        linkOpt: "and",
+      })
     }
 
-    const datas = await post(_apiPaths.bkbmmx, {
-      querySetting: JSON.stringify(query),
-      pageSize: String(opts?.pageSize ?? 100),
-      pageNumber: '1',
-    }, _appIds.bkbl);
-    const rows = extractRows(datas, 'cxbkbmmx');
-    return rows.map((r) => parseMakeupCourse(r as Record<string, unknown>));
-  });
+    const datas = await post(
+      _apiPaths.bkbmmx,
+      {
+        querySetting: JSON.stringify(query),
+        pageSize: String(opts?.pageSize ?? 100),
+        pageNumber: "1",
+      },
+      _appIds.bkbl
+    )
+    const rows = extractRows(datas, "cxbkbmmx")
+    return rows.map((r) => parseMakeupCourse(r as Record<string, unknown>))
+  })
 }
 
 /**
@@ -1631,280 +1658,297 @@ export async function queryMakeupExamCourses(opts?: {
  * code === '1' 为成功，其余为拒绝（msg 含原因）。
  */
 export async function signupMakeupExam(args: {
-  taskId: string;
-  batchId: string;
-  studentId?: string;
+  taskId: string
+  batchId: string
+  studentId?: string
 }): Promise<void> {
   return runWithReauth(async () => {
-    const studentId = args.studentId ?? (await queryStudentInfo()).studentId;
-    await ensureWeu(_appIds.bkbl);
+    const studentId = args.studentId ?? (await queryStudentInfo()).studentId
+    await ensureWeu(_appIds.bkbl)
 
     const param = JSON.stringify([
-      { XH: studentId, KSRWID: args.taskId, KSBMZTDM: '02', KSDM: args.batchId },
-    ]);
-    const datas = await post(_apiPaths.xgksrwxs, { param }, _appIds.bkbl);
+      {
+        XH: studentId,
+        KSRWID: args.taskId,
+        KSBMZTDM: "02",
+        KSDM: args.batchId,
+      },
+    ])
+    const datas = await post(_apiPaths.xgksrwxs, { param }, _appIds.bkbl)
 
-    const node = datas['xgksrwxs'];
+    const node = datas["xgksrwxs"]
     const ext =
-      node !== null && typeof node === 'object'
-        ? (node as Record<string, unknown>)['extParams']
-        : null;
-    if (ext === null || typeof ext !== 'object') {
-      throw new JWXTProtocolError('missing xgksrwxs.extParams in response');
+      node !== null && typeof node === "object"
+        ? (node as Record<string, unknown>)["extParams"]
+        : null
+    if (ext === null || typeof ext !== "object") {
+      throw new JWXTProtocolError("missing xgksrwxs.extParams in response")
     }
-    const extParams = ext as Record<string, unknown>;
-    if (String(extParams['code'] ?? '') !== '1') {
+    const extParams = ext as Record<string, unknown>
+    if (String(extParams["code"] ?? "") !== "1") {
       throw new JWXTBusinessError(
-        extParams['code'] as string | number | null,
-        (extParams['msg'] as string | null) ?? null,
-        buildApiUrl(_apiPaths.xgksrwxs),
-      );
+        extParams["code"] as string | number | null,
+        (extParams["msg"] as string | null) ?? null,
+        buildApiUrl(_apiPaths.xgksrwxs)
+      )
     }
-  });
+  })
 }
 
 // ─── Public: School-wide Schedules (kcbcx) ──────────────────────────── //
 
 /** kcbcx 应用首页，代码表与列表接口需要它作为 Referer。 */
 function kcbcxIndexUrl(): string {
-  return `${jwxtUrls.appBase}/kcbcx/*default/index.do`;
+  return `${jwxtUrls.appBase}/kcbcx/*default/index.do`
 }
 
 /** 查询年级代码表。 */
 export async function queryGradeYears(): Promise<CodeItem[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.kcbcx);
-    const datas = await post(_apiPaths.code_nj, {}, _appIds.kcbcx, kcbcxIndexUrl());
-    return extractRows(datas, 'code').map((r) => parseCodeItem(r as Record<string, unknown>));
-  });
+    await ensureWeu(_appIds.kcbcx)
+    const datas = await post(_apiPaths.code_nj, {}, _appIds.kcbcx, kcbcxIndexUrl())
+    return extractRows(datas, "code").map((r) => parseCodeItem(r as Record<string, unknown>))
+  })
 }
 
 /** 查询院系代码表。 */
 export async function queryDepartments(): Promise<CodeItem[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.kcbcx);
-    const datas = await post(_apiPaths.code_yxdm, {}, _appIds.kcbcx, kcbcxIndexUrl());
-    return extractRows(datas, 'code').map((r) => parseCodeItem(r as Record<string, unknown>));
-  });
+    await ensureWeu(_appIds.kcbcx)
+    const datas = await post(_apiPaths.code_yxdm, {}, _appIds.kcbcx, kcbcxIndexUrl())
+    return extractRows(datas, "code").map((r) => parseCodeItem(r as Record<string, unknown>))
+  })
 }
 
 /** 查询专业代码表（服务端不过滤，院系级联在客户端完成）。 */
 export async function queryMajors(department?: string): Promise<MajorInfo[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.kcbcx);
-    const datas = await post(_apiPaths.code_zydm, {}, _appIds.kcbcx, kcbcxIndexUrl());
-    const majors = extractRows(datas, 'code').map((r) =>
-      parseMajor(r as Record<string, unknown>),
-    );
-    if (department === undefined) return majors;
-    return majors.filter((m) => m.department === department);
-  });
+    await ensureWeu(_appIds.kcbcx)
+    const datas = await post(_apiPaths.code_zydm, {}, _appIds.kcbcx, kcbcxIndexUrl())
+    const majors = extractRows(datas, "code").map((r) => parseMajor(r as Record<string, unknown>))
+    if (department === undefined) return majors
+    return majors.filter((m) => m.department === department)
+  })
 }
 
 /** 查询全校班级列表（bjcx），可按年级/院系/专业级联筛选。 */
 export async function querySchoolClasses(opts?: {
-  term?: string;
-  grade?: string;
-  department?: string;
-  major?: string;
-  pageSize?: number;
+  term?: string
+  grade?: string
+  department?: string
+  major?: string
+  pageSize?: number
 }): Promise<SchoolClassInfo[]> {
   return runWithReauth(async () => {
-    const term =
-      opts?.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq'));
-    await ensureWeu(_appIds.kcbcx);
+    const term = opts?.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq"))
+    await ensureWeu(_appIds.kcbcx)
     const form: Record<string, string> = {
       XNXQDM: term,
-      SFSY: '1',
-      '*order': '-NJ,+YXPX,+ZYPX,+PX',
+      SFSY: "1",
+      "*order": "-NJ,+YXPX,+ZYPX,+PX",
       pageSize: String(opts?.pageSize ?? 1000),
-      pageNumber: '1',
-    };
-    if (opts?.grade !== undefined) form['NJ'] = opts.grade;
-    if (opts?.department !== undefined) form['YXDM'] = opts.department;
-    if (opts?.major !== undefined) form['ZYDM'] = opts.major;
-    const datas = await post(_apiPaths.bjcx, form, _appIds.kcbcx, kcbcxIndexUrl());
-    return extractRows(datas, 'bjcx').map((r) =>
-      parseSchoolClassInfo(r as Record<string, unknown>),
-    );
-  });
+      pageNumber: "1",
+    }
+    if (opts?.grade !== undefined) form["NJ"] = opts.grade
+    if (opts?.department !== undefined) form["YXDM"] = opts.department
+    if (opts?.major !== undefined) form["ZYDM"] = opts.major
+    const datas = await post(_apiPaths.bjcx, form, _appIds.kcbcx, kcbcxIndexUrl())
+    return extractRows(datas, "bjcx").map((r) => parseSchoolClassInfo(r as Record<string, unknown>))
+  })
 }
 
 /** 班级/教室课表系列接口的共用实现（requestParamStr 风格）。 */
 async function queryBjkbRows(args: {
-  pathKey: string;
-  rowKey: string;
-  idParam: string;
-  idValue: string;
-  term?: string;
+  pathKey: string
+  rowKey: string
+  idParam: string
+  idValue: string
+  term?: string
 }): Promise<Record<string, unknown>[]> {
-  const term =
-    args.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq'));
-  await ensureWeu(_appIds.kcbcx);
-  const payload: Record<string, string> = { XNXQDM: term };
-  payload[args.idParam] = args.idValue;
+  const term = args.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq"))
+  await ensureWeu(_appIds.kcbcx)
+  const payload: Record<string, string> = { XNXQDM: term }
+  payload[args.idParam] = args.idValue
   const datas = await post(
     _apiPaths[args.pathKey]!,
     { requestParamStr: JSON.stringify(payload) },
     _appIds.kcbcx,
-    kcbcxIndexUrl(),
-  );
-  return extractRows(datas, args.rowKey) as Record<string, unknown>[];
+    kcbcxIndexUrl()
+  )
+  return extractRows(datas, args.rowKey) as Record<string, unknown>[]
 }
 
 /** 查询指定行政班的课表（querybjkb），与个人课表同构。 */
 export async function queryClassSchedule(
   classId: string,
-  opts?: { term?: string },
+  opts?: { term?: string }
 ): Promise<Course[]> {
   return runWithReauth(async () => {
     const rows = await queryBjkbRows({
-      pathKey: 'kcbcx',
-      rowKey: 'querybjkb',
-      idParam: 'BJDM',
+      pathKey: "kcbcx",
+      rowKey: "querybjkb",
+      idParam: "BJDM",
       idValue: classId,
       term: opts?.term,
-    });
-    return rows.map(parseCourse);
-  });
+    })
+    return rows.map(parseCourse)
+  })
 }
 
 /** 查询校区代码表。 */
 export async function queryCampuses(): Promise<CodeItem[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.kcbcx);
-    const datas = await post(_apiPaths.code_xxxq, {}, _appIds.kcbcx, kcbcxIndexUrl());
-    return extractRows(datas, 'code').map((r) => parseCodeItem(r as Record<string, unknown>));
-  });
+    await ensureWeu(_appIds.kcbcx)
+    const datas = await post(_apiPaths.code_xxxq, {}, _appIds.kcbcx, kcbcxIndexUrl())
+    return extractRows(datas, "code").map((r) => parseCodeItem(r as Record<string, unknown>))
+  })
 }
 
 /** 查询教学楼代码表（按校区代码客户端过滤）。 */
 export async function queryTeachingBuildings(campus?: string): Promise<CodeItem[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.kcbcx);
-    const datas = await post(_apiPaths.code_jxldm, {}, _appIds.kcbcx, kcbcxIndexUrl());
-    const items = extractRows(datas, 'code').map((r) =>
-      parseCodeItem(r as Record<string, unknown>),
-    );
-    if (campus === undefined) return items;
+    await ensureWeu(_appIds.kcbcx)
+    const datas = await post(_apiPaths.code_jxldm, {}, _appIds.kcbcx, kcbcxIndexUrl())
+    const items = extractRows(datas, "code").map((r) => parseCodeItem(r as Record<string, unknown>))
+    if (campus === undefined) return items
     return items.filter((item) => {
-      const other = item.raw['otherFields'];
+      const other = item.raw["otherFields"]
       const xxxqdm =
-        other !== null && typeof other === 'object'
-          ? (other as Record<string, unknown>)['XXXQDM']
-          : null;
-      return String(xxxqdm ?? '') === campus;
-    });
-  });
+        other !== null && typeof other === "object"
+          ? (other as Record<string, unknown>)["XXXQDM"]
+          : null
+      return String(xxxqdm ?? "") === campus
+    })
+  })
 }
 
 /** 查询全校教室列表（jscx），可按名称/校区/教学楼筛选。 */
 export async function queryClassrooms(opts?: {
-  term?: string;
-  name?: string;
-  campus?: string;
-  building?: string;
-  pageSize?: number;
-  pageNumber?: number;
+  term?: string
+  name?: string
+  campus?: string
+  building?: string
+  pageSize?: number
+  pageNumber?: number
 }): Promise<ClassroomInfo[]> {
   return runWithReauth(async () => {
-    const term =
-      opts?.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq'));
-    await ensureWeu(_appIds.kcbcx);
+    const term = opts?.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq"))
+    await ensureWeu(_appIds.kcbcx)
 
-    const query: Array<Record<string, string>> = [];
+    const query: Array<Record<string, string>> = []
     if (opts?.name) {
-      query.push({ name: 'JASMC', builder: 'include', linkOpt: 'AND', value: opts.name });
+      query.push({
+        name: "JASMC",
+        builder: "include",
+        linkOpt: "AND",
+        value: opts.name,
+      })
     }
     if (opts?.campus !== undefined) {
-      query.push({ name: 'XXXQDM', builder: 'equal', linkOpt: 'AND', value: opts.campus });
+      query.push({
+        name: "XXXQDM",
+        builder: "equal",
+        linkOpt: "AND",
+        value: opts.campus,
+      })
     }
     if (opts?.building !== undefined) {
-      query.push({ name: 'JXLDM', builder: 'equal', linkOpt: 'AND', value: opts.building });
+      query.push({
+        name: "JXLDM",
+        builder: "equal",
+        linkOpt: "AND",
+        value: opts.building,
+      })
     }
 
     const form: Record<string, string> = {
       XNXQDM: term,
-      '*order': '+JXLDM,+JASMC',
+      "*order": "+JXLDM,+JASMC",
       pageSize: String(opts?.pageSize ?? 500),
       pageNumber: String(opts?.pageNumber ?? 1),
-    };
-    if (query.length > 0) {
-      form['querySetting'] = JSON.stringify(query);
     }
-    const datas = await post(_apiPaths.jscx, form, _appIds.kcbcx, kcbcxIndexUrl());
-    return extractRows(datas, 'jscx').map((r) =>
-      parseClassroomInfo(r as Record<string, unknown>),
-    );
-  });
+    if (query.length > 0) {
+      form["querySetting"] = JSON.stringify(query)
+    }
+    const datas = await post(_apiPaths.jscx, form, _appIds.kcbcx, kcbcxIndexUrl())
+    return extractRows(datas, "jscx").map((r) => parseClassroomInfo(r as Record<string, unknown>))
+  })
 }
 
 /** 查询指定教室的课表（queryjaskb）。 */
 export async function queryClassroomSchedule(
   classroomCode: string,
-  opts?: { term?: string },
+  opts?: { term?: string }
 ): Promise<Course[]> {
   return runWithReauth(async () => {
     const rows = await queryBjkbRows({
-      pathKey: 'jaskb',
-      rowKey: 'queryjaskb',
-      idParam: 'JASDM',
+      pathKey: "jaskb",
+      rowKey: "queryjaskb",
+      idParam: "JASDM",
       idValue: classroomCode,
       term: opts?.term,
-    });
-    return rows.map(parseCourse);
-  });
+    })
+    return rows.map(parseCourse)
+  })
 }
 
 // ─── Public: Training Plan / Academic ─────────────────────────────────── //
 
 export async function queryTrainingPlan(opts?: {
-  pageSize?: number;
-  pageNumber?: number;
+  pageSize?: number
+  pageNumber?: number
 }): Promise<TrainingPlan[]> {
-  const pageSize = opts?.pageSize ?? 999;
-  const pageNumber = opts?.pageNumber ?? 1;
+  const pageSize = opts?.pageSize ?? 999
+  const pageNumber = opts?.pageNumber ?? 1
 
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.xsfacx);
+    await ensureWeu(_appIds.xsfacx)
 
-    const firstDatas = await post(_apiPaths.pyfa, {}, _appIds.xsfacx);
-    const planRows = extractRows(firstDatas, 'grpyfacx');
+    const firstDatas = await post(_apiPaths.pyfa, {}, _appIds.xsfacx)
+    const planRows = extractRows(firstDatas, "grpyfacx")
     if (planRows.length === 0) {
-      throw new JWXTProtocolError('queryTrainingPlan: no training plan found');
+      throw new JWXTProtocolError("queryTrainingPlan: no training plan found")
     }
-    const pyfadm = rawStr(planRows[0] as Record<string, unknown>, 'PYFADM');
+    const pyfadm = rawStr(planRows[0] as Record<string, unknown>, "PYFADM")
     if (!pyfadm) {
-      throw new JWXTProtocolError('queryTrainingPlan: PYFADM is empty');
+      throw new JWXTProtocolError("queryTrainingPlan: PYFADM is empty")
     }
 
-    const datas = await post(_apiPaths.pyfa_courses, {
-      PYFADM: pyfadm,
-      pageSize: String(pageSize),
-      pageNumber: String(pageNumber),
-    }, _appIds.xsfacx);
-    const rows = extractRows(datas, 'kzkccx');
-    return rows.map((r) => parseTrainingPlan(r as Record<string, unknown>));
-  });
+    const datas = await post(
+      _apiPaths.pyfa_courses,
+      {
+        PYFADM: pyfadm,
+        pageSize: String(pageSize),
+        pageNumber: String(pageNumber),
+      },
+      _appIds.xsfacx
+    )
+    const rows = extractRows(datas, "kzkccx")
+    return rows.map((r) => parseTrainingPlan(r as Record<string, unknown>))
+  })
 }
 
 async function queryCompletionRow(): Promise<Record<string, unknown>> {
-  const datas = await post(_apiPaths.xywc, {
-    SCLBDM: '04',
-    '*order': '-CZSJ',
-  }, _appIds.xywccx);
-  const rows = extractRows(datas, 'cxxsscfa');
+  const datas = await post(
+    _apiPaths.xywc,
+    {
+      SCLBDM: "04",
+      "*order": "-CZSJ",
+    },
+    _appIds.xywccx
+  )
+  const rows = extractRows(datas, "cxxsscfa")
   if (rows.length === 0) {
-    throw new JWXTProtocolError('queryAcademicCompletion returned empty result');
+    throw new JWXTProtocolError("queryAcademicCompletion returned empty result")
   }
-  return rows[0] as Record<string, unknown>;
+  return rows[0] as Record<string, unknown>
 }
 
 export async function queryAcademicCompletion(): Promise<AcademicCompletion> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.xywccx);
-    return parseAcademicCompletion(await queryCompletionRow());
-  });
+    await ensureWeu(_appIds.xywccx)
+    return parseAcademicCompletion(await queryCompletionRow())
+  })
 }
 
 /**
@@ -1913,133 +1957,153 @@ export async function queryAcademicCompletion(): Promise<AcademicCompletion> {
  * 完成后重新查询并返回最新结果。
  */
 export async function recalculateAcademicCompletion(options?: {
-  timeoutMs?: number;
-  pollIntervalMs?: number;
+  timeoutMs?: number
+  pollIntervalMs?: number
 }): Promise<AcademicCompletion> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.xywccx);
+    await ensureWeu(_appIds.xywccx)
 
-    const row = await queryCompletionRow();
-    const pyfadm = rawStr(row, 'PYFADM');
-    const studentId = rawStr(row, 'XH');
+    const row = await queryCompletionRow()
+    const pyfadm = rawStr(row, "PYFADM")
+    const studentId = rawStr(row, "XH")
     if (!pyfadm || !studentId) {
-      throw new JWXTProtocolError('recalculateAcademicCompletion: PYFADM/XH missing in completion row');
+      throw new JWXTProtocolError(
+        "recalculateAcademicCompletion: PYFADM/XH missing in completion row"
+      )
     }
 
-    const datas = await post(_apiPaths.xywc_recalc, {
-      PYFADM: pyfadm,
-      BYNJDM: rawStr(row, 'BYNJDM') || '-',
-      SCLBDM: rawStr(row, 'SCLBDM') || '04',
-    }, _appIds.xywccx);
-    const result = datas['bysc'] as Record<string, unknown> | undefined;
-    if (!result || !('code' in result)) {
-      throw new JWXTProtocolError('recalculateAcademicCompletion: malformed bysc response');
+    const datas = await post(
+      _apiPaths.xywc_recalc,
+      {
+        PYFADM: pyfadm,
+        BYNJDM: rawStr(row, "BYNJDM") || "-",
+        SCLBDM: rawStr(row, "SCLBDM") || "04",
+      },
+      _appIds.xywccx
+    )
+    const result = datas["bysc"] as Record<string, unknown> | undefined
+    if (!result || !("code" in result)) {
+      throw new JWXTProtocolError("recalculateAcademicCompletion: malformed bysc response")
     }
-    if (String(result['code']) !== '0') {
+    if (String(result["code"]) !== "0") {
       throw new JWXTBusinessError(
-        result['code'] as string | number | null,
-        (result['msg'] as string | null) ?? null,
-        _apiPaths.xywc_recalc,
-      );
+        result["code"] as string | number | null,
+        (result["msg"] as string | null) ?? null,
+        _apiPaths.xywc_recalc
+      )
     }
 
-    const timeoutMs = options?.timeoutMs ?? 60_000;
-    const pollIntervalMs = options?.pollIntervalMs ?? 2_000;
-    const deadline = Date.now() + timeoutMs;
-    const progressKey = `BYSC_${studentId}`;
+    const timeoutMs = options?.timeoutMs ?? 60_000
+    const pollIntervalMs = options?.pollIntervalMs ?? 2_000
+    const deadline = Date.now() + timeoutMs
+    const progressKey = `BYSC_${studentId}`
     for (;;) {
-      const progress = await post(_apiPaths.xywc_recalc_progress, {
-        ZXJDKEY: progressKey,
-      }, _appIds.xywccx);
-      const rows = extractRows(progress, 'byscjd');
+      const progress = await post(
+        _apiPaths.xywc_recalc_progress,
+        {
+          ZXJDKEY: progressKey,
+        },
+        _appIds.xywccx
+      )
+      const rows = extractRows(progress, "byscjd")
       if (rows.length > 0) {
-        const progressRow = rows[0] as Record<string, unknown>;
-        const total = Number(progressRow['ZS'] ?? 0);
-        const done = Number(progressRow['YWCS'] ?? 0);
-        if (total > 0 && done >= total) break;
+        const progressRow = rows[0] as Record<string, unknown>
+        const total = Number(progressRow["ZS"] ?? 0)
+        const done = Number(progressRow["YWCS"] ?? 0)
+        if (total > 0 && done >= total) break
       }
       if (Date.now() >= deadline) {
-        throw new JWXTProtocolError('recalculateAcademicCompletion: timed out waiting for recalculation');
+        throw new JWXTProtocolError(
+          "recalculateAcademicCompletion: timed out waiting for recalculation"
+        )
       }
-      const { promise: tick, resolve: tickDone } = Promise.withResolvers<void>();
-      setTimeout(tickDone, pollIntervalMs);
-      await tick;
+      const { promise: tick, resolve: tickDone } = Promise.withResolvers<void>()
+      setTimeout(tickDone, pollIntervalMs)
+      await tick
     }
 
-    return parseAcademicCompletion(await queryCompletionRow());
-  });
+    return parseAcademicCompletion(await queryCompletionRow())
+  })
 }
 
 export async function queryAcademicWarnings(): Promise<AcademicWarning[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.xyyj);
-    const datas = await post(_apiPaths.xyyj, {}, _appIds.xyyj);
-    const rows = extractRows(datas, 'cxxsyjpcjg');
-    return rows.map((r) => parseAcademicWarning(r as Record<string, unknown>));
-  });
+    await ensureWeu(_appIds.xyyj)
+    const datas = await post(_apiPaths.xyyj, {}, _appIds.xyyj)
+    const rows = extractRows(datas, "cxxsyjpcjg")
+    return rows.map((r) => parseAcademicWarning(r as Record<string, unknown>))
+  })
 }
 
 // ─── Public: Evaluation ───────────────────────────────────────────────── //
 
 export async function queryEvaluationTypes(opts?: { term?: string }): Promise<EvaluationType[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.pjapp);
-    let term = opts?.term;
+    await ensureWeu(_appIds.pjapp)
+    let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq');
+      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
-    const datas = await post(_apiPaths.pjlx, { XNXQDM: term }, _appIds.pjapp);
-    const rows = extractRows(datas, 'getPjlx');
-    return rows.map((r) => parseEvaluationType(r as Record<string, unknown>));
-  });
+    const datas = await post(_apiPaths.pjlx, { XNXQDM: term }, _appIds.pjapp)
+    const rows = extractRows(datas, "getPjlx")
+    return rows.map((r) => parseEvaluationType(r as Record<string, unknown>))
+  })
 }
 
 export async function queryPendingEvaluations(
   evalType: string,
-  opts?: { term?: string },
+  opts?: { term?: string }
 ): Promise<EvaluationTask[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.pjapp);
-    let term = opts?.term;
+    await ensureWeu(_appIds.pjapp)
+    let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, 'wdksap_dqxnxq');
+      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const query = [
       {
-        name: 'XNXQDM',
-        builder: 'm_value_equal',
-        linkOpt: 'AND',
+        name: "XNXQDM",
+        builder: "m_value_equal",
+        linkOpt: "AND",
         value: term,
       },
-    ];
-    const datas = await post(_apiPaths.dpwj, {
-      PJLXDM: evalType,
-      querySetting: JSON.stringify(query),
-    }, _appIds.pjapp);
-    const rows = extractRows(datas, 'getDpwj');
-    return rows.map((r) => parseEvaluationTask(r as Record<string, unknown>));
-  });
+    ]
+    const datas = await post(
+      _apiPaths.dpwj,
+      {
+        PJLXDM: evalType,
+        querySetting: JSON.stringify(query),
+      },
+      _appIds.pjapp
+    )
+    const rows = extractRows(datas, "getDpwj")
+    return rows.map((r) => parseEvaluationTask(r as Record<string, unknown>))
+  })
 }
 
 export async function getEvaluationDetail(
   groupNo: string,
   evalType: string,
-  opts?: { sequence?: number },
+  opts?: { sequence?: number }
 ): Promise<EvaluationDetail> {
-  const sequence = opts?.sequence ?? 1;
+  const sequence = opts?.sequence ?? 1
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.pjapp);
-    const datas = await post(_apiPaths.wjtxxx, {
-      GROUPNO: groupNo,
-      PJLXDM: evalType,
-      XUH: String(sequence),
-    }, _appIds.pjapp);
-    const raw = datas['getWjtxxx'];
-    if (!raw || typeof raw !== 'object') {
-      throw new JWXTProtocolError('getEvaluationDetail returned empty result');
+    await ensureWeu(_appIds.pjapp)
+    const datas = await post(
+      _apiPaths.wjtxxx,
+      {
+        GROUPNO: groupNo,
+        PJLXDM: evalType,
+        XUH: String(sequence),
+      },
+      _appIds.pjapp
+    )
+    const raw = datas["getWjtxxx"]
+    if (!raw || typeof raw !== "object") {
+      throw new JWXTProtocolError("getEvaluationDetail returned empty result")
     }
-    return parseEvaluationDetail(raw as Record<string, unknown>);
-  });
+    return parseEvaluationDetail(raw as Record<string, unknown>)
+  })
 }
 
 export async function calculateEvaluationScore(
@@ -2048,21 +2112,21 @@ export async function calculateEvaluationScore(
   evalType: string,
   answers: readonly EvaluationAnswer[],
   opts?: {
-    teacherRelationId?: string;
-    courseName?: string;
-    teacherName?: string;
-    sequence?: number;
-  },
+    teacherRelationId?: string
+    courseName?: string
+    teacherName?: string
+    sequence?: number
+  }
 ): Promise<Record<string, unknown>> {
-  void groupNo;
-  void evalType;
-  const teacherRelationId = opts?.teacherRelationId ?? '';
-  const courseName = opts?.courseName ?? '';
-  const teacherName = opts?.teacherName ?? '';
-  const sequence = opts?.sequence ?? 1;
+  void groupNo
+  void evalType
+  const teacherRelationId = opts?.teacherRelationId ?? ""
+  const courseName = opts?.courseName ?? ""
+  const teacherName = opts?.teacherName ?? ""
+  const sequence = opts?.sequence ?? 1
 
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.pjapp);
+    await ensureWeu(_appIds.pjapp)
     return post(
       _apiPaths.calculate_score,
       evaluationFormData({
@@ -2073,9 +2137,9 @@ export async function calculateEvaluationScore(
         teacherName,
         sequence,
       }),
-      _appIds.pjapp,
-    );
-  });
+      _appIds.pjapp
+    )
+  })
 }
 
 export async function submitEvaluation(
@@ -2084,21 +2148,21 @@ export async function submitEvaluation(
   evalType: string,
   answers: readonly EvaluationAnswer[],
   opts?: {
-    teacherRelationId?: string;
-    courseName?: string;
-    teacherName?: string;
-    sequence?: number;
-  },
+    teacherRelationId?: string
+    courseName?: string
+    teacherName?: string
+    sequence?: number
+  }
 ): Promise<void> {
-  void groupNo;
-  void evalType;
-  const teacherRelationId = opts?.teacherRelationId ?? '';
-  const courseName = opts?.courseName ?? '';
-  const teacherName = opts?.teacherName ?? '';
-  const sequence = opts?.sequence ?? 1;
+  void groupNo
+  void evalType
+  const teacherRelationId = opts?.teacherRelationId ?? ""
+  const courseName = opts?.courseName ?? ""
+  const teacherName = opts?.teacherName ?? ""
+  const sequence = opts?.sequence ?? 1
 
   await runWithReauth(async () => {
-    await ensureWeu(_appIds.pjapp);
+    await ensureWeu(_appIds.pjapp)
     await post(
       _apiPaths.commit_answer,
       evaluationFormData({
@@ -2109,412 +2173,405 @@ export async function submitEvaluation(
         teacherName,
         sequence,
       }),
-      _appIds.pjapp,
-    );
-  });
+      _appIds.pjapp
+    )
+  })
 }
 
 // ─── Parsers ──────────────────────────────────────────────────────────── //
 
 function parseGrade(raw: Record<string, unknown>): Grade {
-  const zcj = raw['ZCJ'];
-  const score =
-    zcj !== undefined && zcj !== null ? String(zcj) : rawStr(raw, 'XSZCJMC');
+  const zcj = raw["ZCJ"]
+  const score = zcj !== undefined && zcj !== null ? String(zcj) : rawStr(raw, "XSZCJMC")
 
   return {
-    courseName: rawStr(raw, 'XSKCM', 'KCM'),
-    courseCode: rawStr(raw, 'XSKCH', 'KCH'),
-    classId: rawStr(raw, 'JXBID'),
+    courseName: rawStr(raw, "XSKCM", "KCM"),
+    courseCode: rawStr(raw, "XSKCH", "KCH"),
+    classId: rawStr(raw, "JXBID"),
     score,
-    numericScore: rawOptionalNum(raw, 'ZCJ'),
-    gradeLevel: rawStr(raw, 'XSZCJMC'),
-    gradePoint: rawStr(raw, 'XFJD'),
-    numericGradePoint: rawOptionalNum(raw, 'XFJD'),
-    credit: rawStr(raw, 'XF'),
-    numericCredit: rawOptionalNum(raw, 'XF'),
-    hours: rawStr(raw, 'XS'),
-    term: rawStr(raw, 'XNXQDM'),
-    courseType: rawStr(raw, 'KCXZDM_DISPLAY', 'KCXZDM'),
-    courseCategory: rawStr(raw, 'KCLBDM_DISPLAY'),
-    examType: rawStr(raw, 'KSLXDM_DISPLAY', 'KSLXDM'),
-    studyMode: rawStr(raw, 'XDFSDM_DISPLAY'),
-    isMajor: toBool(raw['SFZX']),
-    isRetake: rawStr(raw, 'CXCKDM_DISPLAY'),
-    gradeLevelType: rawStr(raw, 'XSDJCJLXDM_DISPLAY'),
-    department: rawStr(raw, 'KKDWDM_DISPLAY'),
-    isPass: toBool(raw['SFJG']),
-    isValid: toBool(raw['SFYX']),
-    specialReason: rawStr(raw, 'TSYYDM_DISPLAY'),
-    isDegreeCourse: toBool(raw['SFZGKC']),
-    projectName: rawStr(raw, 'TYXMDM_DISPLAY'),
+    numericScore: rawOptionalNum(raw, "ZCJ"),
+    gradeLevel: rawStr(raw, "XSZCJMC"),
+    gradePoint: rawStr(raw, "XFJD"),
+    numericGradePoint: rawOptionalNum(raw, "XFJD"),
+    credit: rawStr(raw, "XF"),
+    numericCredit: rawOptionalNum(raw, "XF"),
+    hours: rawStr(raw, "XS"),
+    term: rawStr(raw, "XNXQDM"),
+    courseType: rawStr(raw, "KCXZDM_DISPLAY", "KCXZDM"),
+    courseCategory: rawStr(raw, "KCLBDM_DISPLAY"),
+    examType: rawStr(raw, "KSLXDM_DISPLAY", "KSLXDM"),
+    studyMode: rawStr(raw, "XDFSDM_DISPLAY"),
+    isMajor: toBool(raw["SFZX"]),
+    isRetake: rawStr(raw, "CXCKDM_DISPLAY"),
+    gradeLevelType: rawStr(raw, "XSDJCJLXDM_DISPLAY"),
+    department: rawStr(raw, "KKDWDM_DISPLAY"),
+    isPass: toBool(raw["SFJG"]),
+    isValid: toBool(raw["SFYX"]),
+    specialReason: rawStr(raw, "TSYYDM_DISPLAY"),
+    isDegreeCourse: toBool(raw["SFZGKC"]),
+    projectName: rawStr(raw, "TYXMDM_DISPLAY"),
     raw,
-  };
+  }
 }
 
 function parseGpaStats(raw: Record<string, unknown>): GPAStats {
   return {
-    planName: rawStr(raw, 'PYFAMC'),
-    studyType: rawStr(raw, 'FAXDLX_DISPLAY'),
-    requiredCreditEarned: rawStr(raw, 'BXKHDXF'),
-    numericRequiredCreditEarned: rawOptionalNum(raw, 'BXKHDXF'),
-    electiveCreditEarned: rawStr(raw, 'XXKHDXF'),
-    numericElectiveCreditEarned: rawOptionalNum(raw, 'XXKHDXF'),
-    degreeCreditEarned: rawStr(raw, 'XWKHDXF'),
-    numericDegreeCreditEarned: rawOptionalNum(raw, 'XWKHDXF'),
-    requiredCreditFailed: rawStr(raw, 'BXKBJGXF'),
-    numericRequiredCreditFailed: rawOptionalNum(raw, 'BXKBJGXF'),
-    gpaInitial: rawStr(raw, 'PPJDCX'),
-    numericGpaInitial: rawOptionalNum(raw, 'PPJDCX'),
-    gpaHighest: rawStr(raw, 'PPJDZG'),
-    numericGpaHighest: rawOptionalNum(raw, 'PPJDZG'),
-    requiredGpaHighest: rawStr(raw, 'BXKPPJD'),
-    numericRequiredGpaHighest: rawOptionalNum(raw, 'BXKPPJD'),
-    degreeGpaInitial: rawStr(raw, 'XWKPJJDCX'),
-    numericDegreeGpaInitial: rawOptionalNum(raw, 'XWKPJJDCX'),
-    degreeGpaHighest: rawStr(raw, 'XWKPJJDZG'),
-    numericDegreeGpaHighest: rawOptionalNum(raw, 'XWKPJJDZG'),
-    weightedAvg: rawStr(raw, 'JQPJF'),
-    numericWeightedAvg: rawOptionalNum(raw, 'JQPJF'),
-    arithmeticAvg: rawStr(raw, 'SSPJF'),
-    numericArithmeticAvg: rawOptionalNum(raw, 'SSPJF'),
-    degreeWeightedAvg: rawStr(raw, 'XWKJQPJF'),
-    numericDegreeWeightedAvg: rawOptionalNum(raw, 'XWKJQPJF'),
+    planName: rawStr(raw, "PYFAMC"),
+    studyType: rawStr(raw, "FAXDLX_DISPLAY"),
+    requiredCreditEarned: rawStr(raw, "BXKHDXF"),
+    numericRequiredCreditEarned: rawOptionalNum(raw, "BXKHDXF"),
+    electiveCreditEarned: rawStr(raw, "XXKHDXF"),
+    numericElectiveCreditEarned: rawOptionalNum(raw, "XXKHDXF"),
+    degreeCreditEarned: rawStr(raw, "XWKHDXF"),
+    numericDegreeCreditEarned: rawOptionalNum(raw, "XWKHDXF"),
+    requiredCreditFailed: rawStr(raw, "BXKBJGXF"),
+    numericRequiredCreditFailed: rawOptionalNum(raw, "BXKBJGXF"),
+    gpaInitial: rawStr(raw, "PPJDCX"),
+    numericGpaInitial: rawOptionalNum(raw, "PPJDCX"),
+    gpaHighest: rawStr(raw, "PPJDZG"),
+    numericGpaHighest: rawOptionalNum(raw, "PPJDZG"),
+    requiredGpaHighest: rawStr(raw, "BXKPPJD"),
+    numericRequiredGpaHighest: rawOptionalNum(raw, "BXKPPJD"),
+    degreeGpaInitial: rawStr(raw, "XWKPJJDCX"),
+    numericDegreeGpaInitial: rawOptionalNum(raw, "XWKPJJDCX"),
+    degreeGpaHighest: rawStr(raw, "XWKPJJDZG"),
+    numericDegreeGpaHighest: rawOptionalNum(raw, "XWKPJJDZG"),
+    weightedAvg: rawStr(raw, "JQPJF"),
+    numericWeightedAvg: rawOptionalNum(raw, "JQPJF"),
+    arithmeticAvg: rawStr(raw, "SSPJF"),
+    numericArithmeticAvg: rawOptionalNum(raw, "SSPJF"),
+    degreeWeightedAvg: rawStr(raw, "XWKJQPJF"),
+    numericDegreeWeightedAvg: rawOptionalNum(raw, "XWKJQPJF"),
     raw,
-  };
+  }
 }
 
 function parseGradeStatistics(raw: Record<string, unknown>): GradeStatistics {
   return {
-    scope: TJLX_TO_SCOPE[String(raw['TJLX'] ?? '')] ?? '',
-    term: rawStr(raw, 'XNXQDM'),
-    classId: rawStr(raw, 'JXBID'),
-    courseCode: rawStr(raw, 'KCH'),
-    highestScore: rawNum(raw, 'ZGF'),
-    lowestScore: rawNum(raw, 'ZDF'),
-    averageScore: rawNum(raw, 'PJF'),
+    scope: TJLX_TO_SCOPE[String(raw["TJLX"] ?? "")] ?? "",
+    term: rawStr(raw, "XNXQDM"),
+    classId: rawStr(raw, "JXBID"),
+    courseCode: rawStr(raw, "KCH"),
+    highestScore: rawNum(raw, "ZGF"),
+    lowestScore: rawNum(raw, "ZDF"),
+    averageScore: rawNum(raw, "PJF"),
     raw,
-  };
+  }
 }
 
 function parseGradeDistribution(raw: Record<string, unknown>): GradeDistribution {
   return {
-    scope: TJLX_TO_SCOPE[String(raw['TJLX'] ?? '')] ?? '',
-    term: rawStr(raw, 'XNXQDM'),
-    classId: rawStr(raw, 'JXBID'),
-    courseCode: rawStr(raw, 'KCH'),
-    levelCode: rawStr(raw, 'DJDM'),
-    levelName: rawStr(raw, 'DJDM_DISPLAY'),
-    count: rawInt(raw, 'DJSL'),
+    scope: TJLX_TO_SCOPE[String(raw["TJLX"] ?? "")] ?? "",
+    term: rawStr(raw, "XNXQDM"),
+    classId: rawStr(raw, "JXBID"),
+    courseCode: rawStr(raw, "KCH"),
+    levelCode: rawStr(raw, "DJDM"),
+    levelName: rawStr(raw, "DJDM_DISPLAY"),
+    count: rawInt(raw, "DJSL"),
     raw,
-  };
+  }
 }
 
 function parseGradeRanking(raw: Record<string, unknown>): GradeRanking {
   return {
-    scope: TJLX_TO_SCOPE[String(raw['TJLX'] ?? '')] ?? '',
-    term: rawStr(raw, 'XNXQDM'),
-    studentId: rawStr(raw, 'XH'),
-    classId: rawStr(raw, 'JXBID'),
-    courseCode: rawStr(raw, 'KCH'),
-    score: rawNum(raw, 'PMF'),
-    rank: rawInt(raw, 'PM'),
-    total: rawInt(raw, 'ZRS'),
-    rankingType: rawStr(raw, 'PMLX'),
+    scope: TJLX_TO_SCOPE[String(raw["TJLX"] ?? "")] ?? "",
+    term: rawStr(raw, "XNXQDM"),
+    studentId: rawStr(raw, "XH"),
+    classId: rawStr(raw, "JXBID"),
+    courseCode: rawStr(raw, "KCH"),
+    score: rawNum(raw, "PMF"),
+    rank: rawInt(raw, "PM"),
+    total: rawInt(raw, "ZRS"),
+    rankingType: rawStr(raw, "PMLX"),
     raw,
-  };
+  }
 }
 
 function parseStudentInfo(raw: Record<string, unknown>): StudentInfo {
   return {
-    name: rawStr(raw, 'XM'),
-    namePinyin: rawStr(raw, 'XMPY'),
-    studentId: rawStr(raw, 'XH'),
-    gender: rawStr(raw, 'XBDM_DISPLAY'),
-    nation: rawStr(raw, 'MZDM_DISPLAY'),
-    nationality: rawStr(raw, 'GJDQDM_DISPLAY'),
-    department: rawStr(raw, 'YXDM_DISPLAY'),
-    major: rawStr(raw, 'ZYDM_DISPLAY', 'RXZY_DISPLAY'),
-    className: rawStr(raw, 'BJMC', 'RXBJ_DISPLAY'),
-    gradeLevel: rawStr(raw, 'XZNJ_DISPLAY'),
-    enrollmentDate: rawStr(raw, 'RXNY'),
-    expectedGraduation: rawStr(raw, 'YJBYRQ'),
-    educationLevel: rawStr(raw, 'PYCCDM_DISPLAY'),
-    campus: rawStr(raw, 'XXXQDM_DISPLAY'),
-    studentStatus: rawStr(raw, 'XJZTDM_DISPLAY'),
-    discipline: rawStr(raw, 'XKMLDM_DISPLAY'),
-    studyDuration: rawStr(raw, 'XZ'),
-    foreignLanguage: rawStr(raw, 'WYYZDM_DISPLAY'),
+    name: rawStr(raw, "XM"),
+    namePinyin: rawStr(raw, "XMPY"),
+    studentId: rawStr(raw, "XH"),
+    gender: rawStr(raw, "XBDM_DISPLAY"),
+    nation: rawStr(raw, "MZDM_DISPLAY"),
+    nationality: rawStr(raw, "GJDQDM_DISPLAY"),
+    department: rawStr(raw, "YXDM_DISPLAY"),
+    major: rawStr(raw, "ZYDM_DISPLAY", "RXZY_DISPLAY"),
+    className: rawStr(raw, "BJMC", "RXBJ_DISPLAY"),
+    gradeLevel: rawStr(raw, "XZNJ_DISPLAY"),
+    enrollmentDate: rawStr(raw, "RXNY"),
+    expectedGraduation: rawStr(raw, "YJBYRQ"),
+    educationLevel: rawStr(raw, "PYCCDM_DISPLAY"),
+    campus: rawStr(raw, "XXXQDM_DISPLAY"),
+    studentStatus: rawStr(raw, "XJZTDM_DISPLAY"),
+    discipline: rawStr(raw, "XKMLDM_DISPLAY"),
+    studyDuration: rawStr(raw, "XZ"),
+    foreignLanguage: rawStr(raw, "WYYZDM_DISPLAY"),
     raw,
-  };
+  }
 }
 
 function splitTerm(term: string): { xn: string; xq: string } {
-  const idx = term.lastIndexOf('-');
-  if (idx < 0) return { xn: term, xq: '' };
-  return { xn: term.slice(0, idx), xq: term.slice(idx + 1) };
+  const idx = term.lastIndexOf("-")
+  if (idx < 0) return { xn: term, xq: "" }
+  return { xn: term.slice(0, idx), xq: term.slice(idx + 1) }
 }
 
 function todayDate(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, "0")
+  const d = String(now.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
 }
 
 function combineTerm(raw: Record<string, unknown>): string {
-  const xn = rawStr(raw, 'XN');
-  const xq = rawStr(raw, 'XQ');
-  if (xn && xq) return `${xn}-${xq}`;
-  return xn || xq;
+  const xn = rawStr(raw, "XN")
+  const xq = rawStr(raw, "XQ")
+  if (xn && xq) return `${xn}-${xq}`
+  return xn || xq
 }
 
 function parseCourse(raw: Record<string, unknown>): Course {
-  const weeks = rawStr(raw, 'ZCMC');
+  const weeks = rawStr(raw, "ZCMC")
   return {
-    name: rawStr(raw, 'KCM'),
-    code: rawStr(raw, 'KCH'),
-    teacher: rawStr(raw, 'SKJS', 'JSMC'),
-    classroom: rawStr(raw, 'JASMC'),
-    weekDay: rawInt(raw, 'SKXQ', 'XQ'),
-    startSection: rawInt(raw, 'KSJC'),
-    endSection: rawInt(raw, 'JSJC'),
+    name: rawStr(raw, "KCM"),
+    code: rawStr(raw, "KCH"),
+    teacher: rawStr(raw, "SKJS", "JSMC"),
+    classroom: rawStr(raw, "JASMC"),
+    weekDay: rawInt(raw, "SKXQ", "XQ"),
+    startSection: rawInt(raw, "KSJC"),
+    endSection: rawInt(raw, "JSJC"),
     weeks,
     weekList: parseWeekList(weeks),
-    credit: rawStr(raw, 'XF'),
-    courseType: rawStr(raw, 'KCXZDM'),
-    classId: rawStr(raw, 'JXBID'),
-    syxzdm: rawStr(raw, 'SYXZDM'),
-    scheduleId: rawStr(raw, 'KBID'),
-    classType: rawStr(raw, 'JXBLX') || '1',
+    credit: rawStr(raw, "XF"),
+    courseType: rawStr(raw, "KCXZDM"),
+    classId: rawStr(raw, "JXBID"),
+    syxzdm: rawStr(raw, "SYXZDM"),
+    scheduleId: rawStr(raw, "KBID"),
+    classType: rawStr(raw, "JXBLX") || "1",
     raw,
-  };
+  }
 }
 
 function parseClassPeriod(raw: Record<string, unknown>): ClassPeriod {
-  const startTime = rawStr(raw, 'KSSJ');
-  const endTime = rawStr(raw, 'JSSJ');
+  const startTime = rawStr(raw, "KSSJ")
+  const endTime = rawStr(raw, "JSSJ")
   return {
-    name: rawStr(raw, 'MC'),
-    section: rawInt(raw, 'DM', 'PX'),
+    name: rawStr(raw, "MC"),
+    section: rawInt(raw, "DM", "PX"),
     startTime,
     endTime,
     startMinute: timeToMinute(startTime),
     endMinute: timeToMinute(endTime),
-    isInUse: toBool(raw['SFSY']),
+    isInUse: toBool(raw["SFSY"]),
     raw,
-  };
+  }
 }
 
 function parseTermCalendar(raw: Record<string, unknown>): TermCalendar {
-  const start = rawStr(raw, 'XQKSRQ');
+  const start = rawStr(raw, "XQKSRQ")
   return {
     term: combineTerm(raw),
-    startDate: start ? (start.split(' ')[0] ?? '') : '',
-    totalWeeks: rawInt(raw, 'ZZC'),
-    teachingWeeks: rawInt(raw, 'ZJXZC'),
-    isInUse: toBool(raw['SFSY']),
+    startDate: start ? (start.split(" ")[0] ?? "") : "",
+    totalWeeks: rawInt(raw, "ZZC"),
+    teachingWeeks: rawInt(raw, "ZJXZC"),
+    isInUse: toBool(raw["SFSY"]),
     raw,
-  };
+  }
 }
 
 function parseCurrentWeek(raw: Record<string, unknown>): CurrentWeek {
-  const rq = rawStr(raw, 'RQ');
-  const date = rq ? (rq.split(' ')[0] ?? '') : '';
-  const weekday = rawInt(raw, 'XQJ');
-  const weekRange = calculateWeekDates(date, weekday);
+  const rq = rawStr(raw, "RQ")
+  const date = rq ? (rq.split(" ")[0] ?? "") : ""
+  const weekday = rawInt(raw, "XQJ")
+  const weekRange = calculateWeekDates(date, weekday)
   return {
-    week: rawInt(raw, 'ZC'),
+    week: rawInt(raw, "ZC"),
     weekday,
     term: combineTerm(raw),
     date,
     ...weekRange,
     raw,
-  };
+  }
 }
 
 function parseExam(raw: Record<string, unknown>): Exam {
-  const { startAt, endAt, startTimestamp, endTimestamp, status, timeText } = parseExamDateTimes(raw);
+  const { startAt, endAt, startTimestamp, endTimestamp, status, timeText } = parseExamDateTimes(raw)
   return {
-    name: rawStr(raw, 'KCM'),
-    examName: rawStr(raw, 'KSMC'),
+    name: rawStr(raw, "KCM"),
+    examName: rawStr(raw, "KSMC"),
     startAt,
     endAt,
     startTimestamp,
     endTimestamp,
     status,
     timeText,
-    examLocation: rawStr(raw, 'JASMC'),
-    seatNumber: rawStr(raw, 'ZWH'),
+    examLocation: rawStr(raw, "JASMC"),
+    seatNumber: rawStr(raw, "ZWH"),
     raw,
-  };
+  }
 }
 
 function parseMakeupBatch(raw: Record<string, unknown>): MakeupExamBatch {
   return {
-    name: rawStr(raw, 'KSMC'),
-    batchId: rawStr(raw, 'KSDM'),
-    term: rawStr(raw, 'XNXQDM'),
-    signupStart: normalizeLocalDateTime(rawStr(raw, 'BMKSSJ')),
-    signupEnd: normalizeLocalDateTime(rawStr(raw, 'BMJSSJ')),
-    availableCount: rawInt(raw, 'KBMCOUNT'),
-    registeredCount: rawInt(raw, 'YBMCOUNT'),
+    name: rawStr(raw, "KSMC"),
+    batchId: rawStr(raw, "KSDM"),
+    term: rawStr(raw, "XNXQDM"),
+    signupStart: normalizeLocalDateTime(rawStr(raw, "BMKSSJ")),
+    signupEnd: normalizeLocalDateTime(rawStr(raw, "BMJSSJ")),
+    availableCount: rawInt(raw, "KBMCOUNT"),
+    registeredCount: rawInt(raw, "YBMCOUNT"),
     raw,
-  };
+  }
 }
 
 function parseMakeupCourse(raw: Record<string, unknown>): MakeupExamCourse {
   return {
-    name: rawStr(raw, 'KCM'),
-    code: rawStr(raw, 'KCH'),
-    credit: rawStr(raw, 'XF'),
-    hours: rawStr(raw, 'XS'),
-    examSeq: rawStr(raw, 'KSXH'),
-    department: rawStr(raw, 'KKDWDM_DISPLAY'),
-    status: rawStr(raw, 'KSBMZTDM_DISPLAY'),
-    isAvailable: toBool(raw['SFKBM']),
-    signupStart: normalizeLocalDateTime(rawStr(raw, 'BMKSSJ')),
-    signupEnd: normalizeLocalDateTime(rawStr(raw, 'BMJSSJ')),
-    batchId: rawStr(raw, 'KSDM'),
-    taskId: rawStr(raw, 'KSRWID'),
-    note: rawStr(raw, 'BZ'),
+    name: rawStr(raw, "KCM"),
+    code: rawStr(raw, "KCH"),
+    credit: rawStr(raw, "XF"),
+    hours: rawStr(raw, "XS"),
+    examSeq: rawStr(raw, "KSXH"),
+    department: rawStr(raw, "KKDWDM_DISPLAY"),
+    status: rawStr(raw, "KSBMZTDM_DISPLAY"),
+    isAvailable: toBool(raw["SFKBM"]),
+    signupStart: normalizeLocalDateTime(rawStr(raw, "BMKSSJ")),
+    signupEnd: normalizeLocalDateTime(rawStr(raw, "BMJSSJ")),
+    batchId: rawStr(raw, "KSDM"),
+    taskId: rawStr(raw, "KSRWID"),
+    note: rawStr(raw, "BZ"),
     raw,
-  };
+  }
 }
 
 function parseCodeItem(raw: Record<string, unknown>): CodeItem {
   return {
-    id: rawStr(raw, 'id'),
-    name: rawStr(raw, 'name'),
+    id: rawStr(raw, "id"),
+    name: rawStr(raw, "name"),
     raw,
-  };
+  }
 }
 
 function parseMajor(raw: Record<string, unknown>): MajorInfo {
-  const other = raw['otherFields'];
+  const other = raw["otherFields"]
   return {
-    id: rawStr(raw, 'id'),
-    name: rawStr(raw, 'name'),
+    id: rawStr(raw, "id"),
+    name: rawStr(raw, "name"),
     department:
-      other !== null && typeof other === 'object'
-        ? rawStr(other as Record<string, unknown>, 'YXDM')
-        : '',
+      other !== null && typeof other === "object"
+        ? rawStr(other as Record<string, unknown>, "YXDM")
+        : "",
     raw,
-  };
+  }
 }
 
 function parseSchoolClassInfo(raw: Record<string, unknown>): SchoolClassInfo {
   return {
-    classId: rawStr(raw, 'BJDM'),
-    className: rawStr(raw, 'BJMC'),
-    grade: rawStr(raw, 'NJ'),
-    gradeDisplay: rawStr(raw, 'NJ_DISPLAY'),
-    department: rawStr(raw, 'YXDM'),
-    departmentDisplay: rawStr(raw, 'YXDM_DISPLAY'),
-    major: rawStr(raw, 'ZYDM'),
-    majorDisplay: rawStr(raw, 'ZYDM_DISPLAY'),
-    isScheduled: toBool(raw['SFYPK']),
-    studentCount: rawInt(raw, 'SJRS'),
+    classId: rawStr(raw, "BJDM"),
+    className: rawStr(raw, "BJMC"),
+    grade: rawStr(raw, "NJ"),
+    gradeDisplay: rawStr(raw, "NJ_DISPLAY"),
+    department: rawStr(raw, "YXDM"),
+    departmentDisplay: rawStr(raw, "YXDM_DISPLAY"),
+    major: rawStr(raw, "ZYDM"),
+    majorDisplay: rawStr(raw, "ZYDM_DISPLAY"),
+    isScheduled: toBool(raw["SFYPK"]),
+    studentCount: rawInt(raw, "SJRS"),
     raw,
-  };
+  }
 }
 
 function parseClassroomInfo(raw: Record<string, unknown>): ClassroomInfo {
   return {
-    name: rawStr(raw, 'JASMC'),
-    code: rawStr(raw, 'JASDM'),
-    campus: rawStr(raw, 'XXXQDM'),
-    campusDisplay: rawStr(raw, 'XXXQDM_DISPLAY'),
-    building: rawStr(raw, 'JXLDM'),
-    buildingDisplay: rawStr(raw, 'JXLDM_DISPLAY'),
-    examSeats: rawInt(raw, 'KSZWS'),
-    classSeats: rawInt(raw, 'SKZWS'),
-    typeDisplay: rawStr(raw, 'JASLXDM_DISPLAY'),
-    floor: rawInt(raw, 'LC'),
-    isScheduled: toBool(raw['SFYPK']),
+    name: rawStr(raw, "JASMC"),
+    code: rawStr(raw, "JASDM"),
+    campus: rawStr(raw, "XXXQDM"),
+    campusDisplay: rawStr(raw, "XXXQDM_DISPLAY"),
+    building: rawStr(raw, "JXLDM"),
+    buildingDisplay: rawStr(raw, "JXLDM_DISPLAY"),
+    examSeats: rawInt(raw, "KSZWS"),
+    classSeats: rawInt(raw, "SKZWS"),
+    typeDisplay: rawStr(raw, "JASLXDM_DISPLAY"),
+    floor: rawInt(raw, "LC"),
+    isScheduled: toBool(raw["SFYPK"]),
     raw,
-  };
+  }
 }
 
-const TRAINING_REQUIRED_TOKENS: ReadonlySet<string> = new Set([
-  '01',
-  '1',
-  '必修',
-]);
+const TRAINING_REQUIRED_TOKENS: ReadonlySet<string> = new Set(["01", "1", "必修"])
 
 function parseTrainingPlan(raw: Record<string, unknown>): TrainingPlan {
-  const kcxzdm = rawStr(raw, 'KCXZDM');
+  const kcxzdm = rawStr(raw, "KCXZDM")
   return {
-    courseName: rawStr(raw, 'KCM'),
-    courseCode: rawStr(raw, 'KCH'),
-    credit: rawStr(raw, 'XF'),
-    courseType: rawStr(raw, 'KCXZDM'),
+    courseName: rawStr(raw, "KCM"),
+    courseCode: rawStr(raw, "KCH"),
+    credit: rawStr(raw, "XF"),
+    courseType: rawStr(raw, "KCXZDM"),
     required: TRAINING_REQUIRED_TOKENS.has(kcxzdm),
-    term: rawStr(raw, 'XNXQ', 'JHXNXQ'),
-    courseGroup: rawStr(raw, 'KZM'),
+    term: rawStr(raw, "XNXQ", "JHXNXQ"),
+    courseGroup: rawStr(raw, "KZM"),
     raw,
-  };
+  }
 }
 
 function parseAcademicCompletion(raw: Record<string, unknown>): AcademicCompletion {
   return {
-    planName: rawStr(raw, 'PYFAMC'),
-    totalRequired: rawStr(raw, 'YQXF'),
-    numericTotalRequired: rawOptionalNum(raw, 'YQXF'),
-    completed: rawStr(raw, 'WCXF'),
-    numericCompleted: rawOptionalNum(raw, 'WCXF'),
-    elective: rawStr(raw, 'XKXF'),
-    numericElective: rawOptionalNum(raw, 'XKXF'),
-    passed: toBool(raw['JSSFTG']),
-    lastCalculatedAt: normalizeLocalDateTime(rawStr(raw, 'CZSJ')),
+    planName: rawStr(raw, "PYFAMC"),
+    totalRequired: rawStr(raw, "YQXF"),
+    numericTotalRequired: rawOptionalNum(raw, "YQXF"),
+    completed: rawStr(raw, "WCXF"),
+    numericCompleted: rawOptionalNum(raw, "WCXF"),
+    elective: rawStr(raw, "XKXF"),
+    numericElective: rawOptionalNum(raw, "XKXF"),
+    passed: toBool(raw["JSSFTG"]),
+    lastCalculatedAt: normalizeLocalDateTime(rawStr(raw, "CZSJ")),
     raw,
-  };
+  }
 }
 
 function parseAcademicWarning(raw: Record<string, unknown>): AcademicWarning {
   return {
-    warningType: rawStr(raw, 'SCJLMC'),
-    warningLevel: rawStr(raw, 'YJJB'),
-    description: rawStr(raw, 'BZ'),
-    term: rawStr(raw, 'SCPCMC'),
+    warningType: rawStr(raw, "SCJLMC"),
+    warningLevel: rawStr(raw, "YJJB"),
+    description: rawStr(raw, "BZ"),
+    term: rawStr(raw, "SCPCMC"),
     raw,
-  };
+  }
 }
 
 function parseEvaluationType(raw: Record<string, unknown>): EvaluationType {
   return {
-    name: rawStr(raw, 'PJLXMC'),
-    code: rawStr(raw, 'PJLXDM'),
-    count: rawInt(raw, 'NUMBER'),
+    name: rawStr(raw, "PJLXMC"),
+    code: rawStr(raw, "PJLXDM"),
+    count: rawInt(raw, "NUMBER"),
     raw,
-  };
+  }
 }
 
 function parseEvaluationTask(raw: Record<string, unknown>): EvaluationTask {
-  const seq = raw['XUH'];
+  const seq = raw["XUH"]
   const sequence =
-    seq === undefined || seq === null || seq === '' || seq === 0
-      ? 1
-      : rawInt(raw, 'XUH');
-  const startTime = rawStr(raw, 'KSSJ');
-  const endTime = rawStr(raw, 'JSSJ');
-  const startAt = normalizeLocalDateTime(startTime) || undefined;
-  const endAt = normalizeLocalDateTime(endTime) || undefined;
-  const startTimestamp = localDateTimeTimestamp(startAt ?? '');
-  const endTimestamp = localDateTimeTimestamp(endAt ?? '');
+    seq === undefined || seq === null || seq === "" || seq === 0 ? 1 : rawInt(raw, "XUH")
+  const startTime = rawStr(raw, "KSSJ")
+  const endTime = rawStr(raw, "JSSJ")
+  const startAt = normalizeLocalDateTime(startTime) || undefined
+  const endAt = normalizeLocalDateTime(endTime) || undefined
+  const startTimestamp = localDateTimeTimestamp(startAt ?? "")
+  const endTimestamp = localDateTimeTimestamp(endAt ?? "")
   return {
-    wid: rawStr(raw, 'WID'),
-    wjid: rawStr(raw, 'WJID'),
-    name: rawStr(raw, 'MC'),
-    courseName: rawStr(raw, 'KCM'),
-    teacherName: rawStr(raw, 'XM', 'SKDX'),
-    teacherId: rawStr(raw, 'JSH'),
-    term: rawStr(raw, 'XNXQDM'),
-    termName: rawStr(raw, 'XNXQMC'),
-    evalType: rawStr(raw, 'PJLXDM'),
-    evalTypeName: rawStr(raw, 'PJLXMC'),
-    category: rawStr(raw, 'PJLBDM'),
-    categoryName: rawStr(raw, 'PJLBMC'),
+    wid: rawStr(raw, "WID"),
+    wjid: rawStr(raw, "WJID"),
+    name: rawStr(raw, "MC"),
+    courseName: rawStr(raw, "KCM"),
+    teacherName: rawStr(raw, "XM", "SKDX"),
+    teacherId: rawStr(raw, "JSH"),
+    term: rawStr(raw, "XNXQDM"),
+    termName: rawStr(raw, "XNXQMC"),
+    evalType: rawStr(raw, "PJLXDM"),
+    evalTypeName: rawStr(raw, "PJLXMC"),
+    category: rawStr(raw, "PJLBDM"),
+    categoryName: rawStr(raw, "PJLBMC"),
     startTime,
     endTime,
     startAt,
@@ -2523,63 +2580,59 @@ function parseEvaluationTask(raw: Record<string, unknown>): EvaluationTask {
     endTimestamp,
     status: evaluationTaskStatus(startTimestamp, endTimestamp),
     sequence,
-    className: rawStr(raw, 'BJMC'),
-    groupNo: rawStr(raw, 'GROUPNO'),
+    className: rawStr(raw, "BJMC"),
+    groupNo: rawStr(raw, "GROUPNO"),
     raw,
-  };
+  }
 }
 
 function parseQuestionOption(raw: Record<string, unknown>): QuestionOption {
   return {
-    wid: rawStr(raw, 'WID'),
-    text: rawStr(raw, 'MC'),
-    score: rawNum(raw, 'FZ'),
-    scoreRatio: rawNum(raw, 'FZBL'),
-    questionId: rawStr(raw, 'TMID'),
+    wid: rawStr(raw, "WID"),
+    text: rawStr(raw, "MC"),
+    score: rawNum(raw, "FZ"),
+    scoreRatio: rawNum(raw, "FZBL"),
+    questionId: rawStr(raw, "TMID"),
     raw,
-  };
+  }
 }
 
 function parseQuestion(raw: Record<string, unknown>): Question {
-  const optionsRaw = Array.isArray(raw['questionOptions'])
-    ? (raw['questionOptions'] as unknown[])
-    : [];
-  const options = optionsRaw.map((o) => parseQuestionOption(o as Record<string, unknown>));
-  options.sort((a, b) => rawInt(a.raw, 'PX') - rawInt(b.raw, 'PX'));
+  const optionsRaw = Array.isArray(raw["questionOptions"])
+    ? (raw["questionOptions"] as unknown[])
+    : []
+  const options = optionsRaw.map((o) => parseQuestionOption(o as Record<string, unknown>))
+  options.sort((a, b) => rawInt(a.raw, "PX") - rawInt(b.raw, "PX"))
   return {
-    tmid: rawStr(raw, 'TMID'),
-    wjid: rawStr(raw, 'WJID'),
-    text: rawStr(raw, 'MC'),
-    questionType: rawStr(raw, 'TX'),
-    maxScore: rawNum(raw, 'ZF'),
-    order: rawInt(raw, 'PX'),
+    tmid: rawStr(raw, "TMID"),
+    wjid: rawStr(raw, "WJID"),
+    text: rawStr(raw, "MC"),
+    questionType: rawStr(raw, "TX"),
+    maxScore: rawNum(raw, "ZF"),
+    order: rawInt(raw, "PX"),
     options,
     raw,
-  };
+  }
 }
 
 function parseEvaluationDetail(raw: Record<string, unknown>): EvaluationDetail {
-  const qList = Array.isArray(raw['questionList'])
-    ? (raw['questionList'] as unknown[])
-    : [];
-  const questions = qList.map((q) => parseQuestion(q as Record<string, unknown>));
+  const qList = Array.isArray(raw["questionList"]) ? (raw["questionList"] as unknown[]) : []
+  const questions = qList.map((q) => parseQuestion(q as Record<string, unknown>))
   questions.sort((a, b) => {
-    const pa = rawInt(a.raw, 'PX');
-    const pb = rawInt(b.raw, 'PX');
-    if (pa !== pb) return pa - pb;
-    return a.tmid < b.tmid ? -1 : a.tmid > b.tmid ? 1 : 0;
-  });
-  const teachersRaw = Array.isArray(raw['teachers'])
-    ? (raw['teachers'] as unknown[])
-    : [];
+    const pa = rawInt(a.raw, "PX")
+    const pb = rawInt(b.raw, "PX")
+    if (pa !== pb) return pa - pb
+    return a.tmid < b.tmid ? -1 : a.tmid > b.tmid ? 1 : 0
+  })
+  const teachersRaw = Array.isArray(raw["teachers"]) ? (raw["teachers"] as unknown[]) : []
   return {
-    wjid: rawStr(raw, 'WJID'),
-    name: rawStr(raw, 'WJMC'),
-    deadline: rawStr(raw, 'JZRQ'),
+    wjid: rawStr(raw, "WJID"),
+    name: rawStr(raw, "WJMC"),
+    deadline: rawStr(raw, "JZRQ"),
     questions,
     teachers: teachersRaw.map((t) => t as Record<string, unknown>),
     raw,
-  };
+  }
 }
 
 const EVALUATION_FJTXXX_STUB = {
@@ -2591,55 +2644,51 @@ const EVALUATION_FJTXXX_STUB = {
   SDXSS: null,
   CDZTS: null,
   TKNR: null,
-  TKZC: '10',
-  TKXQ: '0',
-  TKKSJC: '1',
-  TKJSJC: '1',
+  TKZC: "10",
+  TKXQ: "0",
+  TKKSJC: "1",
+  TKJSJC: "1",
   WID: null,
-} as const;
+} as const
 
-function buildAnswerPayload(
-  answer: EvaluationAnswer,
-  wjid: string,
-): Record<string, unknown> {
-  if (answer.questionType === '02' || answer.text) {
+function buildAnswerPayload(answer: EvaluationAnswer, wjid: string): Record<string, unknown> {
+  if (answer.questionType === "02" || answer.text) {
     return {
       WJID: wjid,
       TMID: answer.tmid,
-      TX: answer.questionType || '02',
+      TX: answer.questionType || "02",
       DA: answer.text,
-    };
+    }
   }
   if (answer.optionIds.length === 1) {
     return {
       WJID: wjid,
       TMID: answer.tmid,
-      TX: answer.questionType || '01',
-      DA: { TMXXID: answer.optionIds[0], FJXX: '' },
-    };
+      TX: answer.questionType || "01",
+      DA: { TMXXID: answer.optionIds[0], FJXX: "" },
+    }
   }
   return {
     WJID: wjid,
     TMID: answer.tmid,
-    TX: answer.questionType || '07',
-    DA: answer.optionIds.map((oid) => ({ TMXXID: oid, FJXX: '' })),
-  };
+    TX: answer.questionType || "07",
+    DA: answer.optionIds.map((oid) => ({ TMXXID: oid, FJXX: "" })),
+  }
 }
 
 function evaluationFormData(args: {
-  wjid: string;
-  answers: readonly EvaluationAnswer[];
-  teacherRelationId: string;
-  courseName: string;
-  teacherName: string;
-  sequence: number;
+  wjid: string
+  answers: readonly EvaluationAnswer[]
+  teacherRelationId: string
+  courseName: string
+  teacherName: string
+  sequence: number
 }): Record<string, string> {
-  const { wjid, answers, teacherRelationId, courseName, teacherName, sequence } =
-    args;
-  const daList = answers.map((a) => buildAnswerPayload(a, wjid));
+  const { wjid, answers, teacherRelationId, courseName, teacherName, sequence } = args
+  const daList = answers.map((a) => buildAnswerPayload(a, wjid))
   const payload: Record<string, unknown> = {
     DF: null,
-    PJZT: '0',
+    PJZT: "0",
     DA: daList,
     PJGXID: teacherRelationId,
     KCM: courseName,
@@ -2648,6 +2697,6 @@ function evaluationFormData(args: {
     FJTXXX: { ...EVALUATION_FJTXXX_STUB },
     WJID: wjid,
     questionAnswers: JSON.stringify(daList),
-  };
-  return { requestParamStr: JSON.stringify([payload]) };
+  }
+  return { requestParamStr: JSON.stringify([payload]) }
 }

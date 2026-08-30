@@ -58,31 +58,31 @@ export type {
   StudentSigninStatus,
   StudentSignInput,
   StudentSignResult,
-} from "./types";
+} from "./types"
 
-export { BaseProvider } from "./base-provider";
-export type { ProviderFactory, SchoolRegistration } from "./provider-registry";
-export { ProviderError, ProviderErrorCode, isProviderError, wrapError } from "./errors";
+export { BaseProvider } from "./base-provider"
+export type { ProviderFactory, SchoolRegistration } from "./provider-registry"
+export { ProviderError, ProviderErrorCode, isProviderError, wrapError } from "./errors"
 export {
   ALL_CAPABILITIES,
   NO_CAPABILITIES,
   hasCapability,
   assertCapability,
   getEnabledCapabilities,
-} from "./capabilities";
+} from "./capabilities"
 export {
   registerProvider,
   registerSchool,
   hasProvider,
   getRegisteredProviderIds,
   createProvider,
-} from "./provider-registry";
-export { getSelectableSchools } from "./supported-schools";
-export { registerSchoolConfig } from "@/lib/server-config";
+} from "./provider-registry"
+export { getSelectableSchools } from "./supported-schools"
+export { registerSchoolConfig } from "@/lib/server-config"
 export {
   getActiveProvider,
   setActiveProviderSchool,
   initializeActiveProvider,
   resetActiveProvider,
-} from "./provider-service";
-export { YSUProvider } from "./ysu";
+} from "./provider-service"
+export { YSUProvider } from "./ysu"
