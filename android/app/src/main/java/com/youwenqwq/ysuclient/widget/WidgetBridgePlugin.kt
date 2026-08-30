@@ -23,9 +23,8 @@ class WidgetBridgePlugin : Plugin() {
         UnifiedCache.putInt(context, UnifiedCache.KEY_SYNC_REMINDER_HOURS, syncReminderHours)
         UnifiedCache.putBoolean(context, UnifiedCache.KEY_SHOW_NEXT_DAY_SCHEDULE, showNextDaySchedule)
 
-        // Trigger schedule widget update
-        val scheduleHelper = ScheduleWidgetHelper(context)
-        scheduleHelper.updateAllWidgets()
+        // Trigger all widget updates because settings and caches are shared
+        updateAllWidgets()
 
         call.resolve()
     }
@@ -38,10 +37,8 @@ class WidgetBridgePlugin : Plugin() {
         UnifiedCache.putInt(context, UnifiedCache.KEY_SYNC_REMINDER_HOURS, syncReminderHours)
         UnifiedCache.putBoolean(context, UnifiedCache.KEY_SHOW_NEXT_DAY_SCHEDULE, showNextDaySchedule)
 
-        // Trigger schedule widget update so reminder text reflects new threshold
-        val scheduleHelper = ScheduleWidgetHelper(context)
-        scheduleHelper.updateAllWidgets()
-
+        // Trigger all widget updates so shared settings are reflected everywhere
+        updateAllWidgets()
         call.resolve()
     }
 
@@ -53,10 +50,20 @@ class WidgetBridgePlugin : Plugin() {
         UnifiedCache.saveCachedExams(context, JSONArray(examsJson))
         UnifiedCache.putInt(context, UnifiedCache.KEY_SYNC_REMINDER_HOURS, syncReminderHours)
 
-        // Trigger exam widget update
-        val examHelper = ExamWidgetHelper(context)
-        examHelper.updateAllWidgets()
+        // Trigger all widget updates because settings and caches are shared
+        updateAllWidgets()
 
         call.resolve()
+    }
+    @PluginMethod
+    fun clearWidgetData(call: PluginCall) {
+        UnifiedCache.clearWidgetData(context)
+        updateAllWidgets()
+        call.resolve()
+    }
+
+    private fun updateAllWidgets() {
+        ScheduleWidgetHelper(context).updateAllWidgets()
+        ExamWidgetHelper(context).updateAllWidgets()
     }
 }

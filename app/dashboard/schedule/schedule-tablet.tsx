@@ -14,6 +14,8 @@ import { CalendarOff, Layers } from "lucide-react"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { cn } from "@/lib/utils"
 import type { Course, ClassPeriod, CurrentWeek } from "@/providers/types"
+import type { ExamBlock } from "./exam-blocks"
+import { formatExamTime } from "@/lib/academic/exam-utils"
 import {
   computeMergedBlocks,
   buildSectionTimeMap,
@@ -31,6 +33,7 @@ import { SigninModal } from "./signin-modal"
 
 interface Props {
   courses: Course[]
+  examBlocks?: ExamBlock[]
   periods: ClassPeriod[]
   currentWeekday: number
   currentWeek: CurrentWeek | null
@@ -45,6 +48,7 @@ const DINNER_AFTER = 8
 
 export function ScheduleTablet({
   courses,
+  examBlocks = [],
   periods,
   currentWeekday,
   currentWeek,
@@ -58,6 +62,7 @@ export function ScheduleTablet({
     section: number
     courses: Course[]
   } | null>(null)
+  const [examDialog, setExamDialog] = useState<ExamBlock | null>(null)
   const [activityCourse, setActivityCourse] = useState<Course | null>(null)
   const [activityOpen, setActivityOpen] = useState(false)
   const [signinActivityId, setSigninActivityId] = useState<string | null>(null)
@@ -117,7 +122,7 @@ export function ScheduleTablet({
 
   const mergedBlocks = useMemo(() => computeMergedBlocks(courses, periods), [courses, periods])
 
-  function blockStyle(block: ScheduleBlock) {
+  function blockStyle(block: { day: number; start: number; end: number }) {
     const startRow = sectionToRow.get(block.start)
     const endRow = sectionToRow.get(block.end)
     if (!startRow || !endRow) return { display: "none" as const }
@@ -127,7 +132,7 @@ export function ScheduleTablet({
     }
   }
 
-  if (courses.length === 0) {
+  if (courses.length === 0 && examBlocks.length === 0) {
     return (
       <Empty>
         <EmptyHeader>
@@ -139,7 +144,6 @@ export function ScheduleTablet({
       </Empty>
     )
   }
-
   return (
     <>
       <div className="overflow-auto">
@@ -277,8 +281,63 @@ export function ScheduleTablet({
               </button>
             )
           })}
+          {examBlocks.map((block, idx) => (
+            <button
+              key={`exam-${idx}`}
+              type="button"
+              className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md border border-amber-500/50 bg-amber-500/15 p-1.5 text-left transition-opacity active:opacity-60"
+              style={blockStyle(block)}
+              onClick={(e) => {
+                e.currentTarget.blur()
+                setExamDialog(block)
+              }}
+            >
+              <span className="line-clamp-1 text-[9px] font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
+                {t("schedule.examTag")}
+              </span>
+              <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">
+                {block.exam.name}
+              </span>
+              {block.exam.examLocation && (
+                <span className="line-clamp-1 text-[9px] leading-tight text-foreground/70">
+                  {block.exam.examLocation}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
+
+      <Dialog open={!!examDialog} onOpenChange={(v) => !v && setExamDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{examDialog?.exam.name}</DialogTitle>
+            <DialogDescription className={examDialog?.exam.examName ? undefined : "sr-only"}>
+              {examDialog?.exam.examName || examDialog?.exam.name || ""}
+            </DialogDescription>
+          </DialogHeader>
+          {examDialog && (
+            <div className="flex flex-col gap-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t("schedule.examTime")}</span>
+                <span>{formatExamTime(examDialog.exam)}</span>
+              </div>
+              {examDialog.exam.examLocation && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{t("schedule.examLocation")}</span>
+                  <span>{examDialog.exam.examLocation}</span>
+                </div>
+              )}
+              {examDialog.exam.seatNumber && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{t("schedule.examSeat")}</span>
+                  <span>{examDialog.exam.seatNumber}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!overlapDialog} onOpenChange={(v) => !v && setOverlapDialog(null)}>
         <DialogContent>

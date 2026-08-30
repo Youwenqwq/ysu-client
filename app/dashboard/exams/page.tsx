@@ -30,9 +30,9 @@ export default function ExamsPage() {
   const loading = examsQuery.isLoading || examsQuery.isValidating
 
   useEffect(() => {
-    if (!examsQuery.data) return
+    if (queriedTerm || !examsQuery.data) return
     syncExamsToWidget(examsQuery.data, widgetSyncReminderHours).catch(() => {})
-  }, [examsQuery.data, widgetSyncReminderHours])
+  }, [queriedTerm, examsQuery.data, widgetSyncReminderHours])
 
   useEffect(() => {
     if (!examsQuery.error) return

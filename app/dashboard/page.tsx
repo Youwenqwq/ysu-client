@@ -170,9 +170,10 @@ export default function DashboardPage() {
     widgetShowNextDaySchedule,
   ])
 
-  // Sync exams to widget when fresh data arrives
+  // Sync exams to widget when fresh data arrives, including an empty result
+  // so a term with no exams clears stale native widget data.
   useEffect(() => {
-    if (exams.data && exams.data.length > 0) {
+    if (exams.data) {
       syncExamsToWidget(exams.data, widgetSyncReminderHours).catch(() => {})
     }
   }, [exams.data, widgetSyncReminderHours])

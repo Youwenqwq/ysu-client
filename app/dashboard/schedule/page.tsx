@@ -31,7 +31,7 @@ import {
 import { computeExamBlocks } from "./exam-blocks"
 import { ScheduleTablet } from "./schedule-tablet"
 import { ScheduleMobile } from "./schedule-mobile"
-import { syncScheduleToWidget } from "@/lib/native/widget-bridge"
+import { syncExamsToWidget, syncScheduleToWidget } from "@/lib/native/widget-bridge"
 import { syncClassAlarmsToNative } from "@/lib/native/notify"
 import { useSettingsStore } from "@/lib/stores/settings"
 
@@ -40,9 +40,11 @@ export default function SchedulePage() {
   const isMobile = useIsMobile()
   const compactMode = useSettingsStore((s) => s.scheduleCompactMode)
   const setCompactMode = useSettingsStore((s) => s.setScheduleCompactMode)
+  const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours)
   const [selectedWeek, setSelectedWeek] = useState<number>(0)
   const [term, setTerm] = useState("")
   const [queriedTerm, setQueriedTerm] = useState("")
+  const isDefaultTerm = queriedTerm === ""
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
 
   const scheduleQuery = useSchedule({
@@ -75,7 +77,9 @@ export default function SchedulePage() {
     termCalendarQuery.isLoading ||
     termCalendarQuery.isValidating ||
     periodsQuery.isLoading ||
-    periodsQuery.isValidating
+    periodsQuery.isValidating ||
+    examsQuery.isLoading ||
+    examsQuery.isValidating
 
   // In compact mode, adjust <main> padding-bottom to match the actual nav bar height,
   // so the content area ends exactly at the nav top edge.
@@ -137,13 +141,21 @@ export default function SchedulePage() {
       currentWeekQuery.error,
       termCalendarQuery.error,
       periodsQuery.error,
+      examsQuery.error,
     ].filter(Boolean)
     if (errors.length === 0) return
     toast.error(errors[0]?.message || t("app.updating"))
-  }, [scheduleQuery.error, currentWeekQuery.error, termCalendarQuery.error, periodsQuery.error, t])
+  }, [
+    scheduleQuery.error,
+    currentWeekQuery.error,
+    termCalendarQuery.error,
+    periodsQuery.error,
+    examsQuery.error,
+    t,
+  ])
 
   useEffect(() => {
-    if (!scheduleQuery.data || !widgetCurrentWeek) return
+    if (!isDefaultTerm || !scheduleQuery.data || !widgetCurrentWeek) return
     const activeCourses = scheduleQuery.data.filter((course) =>
       isCourseActiveInWeek(course, widgetCurrentWeek.week)
     )
@@ -155,7 +167,12 @@ export default function SchedulePage() {
       useSettingsStore.getState().widgetShowNextDaySchedule
     ).catch(() => {})
     syncClassAlarmsToNative(activeCourses, widgetCurrentWeek, periodsRef.current).catch(() => {})
-  }, [scheduleQuery.data, widgetCurrentWeek])
+  }, [isDefaultTerm, scheduleQuery.data, widgetCurrentWeek])
+
+  useEffect(() => {
+    if (!isDefaultTerm || !examsQuery.data) return
+    syncExamsToWidget(examsQuery.data, widgetSyncReminderHours).catch(() => {})
+  }, [isDefaultTerm, examsQuery.data, widgetSyncReminderHours])
 
   async function handleQuery() {
     const nextTerm = term.trim()
@@ -165,6 +182,7 @@ export default function SchedulePage() {
         currentWeekQuery.mutate(),
         termCalendarQuery.mutate(),
         periodsQuery.mutate(),
+        examsQuery.mutate(),
       ])
     } else {
       setQueriedTerm(nextTerm)
@@ -317,6 +335,7 @@ export default function SchedulePage() {
           <CardContent className="pt-6">
             <ScheduleTablet
               courses={filteredCourses}
+              examBlocks={examBlocks}
               periods={periods}
               currentWeekday={currentWeekday}
               currentWeek={currentWeek}

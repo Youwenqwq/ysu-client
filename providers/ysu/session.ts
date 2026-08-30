@@ -33,6 +33,7 @@ import { clearAllCache, cleanStaleCacheVersions } from "@/lib/storage/cache"
 import { useRefreshStore } from "@/lib/stores/refresh"
 import { isCapacitor } from "@/lib/native/platform"
 import { stopNotify } from "@/lib/native/notify"
+import { clearWidgetDataFromNative } from "@/lib/native/widget-bridge"
 import { removeCASTGC } from "@/lib/storage/secure"
 
 /** 从 auth-store 恢复 CAS 凭据、JWXT 会话和 mobile 会话到各自的 jar。 */
@@ -160,6 +161,8 @@ export function resetSession(): void {
   useRefreshStore.setState({ count: 0, stale: 0 })
   // Stop all notification services on logout
   stopNotify()
+  // Clear account-specific data kept by home-screen widgets.
+  void clearWidgetDataFromNative()
 }
 
 /** 获取 CAS cookie jar(调试用)。 */

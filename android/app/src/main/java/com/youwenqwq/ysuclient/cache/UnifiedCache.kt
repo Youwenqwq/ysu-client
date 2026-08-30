@@ -46,6 +46,23 @@ object UnifiedCache {
     fun clearAll(context: Context) {
         prefs(context).edit().clear().apply()
     }
+    /**
+     * Clear data rendered by home-screen widgets without touching auth or
+     * background-notification configuration.
+     */
+    fun clearWidgetData(context: Context) {
+        prefs(context).edit()
+            .remove(KEY_CACHED_SCHEDULE)
+            .remove(KEY_CACHED_CURRENT_WEEK)
+            .remove(KEY_CACHED_EXAMS)
+            .remove(KEY_WIDGET_CACHED_EXAMS)
+            .remove(KEY_HAS_SYNCED_SCHEDULE)
+            .remove(KEY_HAS_SYNCED_EXAMS)
+            .remove(KEY_LAST_SYNC_TIME)
+            .remove(KEY_LAST_EXAM_SYNC_TIME)
+            .apply()
+    }
+
 
     fun remove(context: Context, key: String) {
         prefs(context).edit().remove(key).apply()

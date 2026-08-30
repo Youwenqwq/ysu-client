@@ -6,8 +6,8 @@
  * 时刻表重叠 → 起止节次（无重叠时钳到最近节次，如晚间考试）。
  */
 import type { ClassPeriod, CurrentWeek, Exam } from "@/providers/types"
+import { getExamEndTime, getExamStartTime } from "@/lib/academic/exam-utils"
 import { buildSectionTimeMap } from "./schedule-utils"
-
 export interface ExamBlock {
   exam: Exam
   /** 星期几（1-7）。 */
@@ -47,9 +47,11 @@ function mapExamToSections(
   exam: Exam,
   timeMap: Record<number, [number, number]>
 ): { start: number; end: number } | null {
-  if (!exam.startTimestamp || !exam.endTimestamp) return null
-  const startMin = toMinutes(new Date(exam.startTimestamp))
-  const endMin = toMinutes(new Date(exam.endTimestamp))
+  const start = getExamStartTime(exam)
+  const end = getExamEndTime(exam)
+  if (!start || !end) return null
+  const startMin = toMinutes(start)
+  const endMin = toMinutes(end)
 
   const sections = Object.keys(timeMap)
     .map(Number)
@@ -92,8 +94,8 @@ export function computeExamBlocks(
   const timeMap = buildSectionTimeMap(periods)
   const blocks: ExamBlock[] = []
   for (const exam of exams) {
-    if (!exam.startTimestamp) continue
-    const date = new Date(exam.startTimestamp)
+    const date = getExamStartTime(exam)
+    if (!date) continue
     const dayDiff = Math.floor(
       (new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() - monday.getTime()) /
         86_400_000

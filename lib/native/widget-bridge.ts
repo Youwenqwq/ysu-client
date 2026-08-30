@@ -13,6 +13,7 @@ export interface WidgetBridgePlugin {
     syncReminderHours: number
     showNextDaySchedule: boolean
   }): Promise<void>
+  clearWidgetData(): Promise<void>
 }
 
 const WidgetBridge = registerPlugin<WidgetBridgePlugin>("WidgetBridge", {
@@ -25,6 +26,9 @@ const WidgetBridge = registerPlugin<WidgetBridgePlugin>("WidgetBridge", {
         // No-op on web
       },
       async syncWidgetSettings() {
+        // No-op on web
+      },
+      async clearWidgetData() {
         // No-op on web
       },
     }
@@ -139,5 +143,12 @@ export async function syncExamsToWidget(
     })
   } catch {
     // Widget sync is best-effort; fail silently
+  }
+}
+export async function clearWidgetDataFromNative(): Promise<void> {
+  try {
+    await WidgetBridge.clearWidgetData()
+  } catch {
+    // Widget cache cleanup is best-effort; fail silently
   }
 }
