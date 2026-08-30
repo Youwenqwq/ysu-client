@@ -39,6 +39,20 @@ export function isCertThread(t: Pick<SkbirdThread, "certShow">): boolean {
   return t.certShow === "10"
 }
 
+/**
+ * 合并同一帖子的不同接口结果。
+ * 详情接口的字段优先；详情缺少正文、认证标记或图片时，使用列表/解锁结果补齐。
+ */
+export function mergeSkbirdThread(base: SkbirdThread, supplement: SkbirdThread): SkbirdThread {
+  return {
+    ...base,
+    title: base.title || supplement.title,
+    content: base.content || supplement.content,
+    certShow: base.certShow === "0" ? supplement.certShow : base.certShow,
+    imgPaths: base.imgPaths.length > 0 ? base.imgPaths : supplement.imgPaths,
+  }
+}
+
 // ─── raw JSON → 领域模型 ─────────────────────────────────────────────── //
 
 function rawStr(v: unknown): string {

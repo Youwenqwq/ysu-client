@@ -13,7 +13,13 @@ import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { SkbirdError, skbirdImageUrl, SKBIRD_ERRNO_TOKEN_INVALID } from "@/lib/extras/skbird/client"
 import { getSkbirdClient } from "@/lib/extras/skbird/store"
-import { isCertThread, type SkbirdComment, type SkbirdThread } from "@/lib/extras/skbird/types"
+import {
+  isCertThread,
+  mergeSkbirdThread,
+  type SkbirdComment,
+  type SkbirdThread,
+} from "@/lib/extras/skbird/types"
+import { readSkbirdFeedSnapshot } from "@/lib/extras/skbird/feed-state"
 import { SkbirdImage } from "@/components/skbird/skbird-image"
 import { SkbirdCommentItem } from "@/components/skbird/comment-item"
 
@@ -37,12 +43,14 @@ function ThreadDetail() {
       setError(t("skbird.noToken"))
       return
     }
+    const cachedThread = readSkbirdFeedSnapshot()?.threads.find((item) => item.threadId === id)
     let cancelled = false
     client
       .thread(id)
       .then((d) => {
         if (cancelled) return
-        setThread(d.thread)
+        const detailThread = cachedThread ? mergeSkbirdThread(d.thread, cachedThread) : d.thread
+        setThread(detailThread)
         // 评论签名随详情签发；认证帖评论同样可读。
         // 评论失败不拖垮详情：降级为无评论。
         client
@@ -71,12 +79,12 @@ function ThreadDetail() {
 
   const handleUnlock = useCallback(async () => {
     const client = getSkbirdClient()
-    if (!client || !id) return
+    if (!client || !id || !thread) return
     setUnlocking(true)
     try {
       const full = await client.unlockThread(id)
       if (full && (full.title || full.content)) {
-        setUnlocked(full)
+        setUnlocked(mergeSkbirdThread(thread, full))
       } else {
         setError(t("skbird.unlockFailed"))
       }
@@ -85,7 +93,7 @@ function ThreadDetail() {
     } finally {
       setUnlocking(false)
     }
-  }, [id, t])
+  }, [id, t, thread])
 
   const handleLike = useCallback(async () => {
     const client = getSkbirdClient()
@@ -150,8 +158,8 @@ function ThreadDetail() {
   }
 
   const cert = isCertThread(thread)
-  const hidden = cert && !thread.title && !thread.content && !unlocked
-  const display = unlocked ?? thread
+  const display = unlocked ? mergeSkbirdThread(thread, unlocked) : thread
+  const hidden = cert && !display.title && !display.content
 
   return (
     <div className="flex flex-col gap-4 p-4 max-sm:px-2">
