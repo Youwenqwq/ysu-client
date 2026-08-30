@@ -9,13 +9,23 @@ import { skbirdImageUrl } from "@/lib/extras/skbird/client"
 import { isCertThread, type SkbirdThread } from "@/lib/extras/skbird/types"
 import { SkbirdImage } from "./skbird-image"
 
-export function SkbirdThreadCard({ thread }: { thread: SkbirdThread }) {
+export function SkbirdThreadCard({
+  thread,
+  onOpen,
+}: {
+  thread: SkbirdThread
+  onOpen?: () => void
+}) {
   const { t } = useTranslation()
   const cert = isCertThread(thread)
   const hidden = cert && !thread.title && !thread.content
 
   return (
-    <Link href={`/dashboard/skbird/thread/?id=${thread.threadId}`} className="block">
+    <Link
+      href={`/dashboard/skbird/thread/?id=${thread.threadId}`}
+      className="block"
+      onClick={onOpen}
+    >
       <Card className="transition-colors hover:bg-muted/50 max-sm:rounded-none max-sm:bg-transparent max-sm:py-0 max-sm:ring-0">
         <CardContent className="flex flex-col gap-2 p-4 max-sm:px-0 max-sm:py-3">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">

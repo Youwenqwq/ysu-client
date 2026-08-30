@@ -74,6 +74,8 @@ export default function SkbirdPage() {
   const restoredRef = useRef(false)
   const snapshotAvailableRef = useRef(false)
   const scrollRestoredRef = useRef(false)
+  const navigationScrollCapturedRef = useRef(false)
+  const scrollRestoreAppliedRef = useRef(false)
   const restoredScrollRef = useRef({ scrollY: 0, mainScrollTop: 0 })
   const scrollRef = useRef({ scrollY: 0, mainScrollTop: 0 })
   const feedStateRef = useRef<SkbirdFeedSnapshot | null>(null)
@@ -107,6 +109,15 @@ export default function SkbirdPage() {
     }
   }, [hasHydrated, token, tab, wd, submittedWd, cateId, range, searchOpen, threads, hasMore])
 
+  const captureScrollBeforeNavigation = useCallback(() => {
+    navigationScrollCapturedRef.current = true
+    scrollRef.current = {
+      scrollY: window.scrollY,
+      mainScrollTop: document.querySelector("main")?.scrollTop ?? 0,
+    }
+    persistRef.current()
+  }, [])
+
   // 离开列表页前记录滚动位置；桌面端滚动容器是 main，移动端通常是 window。
   useEffect(() => {
     const updateScroll = () => {
@@ -119,7 +130,7 @@ export default function SkbirdPage() {
     const main = document.querySelector("main")
     main?.addEventListener("scroll", updateScroll, { passive: true })
     return () => {
-      updateScroll()
+      if (!navigationScrollCapturedRef.current) updateScroll()
       persistRef.current()
       window.removeEventListener("scroll", updateScroll)
       main?.removeEventListener("scroll", updateScroll)
@@ -153,7 +164,14 @@ export default function SkbirdPage() {
   }, [hasHydrated, token])
 
   useEffect(() => {
-    if (!hasHydrated || !token || !initializedRef.current) return
+    if (
+      !hasHydrated ||
+      !token ||
+      !initializedRef.current ||
+      (snapshotAvailableRef.current && !scrollRestoreAppliedRef.current)
+    ) {
+      return
+    }
     persistRef.current()
   }, [hasHydrated, token, tab, wd, submittedWd, cateId, range, searchOpen, threads, hasMore])
 
@@ -163,19 +181,29 @@ export default function SkbirdPage() {
       scrollRestoredRef.current ||
       !hasHydrated ||
       !token ||
-      threads.length === 0
+      !feedStateReady
     ) {
       return
     }
     scrollRestoredRef.current = true
+    const restoreScroll = () => {
+      const position = restoredScrollRef.current
+      scrollRef.current = position
+      window.scrollTo({ top: position.scrollY, behavior: "auto" })
+      document.querySelector("main")?.scrollTo({ top: position.mainScrollTop, behavior: "auto" })
+      scrollRestoreAppliedRef.current = true
+      persistRef.current()
+    }
+    let timeout: number | undefined
     const frame = requestAnimationFrame(() => {
-      window.scrollTo({ top: restoredScrollRef.current.scrollY, behavior: "auto" })
-      document
-        .querySelector("main")
-        ?.scrollTo({ top: restoredScrollRef.current.mainScrollTop, behavior: "auto" })
+      restoreScroll()
+      timeout = window.setTimeout(restoreScroll, 100)
     })
-    return () => cancelAnimationFrame(frame)
-  }, [hasHydrated, token, threads.length])
+    return () => {
+      cancelAnimationFrame(frame)
+      if (timeout !== undefined) window.clearTimeout(timeout)
+    }
+  }, [hasHydrated, token, feedStateReady, threads.length])
 
   // 移动端搜索展开时自动聚焦
   useEffect(() => {
@@ -494,7 +522,11 @@ export default function SkbirdPage() {
         <>
           <div className="flex flex-col gap-3 max-sm:gap-0 max-sm:divide-y max-sm:divide-border">
             {threads.map((thread, i) => (
-              <SkbirdThreadCard key={thread.threadId || `t-${i}`} thread={thread} />
+              <SkbirdThreadCard
+                key={thread.threadId || `t-${i}`}
+                thread={thread}
+                onOpen={captureScrollBeforeNavigation}
+              />
             ))}
           </div>
           {(CURSOR_TABS[tab] && !submittedWd) || submittedWd ? (
