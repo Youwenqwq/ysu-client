@@ -17,9 +17,13 @@ import type {
   LaborRecord as LdxtLaborRecord,
   LaborSummary as LdxtLaborSummary,
 } from "./protocol/ldxt"
+import { mapCASSessionError } from "./cas-auth"
 import { ProviderError, ProviderErrorCode, wrapError } from "../errors"
 
 function mapLdxtError(e: unknown): ProviderError {
+  const sessionError = mapCASSessionError(e)
+  if (sessionError) return sessionError
+
   if (e instanceof LdxtNotLoggedInError) {
     return new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, e.message, e, 401)
   }

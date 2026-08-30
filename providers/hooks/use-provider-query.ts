@@ -170,6 +170,13 @@ export function useProviderQuery<T>(
         setServedStale(false)
         return result
       } catch (err) {
+        if (
+          err instanceof ProviderError &&
+          err.code === ProviderErrorCode.AUTH_SESSION_EXPIRED &&
+          useAuthStore.getState().isAuthenticated
+        ) {
+          useAuthStore.getState().setSessionExpired(true)
+        }
         if (canPersist && persistentKey) {
           const fallback = cacheGetStale<T>(persistentKey, policy.ttl)
           if (fallback) {

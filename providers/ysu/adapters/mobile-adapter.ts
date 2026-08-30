@@ -8,6 +8,7 @@ import {
   queryStudentSigninStatus,
   studentSign,
 } from "../protocol/jwmobile"
+import { mapCASSessionError } from "../cas-auth"
 import { ProviderError, ProviderErrorCode, wrapError } from "../../errors"
 import type {
   CurrentLesson,
@@ -20,6 +21,9 @@ import type {
 } from "../../types"
 
 function mapMobileError(error: unknown): ProviderError {
+  const sessionError = mapCASSessionError(error)
+  if (sessionError) return sessionError
+
   if (error instanceof MobileNotLoggedInError) {
     return new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, error.message, error, 401)
   }

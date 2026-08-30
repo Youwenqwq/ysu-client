@@ -12,6 +12,7 @@ import {
   fetchWithJar,
   headerSingle,
 } from "@/lib/cookie"
+import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 import { authorize, getCredentialApplied } from "./cas"
 import {
   serverConfig,
@@ -946,9 +947,11 @@ let authorized = false
 let sessionGeneration = 0
 
 async function ensureAuthorized(): Promise<void> {
+  await waitForAuthTransition()
   if (authorized) return
   await getCredentialApplied()
   await hydrationDone
+
   const cookies = await jwxtJar.getAllCookies()
   for (const c of cookies) {
     if (c.domain && c.domain.includes(getJwxtCookieDomain())) {
@@ -960,12 +963,28 @@ async function ensureAuthorized(): Promise<void> {
     await inflightAuth
     return
   }
-  inflightAuth = authorize(jwxtUrls.portal, jwxtJar)
-  try {
-    await inflightAuth
+
+  const promise = withAuthTransition(async () => {
+    if (authorized) return
+    await getCredentialApplied()
+    await hydrationDone
+
+    const currentCookies = await jwxtJar.getAllCookies()
+    for (const c of currentCookies) {
+      if (c.domain && c.domain.includes(getJwxtCookieDomain())) {
+        authorized = true
+        return
+      }
+    }
+
+    await authorize(jwxtUrls.portal, jwxtJar)
     authorized = true
+  })
+  inflightAuth = promise
+  try {
+    await promise
   } finally {
-    inflightAuth = null
+    if (inflightAuth === promise) inflightAuth = null
   }
 }
 
@@ -977,7 +996,9 @@ async function reauthorize(failedGeneration: number): Promise<void> {
   }
 
   const targetJar = jwxtJar
-  const promise = (async () => {
+  const promise = withAuthTransition(async () => {
+    if (sessionGeneration !== failedGeneration || jwxtJar !== targetJar) return
+
     authorized = false
     const all = await targetJar.getAllCookies()
     for (const c of all) {
@@ -993,7 +1014,7 @@ async function reauthorize(failedGeneration: number): Promise<void> {
     ensuredWeuApps.clear()
     inflightWeu.clear()
     weuStore.clear()
-  })()
+  })
   inflightReauth = promise
   try {
     await promise
@@ -1129,6 +1150,7 @@ async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
   } catch (e) {
     if (e instanceof NotLoggedInError) {
       await reauthorize(requestGeneration)
+      await waitForAuthTransition()
       return await fn()
     }
     throw e

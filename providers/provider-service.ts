@@ -1,3 +1,5 @@
+import { mutate } from "swr"
+import { useAuthStore } from "@/lib/stores/auth"
 import { getSchoolId, setSchoolConfig } from "@/lib/server-config"
 import { DEFAULT_SCHOOL_ID, hasSchoolConfig } from "@/lib/school-configs"
 import type { AcademicProvider } from "./types"
@@ -67,5 +69,10 @@ export async function logoutActiveProvider(): Promise<void> {
 }
 
 export async function reloginActiveProvider(): Promise<boolean> {
-  return (await getActiveProvider().relogin?.()) ?? false
+  const success = (await getActiveProvider().relogin?.()) ?? false
+  if (!success) return false
+
+  useAuthStore.getState().setSessionExpired(false)
+  void mutate((key) => Array.isArray(key) && key[0] === "provider").catch(() => {})
+  return true
 }

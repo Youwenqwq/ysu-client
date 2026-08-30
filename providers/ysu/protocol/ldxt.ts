@@ -8,6 +8,7 @@
  */
 import { SimpleCookieJar, fetchWithJar, type HttpResponse } from "@/lib/cookie"
 import { authorize, getCredentialApplied } from "./cas"
+import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 import { parseTables, type TableData } from "./table"
 import { toIsoDatetime } from "./datetime"
 import { getSchoolConfig } from "@/lib/server-config"
@@ -145,6 +146,7 @@ function baseUrl(): string {
  * 3. GET 返回的角色落地 URL —— 写入角色上下文，会话就绪。
  */
 async function ensureAuthorized(): Promise<void> {
+  await waitForAuthTransition()
   if (authorized) return
   await getCredentialApplied()
   if (inflightAuth) {
@@ -152,7 +154,9 @@ async function ensureAuthorized(): Promise<void> {
     return
   }
 
-  inflightAuth = (async () => {
+  const promise = withAuthTransition(async () => {
+    if (authorized) return
+
     await authorize(`${baseUrl()}${SSO_PATH}`, ldxtJar)
 
     const url = `${baseUrl()}${SSO_PATH}`
@@ -182,12 +186,13 @@ async function ensureAuthorized(): Promise<void> {
     // 落地页本身可能是角色选择页（LoginRole），只要未被踢回登录页即就绪
     await getPage(typeof nextPath === "string" && nextPath ? nextPath : HOME_PATH)
     authorized = true
-  })()
+  })
 
+  inflightAuth = promise
   try {
-    await inflightAuth
+    await promise
   } finally {
-    inflightAuth = null
+    if (inflightAuth === promise) inflightAuth = null
   }
 }
 
@@ -245,6 +250,7 @@ async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
     if (e instanceof LdxtNotLoggedInError) {
       authorized = false
       await ensureAuthorized()
+      await waitForAuthTransition()
       return await fn()
     }
     throw e

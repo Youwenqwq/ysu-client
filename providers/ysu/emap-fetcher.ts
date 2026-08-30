@@ -6,8 +6,9 @@
  */
 import { persistJWXTSession } from "./session"
 import { NotLoggedInError, JWXTBusinessError, JWXTProtocolError, JWXTError } from "./protocol/jwxt"
+import { mapCASSessionError } from "./cas-auth"
 import { ProviderError, ProviderErrorCode, wrapError } from "../errors"
-import type {
+import {
   StudentInfo as JWXTStudentInfo,
   Grade as JWXTGrade,
   GradeStatistics as JWXTGradeStatistics,
@@ -71,6 +72,9 @@ import {
 } from "./protocol/jwxt"
 
 function mapJWXTError(e: unknown): ProviderError {
+  const sessionError = mapCASSessionError(e)
+  if (sessionError) return sessionError
+
   if (e instanceof NotLoggedInError) {
     return new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, e.message, e, 401)
   }

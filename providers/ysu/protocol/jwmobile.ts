@@ -12,6 +12,7 @@ import {
   fetchWithJar,
   headerSingle,
 } from "@/lib/cookie"
+import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 import { authorize } from "./cas"
 import { useAuthStore } from "@/lib/stores/auth"
 import { mobileUrls, getJwxtCookieDomain } from "@/lib/server-config"
@@ -248,33 +249,36 @@ async function verifyMobileToken(): Promise<boolean> {
 }
 
 export async function ensureMobileAuthorized(verify = false): Promise<void> {
+  await waitForAuthTransition()
   if (mobileAuthorized) return
-
-  const cookies = await mobileJar.getAllCookies()
-  const hasAuthCookie = cookies.some(
-    (c) => c.name === "Authorization" && c.value && c.domain.includes(getJwxtCookieDomain())
-  )
-  if (hasAuthCookie) {
-    if (verify) {
-      const valid = await verifyMobileToken()
-      if (valid) {
-        mobileAuthorized = true
-        return
-      }
-      // Token 已过期，清除过期的 cookie 继续重新获取
-      await mobileJar.removeCookie(getJwxtCookieDomain(), "/jwmobile", "Authorization")
-    } else {
-      mobileAuthorized = true
-      return
-    }
-  }
-
   if (inflightMobileAuth) {
     await inflightMobileAuth
     return
   }
 
-  inflightMobileAuth = (async () => {
+  const promise = withAuthTransition(async () => {
+    if (mobileAuthorized) return
+    await hydrationDone
+
+    const cookies = await mobileJar.getAllCookies()
+    const hasAuthCookie = cookies.some(
+      (c) => c.name === "Authorization" && c.value && c.domain.includes(getJwxtCookieDomain())
+    )
+    if (hasAuthCookie) {
+      if (verify) {
+        const valid = await verifyMobileToken()
+        if (valid) {
+          mobileAuthorized = true
+          return
+        }
+        // Token 已过期，清除过期的 cookie 继续重新获取
+        await mobileJar.removeCookie(getJwxtCookieDomain(), "/jwmobile", "Authorization")
+      } else {
+        mobileAuthorized = true
+        return
+      }
+    }
+
     // Step 1: Complete CAS SSO to obtain JSESSIONID.
     await authorize(mobileUrls.auth, mobileJar)
 
@@ -290,16 +294,17 @@ export async function ensureMobileAuthorized(verify = false): Promise<void> {
       `Authorization=${token}; Path=${mobileUrls.cookiePath}; Domain=${cookieDomain}; Secure`,
       `https://${cookieDomain}${mobileUrls.cookiePath}/`
     )
-  })()
+  })
 
+  inflightMobileAuth = promise
   try {
-    await inflightMobileAuth
+    await promise
     mobileAuthorized = true
     persistSession().catch(() => {
       /* ignore persist failures */
     })
   } finally {
-    inflightMobileAuth = null
+    if (inflightMobileAuth === promise) inflightMobileAuth = null
   }
 }
 
@@ -391,7 +396,10 @@ async function withMobileReauth<T>(fn: () => Promise<T>): Promise<T> {
     return await fn()
   } catch (e) {
     if (e instanceof MobileNotLoggedInError) {
-      resetMobileAuth()
+      await withAuthTransition(async () => {
+        resetMobileAuth()
+      })
+      await waitForAuthTransition()
       return await fn()
     }
     throw e

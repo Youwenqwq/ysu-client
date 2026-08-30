@@ -35,6 +35,7 @@ import { isCapacitor } from "@/lib/native/platform"
 import { stopNotify } from "@/lib/native/notify"
 import { clearWidgetDataFromNative } from "@/lib/native/widget-bridge"
 import { removeCASTGC } from "@/lib/storage/secure"
+import { withAuthTransition } from "./auth-transition"
 
 /** 从 auth-store 恢复 CAS 凭据、JWXT 会话和 mobile 会话到各自的 jar。 */
 export async function initializeSession(): Promise<void> {
@@ -141,28 +142,28 @@ async function cleanOtaArtifacts(): Promise<void> {
 }
 
 /** 重置所有 SDK 状态(登出时调用)。 */
-export function resetSession(): void {
-  void (async () => {
+export async function resetSession(): Promise<void> {
+  await withAuthTransition(async () => {
     try {
       await logoutCAS()
     } catch {
       // 忽略 CAS 服务端登出失败
     } finally {
+      resetCAS()
+      resetJWXT()
+      resetLdxt()
+      resetScxt()
+      resetXgxt()
+      resetMobileAuth()
+      clearAllCache()
+      useRefreshStore.setState({ count: 0, stale: 0 })
+      // Stop all notification services on logout
+      stopNotify()
+      // Clear account-specific data kept by home-screen widgets.
+      void clearWidgetDataFromNative()
       await removeCASTGC().catch(() => {})
     }
-  })()
-  resetCAS()
-  resetJWXT()
-  resetLdxt()
-  resetScxt()
-  resetXgxt()
-  resetMobileAuth()
-  clearAllCache()
-  useRefreshStore.setState({ count: 0, stale: 0 })
-  // Stop all notification services on logout
-  stopNotify()
-  // Clear account-specific data kept by home-screen widgets.
-  void clearWidgetDataFromNative()
+  })
 }
 
 /** 获取 CAS cookie jar(调试用)。 */
