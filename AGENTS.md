@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Web 传输层**: 浏览器禁改 `Cookie`/`Referer`/`User-Agent` 等头部且教务系统无 CORS 头，Web 端所有教务流量经 `lib/cookie.ts` 的 `proxyHttpSend()` 走同源 `/api/proxy`（EdgeOne 边缘函数 `website/edge-functions/api/proxy.js`，目标 host 硬白名单）。协议细节见函数文件头注释。
 - **State**: Zustand + `persist` middleware backed by `@aparajita/capacitor-secure-storage`
 - **Styling**: Tailwind CSS v4 + shadcn/ui + `next-themes` (dark/light)
+- **Formatting**: TypeScript/TSX uses Prettier via `pnpm run format`; `.prettierrc` uses no semicolons, double quotes, 100-column width, and Tailwind class sorting. Keep formatting-only changes separate from functional commits.
 - **i18n**: Custom lightweight hook at `lib/i18n/`, locales in `lib/i18n/locales/`
 - **Website**: Independent Astro 6 project in `website/`, deployed to EdgeOne Pages
 
@@ -97,11 +98,12 @@ When debugging provider data loading, start from `providers/hooks/use-provider-q
 
 ### Testing Notes
 
-- Vitest is configured in `vitest.config.ts` with `environment: "node"` and includes `providers/**/*.test.ts`.
-- Existing provider regression tests cover cached auth-expiry fallback, YSU academic error mapping, and CAS-verified relogin:
+- Vitest is configured in `vitest.config.ts` with `environment: "node"` and includes `providers/**/*.test.ts`, `lib/**/*.test.ts`, and `app/**/*.test.ts`.
+- Existing regression tests cover cached auth-expiry fallback, YSU academic error mapping, CAS-verified relogin, and schedule week anchoring:
   - `providers/hooks/use-provider-query.test.ts`
   - `providers/ysu/emap-fetcher.test.ts`
   - `providers/ysu/relogin.test.ts`
+  - `app/dashboard/schedule/schedule-utils.test.ts`
 - Tests use explicit imports from `vitest`, not globals.
 
 ### Storage / WebView Gotchas
