@@ -39,6 +39,8 @@
 
         <receiver
             android:name=".widget.ScheduleWidgetProvider"
+            android:label="@string/widget_name"
+            android:icon="@mipmap/ic_launcher"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -50,6 +52,8 @@
 
         <receiver
             android:name=".widget.ExamWidgetProvider"
+            android:label="@string/widget_exam_name"
+            android:icon="@mipmap/ic_launcher"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -61,6 +65,8 @@
 
         <receiver
             android:name=".widget.ExamWidget2x2Provider"
+            android:label="@string/widget_exam_name"
+            android:icon="@mipmap/ic_launcher"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

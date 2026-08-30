@@ -23,7 +23,7 @@ import { useMobileHeaderRight } from "@/lib/stores/mobile-header";
 import { useClassPeriods, useCurrentWeek, useExams, useSchedule, useTermCalendar } from "@/providers/hooks";
 import { ChevronLeft, ChevronRight, Search, Grid3x2, Grid3x3 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isCourseActiveInWeek, periodIsInUse, resolveInitialScheduleWeek } from "./schedule-utils";
+import { isCourseActiveInWeek, periodIsInUse, resolveInitialScheduleWeek, resolveWidgetCurrentWeek } from "./schedule-utils";
 import { computeExamBlocks } from "./exam-blocks";
 import { ScheduleTablet } from "./schedule-tablet";
 import { ScheduleMobile } from "./schedule-mobile";
@@ -54,6 +54,11 @@ export default function SchedulePage() {
   const courses = useMemo(() => scheduleQuery.data ?? [], [scheduleQuery.data]);
   const currentWeek = currentWeekQuery.data ?? null;
   const termCalendar = termCalendarQuery.data;
+
+  const widgetCurrentWeek = useMemo(
+    () => resolveWidgetCurrentWeek(currentWeek, termCalendar?.startDate),
+    [currentWeek, termCalendar?.startDate],
+  );
   const loading =
     scheduleQuery.isLoading ||
     scheduleQuery.isValidating ||
@@ -127,19 +132,17 @@ export default function SchedulePage() {
   }, [scheduleQuery.error, currentWeekQuery.error, termCalendarQuery.error, periodsQuery.error, t]);
 
   useEffect(() => {
-    if (!scheduleQuery.data || !currentWeek) return;
-    const activeCourses = currentWeek.week
-      ? scheduleQuery.data.filter((course) => isCourseActiveInWeek(course, currentWeek.week))
-      : scheduleQuery.data;
+    if (!scheduleQuery.data || !widgetCurrentWeek) return;
+    const activeCourses = scheduleQuery.data.filter((course) => isCourseActiveInWeek(course, widgetCurrentWeek.week));
     syncScheduleToWidget(
       activeCourses,
-      currentWeek,
+      widgetCurrentWeek,
       periodsRef.current,
       useSettingsStore.getState().widgetSyncReminderHours,
       useSettingsStore.getState().widgetShowNextDaySchedule,
     ).catch(() => {});
-    syncClassAlarmsToNative(activeCourses, currentWeek, periodsRef.current).catch(() => {});
-  }, [scheduleQuery.data, currentWeek]);
+    syncClassAlarmsToNative(activeCourses, widgetCurrentWeek, periodsRef.current).catch(() => {});
+  }, [scheduleQuery.data, widgetCurrentWeek]);
 
   async function handleQuery() {
     const nextTerm = term.trim();

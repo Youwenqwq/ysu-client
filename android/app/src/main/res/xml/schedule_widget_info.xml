@@ -10,7 +10,8 @@
     android:maxResizeHeight="300dp"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/schedule_widget_medium"
-    android:previewImage="@mipmap/ic_launcher"
+    android:previewLayout="@layout/schedule_widget_preview"
+    android:previewImage="@drawable/widget_schedule_preview"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:description="@string/widget_description">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CurrentWeek } from "@/providers/types";
-import { computeWeekDateLabels, resolveInitialScheduleWeek } from "./schedule-utils";
+import { computeWeekDateLabels, resolveInitialScheduleWeek, resolveWidgetCurrentWeek } from "./schedule-utils";
 
 const staleCurrentWeek: CurrentWeek = {
   week: 1,
@@ -72,5 +72,18 @@ describe("resolveInitialScheduleWeek", () => {
         new Date(2026, 8, 15),
       ),
     ).toBe(3);
+  });
+});
+
+describe("resolveWidgetCurrentWeek", () => {
+  it("normalizes a negative provider week using the term calendar", () => {
+    const currentWeek: CurrentWeek = {
+      week: -1,
+      weekday: 4,
+      date: "2026-08-27",
+      semester: "2026-2027-1",
+    };
+
+    expect(resolveWidgetCurrentWeek(currentWeek, "2026-08-31", new Date(2026, 8, 14))?.week).toBe(3);
   });
 });

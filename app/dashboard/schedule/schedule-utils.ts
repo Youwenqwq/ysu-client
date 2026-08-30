@@ -82,6 +82,16 @@ export function resolveInitialScheduleWeek(
   return 1;
 }
 
+export function resolveWidgetCurrentWeek(
+  currentWeek: CurrentWeek | null,
+  termStartDate?: string,
+  now = new Date(),
+): CurrentWeek | null {
+  if (!currentWeek) return null;
+  const week = resolveInitialScheduleWeek(currentWeek, termStartDate, now);
+  return currentWeek.week === week ? currentWeek : { ...currentWeek, week };
+}
+
 function weekLabelsFromStart(
   startDate: string | undefined,
   week: number,

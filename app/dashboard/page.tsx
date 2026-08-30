@@ -20,6 +20,7 @@ import {
   useGPAStats,
   useSchedule,
   useStudentInfo,
+  useTermCalendar,
 } from "@/providers/hooks";
 import { cn } from "@/lib/utils";
 import {
@@ -30,6 +31,7 @@ import {
   isCourseActiveInWeek,
   isCoursePast,
   periodIsInUse,
+  resolveWidgetCurrentWeek,
 } from "@/app/dashboard/schedule/schedule-utils";
 import { syncScheduleToWidget, syncExamsToWidget } from "@/lib/native/widget-bridge";
 import { syncClassAlarmsToNative } from "@/lib/native/notify";
@@ -78,6 +80,7 @@ export default function DashboardPage() {
 
   const student = useStudentInfo();
   const currentWeek = useCurrentWeek();
+  const termCalendar = useTermCalendar();
   const gpa = useGPAStats();
   const schedule = useSchedule({ courseCategory: "all", includeLabSchedule: true });
   const exams = useExams();
@@ -98,8 +101,8 @@ export default function DashboardPage() {
   }, [periodsRaw.data]);
 
   const errors = useMemo(
-    () => [student.error, currentWeek.error, gpa.error, schedule.error, exams.error, periodsRaw.error].filter(Boolean),
-    [student.error, currentWeek.error, gpa.error, schedule.error, exams.error, periodsRaw.error],
+    () => [student.error, currentWeek.error, termCalendar.error, gpa.error, schedule.error, exams.error, periodsRaw.error].filter(Boolean),
+    [student.error, currentWeek.error, termCalendar.error, gpa.error, schedule.error, exams.error, periodsRaw.error],
   );
 
   useEffect(() => {
@@ -108,17 +111,22 @@ export default function DashboardPage() {
   }, [errors, t]);
 
   // Sync courses to widget when fresh data arrives
+  const widgetCurrentWeek = useMemo(
+    () => resolveWidgetCurrentWeek(currentWeek.data ?? null, termCalendar.data?.startDate),
+    [currentWeek.data, termCalendar.data?.startDate],
+  );
+
   const activeCoursesForWidget = useMemo(() => {
-    if (!currentWeek.data || !schedule.data) return null;
-    return schedule.data.filter((c) => isCourseActiveInWeek(c, currentWeek.data!.week));
-  }, [schedule.data, currentWeek.data]);
+    if (!widgetCurrentWeek || !schedule.data) return null;
+    return schedule.data.filter((c) => isCourseActiveInWeek(c, widgetCurrentWeek.week));
+  }, [schedule.data, widgetCurrentWeek]);
 
   useEffect(() => {
-    if (activeCoursesForWidget) {
-      syncScheduleToWidget(activeCoursesForWidget, currentWeek.data ?? null, periods, widgetSyncReminderHours, widgetShowNextDaySchedule).catch(() => {});
-      syncClassAlarmsToNative(activeCoursesForWidget, currentWeek.data ?? null, periods).catch(() => {});
+    if (activeCoursesForWidget && widgetCurrentWeek) {
+      syncScheduleToWidget(activeCoursesForWidget, widgetCurrentWeek, periods, widgetSyncReminderHours, widgetShowNextDaySchedule).catch(() => {});
+      syncClassAlarmsToNative(activeCoursesForWidget, widgetCurrentWeek, periods).catch(() => {});
     }
-  }, [activeCoursesForWidget, currentWeek.data, periods, widgetSyncReminderHours, widgetShowNextDaySchedule]);
+  }, [activeCoursesForWidget, widgetCurrentWeek, periods, widgetSyncReminderHours, widgetShowNextDaySchedule]);
 
   // Sync exams to widget when fresh data arrives
   useEffect(() => {
@@ -127,7 +135,7 @@ export default function DashboardPage() {
     }
   }, [exams.data, widgetSyncReminderHours]);
 
-  const hooks = [student, currentWeek, gpa, schedule, exams, periodsRaw];
+  const hooks = [student, currentWeek, termCalendar, gpa, schedule, exams, periodsRaw];
   const anyLoading = hooks.some((h) => h.isLoading);
   const hasAnyData = hooks.some((h) => h.data != null);
 

@@ -10,7 +10,8 @@
     android:maxResizeHeight="400dp"
     android:updatePeriodMillis="3600000"
     android:initialLayout="@layout/exam_widget"
-    android:previewImage="@mipmap/ic_launcher"
+    android:previewLayout="@layout/exam_widget_preview"
+    android:previewImage="@drawable/widget_exam_preview"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:description="@string/widget_exam_description">
