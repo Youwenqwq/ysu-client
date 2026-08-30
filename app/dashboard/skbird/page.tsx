@@ -22,10 +22,16 @@ import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
 import { SkbirdError, SKBIRD_ERRNO_TOKEN_INVALID } from "@/lib/extras/skbird/client"
 import { getSkbirdClient, useSkbirdStore } from "@/lib/extras/skbird/store"
 import type { SkbirdCategory, SkbirdThread } from "@/lib/extras/skbird/types"
+import {
+  readSkbirdFeedSnapshot,
+  type SkbirdFeedSnapshot,
+  type SkbirdFeedTab,
+  writeSkbirdFeedSnapshot,
+} from "@/lib/extras/skbird/feed-state"
 import { SkbirdThreadCard } from "@/components/skbird/thread-card"
 import { useLoadMoreSentinel } from "@/components/skbird/use-load-more-sentinel"
 
-type FeedTab = "hot" | "latest" | "top" | "reward"
+type FeedTab = SkbirdFeedTab
 /** 时间游标分页的 tab（from_time = 末条 postTime） */
 const CURSOR_TABS: Record<string, true> = { latest: true, reward: true }
 
@@ -63,6 +69,113 @@ export default function SkbirdPage() {
   const searchPageRef = useRef(1)
   const busyRef = useRef(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const [feedStateReady, setFeedStateReady] = useState(false)
+  const initializedRef = useRef(false)
+  const restoredRef = useRef(false)
+  const snapshotAvailableRef = useRef(false)
+  const scrollRestoredRef = useRef(false)
+  const restoredScrollRef = useRef({ scrollY: 0, mainScrollTop: 0 })
+  const scrollRef = useRef({ scrollY: 0, mainScrollTop: 0 })
+  const feedStateRef = useRef<SkbirdFeedSnapshot | null>(null)
+  const persistRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    feedStateRef.current = {
+      version: 1,
+      tab,
+      wd,
+      submittedWd,
+      cateId,
+      range,
+      threads,
+      hasMore,
+      cursor: cursorRef.current,
+      searchPage: searchPageRef.current,
+      searchOpen,
+      scrollY: scrollRef.current.scrollY,
+      mainScrollTop: scrollRef.current.mainScrollTop,
+    }
+    persistRef.current = () => {
+      if (!hasHydrated || !token || !initializedRef.current || !feedStateRef.current) return
+      writeSkbirdFeedSnapshot({
+        ...feedStateRef.current,
+        cursor: cursorRef.current,
+        searchPage: searchPageRef.current,
+        scrollY: scrollRef.current.scrollY,
+        mainScrollTop: scrollRef.current.mainScrollTop,
+      })
+    }
+  }, [hasHydrated, token, tab, wd, submittedWd, cateId, range, searchOpen, threads, hasMore])
+
+  // 离开列表页前记录滚动位置；桌面端滚动容器是 main，移动端通常是 window。
+  useEffect(() => {
+    const updateScroll = () => {
+      scrollRef.current = {
+        scrollY: window.scrollY,
+        mainScrollTop: document.querySelector("main")?.scrollTop ?? 0,
+      }
+    }
+    window.addEventListener("scroll", updateScroll, { passive: true })
+    const main = document.querySelector("main")
+    main?.addEventListener("scroll", updateScroll, { passive: true })
+    return () => {
+      updateScroll()
+      persistRef.current()
+      window.removeEventListener("scroll", updateScroll)
+      main?.removeEventListener("scroll", updateScroll)
+    }
+  }, [])
+
+  // 列表页被详情页卸载后，从 sessionStorage 恢复筛选、已加载帖子和分页游标。
+  useEffect(() => {
+    if (!hasHydrated || !token || initializedRef.current) return
+    initializedRef.current = true
+    const snapshot = readSkbirdFeedSnapshot()
+    if (snapshot) {
+      restoredRef.current = true
+      snapshotAvailableRef.current = true
+      restoredScrollRef.current = {
+        scrollY: snapshot.scrollY,
+        mainScrollTop: snapshot.mainScrollTop,
+      }
+      cursorRef.current = snapshot.cursor
+      searchPageRef.current = snapshot.searchPage
+      setTab(snapshot.tab)
+      setWd(snapshot.wd)
+      setSubmittedWd(snapshot.submittedWd)
+      setCateId(snapshot.cateId)
+      setRange(snapshot.range)
+      setSearchOpen(snapshot.searchOpen)
+      setThreads(snapshot.threads)
+      setHasMore(snapshot.hasMore)
+    }
+    setFeedStateReady(true)
+  }, [hasHydrated, token])
+
+  useEffect(() => {
+    if (!hasHydrated || !token || !initializedRef.current) return
+    persistRef.current()
+  }, [hasHydrated, token, tab, wd, submittedWd, cateId, range, searchOpen, threads, hasMore])
+
+  useEffect(() => {
+    if (
+      !snapshotAvailableRef.current ||
+      scrollRestoredRef.current ||
+      !hasHydrated ||
+      !token ||
+      threads.length === 0
+    ) {
+      return
+    }
+    scrollRestoredRef.current = true
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo({ top: restoredScrollRef.current.scrollY, behavior: "auto" })
+      document
+        .querySelector("main")
+        ?.scrollTo({ top: restoredScrollRef.current.mainScrollTop, behavior: "auto" })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [hasHydrated, token, threads.length])
 
   // 移动端搜索展开时自动聚焦
   useEffect(() => {
@@ -121,14 +234,17 @@ export default function SkbirdPage() {
     [tab, cateId, submittedWd, range, mapError]
   )
 
-  // 首屏与条件变化时重新加载
+  // 首屏加载；若存在详情页返回快照，则直接使用快照，条件变化仍按原逻辑重新加载。
   useEffect(() => {
-    if (hasHydrated && token) {
-      cursorRef.current = "0"
-      searchPageRef.current = 1
-      void fetchPage(false)
+    if (!hasHydrated || !token || !feedStateReady) return
+    if (restoredRef.current) {
+      restoredRef.current = false
+      return
     }
-  }, [hasHydrated, token, fetchPage])
+    cursorRef.current = "0"
+    searchPageRef.current = 1
+    void fetchPage(false)
+  }, [hasHydrated, token, feedStateReady, fetchPage])
 
   // 分类列表与未读数：进入页面后各拉一次，失败静默
   useEffect(() => {
