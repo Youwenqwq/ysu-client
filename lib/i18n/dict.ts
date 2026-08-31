@@ -709,6 +709,9 @@ export const zh = {
     sections: "第 {start}-{end} 节",
     selectHint: "选择筛选条件后查询",
     unscheduled: "未排课",
+    singleSection: "第{section}节",
+    freeRoomEntry: "查空教室",
+    freeRoomContext: "正在查找第{week}周 · {weekday}第{section}节 的空教室",
   },
   student: {
     title: "学生基本信息",
@@ -1636,6 +1639,9 @@ export const en = {
     sections: "Sections {start}-{end}",
     selectHint: "Pick filters and search",
     unscheduled: "Not scheduled",
+    singleSection: "Section {section}",
+    freeRoomEntry: "Find free rooms",
+    freeRoomContext: "Finding free rooms · week {week}, {weekday}, section {section}",
   },
   student: {
     title: "Student Info",

@@ -1,6 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -20,10 +27,19 @@ import {
   useSchedule,
   useTermCalendar,
 } from "@/providers/hooks"
-import { ChevronLeft, ChevronRight, Search, Grid3x2, Grid3x3 } from "lucide-react"
+import {
+  CalendarDays,
+  CalendarSearch,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Grid3x2,
+  Grid3x3,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   isCourseActiveInWeek,
+  parseTimeToMinutes,
   periodIsInUse,
   resolveInitialScheduleWeek,
   resolveWidgetCurrentWeek,
@@ -192,8 +208,53 @@ export default function SchedulePage() {
     setFilterDrawerOpen(false)
   }
 
+  const headerWeekday = currentWeek?.weekday ?? 0
+  const currentSection = useMemo(() => {
+    if (headerWeekday <= 0) return null
+    for (const p of periods) {
+      const start = parseTimeToMinutes(p.startTime)
+      const end = parseTimeToMinutes(p.endTime)
+      if (start === null || end === null) continue
+      if (nowMinutes >= start && nowMinutes < end) return p.section
+    }
+    const upcoming = periods.find((p) => {
+      const start = parseTimeToMinutes(p.startTime)
+      return start !== null && start > nowMinutes
+    })
+    return upcoming?.section ?? null
+  }, [periods, nowMinutes, headerWeekday])
+  const freeRoomHref = useMemo(() => {
+    const params = new URLSearchParams({
+      tab: "room",
+      week: String(selectedWeek || currentWeek?.week || 1),
+    })
+    if (headerWeekday >= 1) params.set("day", String(headerWeekday))
+    if (currentSection) params.set("section", String(currentSection))
+    return `/dashboard/school-schedule?${params.toString()}`
+  }, [selectedWeek, currentWeek?.week, headerWeekday, currentSection])
+
   useMobileHeaderRight(
     <div className="flex items-center gap-0.5">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="h-8 w-8"
+            aria-label={t("app.schoolSchedule")}
+          >
+            <CalendarDays className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link href="/dashboard/school-schedule">{t("app.schoolSchedule")}</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href={freeRoomHref}>{t("schoolSchedule.freeRoomEntry")}</Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Button
         variant="ghost"
         size="icon-sm"
@@ -210,7 +271,7 @@ export default function SchedulePage() {
         onClick={() => setFilterDrawerOpen(true)}
       />
     </div>,
-    [selectedWeek, t, compactMode, setCompactMode]
+    [selectedWeek, t, compactMode, setCompactMode, currentSection, freeRoomHref]
   )
 
   const filteredCourses = useMemo(() => {
@@ -303,9 +364,25 @@ export default function SchedulePage() {
       className={compactMode && isMobile ? "flex min-h-0 flex-1 flex-col" : "flex flex-col gap-6"}
     >
       <Card className="hidden md:block">
-        <CardHeader>
-          <CardTitle>{t("schedule.title")}</CardTitle>
-          <CardDescription>{t("schedule.description")}</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle>{t("schedule.title")}</CardTitle>
+            <CardDescription>{t("schedule.description")}</CardDescription>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link href={freeRoomHref}>
+                <CalendarSearch data-icon="inline-start" />
+                {t("schoolSchedule.freeRoomEntry")}
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/school-schedule">
+                <CalendarDays data-icon="inline-start" />
+                {t("app.schoolSchedule")}
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>{renderFilterControls("schedule-desktop")}</CardContent>
       </Card>

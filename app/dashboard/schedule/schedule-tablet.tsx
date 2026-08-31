@@ -41,6 +41,8 @@ interface Props {
   selectedWeek: number
   termStartDate?: string
   nowMinutes: number
+  /** 提供时替代默认的活动弹窗，用于只读课表（如全校课表） */
+  onCourseTap?: (course: Course) => void
 }
 
 const DAYS = [1, 2, 3, 4, 5, 6, 7] as const
@@ -57,6 +59,7 @@ export function ScheduleTablet({
   selectedWeek,
   termStartDate,
   nowMinutes,
+  onCourseTap,
 }: Props) {
   const { t } = useTranslation()
   const [overlapDialog, setOverlapDialog] = useState<{
@@ -241,8 +244,12 @@ export function ScheduleTablet({
                   )}
                   style={blockStyle(block)}
                   onClick={() => {
-                    setActivityCourse(c)
-                    setActivityOpen(true)
+                    if (onCourseTap) {
+                      onCourseTap(c)
+                    } else {
+                      setActivityCourse(c)
+                      setActivityOpen(true)
+                    }
                   }}
                 >
                   <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">
@@ -366,8 +373,12 @@ export function ScheduleTablet({
                   className="cursor-pointer transition-colors hover:bg-accent/50"
                   onClick={() => {
                     setOverlapDialog(null)
-                    setActivityCourse(c)
-                    setActivityOpen(true)
+                    if (onCourseTap) {
+                      onCourseTap(c)
+                    } else {
+                      setActivityCourse(c)
+                      setActivityOpen(true)
+                    }
                   }}
                 >
                   <CardHeader className="pb-2">

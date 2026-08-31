@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest"
-import type { CurrentWeek } from "@/providers/types"
+import type { CurrentWeek, Course } from "@/providers/types"
 import {
   computeWeekDateLabels,
   resolveInitialScheduleWeek,
   resolveWidgetCurrentWeek,
+  isCourseActiveInWeek,
 } from "./schedule-utils"
-
 const staleCurrentWeek: CurrentWeek = {
   week: 1,
   weekday: 1,
@@ -89,5 +89,40 @@ describe("resolveWidgetCurrentWeek", () => {
     }
 
     expect(resolveWidgetCurrentWeek(currentWeek, "2026-08-31", new Date(2026, 8, 14))?.week).toBe(3)
+  })
+})
+
+describe("isCourseActiveInWeek", () => {
+  it("filters school courses by the parsed weeks string when weekList is absent", () => {
+    const course: Course = {
+      name: "高等数学",
+      weeks: "1-8,10-16周",
+      weekDay: 1,
+      startSection: 1,
+      endSection: 2,
+    }
+    expect(isCourseActiveInWeek(course, 1)).toBe(true)
+    expect(isCourseActiveInWeek(course, 8)).toBe(true)
+    expect(isCourseActiveInWeek(course, 9)).toBe(false)
+    expect(isCourseActiveInWeek(course, 16)).toBe(true)
+  })
+
+  it("prefers weekList over the weeks string", () => {
+    const course: Course = {
+      name: "大学英语",
+      weeks: "1-16周",
+      weekList: [2],
+      weekDay: 2,
+      startSection: 3,
+      endSection: 4,
+    }
+    expect(isCourseActiveInWeek(course, 2)).toBe(true)
+    expect(isCourseActiveInWeek(course, 1)).toBe(false)
+  })
+
+  it("shows courses without week info in every week", () => {
+    const noWeeks: Course = { name: "形势与政策", weekDay: 1, startSection: 1, endSection: 2 }
+    expect(isCourseActiveInWeek(noWeeks, 5)).toBe(true)
+    expect(isCourseActiveInWeek({ ...noWeeks, weeks: "" }, 5)).toBe(true)
   })
 })

@@ -41,6 +41,8 @@ interface Props {
   compact?: boolean
   onPrevWeek?: () => void
   onNextWeek?: () => void
+  /** 提供时替代默认的活动弹窗，用于只读课表（如全校课表） */
+  onCourseTap?: (course: Course) => void
 }
 
 const DAYS = [1, 2, 3, 4, 5, 6, 7] as const
@@ -62,6 +64,7 @@ export function ScheduleMobile({
   compact = false,
   onPrevWeek,
   onNextWeek,
+  onCourseTap,
 }: Props) {
   const { t } = useTranslation()
   const [overlapDrawer, setOverlapDrawer] = useState<OverlapState>(null)
@@ -276,8 +279,12 @@ export function ScheduleMobile({
                 type="button"
                 onClick={(e) => {
                   e.currentTarget.blur()
-                  setActivityCourse(c)
-                  setActivityOpen(true)
+                  if (onCourseTap) {
+                    onCourseTap(c)
+                  } else {
+                    setActivityCourse(c)
+                    setActivityOpen(true)
+                  }
                 }}
                 className={cn(
                   "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1 text-left transition-opacity active:opacity-60",
@@ -412,8 +419,12 @@ export function ScheduleMobile({
                   onClick={(e) => {
                     e.currentTarget.blur()
                     setOverlapDrawer(null)
-                    setActivityCourse(c)
-                    setActivityOpen(true)
+                    if (onCourseTap) {
+                      onCourseTap(c)
+                    } else {
+                      setActivityCourse(c)
+                      setActivityOpen(true)
+                    }
                   }}
                   className={cn(
                     "flex flex-col gap-1 rounded-lg p-3 text-left transition-opacity active:opacity-60",
