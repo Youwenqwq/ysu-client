@@ -24,12 +24,13 @@ import {
   periodStartTime,
   type ScheduleBlock,
 } from "./schedule-utils"
-import { COURSE_BG_CLASSES, courseColorIndex } from "./course-color"
+import { courseBgClass, type CourseColorMap } from "./course-color"
 import { ActivityModal } from "./activity-modal"
 import { SigninModal } from "./signin-modal"
 
 interface Props {
   courses: Course[]
+  colorMap: CourseColorMap
   examBlocks?: ExamBlock[]
   periods: ClassPeriod[]
   currentWeekday: number
@@ -51,6 +52,7 @@ type OverlapState = { day: number; section: number; courses: Course[] } | null
 export function ScheduleMobile({
   courses,
   examBlocks = [],
+  colorMap,
   periods,
   currentWeekday,
   currentWeek,
@@ -268,7 +270,6 @@ export function ScheduleMobile({
         {blocks.map((block, idx) => {
           if (block.courses.length === 1) {
             const c = block.courses[0]
-            const colorIdx = courseColorIndex(c)
             return (
               <button
                 key={`block-${idx}`}
@@ -280,7 +281,7 @@ export function ScheduleMobile({
                 }}
                 className={cn(
                   "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1 text-left transition-opacity active:opacity-60",
-                  COURSE_BG_CLASSES[colorIdx],
+                  courseBgClass(colorMap, c),
                   isBlockCurrent(block) && "ring-1 ring-primary"
                 )}
                 style={blockStyle(block)}
@@ -404,7 +405,6 @@ export function ScheduleMobile({
           </DrawerHeader>
           <div className="flex flex-col gap-2 px-4 pb-6">
             {overlapDrawer?.courses.map((c, i) => {
-              const colorIdx = courseColorIndex(c)
               return (
                 <button
                   key={i}
@@ -417,7 +417,7 @@ export function ScheduleMobile({
                   }}
                   className={cn(
                     "flex flex-col gap-1 rounded-lg p-3 text-left transition-opacity active:opacity-60",
-                    COURSE_BG_CLASSES[colorIdx]
+                    courseBgClass(colorMap, c)
                   )}
                 >
                   <span className="text-sm font-medium text-foreground">{c.name}</span>

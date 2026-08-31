@@ -51,6 +51,8 @@
     --color-schedule-4: var(--schedule-4);
     --color-schedule-5: var(--schedule-5);
     --color-schedule-6: var(--schedule-6);
+    --color-schedule-7: var(--schedule-7);
+    --color-schedule-8: var(--schedule-8);
 }
 
 :root {
@@ -86,12 +88,14 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
-    --schedule-1: oklch(0.92 0.05 240);
-    --schedule-2: oklch(0.92 0.06 150);
-    --schedule-3: oklch(0.93 0.07 75);
-    --schedule-4: oklch(0.92 0.07 25);
-    --schedule-5: oklch(0.92 0.06 310);
-    --schedule-6: oklch(0.93 0.06 350);
+    --schedule-1: oklch(0.88 0.06 148);
+    --schedule-2: oklch(0.94 0.03 153);
+    --schedule-3: oklch(0.95 0.06 99);
+    --schedule-4: oklch(0.93 0.04 60);
+    --schedule-5: oklch(0.88 0.06 11);
+    --schedule-6: oklch(0.88 0.05 308);
+    --schedule-7: oklch(0.88 0.05 254);
+    --schedule-8: oklch(0.88 0.06 241);
 }
 
 .dark {
@@ -126,12 +130,14 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
-    --schedule-1: oklch(0.30 0.04 240);
-    --schedule-2: oklch(0.30 0.05 150);
-    --schedule-3: oklch(0.32 0.05 75);
-    --schedule-4: oklch(0.31 0.06 25);
-    --schedule-5: oklch(0.30 0.05 310);
-    --schedule-6: oklch(0.32 0.05 350);
+    --schedule-1: oklch(0.26 0.08 148);
+    --schedule-2: oklch(0.35 0.04 153);
+    --schedule-3: oklch(0.36 0.07 99);
+    --schedule-4: oklch(0.34 0.04 60);
+    --schedule-5: oklch(0.26 0.08 11);
+    --schedule-6: oklch(0.31 0.06 308);
+    --schedule-7: oklch(0.31 0.06 254);
+    --schedule-8: oklch(0.25 0.09 241);
 }
 
 @layer base {

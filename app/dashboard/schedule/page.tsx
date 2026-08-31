@@ -29,6 +29,7 @@ import {
   resolveWidgetCurrentWeek,
 } from "./schedule-utils"
 import { computeExamBlocks } from "./exam-blocks"
+import { buildCourseColorMap } from "./course-color"
 import { ScheduleTablet } from "./schedule-tablet"
 import { ScheduleMobile } from "./schedule-mobile"
 import { syncExamsToWidget, syncScheduleToWidget } from "@/lib/native/widget-bridge"
@@ -216,6 +217,7 @@ export default function SchedulePage() {
     if (selectedWeek <= 0) return courses
     return courses.filter((c) => isCourseActiveInWeek(c, selectedWeek))
   }, [courses, selectedWeek])
+  const courseColors = useMemo(() => buildCourseColorMap(courses), [courses])
 
   const examBlocks = useMemo(
     () =>
@@ -328,6 +330,7 @@ export default function SchedulePage() {
             compact={compactMode}
             onPrevWeek={() => shiftWeek(-1)}
             onNextWeek={() => shiftWeek(1)}
+            colorMap={courseColors}
           />
         </div>
       ) : (
@@ -342,6 +345,7 @@ export default function SchedulePage() {
               selectedWeek={selectedWeek}
               termStartDate={termCalendar?.startDate}
               nowMinutes={nowMinutes}
+              colorMap={courseColors}
             />
           </CardContent>
         </Card>

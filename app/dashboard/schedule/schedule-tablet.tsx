@@ -27,12 +27,13 @@ import {
   periodStartTime,
   type ScheduleBlock,
 } from "./schedule-utils"
-import { COURSE_BG_CLASSES, courseColorIndex } from "./course-color"
+import { courseBgClass, type CourseColorMap } from "./course-color"
 import { ActivityModal } from "./activity-modal"
 import { SigninModal } from "./signin-modal"
 
 interface Props {
   courses: Course[]
+  colorMap: CourseColorMap
   examBlocks?: ExamBlock[]
   periods: ClassPeriod[]
   currentWeekday: number
@@ -48,6 +49,7 @@ const DINNER_AFTER = 8
 
 export function ScheduleTablet({
   courses,
+  colorMap,
   examBlocks = [],
   periods,
   currentWeekday,
@@ -229,13 +231,12 @@ export function ScheduleTablet({
           {mergedBlocks.map((block, idx) => {
             if (block.courses.length === 1) {
               const c = block.courses[0]
-              const colorIdx = courseColorIndex(c)
               return (
                 <button
                   key={`block-${idx}`}
                   className={cn(
                     "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1.5 text-left transition-opacity active:opacity-60",
-                    COURSE_BG_CLASSES[colorIdx],
+                    courseBgClass(colorMap, c),
                     isBlockCurrent(block) && "ring-1 ring-primary"
                   )}
                   style={blockStyle(block)}
