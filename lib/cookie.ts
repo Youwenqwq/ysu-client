@@ -309,7 +309,7 @@ export interface HttpRequest {
    * （已中止则直接抛错），已发出的请求结果由调用方丢弃。
    */
   readonly signal?: AbortSignal
-  /** Passed to CapacitorHttp as responseType (e.g. 'base64' for binary data). */
+  /** Passed to CapacitorHttp as responseType (e.g. 'arraybuffer' for binary data). */
   readonly responseType?: string
 }
 
@@ -597,8 +597,10 @@ async function capacitorHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promis
     // Not on Capacitor or getCookies not available
   }
 
-  const isBase64 = req.responseType === "base64"
-
+  const isBase64 =
+    req.responseType === "arraybuffer" ||
+    req.responseType === "blob" ||
+    req.responseType === "base64"
   return {
     status: response.status,
     headers: normalizedHeaders,

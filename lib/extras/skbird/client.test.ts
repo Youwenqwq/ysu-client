@@ -55,6 +55,12 @@ describe("skbirdImageUrl", () => {
     expect(skbirdImageUrl("http://b2.cdn.zanao.com/x.jpg")).toBe("http://b2.cdn.zanao.com/x.jpg")
   })
 
+  it("微信 HTTP 头像升级为 HTTPS，避免 Capacitor 明文请求被系统拦截", () => {
+    expect(skbirdImageUrl("http://thirdwx.qlogo.cn/mmopen/x/132")).toBe(
+      "https://thirdwx.qlogo.cn/mmopen/x/132"
+    )
+  })
+
   it("缩放档位后缀；original 走 @!common 原图", () => {
     expect(skbirdImageUrl("upload/a.jpg", { w: 200, h: 200 })).toBe(
       "https://b1.cdn.zanao.com/upload/a.jpg@!sm_w200_h200"

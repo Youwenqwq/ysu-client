@@ -283,7 +283,9 @@ export function SkbirdImage({
       method: "GET",
       url,
       redirect: "manual",
-      responseType: "base64",
+      // CapacitorHttp 的二进制响应类型是 arraybuffer，原生桥接返回 base64
+      // 字符串，再由 cookie.ts 的 arrayBuffer() 统一解码。
+      responseType: "arraybuffer",
     })
       .then(async (res) => {
         if (res.status !== 200) throw new Error(`HTTP ${res.status}`)

@@ -75,8 +75,11 @@ export function generateDeviceId(): string {
 }
 
 /**
- * 帖子图片 URL。img_paths 为 CDN 路径（可能不带前导 "/"，如 "upload/xx.jpg"）；
- * CDN 完全匿名。**必须携带变换后缀**
+ * 森空鸟图片 URL。帖子图片的相对路径会拼接 CDN 变换后缀；
+ * 微信头像可能是 thirdwx.qlogo.cn 返回的 HTTP 直链，Capacitor 原生端
+ * 不能访问未加入明文白名单的域名，因此升级为 HTTPS。
+ *
+ * 帖子图片规则：
  * - 无后缀裸路径：403 拒绝；
  * - `@!common`：**原图**（实测 1080x2400 / 1264x2736 全分辨率），http/https 均可；
  * - 缩放档仅 5 种：`@!sm_w100_h100` / `@!sm_w200_h200` / `@!sm_w100` /
@@ -87,6 +90,11 @@ export function skbirdImageUrl(
   path: string,
   size?: { w: number; h?: number } | "original"
 ): string {
+  // 微信头像接口可能返回 HTTP；Capacitor Android 默认禁止未白名单明文域名，
+  // thirdwx.qlogo.cn 支持 HTTPS，统一升级后可直接由 WebView 加载。
+  if (/^http:\/\/thirdwx\.qlogo\.cn(?:[/:?#]|$)/i.test(path)) {
+    return `https://${path.slice("http://".length)}`
+  }
   if (/^https?:\/\//.test(path)) return path
   const p = path.startsWith("/") ? path : `/${path}`
   if (size === "original") return `${CDN_BASE}${p}@!common`
