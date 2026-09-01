@@ -72,6 +72,7 @@ skills-lock.json
 *.keystore
 *.jks
 /gradle.properties
+/android/gradle.properties
 
 # Website build artifacts
 website/node_modules/
@@ -97,3 +98,31 @@ website/.edgeone/
 
 # Should be ignored test file
 lib/extras/meter/client.test.ts
+
+# Local collaboration guidelines (user-specific)
+计划.md
+记忆.md
+协作准则.md
+调试指南.md
+
+# Build artifacts / local caches (not committed)
+*.apk
+/.pnpm-store/
+.serena/
+CODEGRAPH.md
+
+# Local debug scratch: cookie dumps & reverse-engineering probes
+/scripts/probe-*.mjs
+/scripts/verify-epay.mjs
+/scripts/epay-loosejson-check.mjs
+/scripts/cas-encrypt.mjs
+/scripts/cas-full-flow.mjs
+/scripts/cas-login.mjs
+/scripts/cas-server-encrypt.js
+/scripts/debug-auth.mjs
+/cjar*.txt
+/cookiejar.txt
+/headers.txt
+/jwxt_headers.txt
+/post_headers.txt
+/login.html

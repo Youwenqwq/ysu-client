@@ -55,6 +55,12 @@ interface SettingsState {
   analyticsPromptVersion: string
   feedbackIds: string[]
   feedbackHistory: FeedbackHistoryItem[]
+  /** 学费提醒姓名覆盖（空 = 用教务学生信息里的姓名） */
+  epayName: string
+  /** 学费未缴自动提醒开关 */
+  epayNotifyEnabled: boolean
+  /** 上次自动检查时间戳（毫秒） */
+  epayLastCheckedAt: number
   hasHydrated: boolean
   setUpdateMirror: (mirror: string) => void
   setUpdateChannel: (channel: UpdateChannel) => void
@@ -89,6 +95,9 @@ interface SettingsState {
   setAnalyticsPromptVersion: (v: string) => void
   setFeedbackIds: (ids: string[]) => void
   setFeedbackHistory: (items: FeedbackHistoryItem[]) => void
+  setEpayName: (name: string) => void
+  setEpayNotifyEnabled: (v: boolean) => void
+  setEpayLastCheckedAt: (ts: number) => void
   setHasHydrated: (v: boolean) => void
 }
 
@@ -128,6 +137,9 @@ export const useSettingsStore = create<SettingsState>()(
       analyticsPromptVersion: "",
       feedbackIds: [],
       feedbackHistory: [],
+      epayName: "",
+      epayNotifyEnabled: true,
+      epayLastCheckedAt: 0,
       hasHydrated: false,
       setUpdateMirror: (updateMirror) => set({ updateMirror }),
       setUpdateChannel: (updateChannel) => set({ updateChannel }),
@@ -163,6 +175,9 @@ export const useSettingsStore = create<SettingsState>()(
       setAnalyticsPromptVersion: (analyticsPromptVersion) => set({ analyticsPromptVersion }),
       setFeedbackIds: (feedbackIds) => set({ feedbackIds }),
       setFeedbackHistory: (feedbackHistory) => set({ feedbackHistory }),
+      setEpayName: (epayName) => set({ epayName }),
+      setEpayNotifyEnabled: (epayNotifyEnabled) => set({ epayNotifyEnabled }),
+      setEpayLastCheckedAt: (epayLastCheckedAt) => set({ epayLastCheckedAt }),
       setHasHydrated: (v) => set({ hasHydrated: v }),
     }),
     {
