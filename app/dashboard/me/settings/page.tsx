@@ -47,6 +47,7 @@ import {
   Timer,
   AlarmClock,
   Battery,
+  Wallet2,
   ShieldCheck,
   BarChart3,
   WifiOff,
@@ -80,6 +81,8 @@ export default function SettingsPage() {
   const setNotifyNetworkError = useSettingsStore((s) => s.setNotifyNetworkError)
   const classReminderEnabled = useSettingsStore((s) => s.classReminderEnabled)
   const setClassReminderEnabled = useSettingsStore((s) => s.setClassReminderEnabled)
+  const epayNotifyEnabled = useSettingsStore((s) => s.epayNotifyEnabled)
+  const setEpayNotifyEnabled = useSettingsStore((s) => s.setEpayNotifyEnabled)
   const classReminderMinutes = useSettingsStore((s) => s.classReminderMinutes)
   const setClassReminderMinutes = useSettingsStore((s) => s.setClassReminderMinutes)
   const classReminderDays = useSettingsStore((s) => s.classReminderDays)
@@ -482,6 +485,19 @@ export default function SettingsPage() {
                   />
                 </>
               )}
+
+              {/* 缴费提醒 */}
+              <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
+                {t("settings.epayReminderTitle")}
+              </h3>
+              <div className="flex items-center gap-3 py-3">
+                <Wallet2 className="size-5 shrink-0 text-muted-foreground" />
+                <div className="flex flex-1 flex-col">
+                  <span className="text-sm">{t("epay.remindLabel")}</span>
+                  <span className="text-xs text-muted-foreground">{t("epay.remindDesc")}</span>
+                </div>
+                <Switch checked={epayNotifyEnabled} onCheckedChange={setEpayNotifyEnabled} />
+              </div>
             </CardContent>
           </Card>
         </Section>

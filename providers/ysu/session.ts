@@ -26,6 +26,8 @@ import {
 import { resetLdxt } from "./protocol/ldxt"
 import { resetScxt } from "./protocol/scxt"
 import { resetXgxt } from "./protocol/xgxt"
+import { resetEpay } from "./protocol/epay"
+import { resetEcard } from "./protocol/ecard"
 import { useAuthStore } from "@/lib/stores/auth"
 import { initServerConfig } from "@/lib/server-config"
 import { STORAGE_KEYS } from "@/lib/storage/keys"
@@ -154,6 +156,8 @@ export async function resetSession(): Promise<void> {
       resetLdxt()
       resetScxt()
       resetXgxt()
+      resetEpay()
+      resetEcard()
       resetMobileAuth()
       clearAllCache()
       useRefreshStore.setState({ count: 0, stale: 0 })

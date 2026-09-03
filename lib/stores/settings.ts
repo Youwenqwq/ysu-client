@@ -21,6 +21,11 @@ export interface FeedbackHistoryItem {
   deleted?: boolean
 }
 
+interface EpayAccountSettings {
+  name: string
+  lastCheckedAt: number
+}
+
 interface SettingsState {
   updateMirror: string
   updateChannel: UpdateChannel
@@ -55,6 +60,10 @@ interface SettingsState {
   analyticsPromptVersion: string
   feedbackIds: string[]
   feedbackHistory: FeedbackHistoryItem[]
+  /** 学费提醒账号设置，按学号隔离 */
+  epayAccountSettings: Record<string, EpayAccountSettings>
+  /** 学费未缴自动提醒开关 */
+  epayNotifyEnabled: boolean
   hasHydrated: boolean
   setUpdateMirror: (mirror: string) => void
   setUpdateChannel: (channel: UpdateChannel) => void
@@ -89,6 +98,9 @@ interface SettingsState {
   setAnalyticsPromptVersion: (v: string) => void
   setFeedbackIds: (ids: string[]) => void
   setFeedbackHistory: (items: FeedbackHistoryItem[]) => void
+  setEpayName: (username: string, name: string) => void
+  setEpayNotifyEnabled: (v: boolean) => void
+  setEpayLastCheckedAt: (username: string, ts: number) => void
   setHasHydrated: (v: boolean) => void
 }
 
@@ -128,6 +140,8 @@ export const useSettingsStore = create<SettingsState>()(
       analyticsPromptVersion: "",
       feedbackIds: [],
       feedbackHistory: [],
+      epayAccountSettings: {},
+      epayNotifyEnabled: true,
       hasHydrated: false,
       setUpdateMirror: (updateMirror) => set({ updateMirror }),
       setUpdateChannel: (updateChannel) => set({ updateChannel }),
@@ -163,6 +177,27 @@ export const useSettingsStore = create<SettingsState>()(
       setAnalyticsPromptVersion: (analyticsPromptVersion) => set({ analyticsPromptVersion }),
       setFeedbackIds: (feedbackIds) => set({ feedbackIds }),
       setFeedbackHistory: (feedbackHistory) => set({ feedbackHistory }),
+      setEpayName: (username, name) =>
+        set((state) => ({
+          epayAccountSettings: {
+            ...state.epayAccountSettings,
+            [username]: {
+              ...(state.epayAccountSettings[username] ?? { name: "", lastCheckedAt: 0 }),
+              name,
+            },
+          },
+        })),
+      setEpayNotifyEnabled: (epayNotifyEnabled) => set({ epayNotifyEnabled }),
+      setEpayLastCheckedAt: (username, ts) =>
+        set((state) => ({
+          epayAccountSettings: {
+            ...state.epayAccountSettings,
+            [username]: {
+              ...(state.epayAccountSettings[username] ?? { name: "", lastCheckedAt: 0 }),
+              lastCheckedAt: ts,
+            },
+          },
+        })),
       setHasHydrated: (v) => set({ hasHydrated: v }),
     }),
     {
