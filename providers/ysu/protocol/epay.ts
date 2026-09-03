@@ -18,8 +18,10 @@ const BASE_URL = "https://epay.ysu.edu.cn"
 const SERVICE_PATH = "/pay/allPay.html"
 /** 最近一笔付款（登录后 JSON 接口）。 */
 const LAST_PAY_PATH = "pay/lastPay.info.ajax.html"
-/** 全部付款记录页（eterna 数据内联在 HTML 的 $E.D 里，经模型 allPay 渲染）。 */
+/** 付款记录页（已缴/全量历史；默认 payStatus=all=已支付，eterna 数据内联在 $E.D）。 */
 const ALL_PAY_PATH = "/pay/allPay.html"
+/** 我的待付款页（仅列待缴/未支付记录；与 allPay 互补，二者合并去重即可互相印证）。 */
+const INDEX_PATH = "/pay/index.html"
 
 // ─── Types ────────────────────────────────────────────────────────────── //
 
@@ -339,9 +341,9 @@ function extractDObject(html: string): Record<string, unknown> | null {
   return null
 }
 
-/** 登录后抓全部付款记录：拉 allPay.html，解出其 D 对象里的 queryResult。 */
-async function fetchAllRecords(): Promise<EpayRecord[]> {
-  const url = `${BASE_URL}${ALL_PAY_PATH}`
+/** 登录后抓指定页面（allPay/index）里的付款记录，解出其 D 对象里的 queryResult。 */
+async function fetchRecordsFromPage(path: string): Promise<EpayRecord[]> {
+  const url = `${BASE_URL}${path}`
   let resp: HttpResponse
   try {
     resp = await fetchWithJar(epayJar, {
@@ -372,10 +374,42 @@ async function fetchAllRecords(): Promise<EpayRecord[]> {
   return toEpayRecords(D)
 }
 
-/** 查询当前会话的付款状态（全部记录 + 最近一笔）。 */
+/** 抓付款记录页（默认已支付历史）。 */
+async function fetchAllRecords(): Promise<EpayRecord[]> {
+  return fetchRecordsFromPage(ALL_PAY_PATH)
+}
+
+/** 抓"我的待付款"页（未支付/待缴记录）。 */
+async function fetchPendingRecords(): Promise<EpayRecord[]> {
+  return fetchRecordsFromPage(INDEX_PATH)
+}
+
+/**
+ * 合并两个数据源并按记录 id 去重。
+ * allPay（已缴历史）与 index（待缴）互补；同一笔单不会同时出现在两边，
+ * 但去重保险，避免边界情况重复展示。
+ */
+export function mergeRecords(...lists: EpayRecord[][]): EpayRecord[] {
+  const seen = new Set<string>()
+  const merged: EpayRecord[] = []
+  for (const list of lists) {
+    for (const r of list) {
+      if (!r.id) continue
+      if (seen.has(r.id)) continue
+      seen.add(r.id)
+      merged.push(r)
+    }
+  }
+  return merged
+}
+
+/** 查询当前会话的付款状态（全部记录 = allPay 已缴 + index 待缴，互相印证 + 最近一笔）。 */
 export async function getEpayStatus(): Promise<EpaySessionStatus> {
   return runWithReauth(async () => {
-    const records = await fetchAllRecords()
+    // 串行抓两个源：共用 epayJar，并发时 reauth 可能互相干扰
+    const history = await fetchAllRecords()
+    const pending = await fetchPendingRecords()
+    const records = mergeRecords(history, pending)
     let lastPay: EpayLastPay | null = null
     try {
       const body = await callJson(LAST_PAY_PATH)

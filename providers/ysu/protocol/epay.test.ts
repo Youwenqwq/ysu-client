@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { toEpayRecords, toLastPay, toRecordStatus } from "./epay"
+import {
+  mergeRecords,
+  toEpayRecords,
+  toLastPay,
+  toRecordStatus,
+  type EpayRecord,
+} from "./epay"
 
 /** 真实探测到的 allPay 数据块（D 对象值），敏感值保留以验证字段映射 */
 const D = {
@@ -152,5 +158,45 @@ describe("toLastPay", () => {
     expect(lp).not.toBeNull()
     expect(lp!.amount).toBe("870.00")
     expect(lp!.payName).toContain("住宿费")
+  })
+})
+
+describe("mergeRecords（allPay 已缴 + index 待缴 双源合并）", () => {
+  const mk = (id: string, overTime: string): EpayRecord => ({
+    id,
+    payName: `费用${id}`,
+    chargeYear: "2026年",
+    currencyTypeShow: "人民币元[CNY]",
+    amountN: 100,
+    amount: "100.00",
+    payAmount: "",
+    refundAmount: "0.00",
+    status: "1",
+    expired: "0",
+    startTime: "",
+    overTime,
+  })
+
+  it("allPay 已缴 + index 待缴合并后都保留", () => {
+    const history = [mk("1", "2026-09-01")]
+    const pending = [mk("2", "")]
+    const merged = mergeRecords(history, pending)
+    expect(merged).toHaveLength(2)
+    const ids = merged.map((r) => r.id)
+    expect(ids).toContain("1")
+    expect(ids).toContain("2")
+  })
+
+  it("同一 id 只保留一份（去重）", () => {
+    const history = [mk("1", "2026-09-01")]
+    const pending = [mk("1", "")]
+    const merged = mergeRecords(history, pending)
+    expect(merged).toHaveLength(1)
+  })
+
+  it("只有待缴(无历史)也能识别为未缴", () => {
+    const merged = mergeRecords([], [mk("9", "")])
+    expect(merged).toHaveLength(1)
+    expect(toRecordStatus(merged[0]!)).toBe("unpaid")
   })
 })
