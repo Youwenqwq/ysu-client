@@ -453,6 +453,14 @@ async function syncJarCookiesToWebView(): Promise<void> {
   }
 }
 
+function isUnauthenticatedLocation(url: string): boolean {
+  return (
+    url.includes("/authserver/login") ||
+    url.includes("reAuthCheck") ||
+    url.includes("isMultifactor")
+  )
+}
+
 export async function isAuthenticated(): Promise<boolean> {
   const resp = await _fetch({
     method: "GET",
@@ -462,11 +470,12 @@ export async function isAuthenticated(): Promise<boolean> {
   })
   if (REDIRECT_STATUSES.has(resp.status)) {
     const location = headerSingle(resp.headers, "location") ?? ""
-    return !location.includes("/authserver/login")
+    return !isUnauthenticatedLocation(location)
   }
   if (resp.status === 200) {
-    // CapacitorHttp auto-follows redirects — check final URL
-    return !resp.url.includes("/authserver/login")
+    // CapacitorHttp auto-follows redirects — check final URL and re-auth page markers.
+    if (isUnauthenticatedLocation(resp.url)) return false
+    return !isReauthPage(await resp.text())
   }
   return false
 }

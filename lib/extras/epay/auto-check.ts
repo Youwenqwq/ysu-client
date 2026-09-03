@@ -8,7 +8,7 @@
 
 import { useAuthStore } from "@/lib/stores/auth"
 import { useSettingsStore } from "@/lib/stores/settings"
-import { fetchEpayPayments } from "@/providers/ysu/epay-access"
+import { EpayAccessError, fetchEpayPayments } from "@/providers/ysu/epay-access"
 import { toRecordStatus } from "@/providers/ysu/protocol/epay"
 import { fetchEpayBills } from "./client"
 import { isUnpaid } from "./types"
@@ -31,18 +31,21 @@ export interface EpayCheckResult {
 export async function runEpayAutoCheck(): Promise<EpayCheckResult | null> {
   const settings = useSettingsStore.getState()
   if (!settings.epayNotifyEnabled) return null
-  if (Date.now() - settings.epayLastCheckedAt < MIN_INTERVAL_MS) return null
 
   const username = useAuthStore.getState().username
   if (!username) return null
-  const name = settings.epayName.trim()
+
+  const account = settings.epayAccountSettings[username]
+  const lastCheckedAt = account?.lastCheckedAt ?? 0
+  if (Date.now() - lastCheckedAt < MIN_INTERVAL_MS) return null
+  const name = account?.name.trim() ?? ""
 
   try {
     // 优先 SSO：教务会话拉取全部记录
     try {
       const status = await fetchEpayPayments()
       const unpaid = status.records.filter((r) => toRecordStatus(r) === "unpaid")
-      useSettingsStore.getState().setEpayLastCheckedAt(Date.now())
+      useSettingsStore.getState().setEpayLastCheckedAt(username, Date.now())
       return {
         hasUnpaid: unpaid.length > 0,
         count: unpaid.length,
@@ -51,10 +54,10 @@ export async function runEpayAutoCheck(): Promise<EpayCheckResult | null> {
     } catch (e) {
       // SSO 不可用（未登录教务）→ 回退无密码查询（需姓名）
       if (!name) return null
-      if (!(e instanceof Error && e.name === "EpayAccessError")) throw e
+      if (!(e instanceof EpayAccessError)) throw e
       const bills = await fetchEpayBills(username, name)
       const unpaid = bills.unpaid.filter((b) => isUnpaid(b.payStatus))
-      useSettingsStore.getState().setEpayLastCheckedAt(Date.now())
+      useSettingsStore.getState().setEpayLastCheckedAt(username, Date.now())
       return {
         hasUnpaid: unpaid.length > 0,
         count: unpaid.length,

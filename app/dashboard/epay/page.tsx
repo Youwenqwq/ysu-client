@@ -15,7 +15,7 @@ import { useAuthStore } from "@/lib/stores/auth"
 import { useSettingsStore } from "@/lib/stores/settings"
 import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
 import { useStudentInfo } from "@/providers/hooks/use-student-info"
-import { fetchEpayPayments, type EpayRecord, type EpayRecordStatus } from "@/providers/ysu/epay-access"
+import { EpayAccessError, fetchEpayPayments, type EpayRecord } from "@/providers/ysu/epay-access"
 import { toRecordStatus } from "@/providers/ysu/protocol/epay"
 import { EpayError, fetchEpayBills } from "@/lib/extras/epay/client"
 import { cn } from "@/lib/utils"
@@ -24,7 +24,10 @@ export default function EpayPage() {
   const { t } = useTranslation()
   const hasHydrated = useAuthStore((s) => s.hasHydrated)
   const username = useAuthStore((s) => s.username)
-  const epayName = useSettingsStore((s) => s.epayName)
+  const epayAccount = useSettingsStore((s) =>
+    username ? s.epayAccountSettings[username] : undefined
+  )
+  const epayName = epayAccount?.name ?? ""
   const setEpayName = useSettingsStore((s) => s.setEpayName)
   const student = useStudentInfo()
 
@@ -39,6 +42,7 @@ export default function EpayPage() {
   const effectiveName = (epayName.trim() || (student.data?.name ?? "").trim()).trim()
 
   const load = useCallback(async () => {
+    if (!username) return
     setLoading(true)
     // 优先走 SSO：教务会话拉取全部付款记录（含已缴）
     try {
@@ -48,16 +52,10 @@ export default function EpayPage() {
       setNoAuth(false)
       setUpdatedAt(new Date())
     } catch (e) {
-      const isAuthErr = e instanceof Error && e.name === "EpayAccessError"
-      if (isAuthErr) {
-        setNoAuth(true)
-        setRecords([])
-        setError(null)
-      } else {
-        setError(e instanceof Error ? e.message : String(e))
-      }
-      // 若姓名可得，追加无密码待缴查询兜底
-      if (effectiveName && username && !isAuthErr) {
+      const isAuthErr = e instanceof EpayAccessError
+
+      // SSO 不可用时，使用姓名+学号执行无密码待缴查询兜底。
+      if (isAuthErr && effectiveName) {
         try {
           const bills = await fetchEpayBills(username, effectiveName)
           setRecords(
@@ -77,31 +75,56 @@ export default function EpayPage() {
             }))
           )
           setError(null)
+          setNoAuth(false)
+          setUpdatedAt(new Date())
+          return
         } catch {
-          // 忽略无密码查询失败
+          // 兜底查询失败时保留登录/姓名提示，允许用户再次重试。
         }
+      }
+
+      if (isAuthErr) {
+        setNoAuth(true)
+        setRecords([])
+        setError(null)
+      } else {
+        setNoAuth(false)
+        const message = e instanceof EpayError ? e.message : t("epay.errorGeneric")
+        setError(t("epay.loadFailed", { message }))
       }
     } finally {
       setLoading(false)
     }
-  }, [username, effectiveName])
+  }, [username, effectiveName, t])
+
+  useEffect(() => {
+    setRecords(null)
+    setError(null)
+    setUpdatedAt(null)
+    setNoAuth(false)
+    setNameInput("")
+  }, [username])
 
   useEffect(() => {
     if (hasHydrated && username) void load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 学号就绪时首拉一次
   }, [hasHydrated, username, load])
 
   const saveNameAndReload = useCallback(() => {
     const v = nameInput.trim()
-    if (!v) return
-    setEpayName(v)
+    if (!v || !username) return
+    setEpayName(username, v)
     toast.success(t("epay.nameSaved"))
-    void load()
-  }, [nameInput, setEpayName, t, load])
+  }, [nameInput, username, setEpayName, t])
 
   // 移动端刷新按钮入顶栏
   useMobileHeaderRight(
-    <Button variant="ghost" size="icon-sm" onClick={() => void load()} disabled={loading} aria-label={t("epay.refresh")}>
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      onClick={() => void load()}
+      disabled={loading}
+      aria-label={t("epay.refresh")}
+    >
       <RefreshCw className={cn("size-4", loading && "animate-spin")} />
     </Button>,
     [loading, load, t]
@@ -193,6 +216,28 @@ export default function EpayPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
+      <div className="hidden items-center justify-end gap-3 sm:flex">
+        {updatedAt ? (
+          <span className="text-xs text-muted-foreground">
+            {t("epay.updatedAt", {
+              time: updatedAt.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+            })}
+          </span>
+        ) : null}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void load()}
+          disabled={loading}
+          aria-label={t("epay.refresh")}
+        >
+          <RefreshCw className={cn("size-4", loading && "animate-spin")} />
+          {t("epay.refresh")}
+        </Button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
@@ -222,7 +267,9 @@ export default function EpayPage() {
               <Separator />
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">{t("epay.unpaidTotal")}</span>
-                <span className="text-base font-bold text-destructive">¥{unpaidTotal.toFixed(2)}</span>
+                <span className="text-base font-bold text-destructive">
+                  ¥{unpaidTotal.toFixed(2)}
+                </span>
               </div>
             </div>
           )}

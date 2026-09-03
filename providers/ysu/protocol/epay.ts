@@ -7,7 +7,7 @@
  * 接口返回"宽松 JSON"（key 不带引号），用 parseLooseJson 处理。
  */
 import { SimpleCookieJar, fetchWithJar, parseLooseJson, type HttpResponse } from "@/lib/cookie"
-import { authorize, getCredentialApplied } from "./cas"
+import { authorize, getCredentialApplied, isAuthenticated } from "./cas"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 
 // ─── Constants ────────────────────────────────────────────────────────── //
@@ -136,6 +136,9 @@ async function ensureAuthorized(): Promise<void> {
   const promise = withAuthTransition(async () => {
     if (authorized) return
     await authorize(`${BASE_URL}${SERVICE_PATH}`, epayJar)
+    if (!(await isAuthenticated())) {
+      throw new EpayNotLoggedInError("CAS session is not authenticated")
+    }
     authorized = true
   })
 
@@ -268,10 +271,12 @@ export function toEpayRecords(D: unknown): EpayRecord[] {
 
 /** 从行数据归一化支付状态。 */
 export function toRecordStatus(r: EpayRecord): EpayRecordStatus {
-  if (r.overTime && r.overTime.trim() !== "") return "paid"
-  if (r.expired === "1") return "expired"
-  if (r.status === "0") return "closed"
-  return "unpaid"
+  if (r.overTime.trim() !== "") return "paid"
+  if (r.expired.trim() === "1") return "expired"
+  const status = r.status.trim()
+  if (status === "0") return "closed"
+  if (status === "1") return "unpaid"
+  return "unknown"
 }
 
 /**
@@ -356,25 +361,28 @@ async function fetchAllRecords(): Promise<EpayRecord[]> {
     throw new EpayProtocolError(`HTTP ${resp.status} from ${url}`)
   }
   const D = extractDObject(text)
+  const queryResult = D ? asRecord(D).queryResult : null
+  if (
+    queryResult === null ||
+    typeof queryResult !== "object" ||
+    !Array.isArray(asRecord(queryResult).rows)
+  ) {
+    throw new EpayProtocolError(`invalid allPay response from ${url}`)
+  }
   return toEpayRecords(D)
 }
 
 /** 查询当前会话的付款状态（全部记录 + 最近一笔）。 */
 export async function getEpayStatus(): Promise<EpaySessionStatus> {
   return runWithReauth(async () => {
+    const records = await fetchAllRecords()
     let lastPay: EpayLastPay | null = null
-    let records: EpayRecord[] = []
-    try {
-      records = await fetchAllRecords()
-    } catch (e) {
-      if (e instanceof EpayNotLoggedInError) throw e
-    }
     try {
       const body = await callJson(LAST_PAY_PATH)
       lastPay = toLastPay(body)
     } catch (e) {
       if (e instanceof EpayNotLoggedInError) throw e
-      // 其它错误（接口异常但非登录页）→ 会话仍视为就绪
+      // 最近一笔付款是附加信息，接口异常不影响全部记录结果。
     }
     return { ready: true, lastPay, records }
   })
