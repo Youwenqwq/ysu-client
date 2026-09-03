@@ -306,11 +306,6 @@ export default function EpayPage() {
           </EmptyHeader>
         </Empty>
       )}
-
-      <p className="px-1 text-xs text-muted-foreground">
-        {t("epay.sourceHint")}
-        {updatedAt ? ` · ${t("epay.updatedAt", { time: updatedAt.toLocaleTimeString() })}` : ""}
-      </p>
     </div>
   )
 }
