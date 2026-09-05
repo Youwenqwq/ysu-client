@@ -9,7 +9,6 @@
 import { useAuthStore } from "@/lib/stores/auth"
 import { useSettingsStore } from "@/lib/stores/settings"
 import { EpayAccessError, fetchEpayPayments } from "@/providers/ysu/epay-access"
-import { toRecordStatus } from "@/providers/ysu/protocol/epay"
 import { fetchEpayBills } from "./client"
 import { isUnpaid } from "./types"
 
@@ -44,7 +43,8 @@ export async function runEpayAutoCheck(): Promise<EpayCheckResult | null> {
     // 优先 SSO：教务会话拉取全部记录
     try {
       const status = await fetchEpayPayments()
-      const unpaid = status.records.filter((r) => toRecordStatus(r) === "unpaid")
+      // 待缴以 index(我的待付款) 的 unpaid 为准（官方口径）
+      const unpaid = status.unpaid
       useSettingsStore.getState().setEpayLastCheckedAt(username, Date.now())
       return {
         hasUnpaid: unpaid.length > 0,

@@ -74,8 +74,14 @@ export interface EpaySessionStatus {
   ready: boolean
   /** 最近一笔付款；无则 null */
   lastPay: EpayLastPay | null
-  /** 全部付款记录（登录态） */
+  /** 全部付款记录（登录态；allPay 已缴历史 + index 待缴，按 id 合并） */
   records: EpayRecord[]
+  /**
+   * 待缴记录（真正需要缴费的）—— 只来自"我的待付款"(index) 源，
+   * 判定 overTime 为空 && status=1 && expired=0，与官方页面口径一致。
+   * allPay 记录里无 overTime 的（已过期/已关闭）不在此列。
+   */
+  unpaid: EpayRecord[]
 }
 
 // ─── Exceptions ───────────────────────────────────────────────────────── //
@@ -403,13 +409,26 @@ export function mergeRecords(...lists: EpayRecord[][]): EpayRecord[] {
   return merged
 }
 
-/** 查询当前会话的付款状态（全部记录 = allPay 已缴 + index 待缴，互相印证 + 最近一笔）。 */
+/**
+ * 从"我的待付款"(index) 记录中筛出待缴项。
+ * 判定与官方页面一致：overTime 为空 && status=1 && expired=0。
+ * allPay 记录（含已过期/已关闭的未支付历史）不参与待缴判定。
+ */
+export function toUnpaidRecords(pending: EpayRecord[]): EpayRecord[] {
+  return pending.filter(
+    (r) => r.overTime.trim() === "" && r.status.trim() === "1" && r.expired.trim() === "0"
+  )
+}
+
+/** 查询当前会话的付款状态（全部记录 = allPay 已缴 + index 待缴；待缴只以 index 为准）。 */
 export async function getEpayStatus(): Promise<EpaySessionStatus> {
   return runWithReauth(async () => {
     // 串行抓两个源：共用 epayJar，并发时 reauth 可能互相干扰
     const history = await fetchAllRecords()
     const pending = await fetchPendingRecords()
     const records = mergeRecords(history, pending)
+    // 待缴：只认 index(我的待付款) 源，判定与官方一致
+    const unpaid = toUnpaidRecords(pending)
     let lastPay: EpayLastPay | null = null
     try {
       const body = await callJson(LAST_PAY_PATH)
@@ -418,6 +437,6 @@ export async function getEpayStatus(): Promise<EpaySessionStatus> {
       if (e instanceof EpayNotLoggedInError) throw e
       // 最近一笔付款是附加信息，接口异常不影响全部记录结果。
     }
-    return { ready: true, lastPay, records }
+    return { ready: true, lastPay, records, unpaid }
   })
 }

@@ -32,6 +32,7 @@ export default function EpayPage() {
   const student = useStudentInfo()
 
   const [records, setRecords] = useState<EpayRecord[] | null>(null)
+  const [unpaid, setUnpaid] = useState<EpayRecord[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
@@ -48,6 +49,7 @@ export default function EpayPage() {
     try {
       const status = await fetchEpayPayments()
       setRecords(status.records)
+      setUnpaid(status.unpaid)
       setError(null)
       setNoAuth(false)
       setUpdatedAt(new Date())
@@ -131,10 +133,7 @@ export default function EpayPage() {
   )
 
   const paid = useMemo(() => records?.filter((r) => toRecordStatus(r) === "paid") ?? [], [records])
-  const unpaid = useMemo(
-    () => records?.filter((r) => toRecordStatus(r) === "unpaid") ?? [],
-    [records]
-  )
+  // 待缴：以 index(我的待付款) 官方口径为准（协议层已按 overTime/status/expired 过滤）
   const unpaidTotal = unpaid.reduce((s, r) => s + r.amountN, 0)
   const unpaidCount = unpaid.length
 

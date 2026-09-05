@@ -4,6 +4,7 @@ import {
   toEpayRecords,
   toLastPay,
   toRecordStatus,
+  toUnpaidRecords,
   type EpayRecord,
 } from "./epay"
 
@@ -198,5 +199,52 @@ describe("mergeRecords（allPay 已缴 + index 待缴 双源合并）", () => {
     const merged = mergeRecords([], [mk("9", "")])
     expect(merged).toHaveLength(1)
     expect(toRecordStatus(merged[0]!)).toBe("unpaid")
+  })
+})
+
+describe("toUnpaidRecords（待缴以 index 官方口径为准）", () => {
+  const mk = (id: string, opts: Partial<EpayRecord> = {}): EpayRecord => ({
+    id,
+    payName: `费用${id}`,
+    chargeYear: "2026年",
+    currencyTypeShow: "人民币元[CNY]",
+    amountN: 100,
+    amount: "100.00",
+    payAmount: "",
+    refundAmount: "0.00",
+    status: "1",
+    expired: "0",
+    startTime: "",
+    overTime: "",
+    ...opts,
+  })
+
+  it("有效未支付(overTime空,status1,expired0) 记为待缴", () => {
+    const unpaid = toUnpaidRecords([mk("1")])
+    expect(unpaid).toHaveLength(1)
+    expect(unpaid[0]!.id).toBe("1")
+  })
+
+  it("已支付的(overTime 非空) 不记待缴", () => {
+    expect(toUnpaidRecords([mk("1", { overTime: "2026-09-01 10:00:00" })])).toHaveLength(0)
+  })
+
+  it("已过期的(expired=1) 不记待缴", () => {
+    expect(toUnpaidRecords([mk("2", { expired: "1" })])).toHaveLength(0)
+  })
+
+  it("已关闭的(status=0) 不记待缴", () => {
+    expect(toUnpaidRecords([mk("3", { status: "0" })])).toHaveLength(0)
+  })
+
+  it("混合列表只保留有效待缴", () => {
+    const pending = [
+      mk("a"),
+      mk("b", { overTime: "2026-09-01" }),
+      mk("c", { expired: "1" }),
+      mk("d", { status: "0" }),
+    ]
+    const unpaid = toUnpaidRecords(pending)
+    expect(unpaid.map((r) => r.id)).toEqual(["a"])
   })
 })

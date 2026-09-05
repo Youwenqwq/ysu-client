@@ -24,9 +24,6 @@ vi.mock("@/lib/stores/settings", () => ({
 vi.mock("@/lib/stores/auth", () => ({
   useAuthStore: { getState: mocks.getAuth },
 }))
-vi.mock("@/providers/ysu/protocol/epay", () => ({
-  toRecordStatus: (record: { status: string }) => record.status,
-}))
 vi.mock("./client", () => ({
   fetchEpayBills: mocks.fetchEpayBills,
 }))
