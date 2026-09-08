@@ -1,7 +1,7 @@
 import { AirVent } from "lucide-react"
-import type { ExtraFeature } from "../registry"
+import type { DashboardFeature } from "@/lib/dashboard-features"
 
-export const meterFeature: ExtraFeature = {
+export const meterFeature: DashboardFeature = {
   id: "meter",
   nav: { titleKey: "meter.nav", url: "/dashboard/meter", icon: AirVent },
   titleKeys: {

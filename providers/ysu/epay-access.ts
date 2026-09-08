@@ -4,7 +4,7 @@
  * 复用教务 CAS 会话（authorize）免密建立 elpay 会话，拉取全部付款记录。
  * 错误遵循公共 ProviderError 契约。
  *
- * 放在 providers/ysu 下以复用协议层的 jar/authorize，避免 extras 反向依赖。
+ * 学校协议与会话留在 provider，界面和启动提醒仅消费此访问桥。
  */
 import {
   getEpayStatus,

@@ -58,6 +58,7 @@ import { MobileTopBar } from "@/components/mobile-top-bar"
 import { RefreshIndicator } from "@/components/refresh-indicator"
 import { StaleIndicator } from "@/components/stale-indicator"
 import { EXTRA_FEATURES } from "@/lib/extras/registry"
+import { FEE_FEATURES } from "@/lib/fees/registry"
 import { UpdateDialog } from "@/components/update-dialog"
 import { APP_VERSION, APP_BUILD } from "@/lib/version"
 import { useStoredMediaUrl } from "@/lib/storage/media"
@@ -237,6 +238,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         },
       ],
     },
+    {
+      label: t("fees.nav"),
+      items: FEE_FEATURES.map((f) => ({
+        title: t(f.nav.titleKey),
+        url: f.nav.url,
+        icon: f.nav.icon,
+      })),
+    },
     // 玩具箱：与教务无关的第三方功能（lib/extras/registry.ts）
     {
       label: t("extras.nav"),
@@ -250,7 +259,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const titleByPath: Record<string, string> = {
     ...Object.fromEntries(
-      EXTRA_FEATURES.flatMap((f) =>
+      [...FEE_FEATURES, ...EXTRA_FEATURES].flatMap((f) =>
         Object.entries(f.titleKeys).map(([path, key]) => [path, t(key)])
       )
     ),

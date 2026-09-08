@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { useAuthStore } from "@/lib/stores/auth"
 import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
-import { fetchMeterData, MeterError, type MeterData } from "@/lib/extras/meter/client"
+import { fetchMeterData, MeterError, type MeterData } from "@/lib/fees/meter/client"
 import { cn } from "@/lib/utils"
 
 export default function MeterPage() {

@@ -1,7 +1,7 @@
 import { CreditCard } from "lucide-react"
-import type { ExtraFeature } from "../registry"
+import type { DashboardFeature } from "@/lib/dashboard-features"
 
-export const ecardFeature: ExtraFeature = {
+export const ecardFeature: DashboardFeature = {
   id: "ecard",
   nav: { titleKey: "ecard.nav", url: "/dashboard/ecard", icon: CreditCard },
   titleKeys: {

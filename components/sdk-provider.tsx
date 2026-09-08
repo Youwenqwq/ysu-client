@@ -123,7 +123,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
         syncFeedbackReplies().catch(() => {})
 
         // 学费未缴自动检查（仅读状态，不支付）
-        import("@/lib/extras/epay/auto-check")
+        import("@/lib/fees/epay/auto-check")
           .then(async ({ runEpayAutoCheck }) => {
             const result = await runEpayAutoCheck()
             if (result && result.hasUnpaid && !cancelled) {

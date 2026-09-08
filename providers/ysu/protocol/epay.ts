@@ -6,7 +6,8 @@
  *
  * 接口返回"宽松 JSON"（key 不带引号），用 parseLooseJson 处理。
  */
-import { SimpleCookieJar, fetchWithJar, parseLooseJson, type HttpResponse } from "@/lib/cookie"
+import { SimpleCookieJar, fetchWithJar, type HttpResponse } from "@/lib/cookie"
+import { parseLooseJson } from "./parse-json"
 import { authorize, getCredentialApplied } from "./cas"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 
