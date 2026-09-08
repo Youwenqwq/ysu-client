@@ -13,6 +13,8 @@ import { resetJWXT } from "./protocol/jwxt"
 import { resetLdxt } from "./protocol/ldxt"
 import { resetScxt } from "./protocol/scxt"
 import { resetXgxt } from "./protocol/xgxt"
+import { resetEpay } from "./protocol/epay"
+import { resetEcard } from "./protocol/ecard"
 import { resetMobileAuth } from "./protocol/jwmobile"
 import { initializeSession } from "./session"
 import { withAuthTransition } from "./auth-transition"
@@ -38,6 +40,8 @@ export function reloginYSU(): Promise<boolean> {
         resetLdxt()
         resetScxt()
         resetXgxt()
+        resetEpay()
+        resetEcard()
         resetMobileAuth()
         await prepareLogin()
         if (await checkCaptchaNeeded(remembered.username)) {

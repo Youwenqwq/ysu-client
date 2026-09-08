@@ -453,6 +453,15 @@ async function syncJarCookiesToWebView(): Promise<void> {
   }
 }
 
+function isUnauthenticatedLocation(url: string): boolean {
+  const location = new URL(url, casUrls.authLogin)
+  return (
+    location.pathname.includes("/authserver/login") ||
+    location.pathname.includes("reAuthCheck") ||
+    location.searchParams.get("isMultifactor") === "true"
+  )
+}
+
 export async function isAuthenticated(): Promise<boolean> {
   const resp = await _fetch({
     method: "GET",
@@ -462,13 +471,16 @@ export async function isAuthenticated(): Promise<boolean> {
   })
   if (REDIRECT_STATUSES.has(resp.status)) {
     const location = headerSingle(resp.headers, "location") ?? ""
-    return !location.includes("/authserver/login")
+    if (!location) throw new CASProtocolError("CAS status redirect is missing its destination")
+    return !isUnauthenticatedLocation(location)
   }
   if (resp.status === 200) {
-    // CapacitorHttp auto-follows redirects — check final URL
-    return !resp.url.includes("/authserver/login")
+    // CapacitorHttp auto-follows redirects — check final URL and re-auth page markers.
+    if (isUnauthenticatedLocation(resp.url)) return false
+    return !isReauthPage(await resp.text())
   }
-  return false
+  if (resp.status === 401 || resp.status === 403) return false
+  throw new CASProtocolError(`CAS status request returned HTTP ${resp.status}`)
 }
 
 export async function credential(): Promise<CASCredential> {
@@ -994,8 +1006,10 @@ export async function authorize(
   serviceUrl: string,
   targetJar?: SimpleCookieJar
 ): Promise<SimpleCookieJar> {
+  const source = casJar
   const target = targetJar ?? new SimpleCookieJar()
-  await (await CASCredential.fromJar(casJar)).apply(target)
+  await credentialApplied
+  await (await CASCredential.fromJar(source)).apply(target)
 
   const encoded = encodeURIComponent(serviceUrl)
   const url = `${casUrls.authLogin}?service=${encoded}`
@@ -1012,11 +1026,33 @@ export async function authorize(
     throw new CASProtocolError(`authorize redirect chain failed: ${(e as Error).message}`)
   }
 
-  if (resp.url.includes("/authserver/login")) {
-    throw new NotAuthenticatedError("CAS bounced back to login page; TGC missing or expired")
+  if (source !== casJar) {
+    throw new NotAuthenticatedError("CAS session changed during authorization")
+  }
+  if (resp.status >= 400 && resp.status !== 401 && resp.status !== 403) {
+    throw new CASProtocolError(`CAS authorization returned HTTP ${resp.status}`)
+  }
+  if (!resp.url || resp.status < 200 || resp.status >= 300) {
+    throw new NotAuthenticatedError("CAS authorization did not complete")
+  }
+  const finalUrl = new URL(resp.url)
+  const onCAS = finalUrl.origin === new URL(casUrls.authLogin).origin
+  if (
+    isUnauthenticatedLocation(resp.url) ||
+    (onCAS && new URL(serviceUrl).origin !== finalUrl.origin) ||
+    (onCAS && isReauthPage(await resp.text()))
+  ) {
+    throw new NotAuthenticatedError("CAS requires login or secondary authentication")
   }
 
-  await (await CASCredential.fromJar(target)).apply(casJar)
+  const updated = await CASCredential.fromJar(target)
+  if (source !== casJar) {
+    throw new NotAuthenticatedError("CAS session changed during authorization")
+  }
+  await updated.apply(source)
+  if (source !== casJar) {
+    throw new NotAuthenticatedError("CAS session changed during authorization")
+  }
   await saveCASTGC()
 
   return target

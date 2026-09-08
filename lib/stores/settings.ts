@@ -21,6 +21,10 @@ export interface FeedbackHistoryItem {
   deleted?: boolean
 }
 
+interface EpayAccountSettings {
+  lastCheckedAt: number
+}
+
 interface SettingsState {
   updateMirror: string
   updateChannel: UpdateChannel
@@ -55,6 +59,10 @@ interface SettingsState {
   analyticsPromptVersion: string
   feedbackIds: string[]
   feedbackHistory: FeedbackHistoryItem[]
+  /** 缴费提醒检查时间，按学号隔离 */
+  epayAccountSettings: Record<string, EpayAccountSettings>
+  /** 学费未缴自动提醒开关 */
+  epayNotifyEnabled: boolean
   hasHydrated: boolean
   setUpdateMirror: (mirror: string) => void
   setUpdateChannel: (channel: UpdateChannel) => void
@@ -89,6 +97,8 @@ interface SettingsState {
   setAnalyticsPromptVersion: (v: string) => void
   setFeedbackIds: (ids: string[]) => void
   setFeedbackHistory: (items: FeedbackHistoryItem[]) => void
+  setEpayNotifyEnabled: (v: boolean) => void
+  setEpayLastCheckedAt: (username: string, ts: number) => void
   setHasHydrated: (v: boolean) => void
 }
 
@@ -128,6 +138,8 @@ export const useSettingsStore = create<SettingsState>()(
       analyticsPromptVersion: "",
       feedbackIds: [],
       feedbackHistory: [],
+      epayAccountSettings: {},
+      epayNotifyEnabled: true,
       hasHydrated: false,
       setUpdateMirror: (updateMirror) => set({ updateMirror }),
       setUpdateChannel: (updateChannel) => set({ updateChannel }),
@@ -163,6 +175,16 @@ export const useSettingsStore = create<SettingsState>()(
       setAnalyticsPromptVersion: (analyticsPromptVersion) => set({ analyticsPromptVersion }),
       setFeedbackIds: (feedbackIds) => set({ feedbackIds }),
       setFeedbackHistory: (feedbackHistory) => set({ feedbackHistory }),
+      setEpayNotifyEnabled: (epayNotifyEnabled) => set({ epayNotifyEnabled }),
+      setEpayLastCheckedAt: (username, ts) =>
+        set((state) => ({
+          epayAccountSettings: {
+            ...state.epayAccountSettings,
+            [username]: {
+              lastCheckedAt: ts,
+            },
+          },
+        })),
       setHasHydrated: (v) => set({ hasHydrated: v }),
     }),
     {

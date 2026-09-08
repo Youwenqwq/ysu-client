@@ -26,6 +26,8 @@ import {
 import { resetLdxt } from "./protocol/ldxt"
 import { resetScxt } from "./protocol/scxt"
 import { resetXgxt } from "./protocol/xgxt"
+import { resetEpay } from "./protocol/epay"
+import { resetEcard } from "./protocol/ecard"
 import { useAuthStore } from "@/lib/stores/auth"
 import { initServerConfig } from "@/lib/server-config"
 import { STORAGE_KEYS } from "@/lib/storage/keys"
@@ -39,6 +41,9 @@ import { withAuthTransition } from "./auth-transition"
 
 /** 从 auth-store 恢复 CAS 凭据、JWXT 会话和 mobile 会话到各自的 jar。 */
 export async function initializeSession(): Promise<void> {
+  // Fee sessions are derived from CAS and must never survive credential restoration.
+  resetEpay()
+  resetEcard()
   // 从 settings-store 初始化自定义服务器地址
   initServerConfig()
   // 清理因 credential 轮换产生的孤立缓存
@@ -154,6 +159,8 @@ export async function resetSession(): Promise<void> {
       resetLdxt()
       resetScxt()
       resetXgxt()
+      resetEpay()
+      resetEcard()
       resetMobileAuth()
       clearAllCache()
       useRefreshStore.setState({ count: 0, stale: 0 })
