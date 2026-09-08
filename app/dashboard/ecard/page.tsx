@@ -1,7 +1,5 @@
 "use client"
 
-import { useCallback } from "react"
-import useSWR from "swr"
 import { CreditCard, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -9,75 +7,29 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useTranslation } from "@/lib/i18n/use-translation"
-import { useAuthStore } from "@/lib/stores/auth"
 import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
-import { fetchEcardBalance, type EcardSessionStatus } from "@/providers/ysu/ecard-access"
-import { ProviderError, ProviderErrorCode } from "@/providers/errors"
-import { providerQueryKey } from "@/providers/hooks/use-provider-query"
-import { useProvider, useProviderReady } from "@/providers/use-provider"
-import { getSchoolConfigScope } from "@/lib/server-config"
+import { useEcardBalance } from "@/providers/hooks/use-ecard-balance"
 import { cn } from "@/lib/utils"
 
 export default function EcardPage() {
-  const { t } = useTranslation()
-  const provider = useProvider()
-  const isReady = useProviderReady()
-  const hasHydrated = useAuthStore((s) => s.hasHydrated)
-  const username = useAuthStore((s) => s.username)
-
-  const credential = useAuthStore((s) => s.credential)
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const schoolConfigScope = getSchoolConfigScope()
-  const enabled = isReady && hasHydrated && !!username && !!credential && isAuthenticated
+  const { t, locale } = useTranslation()
   const {
-    data,
+    balance,
+    updatedAt,
     error: queryError,
-    isLoading,
-    isValidating,
-    mutate,
-  } = useSWR<EcardSessionStatus, ProviderError>(
-    enabled
-      ? providerQueryKey(provider.id, schoolConfigScope, username, "ecard", { credential })
-      : null,
-    async () => {
-      const account = useAuthStore.getState()
-      if (
-        account.username !== username ||
-        account.credential !== credential ||
-        getSchoolConfigScope() !== schoolConfigScope
-      ) {
-        throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "一卡通查询账户已切换")
-      }
-      const status = await fetchEcardBalance()
-      const current = useAuthStore.getState()
-      if (
-        current.username !== username ||
-        current.credential !== credential ||
-        getSchoolConfigScope() !== schoolConfigScope
-      ) {
-        throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "一卡通查询账户已切换")
-      }
-      return status
-    },
-    { revalidateOnFocus: false, shouldRetryOnError: false, keepPreviousData: false }
-  )
-  const balance = enabled ? (data?.balance ?? null) : null
-  const loading = isLoading || isValidating
-  const noAuth =
-    !isAuthenticated ||
-    !credential ||
-    queryError?.code === ProviderErrorCode.AUTH_REQUIRED ||
-    queryError?.code === ProviderErrorCode.AUTH_SESSION_EXPIRED
+    loading,
+    initializing,
+    noAccount,
+    noAuth,
+    available,
+    enabled,
+    refresh: load,
+  } = useEcardBalance()
   const error = queryError
     ? noAuth
       ? t("ecard.noAuth")
       : t("ecard.loadFailed", { message: t("ecard.errorGeneric") })
     : null
-  const load = useCallback(async () => {
-    if (!enabled) return
-    // SWR retains the error for rendering, including when stale data is still available.
-    await mutate().catch(() => undefined)
-  }, [enabled, mutate])
 
   useMobileHeaderRight(
     <Button
@@ -92,7 +44,7 @@ export default function EcardPage() {
     [enabled, loading, load, t]
   )
 
-  if (!hasHydrated || (!!username && !isReady)) {
+  if (initializing) {
     return (
       <div className="flex flex-col gap-4 p-4">
         <Skeleton className="h-36 w-full" />
@@ -101,7 +53,7 @@ export default function EcardPage() {
     )
   }
 
-  if (hasHydrated && !username) {
+  if (noAccount || !available) {
     return (
       <div className="p-4">
         <Empty>
@@ -109,7 +61,9 @@ export default function EcardPage() {
             <EmptyMedia variant="icon">
               <CreditCard />
             </EmptyMedia>
-            <EmptyTitle>{t("ecard.noAccount")}</EmptyTitle>
+            <EmptyTitle>
+              {t(noAccount ? "ecard.noAccount" : "ecard.unsupportedProvider")}
+            </EmptyTitle>
           </EmptyHeader>
         </Empty>
       </div>
@@ -200,6 +154,13 @@ export default function EcardPage() {
             <span className="text-muted-foreground">{t("ecard.cardStatus")}</span>
             <span>{balance.cardStatusName}</span>
           </div>
+          {updatedAt !== undefined && (
+            <p className="text-xs text-muted-foreground">
+              {t("ecard.updatedAt", {
+                time: new Date(updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US"),
+              })}
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

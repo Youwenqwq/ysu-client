@@ -205,6 +205,20 @@ export default function SettingsPage() {
               </ToggleGroup>
             </div>
 
+            <Link
+              href="/dashboard/me/settings/overview"
+              className="flex items-center gap-3 border-t border-border py-3 transition-colors active:bg-muted/60"
+            >
+              <LayoutDashboard className="size-5 shrink-0 text-muted-foreground" />
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="text-sm">{t("overviewLayout.customize")}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t("overviewLayout.settingsDescription")}
+                </span>
+              </div>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            </Link>
+
             {/* 主题 */}
             <div className="flex items-center gap-3 border-t border-border py-3">
               <Sun className="size-5 shrink-0 text-muted-foreground" />

@@ -2,6 +2,11 @@ import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
 import type { UpdateChannel } from "../updater"
 import { migrateLocalStorageKey, STORAGE_KEYS } from "../storage/keys"
+import {
+  createDefaultOverviewLayout,
+  normalizeOverviewLayout,
+  type OverviewLayout,
+} from "@/app/dashboard/overview/layout-config"
 
 migrateLocalStorageKey(STORAGE_KEYS.settings, STORAGE_KEYS.legacySettings)
 
@@ -45,6 +50,7 @@ interface SettingsState {
   schoolId: string
   scheduleCompactMode: boolean
   gpaVisible: boolean
+  overviewLayout: OverviewLayout
   gradeGachaEnabled: boolean
   notifyEnabled: boolean
   notifyCheckInterval: number
@@ -83,6 +89,7 @@ interface SettingsState {
   setSchoolId: (id: string) => void
   setScheduleCompactMode: (v: boolean) => void
   setGpaVisible: (v: boolean) => void
+  setOverviewLayout: (layout: OverviewLayout) => void
   setGradeGachaEnabled: (v: boolean) => void
   setNotifyEnabled: (v: boolean) => void
   setNotifyCheckInterval: (v: number) => void
@@ -124,6 +131,7 @@ export const useSettingsStore = create<SettingsState>()(
       schoolId: "ysu",
       scheduleCompactMode: false,
       gpaVisible: false,
+      overviewLayout: createDefaultOverviewLayout(),
       gradeGachaEnabled: true,
       notifyEnabled: false,
       notifyCheckInterval: 60,
@@ -161,6 +169,8 @@ export const useSettingsStore = create<SettingsState>()(
       setSchoolId: (schoolId) => set({ schoolId }),
       setScheduleCompactMode: (scheduleCompactMode) => set({ scheduleCompactMode }),
       setGpaVisible: (gpaVisible) => set({ gpaVisible }),
+      setOverviewLayout: (overviewLayout) =>
+        set({ overviewLayout: normalizeOverviewLayout(overviewLayout) }),
       setGradeGachaEnabled: (gradeGachaEnabled) => set({ gradeGachaEnabled }),
       setNotifyEnabled: (notifyEnabled) => set({ notifyEnabled }),
       setNotifyCheckInterval: (notifyCheckInterval) => set({ notifyCheckInterval }),
@@ -190,7 +200,29 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: STORAGE_KEYS.settings,
       storage: createJSONStorage(() => localStorage),
-      onRehydrateStorage: () => (state) => {
+      merge: (persisted, current) => {
+        const saved: Partial<SettingsState> = {}
+        if (typeof persisted === "object" && persisted !== null && !Array.isArray(persisted)) {
+          // Only current preference keys survive hydration; retired preferences are discarded.
+          for (const key of Object.keys(current) as (keyof SettingsState)[]) {
+            if (typeof current[key] !== "function" && Object.hasOwn(persisted, key)) {
+              Object.assign(saved, { [key]: (persisted as Record<string, unknown>)[key] })
+            }
+          }
+        }
+        return {
+          ...current,
+          ...saved,
+          overviewLayout: normalizeOverviewLayout(saved.overviewLayout),
+          hasHydrated: false,
+        }
+      },
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          // Storage failures still permit the default layout after client hydration.
+          queueMicrotask(() => useSettingsStore.getState().setHasHydrated(true))
+          return
+        }
         state?.setHasHydrated(true)
       },
     }
