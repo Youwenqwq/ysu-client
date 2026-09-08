@@ -136,7 +136,6 @@ async function runWithReauth<T>(fn: (jar: SimpleCookieJar) => Promise<T>): Promi
   }
 }
 
-
 // ─── Parsing helpers ──────────────────────────────────────────────────── //
 
 function asRecord(v: unknown): Record<string, unknown> {

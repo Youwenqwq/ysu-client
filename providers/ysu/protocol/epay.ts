@@ -24,7 +24,6 @@ const INDEX_PATH = "/pay/index.html"
 
 // ─── Types ────────────────────────────────────────────────────────────── //
 
-
 /** 一条付款记录（queryResult.rows 行）。 */
 export interface EpayRecord {
   /** 记录 ID */
@@ -203,7 +202,6 @@ async function requestText(targetJar: SimpleCookieJar, path: string): Promise<st
   return text
 }
 
-
 // ─── Parsing helpers ──────────────────────────────────────────────────── //
 
 function asRecord(v: unknown): Record<string, unknown> {
@@ -214,7 +212,6 @@ function str(v: unknown): string {
   if (v === null || v === undefined) return ""
   return String(v)
 }
-
 
 /** names 的 value 是 1 基，转 JS 0 基数组下标 */
 function idxOf(names: Record<string, unknown>, key: string): number | null {
@@ -290,7 +287,6 @@ export function toRecordStatus(r: EpayRecord): EpayRecordStatus {
   return "unknown"
 }
 
-
 // ─── Public: 付款状态 ─────────────────────────────────────────────────── //
 
 /**
@@ -346,7 +342,6 @@ async function fetchRecordsFromPage(
   }
   return toEpayRecords(D)
 }
-
 
 /**
  * 合并两个数据源并按记录 id 去重。

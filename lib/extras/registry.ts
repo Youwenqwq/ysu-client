@@ -8,5 +8,4 @@
 import type { DashboardFeature } from "@/lib/dashboard-features"
 import { skbirdFeature } from "./skbird/feature"
 
-
 export const EXTRA_FEATURES: DashboardFeature[] = [skbirdFeature]

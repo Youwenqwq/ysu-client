@@ -112,7 +112,6 @@ describe("toEpayRecords", () => {
     expect(r1.amountN).toBe(10000)
     expect(r1.amount).toBe("10,000.00")
   })
-
 })
 
 describe("toRecordStatus", () => {
@@ -136,7 +135,6 @@ describe("toRecordStatus", () => {
     expect(toRecordStatus({ overTime: "", expired: "", status: "1" } as never)).toBe("unknown")
   })
 })
-
 
 describe("mergeRecords（allPay 已缴 + index 待缴 双源合并）", () => {
   const mk = (id: string, overTime: string): EpayRecord => ({

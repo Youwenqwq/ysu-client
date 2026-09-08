@@ -19,7 +19,6 @@ import { mapCASSessionError } from "./cas-auth"
 
 export type { EpayRecord, EpaySessionStatus } from "./protocol/epay"
 
-
 /**
  * 登录态下查询缴费状态（历史记录与官方待缴清单）。
  * 未登录/会话失效通过 ProviderError.code 区分。
@@ -43,13 +42,13 @@ export async function fetchEpayPayments(): Promise<EpaySessionStatus> {
     }
     return result
   } catch (e) {
-    const error = mapCASSessionError(e) ?? (
-      e instanceof EpayNotLoggedInError
+    const error =
+      mapCASSessionError(e) ??
+      (e instanceof EpayNotLoggedInError
         ? new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, e.message, e, 401)
         : e instanceof EpayProtocolError
           ? new ProviderError(ProviderErrorCode.BACKEND_PROTOCOL_ERROR, e.message, e)
-          : wrapError(e)
-    )
+          : wrapError(e))
     const current = useAuthStore.getState()
     if (
       error.code === ProviderErrorCode.AUTH_SESSION_EXPIRED &&
@@ -63,4 +62,3 @@ export async function fetchEpayPayments(): Promise<EpaySessionStatus> {
     throw error
   }
 }
-

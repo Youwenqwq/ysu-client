@@ -25,7 +25,9 @@ const auth = {
   credential: "session-a",
   isAuthenticated: true,
   sessionExpired: false,
-  setSessionExpired(value: boolean) { auth.sessionExpired = value },
+  setSessionExpired(value: boolean) {
+    auth.sessionExpired = value
+  },
 }
 
 beforeEach(() => {
@@ -40,7 +42,9 @@ beforeEach(() => {
 describe("fetchEpayPayments session boundary", () => {
   it("marks only the current session expired without clearing the logged-in account", async () => {
     mocks.getEpayStatus.mockRejectedValue(new mocks.EpayNotLoggedInError("expired"))
-    await expect(fetchEpayPayments()).rejects.toMatchObject({ code: ProviderErrorCode.AUTH_SESSION_EXPIRED })
+    await expect(fetchEpayPayments()).rejects.toMatchObject({
+      code: ProviderErrorCode.AUTH_SESSION_EXPIRED,
+    })
     expect(auth.sessionExpired).toBe(true)
     expect(auth.username).toBe("student-a")
     expect(auth.isAuthenticated).toBe(true)
@@ -50,7 +54,9 @@ describe("fetchEpayPayments session boundary", () => {
     const pending = Promise.withResolvers<never>()
     mocks.getEpayStatus.mockReturnValue(pending.promise)
     const query = fetchEpayPayments()
-    const rejected = expect(query).rejects.toMatchObject({ code: ProviderErrorCode.AUTH_SESSION_EXPIRED })
+    const rejected = expect(query).rejects.toMatchObject({
+      code: ProviderErrorCode.AUTH_SESSION_EXPIRED,
+    })
     auth.username = "student-b"
     auth.credential = "session-b"
     pending.reject(new mocks.EpayNotLoggedInError("expired"))
@@ -60,7 +66,9 @@ describe("fetchEpayPayments session boundary", () => {
 
   it("keeps protocol failures distinct from authentication failures", async () => {
     mocks.getEpayStatus.mockRejectedValue(new mocks.EpayProtocolError("malformed payment data"))
-    await expect(fetchEpayPayments()).rejects.toMatchObject({ code: ProviderErrorCode.BACKEND_PROTOCOL_ERROR })
+    await expect(fetchEpayPayments()).rejects.toMatchObject({
+      code: ProviderErrorCode.BACKEND_PROTOCOL_ERROR,
+    })
     expect(auth.sessionExpired).toBe(false)
   })
 
