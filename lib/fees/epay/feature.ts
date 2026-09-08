@@ -1,7 +1,7 @@
 import { Wallet } from "lucide-react"
-import type { ExtraFeature } from "../registry"
+import type { DashboardFeature } from "@/lib/dashboard-features"
 
-export const epayFeature: ExtraFeature = {
+export const epayFeature: DashboardFeature = {
   id: "epay",
   nav: { titleKey: "epay.nav", url: "/dashboard/epay", icon: Wallet },
   titleKeys: {

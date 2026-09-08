@@ -96,4 +96,4 @@ website/.edgeone/
 /Toolchain
 
 # Should be ignored test file
-lib/extras/meter/client.test.ts
+lib/fees/meter/client.test.ts
