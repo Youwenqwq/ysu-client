@@ -1,7 +1,7 @@
 import { Bird } from "lucide-react"
-import type { ExtraFeature } from "../registry"
+import type { DashboardFeature } from "@/lib/dashboard-features"
 
-export const skbirdFeature: ExtraFeature = {
+export const skbirdFeature: DashboardFeature = {
   id: "skbird",
   nav: { titleKey: "skbird.nav", url: "/dashboard/skbird", icon: Bird },
   titleKeys: {

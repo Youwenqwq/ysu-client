@@ -36,6 +36,7 @@ import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate
 import { useTheme } from "next-themes"
 import { APP_VERSION, APP_BUILD } from "@/lib/version"
 import { EXTRA_FEATURES } from "@/lib/extras/registry"
+import { FEE_FEATURES } from "@/lib/fees/registry"
 
 export default function MePage() {
   const router = useRouter()
@@ -142,6 +143,12 @@ export default function MePage() {
     },
   ]
 
+  const feeItems = FEE_FEATURES.map((f) => ({
+    href: f.nav.url,
+    label: t(f.nav.titleKey),
+    icon: f.nav.icon,
+  }))
+
   // 玩具箱入口（移动端经"我的"页进入；桌面端走侧边栏）
   const extraItems = EXTRA_FEATURES.map((f) => ({
     href: f.nav.url,
@@ -196,6 +203,10 @@ export default function MePage() {
 
       <Section title={t("me.sectionPlatforms")}>
         <LinkCard items={platformItems} />
+      </Section>
+
+      <Section title={t("fees.nav")}>
+        <LinkCard items={feeItems} />
       </Section>
 
       {extraItems.length > 0 && (
