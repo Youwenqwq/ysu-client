@@ -122,6 +122,21 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
         // Check feedback replies once on startup
         syncFeedbackReplies().catch(() => {})
 
+        // 学费未缴自动检查（仅读状态，不支付）
+        import("@/lib/extras/epay/auto-check")
+          .then(async ({ runEpayAutoCheck }) => {
+            const result = await runEpayAutoCheck()
+            if (result && result.hasUnpaid && !cancelled) {
+              toast.warning(
+                t("epay.unpaidNotify", {
+                  count: result.count,
+                  total: result.total.toFixed(2),
+                })
+              )
+            }
+          })
+          .catch(() => {})
+
         // Check WebView compatibility (Capacitor only)
         if (isCapacitor()) {
           import("@/lib/native/webview-compat").then(({ checkWebViewCompat }) => {
