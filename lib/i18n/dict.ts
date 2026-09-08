@@ -919,6 +919,9 @@ export const zh = {
     updatedAt: "更新于 {time}",
     dayUseTooltip: "{date} 用电 {use} 度",
   },
+  fees: {
+    nav: "费用",
+  },
   epay: {
     nav: "缴费查询",
     title: "缴费查询",
@@ -1892,6 +1895,9 @@ export const en = {
     noAccount: "Student ID unavailable, please sign in again",
     updatedAt: "Updated {time}",
     dayUseTooltip: "{date}: {use} kWh",
+  },
+  fees: {
+    nav: "Fees",
   },
   epay: {
     nav: "Fee Status",
