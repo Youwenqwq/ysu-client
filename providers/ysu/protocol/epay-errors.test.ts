@@ -34,13 +34,15 @@ function response(text: string, url = "https://epay.ysu.edu.cn/pay/allPay.html")
 }
 
 function page(rows: unknown[], hasNextPage = 0): HttpResponse {
-  return response(`<script>var $E={D : ${JSON.stringify({
-    queryResult: {
-      names: { id: 1, payName: 2, amountN: 3, overTime: 4, status: 5, expired: 6 },
-      rows,
-      hasNextPage,
-    },
-  })}};</script>`)
+  return response(
+    `<script>var $E={D : ${JSON.stringify({
+      queryResult: {
+        names: { id: 1, payName: 2, amountN: 3, overTime: 4, status: 5, expired: 6 },
+        rows,
+        hasNextPage,
+      },
+    })}};</script>`
+  )
 }
 
 beforeEach(() => {
@@ -68,15 +70,19 @@ describe("getEpayStatus", () => {
 
   it("uses index alone for unpaid totals and gives current index rows precedence", async () => {
     mocks.fetchWithJar
-      .mockResolvedValueOnce(page([
-        ["history-only", "historical", 900, "", "1", "0"],
-        ["same", "old paid version", 100, "2026-01-01", "1", "0"],
-      ]))
-      .mockResolvedValueOnce(page([
-        ["same", "current pending", 100, "", "1", "0"],
-        ["same", "current pending", 100, "", "1", "0"],
-        ["expired", "expired", 500, "", "1", "1"],
-      ]))
+      .mockResolvedValueOnce(
+        page([
+          ["history-only", "historical", 900, "", "1", "0"],
+          ["same", "old paid version", 100, "2026-01-01", "1", "0"],
+        ])
+      )
+      .mockResolvedValueOnce(
+        page([
+          ["same", "current pending", 100, "", "1", "0"],
+          ["same", "current pending", 100, "", "1", "0"],
+          ["expired", "expired", 500, "", "1", "1"],
+        ])
+      )
     const result = await getEpayStatus()
     expect(result.unpaid.map((record) => record.id)).toEqual(["same"])
     expect(result.records.find((record) => record.id === "same")?.overTime).toBe("")
@@ -91,7 +97,9 @@ describe("getEpayStatus", () => {
   })
 
   it("reports a final CAS redirect as session expiry even without recognizable login text", async () => {
-    mocks.fetchWithJar.mockResolvedValue(response("<html>sign in</html>", "https://auth.ysu.edu.cn/authserver/login"))
+    mocks.fetchWithJar.mockResolvedValue(
+      response("<html>sign in</html>", "https://auth.ysu.edu.cn/authserver/login")
+    )
     await expect(getEpayStatus()).rejects.toBeInstanceOf(EpayNotLoggedInError)
   })
 

@@ -4,14 +4,18 @@
  * 复用教务 CAS 会话（authorize）免密建立 ehall 会话，查询一卡通余额。
  * 放在 providers/ysu 下以复用协议层的 jar/authorize。
  */
-import { getEcardBalance, EcardNotLoggedInError, EcardProtocolError, type EcardSessionStatus } from "./protocol/ecard"
+import {
+  getEcardBalance,
+  EcardNotLoggedInError,
+  EcardProtocolError,
+  type EcardSessionStatus,
+} from "./protocol/ecard"
 import { mapCASSessionError } from "./cas-auth"
 import { ProviderError, ProviderErrorCode, wrapError } from "../errors"
 import { useAuthStore } from "@/lib/stores/auth"
 import { getSchoolConfigScope } from "@/lib/server-config"
 
 export type { EcardBalance, EcardSessionStatus } from "./protocol/ecard"
-
 
 /** 登录态下查询一卡通余额，复用 ProviderError 会话错误契约。 */
 export async function fetchEcardBalance(): Promise<EcardSessionStatus> {

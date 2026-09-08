@@ -29,10 +29,13 @@ export default function EcardPage() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const schoolConfigScope = getSchoolConfigScope()
   const enabled = isReady && hasHydrated && !!username && !!credential && isAuthenticated
-  const { data, error: queryError, isLoading, isValidating, mutate } = useSWR<
-    EcardSessionStatus,
-    ProviderError
-  >(
+  const {
+    data,
+    error: queryError,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSWR<EcardSessionStatus, ProviderError>(
     enabled
       ? providerQueryKey(provider.id, schoolConfigScope, username, "ecard", { credential })
       : null,
@@ -58,7 +61,7 @@ export default function EcardPage() {
     },
     { revalidateOnFocus: false, shouldRetryOnError: false, keepPreviousData: false }
   )
-  const balance = enabled ? data?.balance ?? null : null
+  const balance = enabled ? (data?.balance ?? null) : null
   const loading = isLoading || isValidating
   const noAuth =
     !isAuthenticated ||
@@ -66,7 +69,9 @@ export default function EcardPage() {
     queryError?.code === ProviderErrorCode.AUTH_REQUIRED ||
     queryError?.code === ProviderErrorCode.AUTH_SESSION_EXPIRED
   const error = queryError
-    ? noAuth ? t("ecard.noAuth") : t("ecard.loadFailed", { message: t("ecard.errorGeneric") })
+    ? noAuth
+      ? t("ecard.noAuth")
+      : t("ecard.loadFailed", { message: t("ecard.errorGeneric") })
     : null
   const load = useCallback(async () => {
     if (!enabled) return
@@ -75,7 +80,13 @@ export default function EcardPage() {
   }, [enabled, mutate])
 
   useMobileHeaderRight(
-    <Button variant="ghost" size="icon-sm" onClick={() => void load()} disabled={!enabled || loading} aria-label={t("ecard.refresh")}>
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      onClick={() => void load()}
+      disabled={!enabled || loading}
+      aria-label={t("ecard.refresh")}
+    >
       <RefreshCw className={cn(loading && "animate-spin")} />
     </Button>,
     [enabled, loading, load, t]
@@ -171,7 +182,9 @@ export default function EcardPage() {
           </div>
           <p className="mt-3 text-4xl font-bold">
             ¥{balance.balance.toFixed(2)}
-            <span className="ml-2 text-base font-normal text-muted-foreground">{t("ecard.balanceUnit")}</span>
+            <span className="ml-2 text-base font-normal text-muted-foreground">
+              {t("ecard.balanceUnit")}
+            </span>
           </p>
         </div>
         <CardContent className="flex flex-col gap-3 pt-4">
