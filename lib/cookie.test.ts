@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { SimpleCookieJar } from "@/lib/cookie"
+import { parseLooseJson, SimpleCookieJar } from "@/lib/cookie"
 
 describe("SimpleCookieJar cookie matching", () => {
   it("发送 Path 以 / 结尾的 cookie 到嵌套路径（RFC 6265 前缀匹配）", async () => {
@@ -65,5 +65,19 @@ describe("SimpleCookieJar deletion & empty-value cookies", () => {
     )
     const header = await jar.getCookieString("https://cer.ysu.edu.cn/authserver/login")
     expect(header).not.toContain("route")
+  })
+})
+
+describe("parseLooseJson", () => {
+  it("preserves key-like text and escaped quotes inside payment names", () => {
+    const name = 'Tuition, label: "first term" {amount: 10} \\ end'
+    const raw = `{D:{name:${JSON.stringify(name)},amount:12.5}}`
+    expect(parseLooseJson(raw)).toEqual({ D: { name, amount: 12.5 } })
+    expect(parseLooseJson(JSON.stringify({ name }))).toEqual({ name })
+  })
+
+  it("rejects executable expressions and oversized responses", () => {
+    expect(() => parseLooseJson("{D:globalThis.process.exit()}")).toThrow()
+    expect(() => parseLooseJson(" ".repeat(2 * 1024 * 1024 + 1))).toThrow()
   })
 })
