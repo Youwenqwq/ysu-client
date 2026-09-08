@@ -75,7 +75,10 @@ describe("toEcardBalance", () => {
   })
 
   it("datas 字段兜底（顶层缺失时）", () => {
-    const body = { id: "student-id", datas: { KNYE: "5.00", KYXQ: "2025-01-01", MC: "挂失", KH: "123" } }
+    const body = {
+      id: "student-id",
+      datas: { KNYE: "5.00", KYXQ: "2025-01-01", MC: "挂失", KH: "123" },
+    }
     const b = toEcardBalance(body)
     expect(b!.balance).toBe(5)
     expect(b!.availableDate).toBe("2025-01-01")
@@ -104,7 +107,7 @@ function response(body: unknown, status = 200, url = BALANCE_URL): HttpResponse 
     status,
     headers: {},
     url,
-    text: async () => typeof body === "string" ? body : JSON.stringify(body),
+    text: async () => (typeof body === "string" ? body : JSON.stringify(body)),
     arrayBuffer: async () => new ArrayBuffer(0),
   }
 }
@@ -214,13 +217,17 @@ describe("ecard session and response handling", () => {
     await rejected
 
     mocks.authorize.mockRejectedValueOnce(new NotAuthenticatedError("expired"))
-    await expect(fetchEcardBalance()).rejects.toMatchObject({ code: ProviderErrorCode.AUTH_SESSION_EXPIRED })
+    await expect(fetchEcardBalance()).rejects.toMatchObject({
+      code: ProviderErrorCode.AUTH_SESSION_EXPIRED,
+    })
   })
 
   it("maps CAS authentication failures to the access layer authentication error", async () => {
     mocks.authorize.mockRejectedValue(new NotAuthenticatedError("expired"))
 
-    await expect(fetchEcardBalance()).rejects.toMatchObject({ code: ProviderErrorCode.AUTH_SESSION_EXPIRED })
+    await expect(fetchEcardBalance()).rejects.toMatchObject({
+      code: ProviderErrorCode.AUTH_SESSION_EXPIRED,
+    })
     expect(mocks.authState.sessionExpired).toBe(true)
   })
 

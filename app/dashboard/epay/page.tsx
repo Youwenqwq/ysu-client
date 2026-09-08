@@ -31,7 +31,13 @@ export default function EpayPage() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const schoolConfigScope = getSchoolConfigScope()
   const canQuery = isReady && hasHydrated && !!username && !!credential && isAuthenticated
-  const { data, error: queryError, isLoading, isValidating, mutate } = useSWR(
+  const {
+    data,
+    error: queryError,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSWR(
     canQuery
       ? providerQueryKey(provider.id, schoolConfigScope, username, "epay", { credential })
       : null,
@@ -61,10 +67,11 @@ export default function EpayPage() {
   const unpaid = data?.status.unpaid ?? []
   const updatedAt = data?.updatedAt
   const loading = isLoading || isValidating
-  const noAuth = (queryError instanceof ProviderError && (
-    queryError.code === ProviderErrorCode.AUTH_REQUIRED ||
-    queryError.code === ProviderErrorCode.AUTH_SESSION_EXPIRED
-  )) || (hasHydrated && !!username && !credential)
+  const noAuth =
+    (queryError instanceof ProviderError &&
+      (queryError.code === ProviderErrorCode.AUTH_REQUIRED ||
+        queryError.code === ProviderErrorCode.AUTH_SESSION_EXPIRED)) ||
+    (hasHydrated && !!username && !credential)
   const error = queryError
     ? noAuth
       ? t("epay.ssoUnavailable")
@@ -90,7 +97,8 @@ export default function EpayPage() {
 
   const paid = useMemo(() => records?.filter((r) => toRecordStatus(r) === "paid") ?? [], [records])
   // 待缴：以 index(我的待付款) 官方口径为准（协议层已按 overTime/status/expired 过滤）
-  const unpaidTotal = unpaid.reduce((sum, record) => sum + Math.round(record.amountN * 100), 0) / 100
+  const unpaidTotal =
+    unpaid.reduce((sum, record) => sum + Math.round(record.amountN * 100), 0) / 100
   const unpaidCount = unpaid.length
 
   if (hasHydrated && !username) {

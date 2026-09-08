@@ -1,4 +1,3 @@
-
 /**
  * 解析“宽松 JSON”（key 不带引号，形如 {D:{root:""}}）。
  * 金智系站点（jwxt/emap/epay）后端常返回非标准 JSON，严格 JSON.parse
@@ -20,4 +19,3 @@ export function parseLooseJson(input: string): unknown {
   )
   return JSON.parse(pre)
 }
-

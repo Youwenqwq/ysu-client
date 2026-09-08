@@ -46,7 +46,8 @@ export async function runEpayAutoCheck(): Promise<EpayCheckResult | null> {
       currentAuth.username !== username ||
       currentAuth.credential !== credential ||
       !useSettingsStore.getState().epayNotifyEnabled
-    ) return null
+    )
+      return null
     // 待缴仅来自 index(我的待付款)，不从 allPay 历史推断。
     const unpaid = status.unpaid
     useSettingsStore.getState().setEpayLastCheckedAt(username, Date.now())

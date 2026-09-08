@@ -24,7 +24,13 @@ import {
 
 const service = "https://epay.ysu.edu.cn/pay/allPay.html"
 function response(url: string, status = 200, body = ""): HttpResponse {
-  return { status, url, headers: {}, text: async () => body, arrayBuffer: async () => new ArrayBuffer(0) }
+  return {
+    status,
+    url,
+    headers: {},
+    text: async () => body,
+    arrayBuffer: async () => new ArrayBuffer(0),
+  }
 }
 
 beforeEach(() => {
@@ -35,7 +41,9 @@ beforeEach(() => {
 describe("CAS service authorization boundaries", () => {
   it("rejects secondary authentication instead of establishing a service session", async () => {
     mocks.fetchWithJar.mockResolvedValue(
-      response("https://cer.ysu.edu.cn/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true")
+      response(
+        "https://cer.ysu.edu.cn/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true"
+      )
     )
     await expect(authorize(service)).rejects.toBeInstanceOf(NotAuthenticatedError)
   })
@@ -57,14 +65,21 @@ describe("CAS service authorization boundaries", () => {
     const rejected = expect(result).rejects.toBeInstanceOf(NotAuthenticatedError)
     await entered.promise
     resetCAS()
-    await target.setCookie("CASTGC=old-account; Path=/authserver", "https://cer.ysu.edu.cn/authserver/login")
+    await target.setCookie(
+      "CASTGC=old-account; Path=/authserver",
+      "https://cer.ysu.edu.cn/authserver/login"
+    )
     pending.resolve(response(service))
     await rejected
-    expect(await getJar().getCookieString("https://cer.ysu.edu.cn/authserver/index.do")).not.toContain("old-account")
+    expect(
+      await getJar().getCookieString("https://cer.ysu.edu.cn/authserver/index.do")
+    ).not.toContain("old-account")
   })
 
   it("does not mark a temporary CAS outage as confirmed session expiry", async () => {
-    mocks.fetchWithJar.mockResolvedValue(response("https://cer.ysu.edu.cn/authserver/index.do", 503))
+    mocks.fetchWithJar.mockResolvedValue(
+      response("https://cer.ysu.edu.cn/authserver/index.do", 503)
+    )
     await expect(isAuthenticated()).rejects.toBeInstanceOf(CASProtocolError)
   })
 })
