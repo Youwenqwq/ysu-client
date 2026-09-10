@@ -396,8 +396,8 @@ export default function SchedulePage() {
           style={compactMode ? undefined : { minHeight: "calc(100dvh - 102px)" }}
         >
           <ScheduleMobile
-            courses={filteredCourses}
-            examBlocks={examBlocks}
+            courses={courses}
+            exams={examsQuery.data}
             periods={periods}
             currentWeekday={currentWeekday}
             currentWeek={currentWeek}

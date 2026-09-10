@@ -185,7 +185,7 @@ function CourseScheduleView({
         <div className="flex min-h-[60dvh] flex-col">
           {isMobile ? (
             <ScheduleMobile
-              courses={weekCourses}
+              courses={courses}
               colorMap={colorMap}
               periods={periods}
               currentWeekday={currentWeek?.weekday ?? 0}
