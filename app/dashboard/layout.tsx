@@ -436,7 +436,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] pb-[calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))] md:overflow-auto md:pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] md:pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom))]">
         <MobileTopBar title={pageTitle} showBack={showBack} />
         {sessionExpired && (
-          <Alert variant="destructive" className="mx-4 mt-4 md:mx-6 md:mt-6">
+          <Alert variant="destructive" className="mx-4 mt-4 w-auto md:mx-6 md:mt-6">
             <TriangleAlert />
             <AlertTitle className="flex flex-wrap items-center gap-3">
               <span>{t("app.sessionExpired")}</span>
