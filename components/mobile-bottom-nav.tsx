@@ -8,7 +8,8 @@ import { useTranslation } from "@/lib/i18n/use-translation"
 import { useSettingsStore } from "@/lib/stores/settings"
 
 export function MobileBottomNav() {
-  const pathname = usePathname()
+  const rawPathname = usePathname()
+  const pathname = rawPathname.replace(/\/$/, "")
   const { t } = useTranslation()
   const hasBackground = useSettingsStore((s) => !!s.backgroundImage)
 
