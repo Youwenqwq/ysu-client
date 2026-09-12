@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service"
 import { isCapacitor } from "@/lib/native/platform"
+import { cn } from "@/lib/utils"
 
 import { syncWidgetSettingsToWidget } from "@/lib/native/widget-bridge"
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
@@ -657,7 +658,7 @@ function SettingNumberInput({
   }
 
   return (
-    <div className={`flex items-center gap-3 py-3${bordered ? "border-t border-border" : ""}`}>
+    <div className={cn("flex items-center gap-3 py-3", bordered && "border-t border-border")}>
       <Icon className="size-5 shrink-0 text-muted-foreground" />
       <div className="flex flex-1 flex-col">
         <span className="text-sm">{label}</span>
