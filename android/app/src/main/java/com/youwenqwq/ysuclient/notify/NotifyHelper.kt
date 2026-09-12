@@ -16,6 +16,7 @@ import okhttp3.RequestBody
 import okio.BufferedSink
 import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONException
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
@@ -35,9 +36,20 @@ sealed class FetchResult {
     data class Failure(val error: Exception? = null, val message: String? = null) : FetchResult()
 }
 
+class NotifySessionExpiredException(message: String) : Exception(message)
+
+class NotifyProtocolException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
 object NotifyHelper {
     private const val TAG = "YsuNotify"
-    const val NOTIFY_SCHEMA_VERSION = 1
+    const val NOTIFY_SCHEMA_VERSION = 2
+    private val gradeAttemptFields = listOf("class_id", "exam_type", "study_mode", "is_retake")
+    private val gradeResultFields = listOf("score", "grade_level", "grade_point", "is_pass")
+    private val htmlTag = Regex("""<\s*(?:!doctype|html|head|body|form|input|script)\b""", RegexOption.IGNORE_CASE)
+    private val loginMarker = Regex(
+        """authserver/login|reAuthCheck|isMultifactor|reAuthType|二次认证|<input\b[^>]*\btype\s*=\s*["']?password\b""",
+        RegexOption.IGNORE_CASE
+    )
 
     // ─── OkHttp client with isolated cookie jar ──────────────────────────────
 
@@ -58,15 +70,10 @@ object NotifyHelper {
 
         override fun loadForRequest(url: HttpUrl): List<Cookie> {
             val result = mutableListOf<Cookie>()
-            for ((key, list) in cookieStore) {
-                val parts = key.split("|", limit = 2)
-                val domain = parts.getOrElse(0) { "" }
-                val path = parts.getOrElse(1) { "/" }
-                if (domainMatches(domain, url.host) && pathMatches(path, url.encodedPath)) {
-                    for (c in list) {
-                        if (!c.hasExpired()) {
-                            result.add(c)
-                        }
+            for (list in cookieStore.values) {
+                for (cookie in list) {
+                    if (!cookie.hasExpired() && cookie.matches(url)) {
+                        result.add(cookie)
                     }
                 }
             }
@@ -76,17 +83,16 @@ object NotifyHelper {
 
     private fun Cookie.hasExpired(): Boolean = expiresAt < System.currentTimeMillis()
 
-    private fun domainMatches(cookieDomain: String, host: String): Boolean {
-        val cd = cookieDomain.removePrefix(".").lowercase()
-        val h = host.lowercase()
-        return h == cd || h.endsWith(".$cd")
-    }
+    private fun valueOrNull(value: Any?): Any? =
+        value?.takeUnless { it == JSONObject.NULL || (it is String && it.isBlank()) }
 
-    private fun pathMatches(cookiePath: String, requestPath: String): Boolean {
-        if (cookiePath == "/") return true
-        if (requestPath == cookiePath) return true
-        val prefix = if (cookiePath.endsWith("/")) cookiePath else "$cookiePath/"
-        return requestPath.startsWith(prefix)
+    private fun JSONObject.text(key: String): String = valueOrNull(opt(key))?.toString() ?: ""
+
+    private fun firstValue(raw: JSONObject, keys: List<String>): Any? {
+        for (key in keys) {
+            valueOrNull(raw.opt(key))?.let { return it }
+        }
+        return null
     }
 
     private fun cleanText(value: String): String {
@@ -119,14 +125,14 @@ object NotifyHelper {
     }
 
     private fun putExamDateTimes(standard: JSONObject, raw: JSONObject) {
-        val date = normalizeDate(raw.optString("KSRQ", ""))
-        val displayText = cleanText(raw.optString("KSSJMS", ""))
+        val date = normalizeDate(raw.text("KSRQ"))
+        val displayText = cleanText(raw.text("KSSJMS"))
         val displayTimes = Regex("""\d{1,2}:\d{2}""").findAll(displayText)
             .map { normalizeTime(it.value) }
             .filter { it.isNotEmpty() }
             .toList()
-        val startTime = normalizeTime(raw.optString("KSSJ", "")).ifEmpty { displayTimes.getOrNull(0) ?: "" }
-        val endTime = normalizeTime(raw.optString("JSSJ", "")).ifEmpty { displayTimes.getOrNull(1) ?: "" }
+        val startTime = normalizeTime(raw.text("KSSJ")).ifEmpty { displayTimes.getOrNull(0) ?: "" }
+        val endTime = normalizeTime(raw.text("JSSJ")).ifEmpty { displayTimes.getOrNull(1) ?: "" }
         val timeText = displayText.ifEmpty {
             when {
                 startTime.isNotEmpty() && endTime.isNotEmpty() -> "$startTime-$endTime"
@@ -335,20 +341,10 @@ object NotifyHelper {
 
     // ─── Cookie helpers ─────────────────────────────────────────────────────
 
-    private fun getCookiesForHost(host: String): Map<String, String> {
-        val result = mutableMapOf<String, String>()
-        for ((key, list) in cookieStore) {
-            val domain = key.split("|", limit = 2).getOrElse(0) { "" }
-            if (domainMatches(domain, host)) {
-                for (cookie in list) {
-                    if (!cookie.hasExpired()) {
-                        result[cookie.name] = cookie.value
-                    }
-                }
-            }
+    private fun hasSessionCookie(url: HttpUrl): Boolean =
+        cookieJar.loadForRequest(url).any {
+            (it.name == "GS_SESSIONID" || it.name == "JSESSIONID") && it.value.isNotEmpty()
         }
-        return result
-    }
 
     // ─── HTTP helpers ───────────────────────────────────────────────────────
 
@@ -358,7 +354,12 @@ object NotifyHelper {
         .header("Accept-Language", "zh-CN,zh;q=0.9")
         .build()
 
-    private data class HttpResult(val code: Int, val body: String, val finalUrl: String)
+    internal data class HttpResult(
+        val code: Int,
+        val body: String,
+        val finalUrl: String,
+        val location: String? = null
+    )
 
     /** 单次 GET，不跟随重定向。 */
     private fun httpGet(url: String): HttpResult {
@@ -366,11 +367,11 @@ object NotifyHelper {
             val body = resp.body?.string() ?: ""
             val u = resp.request.url
             Log.d(TAG, "httpGet: code=${resp.code}, host=${u.host}, path=${u.encodedPath}")
-            return HttpResult(resp.code, body, resp.request.url.toString())
+            return HttpResult(resp.code, body, resp.request.url.toString(), resp.header("Location"))
         }
     }
 
-    private fun httpPost(url: String, data: String): Pair<Int, String> {
+    private fun httpPost(url: String, data: String): HttpResult {
         val body = object : RequestBody() {
             override fun contentType() = "application/x-www-form-urlencoded; charset=UTF-8".toMediaType()
             override fun writeTo(sink: BufferedSink) {
@@ -386,98 +387,106 @@ object NotifyHelper {
             .build()
 
         client.newCall(request).execute().use { resp ->
-            val code = resp.code
-            val responseBody = resp.body?.string() ?: ""
-            return Pair(code, responseBody)
+            return HttpResult(resp.code, resp.body?.string() ?: "", resp.request.url.toString(), resp.header("Location"))
         }
     }
 
     // ─── JWXT session establishment ─────────────────────────────────────────
 
+    private fun isRedirect(code: Int): Boolean = code == 301 || code == 302 || code == 303 || code == 307 || code == 308
+
+    private fun sameOrigin(left: HttpUrl, right: HttpUrl): Boolean =
+        left.scheme == right.scheme && left.host == right.host && left.port == right.port
+
+    private fun isAuthLocation(url: HttpUrl): Boolean =
+        url.encodedPath.contains("/authserver/login", ignoreCase = true) ||
+            url.encodedPath.contains("reAuthCheck", ignoreCase = true) ||
+            url.queryParameter("isMultifactor").equals("true", ignoreCase = true)
+
+    private fun isLoginHtml(body: String): Boolean =
+        htmlTag.containsMatchIn(body) && loginMarker.containsMatchIn(body)
+
+    private fun checkStatus(result: HttpResult) {
+        if (result.code == 401 || result.code == 403) {
+            throw NotifySessionExpiredException("Authentication required: HTTP ${result.code}")
+        }
+        if (result.code != 200 && !isRedirect(result.code)) {
+            throw NotifyProtocolException("Unexpected HTTP ${result.code}")
+        }
+    }
+
+    private fun redirectTarget(result: HttpResult): HttpUrl {
+        val location = result.location?.takeIf { it.isNotBlank() }
+            ?: throw NotifyProtocolException("Redirect missing Location")
+        return result.finalUrl.toHttpUrl().resolve(location)
+            ?: throw NotifyProtocolException("Invalid redirect Location")
+    }
+
+    private fun requireJwxtDestination(url: HttpUrl, jwxt: HttpUrl, cas: HttpUrl) {
+        if (!sameOrigin(url, jwxt) && !sameOrigin(url, cas)) {
+            throw NotifyProtocolException("Untrusted redirect destination")
+        }
+        if (url.username.isNotEmpty() || url.password.isNotEmpty()) {
+            throw NotifyProtocolException("Redirect contains user information")
+        }
+        if (isAuthLocation(url)) {
+            throw NotifySessionExpiredException("Redirect requires CAS login or MFA")
+        }
+        if (!sameOrigin(url, jwxt) || !url.encodedPath.startsWith("/jwapp/")) {
+            throw NotifyProtocolException("Redirect is not a JWXT application destination")
+        }
+    }
+
+    internal fun sessionDestination(
+        result: HttpResult,
+        jwxt: HttpUrl,
+        cas: HttpUrl,
+        hasSession: Boolean,
+        fromCas: Boolean
+    ): HttpUrl {
+        checkStatus(result)
+        if (result.code == 200 && isLoginHtml(result.body)) {
+            throw NotifySessionExpiredException("Session requires login or MFA")
+        }
+        if (fromCas && !isRedirect(result.code)) {
+            throw NotifyProtocolException("CAS did not authorize the JWXT service")
+        }
+        val destination = if (isRedirect(result.code)) redirectTarget(result) else result.finalUrl.toHttpUrl()
+        requireJwxtDestination(destination, jwxt, cas)
+        if (!fromCas && !hasSession) {
+            throw NotifyProtocolException("JWXT response did not establish a session cookie")
+        }
+        return destination
+    }
+
     /**
-     * 使用 CASTGC 建立 JWXT 会话。
-     *
-     * 流程：
-     * 1. 请求 CAS（带 CASTGC），CAS 返回 302 到 JWXT（带 ticket）
-     * 2. 手动跟随 CAS → JWXT 重定向（OkHttp 跨域会剥离 Cookie）
-     * 3. JWXT 返回 302（带 Set-Cookie: GS_SESSIONID 等），**不再跟随此重定向**
-     * 4. CookieJar 已存入会话 cookie，可直接用于后续请求
-     *
-     * @return true 如果成功建立会话，false 如果 CASTGC 过期。
+     * Exchange CASTGC for a JWXT session without automatically following redirects.
+     * Only confirmed authentication failures return false; transport and protocol errors propagate.
      */
     fun establishSession(context: Context, castgc: String): Boolean {
-        cookieStore.clear()
-
-        // 种入 CASTGC
-        val cerHost = getCerBase(context).toHttpUrl().host
-        val castgcCookie = Cookie.Builder()
-            .domain(cerHost)
-            .path("/authserver")
-            .name("CASTGC")
-            .value(castgc)
-            .build()
-        cookieStore["$cerHost|/authserver"] = mutableListOf(castgcCookie)
-
-        val portalUrl = getPortalUrl(context)
-        val cerBase = getCerBase(context)
-        val service = URLEncoder.encode(portalUrl, "UTF-8")
-        val casUrl = "$cerBase/authserver/login?service=$service"
-
-        // Step 1: 请求 CAS，跟随 CAS → JWXT 的重定向
-        var casRespUrl: String
         try {
-            client.newCall(buildGet(casUrl)).execute().use { resp ->
-                casRespUrl = resp.request.url.toString()
-                Log.d(TAG, "CAS response: code=${resp.code}, url=$casRespUrl")
+            cookieStore.clear()
+            val cerBase = getCerBase(context).toHttpUrl()
+            val jwxtBase = getJwxtBase(context).toHttpUrl()
+            val castgcBuilder = Cookie.Builder()
+                .hostOnlyDomain(cerBase.host)
+                .path("/authserver")
+                .name("CASTGC")
+                .value(castgc)
+            if (cerBase.isHttps) castgcBuilder.secure()
+            cookieJar.saveFromResponse(cerBase, listOf(castgcBuilder.build()))
 
-                // CAS 直接返回非重定向 → 可能是登录页
-                if (resp.code !in setOf(301, 302, 303, 307, 308)) {
-                    if (casRespUrl.contains("authserver/login")) {
-                        Log.w(TAG, "CASTGC expired, CAS returned login page")
-                        return false
-                    }
-                    // CAS 直接返回 200（已有有效 session），但我们需要 JWXT 的 cookie
-                    // 继续请求 JWXT portal
-                }
-
-                // 跟随 CAS 的 302 到 JWXT
-                val location = resp.header("Location")
-                if (location.isNullOrEmpty()) {
-                    Log.w(TAG, "CAS redirect without Location header")
-                    return false
-                }
-                casRespUrl = if (location.startsWith("http://") || location.startsWith("https://")) {
-                    location
-                } else {
-                    resp.request.url.resolve(location)?.toString() ?: return false
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "CAS request failed", e)
+            val portalUrl = getPortalUrl(context)
+            val service = URLEncoder.encode(portalUrl, "UTF-8")
+            val casResponse = httpGet("${getCerBase(context)}/authserver/login?service=$service")
+            val ticketUrl = sessionDestination(casResponse, jwxtBase, cerBase, false, true)
+            val jwxtResponse = httpGet(ticketUrl.toString())
+            sessionDestination(jwxtResponse, jwxtBase, cerBase, hasSessionCookie(portalUrl.toHttpUrl()), false)
+            return true
+        } catch (_: NotifySessionExpiredException) {
             return false
-        }
-
-        // Step 2: 请求 JWXT（带 ticket），不跟随重定向
-        // JWXT 返回 302 + Set-Cookie（GS_SESSIONID 等），这就是我们需要的会话 cookie
-        try {
-            client.newCall(buildGet(casRespUrl)).execute().use { resp ->
-                Log.d(TAG, "JWXT response: code=${resp.code}, url=${resp.request.url}")
-
-                if (resp.code in setOf(301, 302, 303, 307, 308)) {
-                    // 302 是预期的（重定向到不带 ticket 的 index.do），cookie 已在 CookieJar 中
-                    return true
-                }
-
-                if (resp.request.url.toString().contains("authserver/login")) {
-                    Log.w(TAG, "JWXT bounced to CAS login, ticket invalid")
-                    return false
-                }
-
-                return resp.code == 200
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "JWXT request failed", e)
-            return false
+        } catch (e: IllegalArgumentException) {
+            throw NotifyProtocolException("Invalid notification session configuration or request", e)
         }
     }
 
@@ -490,13 +499,15 @@ object NotifyHelper {
         val result = httpGet(url)
         Log.d(TAG, "appShow: appId=$appId, code=${result.code}, finalUrl=${result.finalUrl}")
 
-        if (result.code != 200) {
-            Log.w(TAG, "appShow failed: code=${result.code}")
-            return null
+        checkStatus(result)
+        if (isRedirect(result.code)) {
+            requireJwxtDestination(redirectTarget(result), jwxtBase.toHttpUrl(), getCerBase(context).toHttpUrl())
+        } else if (isLoginHtml(result.body)) {
+            throw NotifySessionExpiredException("Application entry requires login")
         }
 
-        val cookies = getCookiesForHost(url.toHttpUrl().host)
-        val weu = cookies["_WEU"]
+        // appShow may set _WEU on a 302; do not follow the application redirect.
+        val weu = cookieJar.loadForRequest(url.toHttpUrl()).firstOrNull { it.name == "_WEU" }?.value
         Log.d(TAG, "WEU for appId=$appId: ${weu != null}")
         return weu
     }
@@ -506,23 +517,16 @@ object NotifyHelper {
     fun getCurrentTerm(context: Context): String? {
         val appBase = getAppBase(context)
         val apiPath = getApiPath(context, "currentTerm")
-        val (code, body) = httpPost("$appBase/$apiPath", "")
-        if (code != 200) {
-            Log.w(TAG, "getCurrentTerm failed: code=$code")
-            return null
-        }
-
-        return try {
-            val json = JSONObject(body)
-            val datas = json.optJSONObject("datas") ?: return null
-            val dqxnxq = datas.optJSONObject("dqxnxq") ?: return null
-            val rows = dqxnxq.optJSONArray("rows") ?: return null
-            if (rows.length() == 0) return null
-            rows.getJSONObject(0).optString("DM").takeIf { it.isNotEmpty() }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse current term", e)
-            null
-        }
+        val rows = emapRows(
+            httpPost("$appBase/$apiPath", ""),
+            "dqxnxq",
+            getJwxtBase(context).toHttpUrl(),
+            getCerBase(context).toHttpUrl()
+        )
+        if (rows.length() == 0) throw NotifyProtocolException("Current term response has no rows")
+        val term = rows.optJSONObject(0)?.text("DM")
+        return term?.takeIf { it.isNotEmpty() }
+            ?: throw NotifyProtocolException("Current term response has no term")
     }
 
     // ─── Format conversion ──────────────────────────────────────────────────
@@ -534,10 +538,9 @@ object NotifyHelper {
         val value = mappings.opt(standardKey) ?: return listOf(standardKey)
         return when (value) {
             is JSONArray -> (0 until value.length()).mapNotNull {
-                val s = value.optString(it, "")
-                if (s.isNotEmpty()) s else null
+                (value.opt(it) as? String)?.takeIf { key -> key.isNotBlank() }
             }
-            is String -> listOf(value)
+            is String -> listOf(value).filter { it.isNotBlank() }
             else -> listOf(standardKey)
         }
     }
@@ -548,42 +551,39 @@ object NotifyHelper {
     fun convertGradeToStandard(context: Context, raw: JSONObject): JSONObject {
         val config = getServerConfig(context)
         val mappings = config?.optJSONObject("fieldMappings")?.optJSONObject("grade") ?: JSONObject()
+        return convertGradeToStandard(raw, mappings)
+    }
+
+    private fun mapFields(raw: JSONObject, mappings: JSONObject): JSONObject {
         val standard = JSONObject()
         val keys = mappings.keys()
         while (keys.hasNext()) {
-            val standardKey = keys.next()
-            for (rawKey in resolveRawKeys(mappings, standardKey)) {
-                if (raw.has(rawKey)) {
-                    standard.put(standardKey, raw.opt(rawKey))
-                    break
-                }
-            }
+            val key = keys.next()
+            firstValue(raw, resolveRawKeys(mappings, key))?.let { standard.put(key, it) }
         }
-        // Fallback: ensure essential keys exist using common raw keys
-        if (!standard.has("course_name")) {
-            val name = raw.optString("XSKCM", raw.optString("KCM", ""))
-            if (name.isNotEmpty()) standard.put("course_name", name)
+        return standard
+    }
+
+    private fun putFallback(standard: JSONObject, raw: JSONObject, key: String, vararg rawKeys: String) {
+        if (valueOrNull(standard.opt(key)) == null) {
+            firstValue(raw, rawKeys.asList())?.let { standard.put(key, it) }
         }
-        if (!standard.has("course_code")) {
-            val code = raw.optString("XSKCH", raw.optString("KCH", ""))
-            if (code.isNotEmpty()) standard.put("course_code", code)
-        }
-        if (!standard.has("score")) {
-            val score = raw.optString("ZCJ", raw.optString("BFZCJ", ""))
-            if (score.isNotEmpty()) standard.put("score", score)
-        }
-        if (!standard.has("credit")) {
-            val credit = raw.optString("XF", "")
-            if (credit.isNotEmpty()) standard.put("credit", credit)
-        }
-        if (!standard.has("term")) {
-            val term = raw.optString("XNXQDM", "")
-            if (term.isNotEmpty()) standard.put("term", term)
-        }
-        if (!standard.has("exam_type")) {
-            val type = raw.optString("KSXS", "")
-            if (type.isNotEmpty()) standard.put("exam_type", type)
-        }
+    }
+
+    internal fun convertGradeToStandard(raw: JSONObject, mappings: JSONObject): JSONObject {
+        val standard = mapFields(raw, mappings)
+        putFallback(standard, raw, "course_name", "XSKCM", "KCM")
+        putFallback(standard, raw, "course_code", "XSKCH", "KCH")
+        putFallback(standard, raw, "record_id", "WID")
+        putFallback(standard, raw, "class_id", "JXBID")
+        putFallback(standard, raw, "score", "ZCJ", "XSZCJMC", "BFZCJ")
+        putFallback(standard, raw, "grade_level", "XSZCJMC")
+        putFallback(standard, raw, "grade_point", "XFJD")
+        putFallback(standard, raw, "credit", "XF")
+        putFallback(standard, raw, "term", "XNXQDM")
+        putFallback(standard, raw, "exam_type", "KSLXDM_DISPLAY", "KSLXDM", "KSXS")
+        putFallback(standard, raw, "study_mode", "XDFSDM_DISPLAY")
+        putFallback(standard, raw, "is_retake", "CXCKDM_DISPLAY")
         return standard
     }
 
@@ -593,40 +593,47 @@ object NotifyHelper {
     fun convertExamToStandard(context: Context, raw: JSONObject): JSONObject {
         val config = getServerConfig(context)
         val mappings = config?.optJSONObject("fieldMappings")?.optJSONObject("exam") ?: JSONObject()
-        val standard = JSONObject()
-        val keys = mappings.keys()
-        while (keys.hasNext()) {
-            val standardKey = keys.next()
-            for (rawKey in resolveRawKeys(mappings, standardKey)) {
-                if (raw.has(rawKey)) {
-                    standard.put(standardKey, raw.opt(rawKey))
-                    break
-                }
+        return convertExamToStandard(raw, mappings)
+    }
+
+    internal fun convertExamToStandard(raw: JSONObject, mappings: JSONObject): JSONObject {
+        val standard = mapFields(raw, mappings)
+        putFallback(standard, raw, "name", "KCM")
+        putFallback(standard, raw, "course_name", "KCM")
+        putExamDateTimes(standard, raw)
+        putFallback(standard, raw, "exam_location", "JASMC")
+        putFallback(standard, raw, "seat_number", "ZWH")
+        putFallback(standard, raw, "term", "XNXQDM")
+        return standard
+    }
+
+    internal fun emapRows(result: HttpResult, dataKey: String, jwxt: HttpUrl, cas: HttpUrl): JSONArray {
+        checkStatus(result)
+        if (isRedirect(result.code)) {
+            requireJwxtDestination(redirectTarget(result), jwxt, cas)
+            throw NotifyProtocolException("Unexpected EMAP redirect")
+        }
+        if (isLoginHtml(result.body)) {
+            throw NotifySessionExpiredException("EMAP response requires login or MFA")
+        }
+        val json = try {
+            JSONObject(result.body)
+        } catch (e: JSONException) {
+            throw NotifyProtocolException("EMAP response is not a JSON object", e)
+        }
+        // A business code, including a numeric 401/403, is not an HTTP authentication failure.
+        val code = valueOrNull(json.opt("code"))
+        if (code != "0" && !(code is Number && code.toDouble() == 0.0)) {
+            throw NotifyProtocolException("EMAP business failure: code=${code ?: "missing"}, ${json.text("msg")}")
+        }
+        val rows = json.optJSONObject("datas")?.optJSONObject(dataKey)?.optJSONArray("rows")
+            ?: throw NotifyProtocolException("EMAP response missing $dataKey rows")
+        for (index in 0 until rows.length()) {
+            if (rows.optJSONObject(index) == null) {
+                throw NotifyProtocolException("EMAP response contains a non-object row")
             }
         }
-        // Fallback: ensure essential keys exist using common raw keys
-        if (!standard.has("name")) {
-            val name = raw.optString("KCM", "")
-            if (name.isNotEmpty()) standard.put("name", name)
-        }
-        if (!standard.has("course_name")) {
-            val name = raw.optString("KCM", "")
-            if (name.isNotEmpty()) standard.put("course_name", name)
-        }
-        putExamDateTimes(standard, raw)
-        if (!standard.has("exam_location")) {
-            val loc = raw.optString("JASMC", "")
-            if (loc.isNotEmpty()) standard.put("exam_location", loc)
-        }
-        if (!standard.has("seat_number")) {
-            val seat = raw.optString("ZWH", "")
-            if (seat.isNotEmpty()) standard.put("seat_number", seat)
-        }
-        if (!standard.has("term")) {
-            val term = raw.optString("XNXQDM", "")
-            if (term.isNotEmpty()) standard.put("term", term)
-        }
-        return standard
+        return rows
     }
 
     // ─── Fetch grades ───────────────────────────────────────────────────────
@@ -650,20 +657,12 @@ object NotifyHelper {
             }
 
             val postData = "querySetting=${URLEncoder.encode(query, "UTF-8")}&pageSize=999&pageNumber=1&*order=-XNXQDM,-KCH,-KXH"
-            val (code, body) = httpPost("$appBase/$apiCjcx", postData)
-
-            if (code != 200) {
-                Log.w(TAG, "fetchGrades failed: code=$code")
-                return FetchResult.Failure(message = "fetchGrades failed: code=$code")
-            }
-
-            val json = JSONObject(body)
-            val datas = json.optJSONObject("datas")
-                ?: return FetchResult.Failure(message = "fetchGrades missing datas")
-            val xscjcx = datas.optJSONObject("xscjcx")
-                ?: return FetchResult.Failure(message = "fetchGrades missing xscjcx")
-            val rows = xscjcx.optJSONArray("rows")
-                ?: return FetchResult.Failure(message = "fetchGrades missing rows")
+            val rows = emapRows(
+                httpPost("$appBase/$apiCjcx", postData),
+                "xscjcx",
+                getJwxtBase(context).toHttpUrl(),
+                getCerBase(context).toHttpUrl()
+            )
 
             for (i in 0 until rows.length()) {
                 val raw = rows.getJSONObject(i)
@@ -689,7 +688,7 @@ object NotifyHelper {
 
             fetchWeu(context, appIdWdksap)
             val term = getCurrentTerm(context)
-                ?: return FetchResult.Failure(message = "fetchExams missing current term")
+                ?: throw NotifyProtocolException("Exam response missing current term")
 
             val param = JSONObject().apply {
                 put("XNXQDM", term)
@@ -697,20 +696,12 @@ object NotifyHelper {
             }
 
             val postData = "requestParamStr=${URLEncoder.encode(param.toString(), "UTF-8")}"
-            val (code, body) = httpPost("$appBase/$apiWdksap", postData)
-
-            if (code != 200) {
-                Log.w(TAG, "fetchExams failed: code=$code")
-                return FetchResult.Failure(message = "fetchExams failed: code=$code")
-            }
-
-            val json = JSONObject(body)
-            val datas = json.optJSONObject("datas")
-                ?: return FetchResult.Failure(message = "fetchExams missing datas")
-            val cxxsksap = datas.optJSONObject("cxxsksap")
-                ?: return FetchResult.Failure(message = "fetchExams missing cxxsksap")
-            val rows = cxxsksap.optJSONArray("rows")
-                ?: return FetchResult.Failure(message = "fetchExams missing rows")
+            val rows = emapRows(
+                httpPost("$appBase/$apiWdksap", postData),
+                "cxxsksap",
+                getJwxtBase(context).toHttpUrl(),
+                getCerBase(context).toHttpUrl()
+            )
 
             for (i in 0 until rows.length()) {
                 val raw = rows.getJSONObject(i)
@@ -727,18 +718,36 @@ object NotifyHelper {
     // ─── Diff logic ─────────────────────────────────────────────────────────
 
     fun diffGrades(oldList: List<JSONObject>, newList: List<JSONObject>): List<JSONObject> {
-        fun gradeKey(it: JSONObject): String {
-            val code = it.optString("course_code", "")
-            if (code.isNotEmpty()) return "$code|${it.optString("term", "")}"
-            val name = it.optString("course_name", "")
-            return "$name|${it.optString("term", "")}"
+        fun courseKey(grade: JSONObject): Pair<String, String> =
+            grade.text("course_code").ifEmpty { grade.text("course_name") } to grade.text("term")
+
+        fun sameRecord(old: JSONObject, current: JSONObject): Boolean {
+            val oldId = old.text("record_id")
+            val currentId = current.text("record_id")
+            if (oldId.isNotEmpty() && currentId.isNotEmpty()) return oldId == currentId
+            // Older baselines lack record/class IDs. Compare available attempt fields without
+            // treating newly populated identifiers as new grades.
+            return gradeAttemptFields.all { key ->
+                val before = old.text(key)
+                val after = current.text(key)
+                before.isEmpty() || after.isEmpty() || before == after
+            }
         }
 
-        val oldKeys = oldList.map { gradeKey(it) }.toSet()
+        fun sameResult(old: JSONObject, current: JSONObject): Boolean =
+            gradeResultFields.all { old.text(it) == current.text(it) }
 
-        return newList.filter {
-            !oldKeys.contains(gradeKey(it))
+        val oldGroups = oldList.groupBy(::courseKey).mapValues { (_, grades) -> grades.toMutableList() }
+        val unmatched = mutableListOf<JSONObject>()
+        // Reserve exact matches first so response ordering cannot consume an unchanged attempt
+        // as a different attempt's score update. Lists preserve duplicate records.
+        for (grade in newList) {
+            val candidates = oldGroups[courseKey(grade)]
+            val index = candidates?.indexOfFirst { sameRecord(it, grade) && sameResult(it, grade) } ?: -1
+            if (index >= 0) candidates?.removeAt(index) else unmatched.add(grade)
         }
+        // Every unmatched row is a new attempt or an existing attempt with a changed result.
+        return unmatched
     }
 
     fun diffExams(oldList: List<JSONObject>, newList: List<JSONObject>): List<JSONObject> {

@@ -21,15 +21,15 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
 
-        val pendingResult = goAsync()
         try {
-            val alarmsJson = UnifiedCache.getString(context, UnifiedCache.KEY_CLASS_ALARMS, "[]")
-            if (alarmsJson == "[]") return
-
-            Log.d(TAG, "Rescheduling class alarms after reboot")
-            ClassAlarmManager.scheduleAlarms(context, alarmsJson)
-        } finally {
-            pendingResult.finish()
+            synchronized(ClassAlarmManager) {
+                val alarmsJson = UnifiedCache.getString(context, UnifiedCache.KEY_CLASS_ALARMS, "[]")
+                if (alarmsJson == "[]") return
+                Log.d(TAG, "Rescheduling future class alarms after reboot")
+                ClassAlarmManager.scheduleAlarms(context, alarmsJson)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Unable to restore class alarms after reboot", e)
         }
     }
 }

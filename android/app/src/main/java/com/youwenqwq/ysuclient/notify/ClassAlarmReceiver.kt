@@ -1,114 +1,84 @@
 package com.youwenqwq.ysuclient.notify
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
-import androidx.core.app.NotificationCompat
-import com.youwenqwq.ysuclient.MainActivity
 import com.youwenqwq.ysuclient.R
 import com.youwenqwq.ysuclient.cache.UnifiedCache
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.Calendar
 
 class ClassAlarmReceiver : BroadcastReceiver() {
 
     companion object {
         const val TAG = "YsuClassAlarm"
-        const val CHANNEL_ID = "ysu_class_alarm_channel"
         const val EXTRA_ALARM_ID = "alarm_id"
+        const val EXTRA_ALARM_TIME = "alarm_time"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         val alarmId = intent.getStringExtra(EXTRA_ALARM_ID) ?: return
-        Log.d(TAG, "Alarm triggered: $alarmId")
-
-        val pendingResult = goAsync()
+        val expectedTime = intent.getLongExtra(EXTRA_ALARM_TIME, 0L)
         try {
-            val alarmsJson = UnifiedCache.getString(context, UnifiedCache.KEY_CLASS_ALARMS, "[]")
-            val alarms = JSONArray(alarmsJson)
-            var alarmConfig: JSONObject? = null
-
-            for (i in 0 until alarms.length()) {
-                val obj = alarms.getJSONObject(i)
-                if (obj.optString("alarmId") == alarmId) {
-                    alarmConfig = obj
-                    break
+            // Scheduling, cancellation and delivery share the same snapshot lock.
+            synchronized(ClassAlarmManager) {
+                val alarms = JSONArray(
+                    UnifiedCache.getString(context, UnifiedCache.KEY_CLASS_ALARMS, "[]")
+                )
+                var alarmConfig: JSONObject? = null
+                for (i in 0 until alarms.length()) {
+                    val alarm = alarms.getJSONObject(i)
+                    if (alarm.optString("alarmId") == alarmId) {
+                        alarmConfig = alarm
+                        break
+                    }
                 }
-            }
+                if (alarmConfig == null) return
+                val alarmTime = alarmConfig.getLong("alarmTime")
+                val now = System.currentTimeMillis()
+                // Pre-upgrade alarms have no timestamp extra; validate their saved due/expiry times.
+                // New broadcasts additionally identify the exact configuration they were scheduled for.
+                if (intent.hasExtra(EXTRA_ALARM_TIME) && expectedTime != alarmTime) return
+                if (now < alarmTime) return
 
-            // Remove triggered alarm from cache (regardless of validity)
-            val updatedAlarms = JSONArray()
-            for (i in 0 until alarms.length()) {
-                val obj = alarms.getJSONObject(i)
-                if (obj.optString("alarmId") != alarmId) {
-                    updatedAlarms.put(obj)
+                val updatedAlarms = JSONArray()
+                for (i in 0 until alarms.length()) {
+                    val alarm = alarms.getJSONObject(i)
+                    if (alarm.optString("alarmId") != alarmId) updatedAlarms.put(alarm)
                 }
-            }
-            UnifiedCache.putString(context, UnifiedCache.KEY_CLASS_ALARMS, updatedAlarms.toString())
+                UnifiedCache.putString(context, UnifiedCache.KEY_CLASS_ALARMS, updatedAlarms.toString())
 
-            if (alarmConfig == null) {
-                Log.w(TAG, "Alarm config not found for $alarmId")
-                return
-            }
-
-            val courseName = alarmConfig.optString("courseName", context.getString(R.string.notify_fallback_alarm_course))
-            val classroom = alarmConfig.optString("classroom", "")
-            val startTime = alarmConfig.optString("startTime", "")
-            val remindMinutes = alarmConfig.optInt("remindMinutes", 15)
-
-            // Verify course is still in today's schedule
-            val schedule = UnifiedCache.getCachedSchedule(context)
-            val now = Calendar.getInstance()
-            val currentWeekday = now.get(Calendar.DAY_OF_WEEK)
-            val mappedWeekday = when (currentWeekday) {
-                Calendar.MONDAY -> 1
-                Calendar.TUESDAY -> 2
-                Calendar.WEDNESDAY -> 3
-                Calendar.THURSDAY -> 4
-                Calendar.FRIDAY -> 5
-                Calendar.SATURDAY -> 6
-                Calendar.SUNDAY -> 7
-                else -> 1
-            }
-
-            var courseStillValid = false
-            for (i in 0 until schedule.length()) {
-                val course = schedule.getJSONObject(i)
-                if (course.optString("name") == courseName &&
-                    course.optInt("week_day", 0) == mappedWeekday) {
-                    courseStillValid = true
-                    break
+                val remindMinutes = alarmConfig.optInt("remindMinutes", 15)
+                if (now >= alarmTime + remindMinutes * 60_000L) {
+                    Log.d(TAG, "Class has already started; skipping delayed alarm $alarmId")
+                    return
                 }
+                // This snapshot is rebuilt from the complete schedule, including future weeks.
+                // Widget data is filtered to one week and cannot validate these reminders.
+                sendClassNotification(
+                    context,
+                    alarmId,
+                    alarmConfig.optString("courseName", context.getString(R.string.notify_fallback_alarm_course)),
+                    alarmConfig.optString("classroom", ""),
+                    alarmConfig.optString("startTime", ""),
+                    remindMinutes
+                )
             }
-
-            if (!courseStillValid) {
-                Log.d(TAG, "Course no longer in today's schedule, skipping notification")
-                return
-            }
-
-            sendClassNotification(context, courseName, classroom, startTime, remindMinutes)
-
         } catch (e: Exception) {
             Log.e(TAG, "Error handling class alarm", e)
-        } finally {
-            pendingResult.finish()
         }
     }
 
     private fun sendClassNotification(
         ctx: Context,
+        alarmId: String,
         courseName: String,
         classroom: String,
         startTime: String,
         remindMinutes: Int
     ) {
-        createNotificationChannel(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val parts = buildList {
@@ -121,36 +91,12 @@ class ClassAlarmReceiver : BroadcastReceiver() {
             ctx.getString(R.string.class_alarm_text, remindMinutes)
         }
 
-        val openIntent = Intent(ctx, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            ctx, 0, openIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+        val notification = NativeNotifications.builder(ctx, NotificationKind.CLASSES)
             .setContentTitle(courseName)
             .setContentText(content)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
             .build()
 
-        nm.notify(System.currentTimeMillis().toInt(), notification)
+        nm.notify("class:$alarmId", 0, notification)
     }
 
-    private fun createNotificationChannel(ctx: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            ctx.getString(R.string.class_alarm_channel_name),
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = ctx.getString(R.string.class_alarm_channel_desc)
-        }
-        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(channel)
-    }
 }

@@ -1,5 +1,6 @@
 import { registerPlugin } from "@capacitor/core"
 import type { Course, CurrentWeek, ClassPeriod, Exam } from "@/providers/types"
+import { parseWeeks } from "@/app/dashboard/schedule/schedule-utils"
 
 export interface WidgetBridgePlugin {
   syncSchedule(options: {
@@ -39,6 +40,7 @@ export interface WidgetCourse {
   name: string
   classroom?: string
   week_day: number
+  week_list: number[]
   start_section: number
   end_section: number
   start_time?: string
@@ -50,6 +52,7 @@ export interface WidgetWeekInfo {
   weekday: number
   term?: string
   date?: string
+  full_schedule: boolean
 }
 
 export interface WidgetExam {
@@ -81,6 +84,7 @@ export async function syncScheduleToWidget(
         name: c.name,
         classroom: c.classroom,
         week_day: c.weekDay,
+        week_list: c.weekList ?? parseWeeks(c.weeks || ""),
         start_section: startSection,
         end_section: endSection,
         start_time: startPeriod?.startTime,
@@ -94,6 +98,7 @@ export async function syncScheduleToWidget(
           weekday: currentWeek.weekday,
           term: currentWeek.semester,
           date: currentWeek.date,
+          full_schedule: true,
         }
       : null
 

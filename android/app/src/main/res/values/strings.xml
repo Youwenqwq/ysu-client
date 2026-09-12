@@ -8,6 +8,12 @@
     <!-- Widget -->
     <string name="widget_name">今日课表</string>
     <string name="widget_description">显示今日课程安排</string>
+    <string name="widget_tomorrow_name">明日课表</string>
+    <string name="widget_tomorrow_description">固定显示明天的课程安排，支持跨周课表</string>
+    <string name="widget_tomorrow_short">明日</string>
+    <string name="widget_tomorrow_header">明日 %1$s</string>
+    <string name="widget_tomorrow_empty">明日无课</string>
+    <string name="widget_tomorrow_courses">%d节课</string>
     <string name="widget_remaining_courses">还有%d节课</string>
     <string name="widget_week_number">第%d周</string>
     <string name="widget_section_format">第%1$d-%2$d节</string>
@@ -25,11 +31,17 @@
     <string name="widget_sync_days_ago">%d天前同步</string>
 
     <!-- Notify: grade/exam change detection -->
-    <string name="notify_channel_name">成绩/考试通知</string>
-    <string name="notify_channel_desc">检测到新成绩发布或考试安排变更时推送通知</string>
-    <string name="notify_grade_title">新成绩发布</string>
+    <string name="notify_grades_channel_name">成绩通知</string>
+    <string name="notify_grades_channel_desc">新成绩发布或成绩变化时提醒</string>
+    <string name="notify_exams_channel_name">考试通知</string>
+    <string name="notify_exams_channel_desc">考试安排发布或变化时提醒</string>
+    <string name="notify_auth_channel_name">登录状态提醒</string>
+    <string name="notify_auth_channel_desc">登录失效、需要重新登录时提醒</string>
+    <string name="notify_errors_channel_name">通知服务状态</string>
+    <string name="notify_errors_channel_desc">后台检查异常提示，默认无声音和震动</string>
+    <string name="notify_grade_title">成绩更新</string>
     <string name="notify_grade_text">%1$s — 成绩: %2$s</string>
-    <string name="notify_grade_text_no_score">%1$s — 新成绩已发布</string>
+    <string name="notify_grade_text_no_score">%1$s — 成绩信息已更新</string>
     <string name="notify_exam_title">考试安排更新</string>
     <string name="notify_exam_text">%1$s — %2$s</string>
     <string name="notify_exam_text_no_details">%1$s</string>

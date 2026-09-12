@@ -65,25 +65,22 @@ export function useOverviewSchedule(): OverviewSchedule {
     () => resolveWidgetCurrentWeek(currentWeek.data ?? null, termCalendar.data?.startDate),
     [currentWeek.data, termCalendar.data?.startDate]
   )
-  const activeCourses = useMemo(
-    () =>
-      widgetCurrentWeek && schedule.data
-        ? schedule.data.filter((course) => isCourseActiveInWeek(course, widgetCurrentWeek.week))
-        : null,
-    [schedule.data, widgetCurrentWeek]
-  )
 
   useEffect(() => {
-    if (!activeCourses || !widgetCurrentWeek) return
+    if (!schedule.data || !widgetCurrentWeek) return
     void syncScheduleToWidget(
-      activeCourses,
+      schedule.data,
       widgetCurrentWeek,
       periods,
       reminderHours,
       showNextDay
     ).catch(() => {})
-    void syncClassAlarmsToNative(activeCourses, widgetCurrentWeek, periods).catch(() => {})
-  }, [activeCourses, widgetCurrentWeek, periods, reminderHours, showNextDay])
+  }, [schedule.data, widgetCurrentWeek, periods, reminderHours, showNextDay])
+
+  useEffect(() => {
+    if (!schedule.data) return
+    void syncClassAlarmsToNative(schedule.data, widgetCurrentWeek, periods).catch(() => {})
+  }, [schedule.data, widgetCurrentWeek, periods])
 
   useEffect(() => {
     // Empty results must also clear stale exams from the native widget.

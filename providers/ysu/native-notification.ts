@@ -31,6 +31,8 @@ export function buildNativeServerConfig(): NativeServerConfig {
     jwxtBaseUrl: serverConfig.jwxtBaseUrl,
     fieldMappings: {
       grade: {
+        record_id: ["WID"],
+        class_id: ["JXBID"],
         course_name: ["XSKCM", "KCM"],
         course_code: ["XSKCH", "KCH"],
         score: ["ZCJ", "XSZCJMC"],

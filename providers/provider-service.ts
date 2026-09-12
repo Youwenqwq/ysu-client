@@ -4,6 +4,7 @@ import { getSchoolId, setSchoolConfig } from "@/lib/server-config"
 import { DEFAULT_SCHOOL_ID, hasSchoolConfig } from "@/lib/school-configs"
 import type { AcademicProvider } from "./types"
 import { createProvider, hasProvider } from "./provider-registry"
+import { stopNotify, syncNativeNotifications } from "@/lib/native/notify"
 
 function resolveSupportedSchoolId(schoolId: string): string {
   if (hasSchoolConfig(schoolId) && hasProvider(schoolId)) {
@@ -15,6 +16,7 @@ function resolveSupportedSchoolId(schoolId: string): string {
 let activeSchoolId = resolveSupportedSchoolId(getSchoolId())
 let activeProvider: AcademicProvider = createProvider(activeSchoolId)
 let activeInitializePromise: Promise<AcademicProvider> | null = null
+let authOperation = 0
 setSchoolConfig(activeSchoolId)
 
 export function getActiveProvider(): AcademicProvider {
@@ -64,15 +66,23 @@ export async function resetActiveProvider(): Promise<void> {
 }
 
 export async function logoutActiveProvider(): Promise<void> {
+  authOperation++
+  stopNotify()
   await getActiveProvider().logout()
   activeInitializePromise = null
 }
 
 export async function reloginActiveProvider(): Promise<boolean> {
-  const success = (await getActiveProvider().relogin?.()) ?? false
-  if (!success) return false
+  const operation = authOperation
+  const provider = getActiveProvider()
+  const success = (await provider.relogin?.()) ?? false
+  if (!success || operation !== authOperation || provider !== getActiveProvider()) return false
 
   useAuthStore.getState().setSessionExpired(false)
+  await syncNativeNotifications(true, true).catch((error) => {
+    console.warn("Failed to restore native notifications after relogin", error)
+  })
+  if (operation !== authOperation || provider !== getActiveProvider()) return false
   void mutate((key) => Array.isArray(key) && key[0] === "provider").catch(() => {})
   return true
 }

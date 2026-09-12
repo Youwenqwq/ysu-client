@@ -20,14 +20,13 @@ import { useSettingsStore, type LandingPage } from "@/lib/stores/settings"
 import { Input } from "@/components/ui/input"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service"
-import { useProvider } from "@/providers/use-provider"
 import { isCapacitor } from "@/lib/native/platform"
 
 import { syncWidgetSettingsToWidget } from "@/lib/native/widget-bridge"
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
 import { useUpdateStore } from "@/lib/stores/update"
 import { useTheme } from "next-themes"
-import { startNotifyIfNeeded, stopNativePolling, triggerNotifyCheck } from "@/lib/native/notify"
+import { setNotificationEnabled } from "@/lib/native/notify"
 import { NotifyPlugin } from "@/lib/native/notify-plugin"
 import {
   LayoutDashboard,
@@ -55,8 +54,6 @@ import {
 
 export default function SettingsPage() {
   const router = useRouter()
-  const provider = useProvider()
-  const nativeNotification = provider.nativeNotification
   const { t, locale, setLocale } = useTranslation()
   const { theme, setTheme } = useTheme()
   const hasUpdate = useUpdateStore((s) => s.hasUpdate)
@@ -70,7 +67,6 @@ export default function SettingsPage() {
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   const notifyEnabled = useSettingsStore((s) => s.notifyEnabled)
-  const setNotifyEnabled = useSettingsStore((s) => s.setNotifyEnabled)
   const notifyCheckInterval = useSettingsStore((s) => s.notifyCheckInterval)
   const setNotifyCheckInterval = useSettingsStore((s) => s.setNotifyCheckInterval)
   const notifyGrades = useSettingsStore((s) => s.notifyGrades)
@@ -80,7 +76,6 @@ export default function SettingsPage() {
   const notifyNetworkError = useSettingsStore((s) => s.notifyNetworkError)
   const setNotifyNetworkError = useSettingsStore((s) => s.setNotifyNetworkError)
   const classReminderEnabled = useSettingsStore((s) => s.classReminderEnabled)
-  const setClassReminderEnabled = useSettingsStore((s) => s.setClassReminderEnabled)
   const epayNotifyEnabled = useSettingsStore((s) => s.epayNotifyEnabled)
   const setEpayNotifyEnabled = useSettingsStore((s) => s.setEpayNotifyEnabled)
   const classReminderMinutes = useSettingsStore((s) => s.classReminderMinutes)
@@ -93,6 +88,20 @@ export default function SettingsPage() {
   const setGradeGachaEnabled = useSettingsStore((s) => s.setGradeGachaEnabled)
   const [batteryIgnored, setBatteryIgnored] = useState<boolean | null>(null)
   const [autoStartDialogOpen, setAutoStartDialogOpen] = useState(false)
+  const [notificationPermissionPending, setNotificationPermissionPending] = useState(false)
+
+  async function handleNotificationToggle(kind: "polling" | "classes", enabled: boolean) {
+    setNotificationPermissionPending(true)
+    try {
+      if (!(await setNotificationEnabled(kind, enabled))) {
+        toast.error(t("settings.notificationPermissionDenied"))
+      }
+    } catch {
+      toast.error(t("settings.notificationSyncFailed"))
+    } finally {
+      setNotificationPermissionPending(false)
+    }
+  }
 
   // Check battery optimization status on mount and when returning from settings
   useEffect(() => {
@@ -394,16 +403,8 @@ export default function SettingsPage() {
                 </div>
                 <Switch
                   checked={notifyEnabled}
-                  onCheckedChange={(enabled) => {
-                    setNotifyEnabled(enabled)
-                    if (enabled) {
-                      startNotifyIfNeeded(nativeNotification, provider.id)
-                        .then(() => triggerNotifyCheck())
-                        .catch(() => {})
-                    } else {
-                      stopNativePolling().catch(() => {})
-                    }
-                  }}
+                  disabled={notificationPermissionPending}
+                  onCheckedChange={(enabled) => void handleNotificationToggle("polling", enabled)}
                 />
               </div>
 
@@ -473,7 +474,11 @@ export default function SettingsPage() {
                     {t("settings.classReminderHint")}
                   </span>
                 </div>
-                <Switch checked={classReminderEnabled} onCheckedChange={setClassReminderEnabled} />
+                <Switch
+                  checked={classReminderEnabled}
+                  disabled={notificationPermissionPending}
+                  onCheckedChange={(enabled) => void handleNotificationToggle("classes", enabled)}
+                />
               </div>
               {classReminderEnabled && (
                 <>
@@ -652,7 +657,7 @@ function SettingNumberInput({
   }
 
   return (
-    <div className={`flex items-center gap-3 py-3${bordered ? " border-t border-border" : ""}`}>
+    <div className={`flex items-center gap-3 py-3${bordered ? "border-t border-border" : ""}`}>
       <Icon className="size-5 shrink-0 text-muted-foreground" />
       <div className="flex flex-1 flex-col">
         <span className="text-sm">{label}</span>

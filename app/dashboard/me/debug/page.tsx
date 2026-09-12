@@ -390,7 +390,7 @@ export default function DebugPage() {
       return
     }
     try {
-      await startNativePolling(provider.nativeNotification, provider.id)
+      await startNativePolling()
       logNative(
         `startNativePolling: 已启动 (interval=${notifyCheckInterval}min, grades=${notifyGrades}, exams=${notifyExams})`
       )

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   DropdownMenu,
@@ -139,12 +139,6 @@ export default function SchedulePage() {
     setSelectedWeek((w) => Math.max(1, (w || 1) + delta))
   }
 
-  // 用 ref 持有最新的 periods 数据，避免 periods 变化触发 effect 重新执行
-  const periodsRef = useRef(periods)
-  useEffect(() => {
-    periodsRef.current = periods
-  })
-
   useEffect(() => {
     if (!currentWeek && !termCalendar?.startDate) return
     setSelectedWeek((curr) =>
@@ -173,18 +167,19 @@ export default function SchedulePage() {
 
   useEffect(() => {
     if (!isDefaultTerm || !scheduleQuery.data || !widgetCurrentWeek) return
-    const activeCourses = scheduleQuery.data.filter((course) =>
-      isCourseActiveInWeek(course, widgetCurrentWeek.week)
-    )
     syncScheduleToWidget(
-      activeCourses,
+      scheduleQuery.data,
       widgetCurrentWeek,
-      periodsRef.current,
+      periods,
       useSettingsStore.getState().widgetSyncReminderHours,
       useSettingsStore.getState().widgetShowNextDaySchedule
     ).catch(() => {})
-    syncClassAlarmsToNative(activeCourses, widgetCurrentWeek, periodsRef.current).catch(() => {})
-  }, [isDefaultTerm, scheduleQuery.data, widgetCurrentWeek])
+  }, [isDefaultTerm, scheduleQuery.data, widgetCurrentWeek, periods])
+
+  useEffect(() => {
+    if (!isDefaultTerm || !scheduleQuery.data) return
+    void syncClassAlarmsToNative(scheduleQuery.data, widgetCurrentWeek, periods).catch(() => {})
+  }, [isDefaultTerm, scheduleQuery.data, widgetCurrentWeek, periods])
 
   useEffect(() => {
     if (!isDefaultTerm || !examsQuery.data) return

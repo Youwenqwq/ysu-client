@@ -1,9 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { useAuthStore } from "@/lib/stores/auth"
-import { startNotifyIfNeeded, stopNotify } from "@/lib/native/notify"
-import { isCapacitor } from "@/lib/native/platform"
+import { observeNativeNotifications } from "@/lib/native/notify"
 import { useProvider } from "@/providers/use-provider"
 
 /**
@@ -11,17 +9,12 @@ import { useProvider } from "@/providers/use-provider"
  * 在 SDK 初始化完成后挂载，仅 Capacitor 平台生效。
  */
 export function NotifyProvider() {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const provider = useProvider()
   const nativeNotification = provider.nativeNotification
 
   useEffect(() => {
-    if (!isCapacitor() || !isAuthenticated || !nativeNotification) return
-    startNotifyIfNeeded(nativeNotification, provider.id)
-    return () => {
-      stopNotify()
-    }
-  }, [isAuthenticated, nativeNotification, provider.id])
+    return observeNativeNotifications(nativeNotification, provider.id)
+  }, [nativeNotification, provider.id])
 
   return null
 }

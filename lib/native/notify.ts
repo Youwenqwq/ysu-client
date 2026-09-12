@@ -18,7 +18,30 @@ import type {
   ProviderNativeNotification,
 } from "@/providers/types"
 
-// ─── Config Sync ────────────────────────────────────────────────────────── //
+// Native mutations share one queue. Revisions invalidate work waiting on a token
+// or permission prompt before logout/disable can be undone by its completion.
+let nativeQueue: Promise<void> = Promise.resolve()
+let pollingSync: Promise<void> = Promise.resolve()
+let alarmSync: Promise<void> = Promise.resolve()
+let pollingRevision = 0
+let alarmRevision = 0
+let lifecycleRevision = 0
+let stopped = false
+let notificationProvider: ProviderNativeNotification | undefined
+let notificationProviderId: string | undefined
+let lastPollingHash = ""
+let lastCastgc = ""
+let pendingTokenRefresh = false
+let pendingCheck = false
+const permissionRevisions = { polling: 0, classes: 0 }
+
+function enqueueNative(operation: () => Promise<void>): Promise<void> {
+  const result = nativeQueue.then(operation)
+  nativeQueue = result.catch((error) => {
+    console.warn("Failed to sync native notifications", error)
+  })
+  return result
+}
 
 function hashNotifyAccount(providerId: string, username: string): string {
   let hash = 2166136261
@@ -30,44 +53,23 @@ function hashNotifyAccount(providerId: string, username: string): string {
   return (hash >>> 0).toString(16)
 }
 
-export async function syncServerConfigToNative(
-  nativeNotification?: ProviderNativeNotification
+async function syncProviderToNative(
+  nativeNotification: ProviderNativeNotification,
+  providerId: string,
+  username: string
 ): Promise<void> {
-  if (!isCapacitor() || !nativeNotification) return
-  try {
-    const config = nativeNotification.getServerConfig()
-    await NotifyPlugin.setServerConfig({ configJson: JSON.stringify(config) })
-  } catch (e) {
-    console.warn("Failed to sync server config to native", e)
-  }
+  await NotifyPlugin.setServerConfig({
+    configJson: JSON.stringify(nativeNotification.getServerConfig()),
+  })
+  await NotifyPlugin.setProviderIdentity({
+    providerId,
+    accountHash: hashNotifyAccount(providerId, username),
+  })
 }
 
-export async function syncProviderIdentityToNative(providerId?: string): Promise<void> {
-  if (!isCapacitor() || !providerId) return
-  const username = useAuthStore.getState().username
-  if (!username) return
-
-  try {
-    await NotifyPlugin.setProviderIdentity({
-      providerId,
-      accountHash: hashNotifyAccount(providerId, username),
-    })
-  } catch (e) {
-    console.warn("Failed to sync provider identity to native", e)
-  }
-}
-
-/**
- * 将 CASTGC 同步到原生插件。
- *
- * 优先从 secure storage 读取（saveCASTGC 时检查了非空），
- * fallback 到 CapacitorHttp cookie store 和 JS cookie jar。
- */
-export async function syncCastgcToNative(
-  nativeNotification?: ProviderNativeNotification
-): Promise<void> {
-  if (!isCapacitor() || !nativeNotification) return
-
+async function readCastgc(
+  nativeNotification: ProviderNativeNotification
+): Promise<string | undefined> {
   let castgc: string | undefined
 
   // 1. 优先由当前 provider 提供认证 token。
@@ -94,86 +96,224 @@ export async function syncCastgcToNative(
     }
   }
 
-  if (castgc) {
-    await NotifyPlugin.setCastgc({ castgc })
+  return castgc
+}
+
+/** Bind the single control source; React cleanup only removes subscriptions. */
+export function observeNativeNotifications(
+  nativeNotification: ProviderNativeNotification | undefined,
+  providerId: string
+): () => void {
+  if (!isCapacitor()) return () => {}
+  if (notificationProviderId && notificationProviderId !== providerId) stopNotify()
+  notificationProvider = nativeNotification
+  notificationProviderId = providerId
+  stopped = !useAuthStore.getState().isAuthenticated
+
+  const sync = () => {
+    void syncNativeNotifications().catch(() => {})
+    void refreshClassAlarms().catch(() => {})
   }
-}
-
-// ─── Native Polling Control ─────────────────────────────────────────────── //
-
-/**
- * 确保通知轮询在调度中。冷启动时由 NotifyProvider 调用，不主动触发立即检查。
- */
-export async function startNotifyIfNeeded(
-  nativeNotification?: ProviderNativeNotification,
-  providerId?: string
-): Promise<void> {
-  if (!isCapacitor() || !nativeNotification) return
-
-  const { notifyEnabled } = useSettingsStore.getState()
-  if (!notifyEnabled) return
-
-  await syncServerConfigToNative(nativeNotification)
-  await syncProviderIdentityToNative(providerId)
-  await startNativePolling(nativeNotification, providerId)
-}
-
-/**
- * 立即触发一次通知检查。用户手动开启通知时调用。
- */
-export async function triggerNotifyCheck(): Promise<void> {
-  if (!isCapacitor()) return
-  await NotifyPlugin.executeOnce().catch(() => {})
-}
-
-/**
- * 启动原生后台轮询。在通知设置启用时调用。
- */
-export async function startNativePolling(
-  nativeNotification?: ProviderNativeNotification,
-  providerId?: string
-): Promise<void> {
-  if (!isCapacitor() || !nativeNotification) return
-
-  const { notifyCheckInterval, notifyGrades, notifyExams, notifyNetworkError } =
-    useSettingsStore.getState()
-
-  // 检查通知权限
-  const perm = await NotifyPlugin.checkPermissions()
-  if (!perm.granted) {
-    await NotifyPlugin.requestPermissions()
-  }
-
-  // 同步 provider 身份和认证 token
-  await syncProviderIdentityToNative(providerId)
-  await syncCastgcToNative(nativeNotification)
-
-  // 启动轮询
-  await NotifyPlugin.startPolling({
-    intervalMinutes: notifyCheckInterval,
-    checkGrades: notifyGrades,
-    checkExams: notifyExams,
-    notifyNetworkError,
+  const unsubscribeSettings = useSettingsStore.subscribe((state, previous) => {
+    if (
+      state.hasHydrated !== previous.hasHydrated ||
+      state.notifyEnabled !== previous.notifyEnabled ||
+      state.notifyCheckInterval !== previous.notifyCheckInterval ||
+      state.notifyGrades !== previous.notifyGrades ||
+      state.notifyExams !== previous.notifyExams ||
+      state.notifyNetworkError !== previous.notifyNetworkError
+    ) {
+      void syncNativeNotifications(state.notifyEnabled && !previous.notifyEnabled).catch(() => {})
+    }
+    if (
+      state.hasHydrated !== previous.hasHydrated ||
+      state.classReminderEnabled !== previous.classReminderEnabled ||
+      state.classReminderMinutes !== previous.classReminderMinutes ||
+      state.classReminderDays !== previous.classReminderDays
+    ) {
+      void refreshClassAlarms().catch(() => {})
+    }
   })
-}
-
-/**
- * 停止原生后台轮询。
- */
-export async function stopNativePolling(): Promise<void> {
-  if (!isCapacitor()) return
-  await NotifyPlugin.stopPolling()
-}
-
-/**
- * 停止所有通知服务。登出时调用。
- */
-export function stopNotify(): void {
-  if (isCapacitor()) {
-    NotifyPlugin.stopPolling().catch(() => {})
-    NotifyPlugin.clearCastgc().catch(() => {})
-    NotifyPlugin.cancelClassAlarms().catch(() => {})
+  const unsubscribeAuth = useAuthStore.subscribe((state, previous) => {
+    if (
+      (previous.isAuthenticated && !state.isAuthenticated) ||
+      state.username !== previous.username
+    ) {
+      stopNotify()
+    }
+    if (
+      state.isAuthenticated &&
+      (!previous.isAuthenticated || state.username !== previous.username)
+    ) {
+      stopped = false
+    }
+    if (
+      state.isAuthenticated !== previous.isAuthenticated ||
+      state.username !== previous.username ||
+      state.credential !== previous.credential ||
+      state.sessionExpired !== previous.sessionExpired ||
+      state.hasHydrated !== previous.hasHydrated
+    )
+      sync()
+  })
+  sync()
+  return () => {
+    unsubscribeSettings()
+    unsubscribeAuth()
   }
+}
+
+/** Also called after relogin, even when isAuthenticated remained true. */
+export function syncNativeNotifications(checkNow = false, refreshToken = false): Promise<void> {
+  const revision = ++pollingRevision
+  pendingTokenRefresh ||= refreshToken
+  pendingCheck ||= checkNow
+  return (pollingSync = enqueueNative(async () => {
+    if (!isCapacitor() || revision !== pollingRevision) return
+    const auth = useAuthStore.getState()
+    const settings = useSettingsStore.getState()
+    if (!auth.hasHydrated || !settings.hasHydrated) return
+    const provider = notificationProvider
+    const providerId = notificationProviderId
+    const valid = () =>
+      revision === pollingRevision && !stopped && useAuthStore.getState().isAuthenticated
+    if (
+      !valid() ||
+      (!settings.notifyEnabled && !pendingTokenRefresh) ||
+      auth.sessionExpired ||
+      !provider ||
+      !providerId ||
+      !auth.username
+    ) {
+      await NotifyPlugin.stopPolling()
+      lastPollingHash = ""
+      return
+    }
+    const hash = JSON.stringify([
+      providerId,
+      auth.username,
+      auth.credential,
+      settings.notifyCheckInterval,
+      settings.notifyGrades,
+      settings.notifyExams,
+      settings.notifyNetworkError,
+    ])
+    if (hash === lastPollingHash && !pendingTokenRefresh && !pendingCheck) return
+    const castgc = await readCastgc(provider)
+    if (!valid()) return
+    if (!castgc) {
+      await NotifyPlugin.stopPolling()
+      lastPollingHash = ""
+      return
+    }
+    await syncProviderToNative(provider, providerId, auth.username)
+    if (!valid()) return
+    if (castgc !== lastCastgc || pendingTokenRefresh) {
+      await NotifyPlugin.setCastgc({ castgc })
+      if (!valid()) return
+      lastCastgc = castgc
+      pendingTokenRefresh = false
+    }
+    if (!valid()) return
+    if (!settings.notifyEnabled) {
+      pendingCheck = false
+      await NotifyPlugin.stopPolling()
+      lastPollingHash = ""
+      return
+    }
+    const { granted } = await NotifyPlugin.checkPermissions()
+    if (!valid()) return
+    if (!granted) {
+      settings.setNotifyEnabled(false)
+      return
+    }
+    await NotifyPlugin.startPolling({
+      intervalMinutes: settings.notifyCheckInterval,
+      checkGrades: settings.notifyGrades,
+      checkExams: settings.notifyExams,
+      notifyNetworkError: settings.notifyNetworkError,
+    })
+    if (!valid()) return
+    lastPollingHash = hash
+    if (pendingCheck) {
+      pendingCheck = false
+      await NotifyPlugin.executeOnce()
+    }
+  }))
+}
+
+/** Permission is requested by user interaction, independently for both features. */
+export async function setNotificationEnabled(
+  kind: "polling" | "classes",
+  enabled: boolean
+): Promise<boolean> {
+  const revision = ++permissionRevisions[kind]
+  const lifecycle = lifecycleRevision
+  const auth = useAuthStore.getState()
+  const setEnabled =
+    kind === "polling"
+      ? useSettingsStore.getState().setNotifyEnabled
+      : useSettingsStore.getState().setClassReminderEnabled
+  if (!enabled) {
+    setEnabled(false)
+    await (kind === "polling" ? pollingSync : alarmSync)
+    return true
+  }
+  if (!isCapacitor() || stopped || !auth.isAuthenticated) return false
+  let permission = await NotifyPlugin.checkPermissions()
+  if (!permission.granted) permission = await NotifyPlugin.requestPermissions()
+  if (
+    !permission.granted ||
+    revision !== permissionRevisions[kind] ||
+    lifecycle !== lifecycleRevision ||
+    stopped ||
+    !useAuthStore.getState().isAuthenticated ||
+    useAuthStore.getState().username !== auth.username
+  )
+    return false
+  setEnabled(true)
+  await (kind === "polling" ? pollingSync : alarmSync)
+  return true
+}
+
+/** Debug actions change the same state as the settings screen. */
+export async function startNativePolling(): Promise<void> {
+  const alreadyEnabled = useSettingsStore.getState().notifyEnabled
+  if (!(await setNotificationEnabled("polling", true))) {
+    throw new Error("Notification permission not granted")
+  }
+  if (alreadyEnabled) await syncNativeNotifications(true)
+}
+
+export async function stopNativePolling(): Promise<void> {
+  await setNotificationEnabled("polling", false)
+  await pollingSync
+}
+
+/** Invalidate synchronously, then clear native state behind any in-flight call. */
+export function stopNotify(): void {
+  stopped = true
+  lifecycleRevision++
+  pollingRevision++
+  alarmRevision++
+  lastPollingHash = ""
+  lastCastgc = ""
+  pendingTokenRefresh = false
+  pendingCheck = false
+  lastAlarmHash = ""
+  latestAlarmSchedule = null
+  void enqueueNative(async () => {
+    if (!isCapacitor()) return
+    const results = await Promise.allSettled([
+      NotifyPlugin.stopPolling(),
+      NotifyPlugin.clearCastgc(),
+      NotifyPlugin.cancelClassAlarms(),
+    ])
+    for (const result of results) {
+      if (result.status === "rejected")
+        console.warn("Failed to stop native notifications", result.reason)
+    }
+  }).catch(() => {})
 }
 
 // ─── Class Alarm ────────────────────────────────────────────────────────────
@@ -246,44 +386,74 @@ export function computeClassAlarms(
 }
 
 let lastAlarmHash = ""
+let latestAlarmSchedule: {
+  courses: Course[]
+  currentWeek: CurrentWeek | null
+  periods: ClassPeriod[]
+  monday: number
+} | null = null
 
-export async function syncClassAlarmsToNative(
+function currentMonday(): number {
+  const now = new Date()
+  return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7))
+}
+
+export function syncClassAlarmsToNative(
   courses: Course[],
   currentWeek: CurrentWeek | null,
   periods: ClassPeriod[]
 ): Promise<void> {
-  if (!isCapacitor()) return
+  if (!isCapacitor() || stopped || !useAuthStore.getState().isAuthenticated)
+    return Promise.resolve()
+  latestAlarmSchedule = { courses, currentWeek, periods, monday: currentMonday() }
+  return refreshClassAlarms()
+}
 
-  const { classReminderEnabled, classReminderMinutes, classReminderDays } =
-    useSettingsStore.getState()
-  if (!classReminderEnabled) {
-    if (lastAlarmHash) {
-      await NotifyPlugin.cancelClassAlarms().catch(() => {})
+function refreshClassAlarms(): Promise<void> {
+  const revision = ++alarmRevision
+  return (alarmSync = enqueueNative(async () => {
+    if (!isCapacitor() || revision !== alarmRevision) return
+    const auth = useAuthStore.getState()
+    const settings = useSettingsStore.getState()
+    if (!auth.hasHydrated || !settings.hasHydrated) return
+    const valid = () =>
+      revision === alarmRevision && !stopped && useAuthStore.getState().isAuthenticated
+    if (!valid() || !settings.classReminderEnabled) {
+      await NotifyPlugin.cancelClassAlarms()
       lastAlarmHash = ""
+      return
     }
-    return
-  }
-
-  const alarms = computeClassAlarms(
-    courses,
-    currentWeek,
-    periods,
-    classReminderMinutes,
-    classReminderDays
-  )
-  // Use stable fields for dedup (alarmId doesn't depend on timestamps)
-  const hash = alarms
-    .map((a) => a.alarmId)
-    .sort()
-    .join("|")
-  if (hash === lastAlarmHash) return
-
-  await NotifyPlugin.cancelClassAlarms().catch(() => {})
-  lastAlarmHash = ""
-  if (alarms.length > 0) {
-    await NotifyPlugin.scheduleClassAlarms({
-      alarmsJson: JSON.stringify(alarms),
-    })
+    const schedule = latestAlarmSchedule
+    if (!schedule) return
+    const { granted } = await NotifyPlugin.checkPermissions()
+    if (!valid()) return
+    if (!granted) {
+      settings.setClassReminderEnabled(false)
+      return
+    }
+    const currentWeek = schedule.currentWeek && {
+      ...schedule.currentWeek,
+      week: schedule.currentWeek.week + (currentMonday() - schedule.monday) / (7 * 86400000),
+    }
+    const alarms = currentWeek
+      ? computeClassAlarms(
+          schedule.courses,
+          currentWeek,
+          schedule.periods,
+          settings.classReminderMinutes,
+          settings.classReminderDays
+        )
+      : []
+    alarms.sort((a, b) => a.alarmId.localeCompare(b.alarmId) || a.alarmTime - b.alarmTime)
+    const hash = JSON.stringify(alarms)
+    if (hash === lastAlarmHash) return
+    await NotifyPlugin.cancelClassAlarms()
+    lastAlarmHash = ""
+    if (!valid()) return
+    if (alarms.length > 0) {
+      await NotifyPlugin.scheduleClassAlarms({ alarmsJson: hash })
+      if (!valid()) return
+    }
     lastAlarmHash = hash
-  }
+  }))
 }

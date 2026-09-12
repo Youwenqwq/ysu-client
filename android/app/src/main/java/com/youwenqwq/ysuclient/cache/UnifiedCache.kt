@@ -30,6 +30,7 @@ object UnifiedCache {
     const val KEY_NOTIFY_ACCOUNT_HASH = "notify_account_hash"
     const val KEY_NOTIFY_SCHEMA_VERSION = "notify_schema_version"
     const val KEY_NOTIFY_SETTINGS = "notify_settings"
+    const val KEY_NOTIFY_POLLING_ENABLED = "notify_polling_enabled"
     const val KEY_CLASS_ALARMS = "class_alarms"
     const val KEY_HAS_SYNCED_SCHEDULE = "has_synced_schedule"
     const val KEY_HAS_SYNCED_EXAMS = "has_synced_exams"

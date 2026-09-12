@@ -1,21 +1,21 @@
 package com.youwenqwq.ysuclient.notify
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import android.os.Build
 import android.util.Log
-import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.youwenqwq.ysuclient.MainActivity
 import com.youwenqwq.ysuclient.R
 import com.youwenqwq.ysuclient.cache.UnifiedCache
 import java.io.IOException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -32,164 +32,165 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     companion object {
         const val TAG = "YsuNotifyWorker"
         const val WORK_NAME = "ysu_notify_work"
-        const val CHANNEL_ID = "ysu_notify_channel"
+        const val IMMEDIATE_WORK_NAME = "ysu_notify_immediate"
         const val NOTIFICATION_ID_BASE = 1000
         private const val MAX_CONSECUTIVE_FAILURES = 3
         private const val MAX_INDIVIDUAL_CHANGE_NOTIFICATIONS = 5
         private const val KEY_CONSECUTIVE_FAILURES = "notify_consecutive_failures"
 
         private val nextNotificationId = AtomicInteger(NOTIFICATION_ID_BASE)
+        private val sessionMutex = Mutex()
     }
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        // Both periodic and immediate work share the isolated HTTP cookie jar.
+        sessionMutex.withLock { checkForUpdates() }
+    }
+
+    private suspend fun checkForUpdates(): Result {
         val ctx = applicationContext
-        Log.d(TAG, "NotifyWorker started")
+        val castgc = NotifyHelper.getCastgc(ctx) ?: return Result.success()
+        val config = UnifiedCache.getString(ctx, UnifiedCache.KEY_SERVER_CONFIG)
+        val providerId = UnifiedCache.getString(ctx, UnifiedCache.KEY_NOTIFY_PROVIDER_ID)
+        val accountHash = UnifiedCache.getString(ctx, UnifiedCache.KEY_NOTIFY_ACCOUNT_HASH)
+        val settings = UnifiedCache.getString(ctx, UnifiedCache.KEY_NOTIFY_SETTINGS)
+        if (config.isEmpty() || NotifyHelper.isSessionExpired(ctx) ||
+            !UnifiedCache.getBoolean(ctx, UnifiedCache.KEY_NOTIFY_POLLING_ENABLED, true)) {
+            return Result.success()
+        }
+
+        suspend fun ensureCurrent() {
+            currentCoroutineContext().ensureActive()
+            if (isStopped ||
+                !UnifiedCache.getBoolean(ctx, UnifiedCache.KEY_NOTIFY_POLLING_ENABLED, true) ||
+                NotifyHelper.getCastgc(ctx) != castgc ||
+                UnifiedCache.getString(ctx, UnifiedCache.KEY_SERVER_CONFIG) != config ||
+                UnifiedCache.getString(ctx, UnifiedCache.KEY_NOTIFY_PROVIDER_ID) != providerId ||
+                UnifiedCache.getString(ctx, UnifiedCache.KEY_NOTIFY_ACCOUNT_HASH) != accountHash ||
+                UnifiedCache.getString(ctx, UnifiedCache.KEY_NOTIFY_SETTINGS) != settings) {
+                throw CancellationException("Notification configuration changed during fetch")
+            }
+        }
 
         try {
-            if (UnifiedCache.getJsonObject(ctx, UnifiedCache.KEY_SERVER_CONFIG) == null) {
-                Log.d(TAG, "No server config, skipping")
-                return Result.success()
-            }
-
-            val castgc = UnifiedCache.getString(ctx, UnifiedCache.KEY_CASTGC, "")
-            if (castgc.isEmpty()) {
-                Log.d(TAG, "No CASTGC, skipping")
-                return Result.success()
-            }
-
+            ensureCurrent()
             val (_, checkGrades, checkExams) = NotifyHelper.getSettings(ctx)
-            if (!checkGrades && !checkExams) {
-                Log.d(TAG, "Nothing to check, skipping")
-                return Result.success()
+            if (!checkGrades && !checkExams) return Result.success()
+            val provider = NativeAcademicProviders.active(ctx) ?: return Result.success()
+            val sessionOk = provider.establishSession(ctx, castgc)
+            ensureCurrent()
+            if (!sessionOk) throw NotifySessionExpiredException("CAS session expired")
+            if (!NotifyHelper.ensureBaselineIdentity(ctx)) return Result.success()
+
+            var networkFailure = false
+            var protocolFailure = false
+            fun recordFailure(error: Exception) {
+                when (error) {
+                    is CancellationException -> throw error
+                    is NotifySessionExpiredException -> throw error
+                    is IOException -> networkFailure = true
+                    else -> protocolFailure = true
+                }
+                Log.w(TAG, "Notification data check failed", error)
             }
 
-            if (NotifyHelper.isSessionExpired(ctx)) {
-                Log.d(TAG, "Session already expired, skipping")
-                return Result.success()
-            }
-
-            val nativeProvider = NativeAcademicProviders.active(ctx) ?: return Result.success()
-
-            // 1. 建立 provider 原生会话
-            val sessionOk = nativeProvider.establishSession(ctx, castgc)
-            if (!sessionOk) {
-                Log.w(TAG, "Failed to establish JWXT session, CASTGC expired")
-                NotifyHelper.setSessionExpired(ctx, true)
-                sendSessionExpiredNotification(ctx)
-                resetFailures(ctx)
-                return Result.success()
-            }
-
-            NotifyHelper.ensureBaselineIdentity(ctx)
-
-            var hasChanges = false
-
-            // 2. 检查成绩
             if (checkGrades) {
                 try {
-                    val gradeResult = nativeProvider.fetchGrades(ctx)
-                    if (gradeResult is FetchResult.Failure) {
-                        if (gradeResult.error is IOException) throw gradeResult.error
-                        Log.w(TAG, "Skipping grade cache update: ${gradeResult.message ?: "fetch failed"}", gradeResult.error)
-                    } else if (gradeResult is FetchResult.Success) {
-                        val newGrades = gradeResult.items
-                        if (!NotifyHelper.isGradesBaselineInitialized(ctx)) {
-                            NotifyHelper.saveCachedGrades(ctx, newGrades)
-                            NotifyHelper.setGradesBaselineInitialized(ctx, true)
-                            Log.d(TAG, "Grades baseline initialized: new=${newGrades.size}")
-                        } else {
-                            val cachedGrades = NotifyHelper.getCachedGrades(ctx)
-                            val diff = NotifyHelper.diffGrades(cachedGrades, newGrades)
-
-                            Log.d(TAG, "Grades: cached=${cachedGrades.size}, new=${newGrades.size}, diff=${diff.size}")
-
-                            if (diff.isNotEmpty()) {
-                                hasChanges = true
-                                if (shouldSendSummary(diff.size, newGrades.size)) {
-                                    sendGradeSummaryNotification(ctx, diff.size)
-                                } else {
-                                    for (grade in diff) {
-                                        val courseName = grade.optString("course_name", ctx.getString(R.string.notify_fallback_course_name))
-                                        val score = grade.optString("score", "")
-                                        sendGradeNotification(ctx, courseName, score)
-                                    }
-                                }
-                            }
-
-                            NotifyHelper.saveCachedGrades(ctx, newGrades)
-                        }
-                    }
-                } catch (e: IOException) {
-                    throw e // Let outer handler deal with network errors
+                    val grades = provider.fetchGrades(ctx).itemsOrThrow()
+                    ensureCurrent()
+                    updateGrades(ctx, grades)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error checking grades", e)
+                    ensureCurrent()
+                    recordFailure(e)
                 }
             }
-
-            // 3. 检查考试
             if (checkExams) {
                 try {
-                    val examResult = nativeProvider.fetchExams(ctx)
-                    if (examResult is FetchResult.Failure) {
-                        if (examResult.error is IOException) throw examResult.error
-                        Log.w(TAG, "Skipping exam cache update: ${examResult.message ?: "fetch failed"}", examResult.error)
-                    } else if (examResult is FetchResult.Success) {
-                        val newExams = examResult.items
-                        if (!NotifyHelper.isExamsBaselineInitialized(ctx)) {
-                            NotifyHelper.saveCachedExams(ctx, newExams)
-                            NotifyHelper.setExamsBaselineInitialized(ctx, true)
-                            Log.d(TAG, "Exams baseline initialized: new=${newExams.size}")
-                        } else {
-                            val cachedExams = NotifyHelper.getCachedExams(ctx)
-                            val diff = NotifyHelper.diffExams(cachedExams, newExams)
-
-                            Log.d(TAG, "Exams: cached=${cachedExams.size}, new=${newExams.size}, diff=${diff.size}")
-
-                            if (diff.isNotEmpty()) {
-                                hasChanges = true
-                                if (shouldSendSummary(diff.size, newExams.size)) {
-                                    sendExamSummaryNotification(ctx, diff.size)
-                                } else {
-                                    for (exam in diff) {
-                                        val name = exam.optString("name", ctx.getString(R.string.notify_fallback_exam_name))
-                                        val time = exam.optString("time_text", "")
-                                        val location = exam.optString("exam_location", "")
-                                        sendExamNotification(ctx, name, time, location)
-                                    }
-                                }
-                            }
-
-                            NotifyHelper.saveCachedExams(ctx, newExams)
-                        }
-                    }
-                } catch (e: IOException) {
-                    throw e
+                    val exams = provider.fetchExams(ctx).itemsOrThrow()
+                    ensureCurrent()
+                    updateExams(ctx, exams)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error checking exams", e)
+                    ensureCurrent()
+                    recordFailure(e)
                 }
             }
 
-            // 成功，重置失败计数
+            ensureCurrent()
+            // A successful endpoint must not erase the other endpoint's failure.
+            if (networkFailure || protocolFailure) {
+                handleFailure(ctx, isNetworkError = !protocolFailure)
+                return if (protocolFailure) Result.success() else Result.retry()
+            }
             resetFailures(ctx)
-            Log.d(TAG, "NotifyWorker finished, hasChanges=$hasChanges")
             return Result.success()
-        } catch (e: UnknownHostException) {
-            Log.w(TAG, "Network error (DNS)", e)
-            handleFailure(ctx, isNetworkError = true)
-            return Result.retry()
-        } catch (e: SocketTimeoutException) {
-            Log.w(TAG, "Network error (timeout)", e)
-            handleFailure(ctx, isNetworkError = true)
-            return Result.retry()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: NotifySessionExpiredException) {
+            ensureCurrent()
+            NotifyHelper.setSessionExpired(ctx, true)
+            sendSessionExpiredNotification(ctx)
+            resetFailures(ctx)
+            return Result.success()
         } catch (e: IOException) {
-            Log.w(TAG, "Network error (IO)", e)
+            ensureCurrent()
+            Log.w(TAG, "Notification transport failed", e)
             handleFailure(ctx, isNetworkError = true)
             return Result.retry()
         } catch (e: Exception) {
-            Log.e(TAG, "NotifyWorker error", e)
+            ensureCurrent()
+            Log.e(TAG, "Notification protocol failed", e)
             handleFailure(ctx, isNetworkError = false)
             return Result.success()
         }
+    }
+
+    private fun FetchResult.itemsOrThrow(): List<JSONObject> = when (this) {
+        is FetchResult.Success -> items
+        is FetchResult.Failure -> throw error
+            ?: NotifyProtocolException(message ?: "Academic data fetch failed")
+    }
+
+    private fun updateGrades(ctx: Context, grades: List<JSONObject>) {
+        if (!NotifyHelper.isGradesBaselineInitialized(ctx)) {
+            NotifyHelper.saveCachedGrades(ctx, grades)
+            NotifyHelper.setGradesBaselineInitialized(ctx, true)
+            return
+        }
+        val diff = NotifyHelper.diffGrades(NotifyHelper.getCachedGrades(ctx), grades)
+        if (shouldSendSummary(diff.size, grades.size)) {
+            sendGradeSummaryNotification(ctx, diff.size)
+        } else {
+            for (grade in diff) {
+                sendGradeNotification(
+                    ctx,
+                    grade.optString("course_name", ctx.getString(R.string.notify_fallback_course_name)),
+                    grade.optString("score", "")
+                )
+            }
+        }
+        NotifyHelper.saveCachedGrades(ctx, grades)
+    }
+
+    private fun updateExams(ctx: Context, exams: List<JSONObject>) {
+        if (!NotifyHelper.isExamsBaselineInitialized(ctx)) {
+            NotifyHelper.saveCachedExams(ctx, exams)
+            NotifyHelper.setExamsBaselineInitialized(ctx, true)
+            return
+        }
+        val diff = NotifyHelper.diffExams(NotifyHelper.getCachedExams(ctx), exams)
+        if (shouldSendSummary(diff.size, exams.size)) {
+            sendExamSummaryNotification(ctx, diff.size)
+        } else {
+            for (exam in diff) {
+                sendExamNotification(
+                    ctx,
+                    exam.optString("name", ctx.getString(R.string.notify_fallback_exam_name)),
+                    exam.optString("time_text", ""),
+                    exam.optString("exam_location", "")
+                )
+            }
+        }
+        NotifyHelper.saveCachedExams(ctx, exams)
     }
 
     // ─── Failure tracking ─────────────────────────────────────────────────
@@ -233,31 +234,7 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
 
     // ─── Notifications ─────────────────────────────────────────────────────
 
-    private fun createNotificationChannel(ctx: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            ctx.getString(R.string.notify_channel_name),
-            NotificationManager.IMPORTANCE_DEFAULT
-        ).apply {
-            description = ctx.getString(R.string.notify_channel_desc)
-        }
-        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(channel)
-    }
-
-    private fun getOpenAppIntent(ctx: Context): PendingIntent {
-        val intent = Intent(ctx, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        return PendingIntent.getActivity(
-            ctx, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-    }
-
     private fun sendGradeNotification(ctx: Context, courseName: String, score: String) {
-        createNotificationChannel(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val text = if (score.isNotEmpty()) {
@@ -266,13 +243,9 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             ctx.getString(R.string.notify_grade_text_no_score, courseName)
         }
 
-        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+        val notification = NativeNotifications.builder(ctx, NotificationKind.GRADES)
             .setContentTitle(ctx.getString(R.string.notify_grade_title))
             .setContentText(text)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(getOpenAppIntent(ctx))
-            .setAutoCancel(true)
             .build()
 
         val id = nextNotificationId.getAndIncrement()
@@ -280,7 +253,6 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     }
 
     private fun sendExamNotification(ctx: Context, name: String, time: String, location: String) {
-        createNotificationChannel(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val details = buildList {
@@ -294,13 +266,9 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             ctx.getString(R.string.notify_exam_text_no_details, name)
         }
 
-        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+        val notification = NativeNotifications.builder(ctx, NotificationKind.EXAMS)
             .setContentTitle(ctx.getString(R.string.notify_exam_title))
             .setContentText(text)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(getOpenAppIntent(ctx))
-            .setAutoCancel(true)
             .build()
 
         val id = nextNotificationId.getAndIncrement()
@@ -308,80 +276,55 @@ class NotifyWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     }
 
     private fun sendGradeSummaryNotification(ctx: Context, count: Int) {
-        createNotificationChannel(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+        val notification = NativeNotifications.builder(ctx, NotificationKind.GRADES)
             .setContentTitle(ctx.getString(R.string.notify_grade_summary_title))
             .setContentText(ctx.getString(R.string.notify_grade_summary_text, count))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(getOpenAppIntent(ctx))
-            .setAutoCancel(true)
             .build()
 
         nm.notify(NOTIFICATION_ID_BASE + 9996, notification)
     }
 
     private fun sendExamSummaryNotification(ctx: Context, count: Int) {
-        createNotificationChannel(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+        val notification = NativeNotifications.builder(ctx, NotificationKind.EXAMS)
             .setContentTitle(ctx.getString(R.string.notify_exam_summary_title))
             .setContentText(ctx.getString(R.string.notify_exam_summary_text, count))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(getOpenAppIntent(ctx))
-            .setAutoCancel(true)
             .build()
 
         nm.notify(NOTIFICATION_ID_BASE + 9995, notification)
     }
 
     private fun sendSessionExpiredNotification(ctx: Context) {
-        createNotificationChannel(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+        val notification = NativeNotifications.builder(ctx, NotificationKind.AUTH)
             .setContentTitle(ctx.getString(R.string.notify_session_expired_title))
             .setContentText(ctx.getString(R.string.notify_session_expired_text))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(getOpenAppIntent(ctx))
-            .setAutoCancel(true)
             .build()
 
         nm.notify(NOTIFICATION_ID_BASE + 9999, notification)
     }
 
     private fun sendNetworkErrorNotification(ctx: Context) {
-        createNotificationChannel(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+        val notification = NativeNotifications.builder(ctx, NotificationKind.ERRORS)
             .setContentTitle(ctx.getString(R.string.notify_network_error_title))
             .setContentText(ctx.getString(R.string.notify_network_error_text))
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setContentIntent(getOpenAppIntent(ctx))
-            .setAutoCancel(true)
             .build()
 
         nm.notify(NOTIFICATION_ID_BASE + 9998, notification)
     }
 
     private fun sendRetryFailedNotification(ctx: Context) {
-        createNotificationChannel(ctx)
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+        val notification = NativeNotifications.builder(ctx, NotificationKind.ERRORS)
             .setContentTitle(ctx.getString(R.string.notify_retry_failed_title))
             .setContentText(ctx.getString(R.string.notify_retry_failed_text))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(getOpenAppIntent(ctx))
-            .setAutoCancel(true)
             .build()
 
         nm.notify(NOTIFICATION_ID_BASE + 9997, notification)
