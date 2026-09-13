@@ -18,6 +18,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONException
 import java.net.URLEncoder
+import java.math.BigDecimal
 import java.util.concurrent.TimeUnit
 
 /**
@@ -86,7 +87,12 @@ object NotifyHelper {
     private fun valueOrNull(value: Any?): Any? =
         value?.takeUnless { it == JSONObject.NULL || (it is String && it.isBlank()) }
 
-    private fun JSONObject.text(key: String): String = valueOrNull(opt(key))?.toString() ?: ""
+    private fun JSONObject.text(key: String): String =
+        when (val value = valueOrNull(opt(key))) {
+            null -> ""
+            is Number -> BigDecimal(value.toString()).stripTrailingZeros().toPlainString()
+            else -> value.toString()
+        }
 
     private fun firstValue(raw: JSONObject, keys: List<String>): Any? {
         for (key in keys) {
