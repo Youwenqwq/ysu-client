@@ -12,8 +12,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **State**: Zustand + `persist` middleware backed by `@aparajita/capacitor-secure-storage`
 - **Styling**: Tailwind CSS v4 + shadcn/ui + `next-themes` (dark/light)
 - **Formatting**: TypeScript/TSX uses Prettier via `pnpm run format`; `.prettierrc` uses no semicolons, double quotes, 100-column width, and Tailwind class sorting. Keep formatting-only changes separate from functional commits.
-- **i18n**: Custom lightweight hook at `lib/i18n/`, locales in `lib/i18n/locales/`
-- **Website**: Independent Astro 6 project in `website/`, deployed to EdgeOne Pages
+- **i18n**: Custom lightweight hook at `lib/i18n/`, dictionaries in `lib/i18n/dict.ts`
+- **Website**: `website/` 是 EdgeOne Pages 上的服务承载站点（Astro 6 极简工程）：托管 Web PWA（`/app`）、边缘函数 API（proxy/activate/stats/announcement）和 admin 管理后台（`/admin`，统计数据 + 公告管理）。官网页面已弃用，根域默认跳转 `www.welain.com`。
 
 ## Development Commands
 
@@ -29,19 +29,19 @@ pnpm run test             # Vitest regression tests (config: vitest.config.ts, n
 npx cap sync             # Sync dist/ to Capacitor android/
 npx cap open android     # Open Android Studio
 
-pnpm run release          # Full release: build + zip + APK + GitHub release + website deploy
+pnpm run release          # Preflight + 创建 GitHub Release（手写 notes）；产物由 Actions 构建上传
 ```
 
 `pnpm run start` serves the static production build from `dist/`; run `pnpm run build` first because `next.config.mjs` sets `distDir: 'dist'`.
 
-Release script (`scripts/release.sh`) builds the static export, creates `dist.zip`, builds the Android release APK, computes `version.json` for OTA updates, publishes a GitHub release with all artifacts, and deploys the website to EdgeOne Pages.
+发版分两半：本地 `scripts/release.sh` 只做 preflight 和 `gh release create`（交互编辑 notes，保证 changelog 与 release 同步）；release 发布事件触发 `.github/workflows/release.yml` 构建 `dist.zip`、签名 APK、生成 `version.json` 并上传到该 release。prerelease 的合并 manifest 还会同步覆盖到最新 stable release，因为 OTA 检查固定走 `releases/latest/download/version.json`。
 
 ```bash
 cd website && pnpm dev       # Astro dev server
 cd website && pnpm build     # Static export to website/dist/
 ```
 
-Web 站点+App 一体化部署：`scripts/deploy-website.sh` 拉取最新 OTA 文件、构建 App 到 `website/public/app/`（gitignored）、再 `edgeone makers deploy`（CLI 自动构建 Astro 并包含 `edge-functions/`）。
+PWA + 服务部署：`scripts/deploy-website.sh` 构建 App（`APP_BASE_PATH=/app`）注入 `website/public/app/`（gitignored），再在 `website/` 下执行 `edgeone makers deploy`（CLI 自动构建 Astro 并打包 `edge-functions/` 与 `public/`）。
 
 ## High-Level Architecture
 
@@ -114,13 +114,11 @@ When debugging provider data loading, start from `providers/hooks/use-provider-q
 
 ### Website
 
+- **定位**: 纯服务承载站点（官网已弃用）。页面只有 `/`（跳转 `www.welain.com`）、`/faq`（WebView 兼容性自助文档，内容内联在 `src/pages/faq.astro`）和 `/admin`（管理后台：统计数据 + 公告管理）。
 - **Framework**: Astro 6 + React islands (`client:load`) + Tailwind CSS v4
-- **i18n**: Astro native `i18n` config with `prefixDefaultLocale: false` — default locale at `/`, English at `/en/`
-- **Pattern**: Page content lives in shared components (`HomePage.astro`, `ChangelogPage.astro`, etc.), language pages are thin wrappers
-- **Styling**: Tailwind v4 `@theme` custom properties + `@custom-variant dark (&:is(.dark *))`
-- **Deployment**: `scripts/deploy-website.sh`（或 release 流程）在 `website/` 下执行 `edgeone makers deploy`，CLI 自动构建 Astro 并打包 `edge-functions/` 与 `public/`（含注入的 App 产物 `public/app/`）
-- **OTA files**: `release.sh` copies `dist.zip`, `app-release.apk`, `version.json` to `website/public/updates/`
-- **Generated files** (do not commit): `website/src/data/changelog.json`, `website/.edgeone/`, `website/public/app/`
+- **Edge functions** (`website/edge-functions/`): `api/proxy.js`（Web 端教务代理）、`api/activate.js`（激活校验）、`api/stats.js`（启动统计）、`api/announcement.js` + `updates/announcement.json.js`（公告，KV 存储）、`api/admin.js`（后台接口）
+- **Deployment**: `scripts/deploy-website.sh` 在 `website/` 下执行 `edgeone makers deploy`，CLI 自动构建 Astro 并打包 `edge-functions/` 与 `public/`（含注入的 App 产物 `public/app/`）
+- **Generated files** (do not commit): `website/.edgeone/`, `website/public/app/`
 
 ### App Shell Layout
 
@@ -132,7 +130,7 @@ When debugging provider data loading, start from `providers/hooks/use-provider-q
 
 - `CapacitorHttp.enabled: true` (required for CORS to university servers)
 - `CapacitorUpdater.autoUpdate: false` (manual update checks via `lib/updater.ts`)
-- Update mirrors: official (`ysu.welain.com/updates/`) + GitHub direct + user-defined custom
+- Update mirrors: GitHub direct (default) + user-defined custom prefix
 - `appReadyTimeout: 15000`
 
 ## Release Notes Format
@@ -163,8 +161,6 @@ Rules:
 - Omit category if there are no items in it
 - End with `**Full Changelog**: {compare URL}`
 
-The release script (`scripts/release.sh`) auto-extracts `^\s*[-*]\s+` lines into `website/src/data/changelog.json`.
-
 ## Version Numbering
 
 - **Web version** (`package.json`): SemVer, including prerelease tags for preview channel releases (e.g. `1.0.0`, `1.0.0-rc.1`)
@@ -174,15 +170,15 @@ The release script (`scripts/release.sh`) auto-extracts `^\s*[-*]\s+` lines into
   - alpha.N: `stageCode = N` (`1..19`)
   - beta.N: `stageCode = 20 + N` (`21..49`)
   - rc.N: `stageCode = 50 + N` (`51..98`)
-- Stable releases should update stable channel metadata; prerelease releases should update only `channels.prerelease` and use versioned OTA/APK asset paths.
+- Stable releases should update stable channel metadata; prerelease releases should update only `channels.prerelease`（release.yml 会自动处理，并把 prerelease 合并后的 version.json 同步到最新 stable release）。
 
 ## Release Checklist
 
 1. Bump version in `package.json` and `android/app/build.gradle`
-2. Run `npm run typecheck` — must pass
-3. Run `./scripts/release.sh` — builds, publishes GitHub release, deploys website to EdgeOne Pages
-4. Verify `version.json` is uploaded to GitHub release assets
-5. Verify website is live at `https://ysu.welain.com`
+2. Run `pnpm run typecheck` — must pass
+3. Run `./scripts/release.sh` — preflight + `gh release create`（在编辑器里写好 notes）
+4. 用 `gh run watch` 确认 release.yml 构建完成，`gh release view` 确认 `dist.zip` / `app-release-*.apk` / `version.json` 三个产物已上传
+5. 如编辑 notes 耗时较长，re-run 一次 release.yml，让 version.json 里的 body 与最终 notes 同步
 
 ## Project Notes
 
