@@ -1,0 +1,277 @@
+name: Release Artifacts
+
+# 维护者本地运行 scripts/release.sh 创建 GitHub Release 后，
+# 本 workflow 自动构建 dist.zip、签名 APK、生成 version.json 并上传到该 Release。
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.event.release.tag_name }}
+      cancel-in-progress: false
+
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+      REPO: ${{ github.repository }}
+      IS_PRERELEASE: ${{ github.event.release.prerelease }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
+
+      - name: Install pnpm dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web app
+        run: pnpm run build
+
+      - name: Zip static export
+        working-directory: dist
+        run: zip -r ../dist.zip . -x '*.DS_Store'
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          else
+            echo "::error::KEYSTORE_BASE64 secret not set — cannot sign release APK"
+            exit 1
+          fi
+
+      - name: Sync to Capacitor
+        run: npx cap sync
+
+      - name: Build release APK
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease \
+            -PKEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}' \
+            -PKEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
+
+      # versionCode 布局：major*1_000_000 + minor*10_000 + patch*100 + stageCode
+      # stageCode：alpha.N=N (1..19)，beta.N=20+N (21..49)，rc.N=50+N (51..98)，stable=99
+      # 校验上限与 android/app/build.gradle 保持一致（beta 1..29，rc 1..48）
+      - name: Compute versions
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          read -r APK_VERSION_NAME APK_VERSION_CODE < <(node - <<'NODE'
+          const { readFileSync } = require('node:fs');
+          const text = readFileSync('android/app/build.gradle', 'utf8');
+          const versionName = text.match(/versionName\s+"([^"]+)"/)?.[1];
+          if (!versionName) {
+            console.error('Error: Unable to find Android versionName.');
+            process.exit(1);
+          }
+          const match = versionName.match(/^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?$/);
+          if (!match) {
+            console.error(`Error: Invalid Android versionName '${versionName}'.`);
+            process.exit(1);
+          }
+          const [, majorText, minorText, patchText, stage, numberText] = match;
+          const major = Number(majorText);
+          const minor = Number(minorText);
+          const patch = Number(patchText);
+          let stageCode = 99;
+          if (stage) {
+            const n = Number(numberText);
+            if (!Number.isInteger(n) || n < 1) {
+              console.error(`Error: Invalid prerelease number in Android versionName '${versionName}'.`);
+              process.exit(1);
+            }
+            if (stage === 'alpha') {
+              if (n > 19) {
+                console.error(`Error: alpha prerelease number must be 1..19: ${versionName}`);
+                process.exit(1);
+              }
+              stageCode = n;
+            } else if (stage === 'beta') {
+              if (n > 29) {
+                console.error(`Error: beta prerelease number must be 1..29: ${versionName}`);
+                process.exit(1);
+              }
+              stageCode = 20 + n;
+            } else if (stage === 'rc') {
+              if (n > 48) {
+                console.error(`Error: rc prerelease number must be 1..48: ${versionName}`);
+                process.exit(1);
+              }
+              stageCode = 50 + n;
+            }
+          }
+          const versionCode = major * 1_000_000 + minor * 10_000 + patch * 100 + stageCode;
+          console.log(`${versionName} ${versionCode}`);
+          NODE
+          )
+          echo "APK_VERSION_NAME=$APK_VERSION_NAME" >> "$GITHUB_ENV"
+          echo "APK_VERSION_CODE=$APK_VERSION_CODE" >> "$GITHUB_ENV"
+          echo "Web version: $VERSION / Android: $APK_VERSION_NAME ($APK_VERSION_CODE)"
+
+      - name: Stage APK asset
+        run: |
+          set -euo pipefail
+          cp android/app/build/outputs/apk/release/app-release.apk "app-release-${VERSION}.apk"
+
+      - name: Fetch release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "$TAG" --repo "$REPO" --json body -q .body > release-notes.txt
+
+      - name: Generate version.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BODY=$(cat release-notes.txt)
+          DIST_URL="https://github.com/${REPO}/releases/download/${TAG}/dist.zip"
+          APK_URL="https://github.com/${REPO}/releases/download/${TAG}/app-release-${VERSION}.apk"
+          APK_IS_PRERELEASE="false"
+          [[ "${APK_VERSION_NAME}" == *-* ]] && APK_IS_PRERELEASE="true"
+
+          BASE_FILE=$(mktemp)
+          echo '{}' > "$BASE_FILE"
+
+          # stable 发布时以「上一个 stable release」的 version.json 为基底，
+          # 继承其中的 channels.prerelease，避免每次 stable 发版清空预览通道信息。
+          if [[ "${IS_PRERELEASE}" != "true" ]]; then
+            PREV_STABLE_TAG=$(gh api "repos/${REPO}/releases" --paginate \
+              -q '[.[] | select(.prerelease == false and .draft == false and .tag_name != "'"${TAG}"'")][0].tag_name // ""' 2>/dev/null || true)
+            if [[ -n "${PREV_STABLE_TAG}" ]]; then
+              PREV_DIR=$(mktemp -d)
+              if gh release download "${PREV_STABLE_TAG}" --repo "${REPO}" \
+                  --pattern "version.json" --dir "${PREV_DIR}" 2>/dev/null; then
+                cp "${PREV_DIR}/version.json" "$BASE_FILE"
+              else
+                echo "::warning::previous stable version.json unavailable; starting from empty manifest"
+              fi
+            fi
+          fi
+
+          if [[ "${IS_PRERELEASE}" == "true" ]]; then
+            LATEST_STABLE_TAG=$(gh api "repos/${REPO}/releases/latest" -q .tag_name 2>/dev/null || true)
+            if [[ -n "${LATEST_STABLE_TAG}" ]]; then
+              STABLE_DIR=$(mktemp -d)
+              if gh release download "${LATEST_STABLE_TAG}" --repo "${REPO}" \
+                  --pattern "version.json" --dir "${STABLE_DIR}" 2>/dev/null; then
+                cp "${STABLE_DIR}/version.json" "$BASE_FILE"
+              else
+                echo "::warning::stable version.json unavailable; prerelease manifest will not include stable metadata"
+              fi
+            else
+              echo "::warning::no stable release found; prerelease manifest will not include stable metadata"
+            fi
+
+            if [[ "${APK_IS_PRERELEASE}" == "true" ]]; then
+              jq \
+                --arg webVersion "$VERSION" \
+                --arg webDownloadUrl "$DIST_URL" \
+                --arg apkDownloadUrl "$APK_URL" \
+                --arg body "$BODY" \
+                --argjson apkVersionCode "$APK_VERSION_CODE" \
+                '.channels = ((.channels // {}) + {
+                  prerelease: {
+                    webVersion: $webVersion,
+                    webDownloadUrl: $webDownloadUrl,
+                    apkVersionCode: $apkVersionCode,
+                    apkDownloadUrl: $apkDownloadUrl,
+                    body: $body
+                  }
+                })' \
+                "$BASE_FILE" > version.json
+            else
+              jq \
+                --arg webVersion "$VERSION" \
+                --arg webDownloadUrl "$DIST_URL" \
+                --arg body "$BODY" \
+                '.channels = ((.channels // {}) + {
+                  prerelease: {
+                    webVersion: $webVersion,
+                    webDownloadUrl: $webDownloadUrl,
+                    body: $body
+                  }
+                })' \
+                "$BASE_FILE" > version.json
+            fi
+          else
+            jq \
+              --arg webVersion "$VERSION" \
+              --arg webDownloadUrl "$DIST_URL" \
+              --arg apkDownloadUrl "$APK_URL" \
+              --arg body "$BODY" \
+              --argjson apkVersionCode "$APK_VERSION_CODE" \
+              '. + {
+                apkVersionCode: $apkVersionCode,
+                webVersion: $webVersion,
+                webDownloadUrl: $webDownloadUrl,
+                apkDownloadUrl: $apkDownloadUrl,
+                body: $body
+              }
+              | .channels = ((.channels // {}) + {
+                stable: {
+                  apkVersionCode: $apkVersionCode,
+                  webVersion: $webVersion,
+                  webDownloadUrl: $webDownloadUrl,
+                  apkDownloadUrl: $apkDownloadUrl,
+                  body: $body
+                }
+              })' \
+              "$BASE_FILE" > version.json
+          fi
+
+          cat version.json
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" --repo "$REPO" \
+            dist.zip "app-release-${VERSION}.apk" version.json --clobber
+
+      # OTA 检查固定走 releases/latest/download/version.json（latest 永远指向最新
+      # stable），因此 prerelease 合并后的 manifest 必须同步覆盖到最新 stable
+      # release 上，prerelease 通道的用户才能看到 channels.prerelease 更新。
+      - name: Sync version.json to latest stable release
+        if: ${{ github.event.release.prerelease }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          LATEST_STABLE_TAG=$(gh api "repos/${REPO}/releases/latest" -q .tag_name 2>/dev/null || true)
+          if [[ -z "${LATEST_STABLE_TAG}" ]]; then
+            echo "::warning::no stable release found; skipping version.json sync"
+            exit 0
+          fi
+          gh release upload "${LATEST_STABLE_TAG}" --repo "${REPO}" version.json --clobber
