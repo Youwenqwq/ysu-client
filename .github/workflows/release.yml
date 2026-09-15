@@ -42,9 +42,9 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
+      # ubuntu-latest 镜像已预装 Android SDK（含 cmdline-tools/latest 与近期 platform），
+      # 无需 setup-android；该 action 会执行 sdkmanager tools，而 cmdline-tools 16.0
+      # 已移除 legacy tools 包导致步骤失败。
       - name: Accept Android licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
 
