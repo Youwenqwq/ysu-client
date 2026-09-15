@@ -14,18 +14,6 @@ export type CardStyle = "solid" | "translucent" | "glass"
 export type BackgroundStyle = "overlay" | "blur-overlay"
 export type LandingPage = "overview" | "schedule"
 
-export interface FeedbackHistoryItem {
-  id: string
-  rating: number
-  text: string
-  ts: number
-  replied?: boolean
-  replyText?: string
-  repliedAt?: number
-  notifiedAt?: number
-  deleted?: boolean
-}
-
 interface EpayAccountSettings {
   lastCheckedAt: number
 }
@@ -63,8 +51,6 @@ interface SettingsState {
   analyticsConsent: boolean
   lastAnalyticsDate: string
   analyticsPromptVersion: string
-  feedbackIds: string[]
-  feedbackHistory: FeedbackHistoryItem[]
   /** 缴费提醒检查时间，按学号隔离 */
   epayAccountSettings: Record<string, EpayAccountSettings>
   /** 学费未缴自动提醒开关 */
@@ -102,8 +88,6 @@ interface SettingsState {
   setAnalyticsConsent: (v: boolean) => void
   setLastAnalyticsDate: (v: string) => void
   setAnalyticsPromptVersion: (v: string) => void
-  setFeedbackIds: (ids: string[]) => void
-  setFeedbackHistory: (items: FeedbackHistoryItem[]) => void
   setEpayNotifyEnabled: (v: boolean) => void
   setEpayLastCheckedAt: (username: string, ts: number) => void
   setHasHydrated: (v: boolean) => void
@@ -112,7 +96,7 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      updateMirror: "https://ysu.welain.com/updates/",
+      updateMirror: "",
       updateChannel: "stable",
       backgroundImage: "",
       backgroundOverlayOpacity: 75,
@@ -144,8 +128,6 @@ export const useSettingsStore = create<SettingsState>()(
       analyticsConsent: false,
       lastAnalyticsDate: "",
       analyticsPromptVersion: "",
-      feedbackIds: [],
-      feedbackHistory: [],
       epayAccountSettings: {},
       epayNotifyEnabled: true,
       hasHydrated: false,
@@ -183,8 +165,6 @@ export const useSettingsStore = create<SettingsState>()(
       setAnalyticsConsent: (analyticsConsent) => set({ analyticsConsent }),
       setLastAnalyticsDate: (lastAnalyticsDate) => set({ lastAnalyticsDate }),
       setAnalyticsPromptVersion: (analyticsPromptVersion) => set({ analyticsPromptVersion }),
-      setFeedbackIds: (feedbackIds) => set({ feedbackIds }),
-      setFeedbackHistory: (feedbackHistory) => set({ feedbackHistory }),
       setEpayNotifyEnabled: (epayNotifyEnabled) => set({ epayNotifyEnabled }),
       setEpayLastCheckedAt: (username, ts) =>
         set((state) => ({

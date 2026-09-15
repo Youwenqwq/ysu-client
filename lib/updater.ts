@@ -39,21 +39,16 @@ interface UpdateCandidate extends VersionManifestEntry {
   normalizedVersion: string
 }
 
-const OFFICIAL_BASE = "https://ysu.welain.com/updates/"
 const GITHUB_RELEASE_BASE = "https://github.com/Youwenqwq/ysu-client/releases/latest/download"
 const ASSET_NAME = "dist.zip"
 const VERSION_JSON_NAME = "version.json"
-const APK_NAME = "app-release.apk"
 const LAST_CHECK_KEY = STORAGE_KEYS.lastUpdateCheck
 const LEGACY_LAST_CHECK_KEY = STORAGE_KEYS.legacyLastUpdateCheck
 const CHECK_COOLDOWN_MS = 30 * 60 * 1000 // 30 minutes
 export const OTA_CLEANUP_FLAG = STORAGE_KEYS.otaCleanup
 export const LEGACY_OTA_CLEANUP_FLAG = STORAGE_KEYS.legacyOtaCleanup
 
-export const UPDATE_MIRRORS: readonly UpdateMirror[] = [
-  { label: "官方源", value: OFFICIAL_BASE },
-  { label: "GitHub 直连", value: "" },
-]
+export const UPDATE_MIRRORS: readonly UpdateMirror[] = [{ label: "GitHub 直连", value: "" }]
 
 function normalizeVersion(version: string): string | null {
   const trimmed = version.trim()
@@ -86,14 +81,7 @@ const EMPTY_RESULT: UpdateInfo = {
   apkDownloadUrl: "",
 }
 
-function isOfficialSource(prefix: string): boolean {
-  return prefix === OFFICIAL_BASE
-}
-
 function getVersionJsonUrl(mirrorPrefix: string): string {
-  if (isOfficialSource(mirrorPrefix)) {
-    return `${OFFICIAL_BASE}${VERSION_JSON_NAME}`
-  }
   if (!mirrorPrefix) {
     return `${GITHUB_RELEASE_BASE}/${VERSION_JSON_NAME}`
   }
@@ -101,9 +89,6 @@ function getVersionJsonUrl(mirrorPrefix: string): string {
 }
 
 function getDistZipUrl(mirrorPrefix: string): string {
-  if (isOfficialSource(mirrorPrefix)) {
-    return `${OFFICIAL_BASE}${ASSET_NAME}`
-  }
   if (!mirrorPrefix) {
     return `${GITHUB_RELEASE_BASE}/${ASSET_NAME}`
   }
@@ -116,20 +101,13 @@ function getWebDownloadUrl(
   fallbackUrl: string
 ): string {
   if (!webDownloadUrl) return fallbackUrl
-  if (
-    mirrorPrefix &&
-    !isOfficialSource(mirrorPrefix) &&
-    webDownloadUrl.startsWith("https://github.com/")
-  ) {
+  if (mirrorPrefix && webDownloadUrl.startsWith("https://github.com/")) {
     return `${mirrorPrefix}${webDownloadUrl}`
   }
   return webDownloadUrl
 }
 
 function getApkUrl(mirrorPrefix: string, apkDownloadUrl: string): string {
-  if (isOfficialSource(mirrorPrefix) && apkDownloadUrl.startsWith("https://github.com/")) {
-    return `${OFFICIAL_BASE}${APK_NAME}`
-  }
   if (!mirrorPrefix || !apkDownloadUrl.startsWith("https://github.com/")) {
     return apkDownloadUrl
   }
@@ -183,7 +161,7 @@ async function getApkUpdateCandidate(
 /** Check for a newer version. Respects 30-min cooldown when `auto` is true. */
 export async function checkForUpdate(
   auto = false,
-  mirrorPrefix = OFFICIAL_BASE,
+  mirrorPrefix = "",
   channel: UpdateChannel = "stable"
 ): Promise<UpdateInfo> {
   if (auto) {

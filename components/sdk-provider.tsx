@@ -13,7 +13,6 @@ import { isCapacitor } from "@/lib/native/platform"
 import { blurActiveElement } from "@/lib/utils"
 import { initSafeArea } from "@/lib/native/webview-compat"
 import { trackAppLaunch } from "@/lib/analytics"
-import { syncFeedbackReplies } from "@/lib/feedback-check"
 import { AnalyticsPrompt } from "@/components/analytics-prompt"
 import { APP_VERSION } from "@/lib/version"
 import { useAnnouncementStore } from "@/lib/stores/announcement"
@@ -118,9 +117,6 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
           // Fire-and-forget: anonymous usage stats
           trackAppLaunch().catch(() => {})
         }
-
-        // Check feedback replies once on startup
-        syncFeedbackReplies().catch(() => {})
 
         // 学费未缴自动检查（仅读状态，不支付）
         import("@/lib/fees/epay/auto-check")

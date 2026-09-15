@@ -8,13 +8,10 @@ import {
   Code,
   CircleFadingArrowUp,
   ExternalLink,
-  Globe,
   RotateCcw,
   CheckCircle2,
   AlertCircle,
   Settings,
-  MessageSquare,
-  Star,
 } from "lucide-react"
 import {
   Accordion,
@@ -48,7 +45,6 @@ import {
   APP_COPYRIGHT,
   APP_LICENSE,
   APP_REPO,
-  APP_WEBSITE,
   APP_OPEN_SOURCE,
   APP_PEOPLE,
 } from "@/lib/version"
@@ -85,17 +81,6 @@ export function AboutContent() {
   const [dialogPreset, setDialogPreset] = useState("")
   const [dialogCustomValue, setDialogCustomValue] = useState("")
   const [dialogChannel, setDialogChannel] = useState<UpdateChannel>("stable")
-
-  // Feedback state
-  const [showFeedback, setShowFeedback] = useState(false)
-  const [feedbackTab, setFeedbackTab] = useState<"submit" | "history">("submit")
-  const [feedbackRating, setFeedbackRating] = useState(0)
-  const [feedbackText, setFeedbackText] = useState("")
-  const [feedbackState, setFeedbackState] = useState<"idle" | "submitting" | "success" | "error">(
-    "idle"
-  )
-  const [refreshingHistory, setRefreshingHistory] = useState(false)
-  const feedbackHistory = useSettingsStore((s) => s.feedbackHistory)
 
   // Hidden debug trigger
   const tapTimes = useRef<number[]>([])
@@ -180,25 +165,6 @@ export function AboutContent() {
     }
   }, [])
 
-  const handleFeedbackSubmit = useCallback(async () => {
-    if (feedbackRating < 1) return
-    setFeedbackState("submitting")
-    try {
-      const { submitFeedback } = await import("@/lib/feedback")
-      await submitFeedback(feedbackRating, feedbackText)
-      setFeedbackState("success")
-      setTimeout(() => {
-        setShowFeedback(false)
-        setFeedbackRating(0)
-        setFeedbackText("")
-        setFeedbackState("idle")
-        setFeedbackTab("history")
-      }, 1500)
-    } catch {
-      setFeedbackState("error")
-    }
-  }, [feedbackRating, feedbackText])
-
   const canCheck = updatePlatform !== "unsupported"
   const canReset = updatePlatform === "native"
 
@@ -240,19 +206,6 @@ export function AboutContent() {
             <ExternalLink className="size-4 shrink-0 text-muted-foreground" />
           </a>
 
-          <Separator />
-
-          <a
-            href={APP_WEBSITE}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
-          >
-            <Globe className="size-5 shrink-0 text-muted-foreground" />
-            <span className="flex-1 text-sm">{t("about.website")}</span>
-            <ExternalLink className="size-4 shrink-0 text-muted-foreground" />
-          </a>
-
           <InstallAppButton />
 
           <Separator />
@@ -271,34 +224,6 @@ export function AboutContent() {
               t={t}
             />
           )}
-
-          <Separator />
-
-          <button
-            type="button"
-            onClick={() => {
-              setShowFeedback(true)
-              setFeedbackTab(feedbackHistory.length > 0 ? "history" : "submit")
-              // Mark replies as read when user opens the dialog
-              const state = useSettingsStore.getState()
-              const unread = state.feedbackHistory.some((h) => h.replyText && !h.notifiedAt)
-              if (unread) {
-                const updated = state.feedbackHistory.map((h) =>
-                  h.replyText && !h.notifiedAt ? { ...h, notifiedAt: Date.now() } : h
-                )
-                state.setFeedbackHistory(updated)
-              }
-            }}
-            className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
-          >
-            <MessageSquare className="size-5 shrink-0 text-muted-foreground" />
-            <span className="flex-1 text-left text-sm">{t("about.feedback")}</span>
-            {feedbackHistory.some((h) => h.replyText && !h.notifiedAt) ? (
-              <span className="inline-block size-2 rounded-full bg-destructive" />
-            ) : (
-              <span className="text-xs text-muted-foreground">{t("about.feedbackDesc")}</span>
-            )}
-          </button>
 
           <Separator />
 
@@ -450,206 +375,6 @@ export function AboutContent() {
           <DialogFooter>
             <Button onClick={confirmMirror}>{t("update.confirm")}</Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showFeedback} onOpenChange={setShowFeedback}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{t("about.feedback")}</DialogTitle>
-            <DialogDescription>{t("about.feedbackDesc")}</DialogDescription>
-          </DialogHeader>
-
-          {feedbackHistory.length > 0 && (
-            <div className="flex gap-1 rounded-lg border p-1">
-              <button
-                type="button"
-                onClick={() => setFeedbackTab("submit")}
-                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  feedbackTab === "submit"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted/60"
-                }`}
-              >
-                {t("about.feedbackSubmitTab")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setFeedbackTab("history")}
-                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  feedbackTab === "history"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted/60"
-                }`}
-              >
-                {t("about.feedbackHistoryTab")}
-                {feedbackHistory.some((h) => h.replyText && !h.notifiedAt) && (
-                  <span className="ml-1 inline-block size-2 rounded-full bg-destructive" />
-                )}
-              </button>
-            </div>
-          )}
-
-          {feedbackTab === "submit" && (
-            <>
-              {feedbackState === "success" ? (
-                <div className="flex flex-col items-center gap-3 py-6">
-                  <CheckCircle2 className="size-10 text-green-500" />
-                  <p className="text-sm text-muted-foreground">{t("about.feedbackSuccess")}</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-2">
-                    <span className="text-sm font-medium">{t("about.feedbackRating")}</span>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setFeedbackRating(star)}
-                          className="p-1 transition-colors"
-                        >
-                          <Star
-                            className={`size-6 ${
-                              star <= feedbackRating
-                                ? "fill-yellow-400 text-yellow-400"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <span className="text-sm font-medium">{t("about.feedbackText")}</span>
-                    <textarea
-                      name="feedback-text"
-                      value={feedbackText}
-                      onChange={(e) => setFeedbackText(e.target.value)}
-                      placeholder={t("about.feedbackTextPlaceholder")}
-                      rows={4}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-                    />
-                  </div>
-                  {feedbackState === "error" && (
-                    <p className="text-sm text-destructive">{t("about.feedbackError")}</p>
-                  )}
-                </div>
-              )}
-              {feedbackState !== "success" && (
-                <DialogFooter className="gap-2">
-                  <Button variant="outline" onClick={() => setShowFeedback(false)}>
-                    {t("dialog.cancel")}
-                  </Button>
-                  <Button
-                    onClick={handleFeedbackSubmit}
-                    disabled={feedbackRating < 1 || feedbackState === "submitting"}
-                  >
-                    {feedbackState === "submitting"
-                      ? t("about.feedbackSubmitting")
-                      : t("about.feedbackSubmit")}
-                  </Button>
-                </DialogFooter>
-              )}
-            </>
-          )}
-
-          {feedbackTab === "history" && (
-            <div className="flex max-h-[50vh] flex-col gap-3 overflow-y-auto">
-              <button
-                type="button"
-                disabled={refreshingHistory}
-                onClick={async () => {
-                  setRefreshingHistory(true)
-                  try {
-                    const { syncFeedbackReplies } = await import("@/lib/feedback-check")
-                    await syncFeedbackReplies(true)
-                  } catch {
-                    // ignore
-                  } finally {
-                    setRefreshingHistory(false)
-                  }
-                }}
-                className="self-end text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-              >
-                {refreshingHistory ? "..." : t("about.feedbackRefresh")}
-              </button>
-              {feedbackHistory.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className={`rounded-lg border p-3 ${item.deleted ? "opacity-60" : ""}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-muted-foreground">
-                        #{feedbackHistory.length - idx}
-                      </span>
-                      <div className="flex gap-0.5">
-                        {[1, 2, 3, 4, 5].map((s) => (
-                          <Star
-                            key={s}
-                            className={`size-3.5 ${
-                              s <= item.rating
-                                ? "fill-yellow-400 text-yellow-400"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(item.ts).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm">{item.text || "（无文字内容）"}</p>
-                  {item.deleted && (
-                    <p className="mt-2 text-xs text-destructive">{t("about.feedbackDeleted")}</p>
-                  )}
-                  {item.replied && item.replyText && (
-                    <div className="mt-2 rounded-md bg-muted p-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-medium text-muted-foreground">
-                          {t("about.feedbackDevReply")}
-                        </p>
-                        {item.repliedAt && (
-                          <p className="text-[10px] text-muted-foreground">
-                            {new Date(item.repliedAt).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                      <p className="mt-1 text-sm">{item.replyText}</p>
-                    </div>
-                  )}
-                  {item.replied && !item.replyText && (
-                    <p className="mt-2 text-xs text-primary">{t("about.feedbackReplied")}</p>
-                  )}
-                  <div className="mt-2 flex items-center justify-between">
-                    <p className="font-mono text-[10px] text-muted-foreground/60">ID: {item.id}</p>
-                    {item.deleted && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const state = useSettingsStore.getState()
-                          state.setFeedbackIds(state.feedbackIds.filter((fid) => fid !== item.id))
-                          state.setFeedbackHistory(
-                            state.feedbackHistory.filter((h) => h.id !== item.id)
-                          )
-                        }}
-                        className="text-xs text-destructive hover:underline"
-                      >
-                        {t("about.feedbackRemove")}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {feedbackHistory.length === 0 && (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  {t("about.feedbackNoHistory")}
-                </p>
-              )}
-            </div>
-          )}
         </DialogContent>
       </Dialog>
     </div>
