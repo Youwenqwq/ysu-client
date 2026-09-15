@@ -1,14 +1,21 @@
 ---
-import HomePage from '../components/HomePage.astro';
+const target = 'https://www.welain.com';
 ---
 
-<script is:inline>
-  (async () => {
-    try {
-      const r = await fetch('/api/site-status');
-      const s = await r.json();
-      if (!s.enabled) location.replace('/404');
-    } catch { /* offline — show as normal */ }
-  })();
-</script>
-<HomePage />
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta http-equiv="refresh" content={`0; url=${target}`} />
+    <link rel="canonical" href={target} />
+    <title>燕大终端</title>
+    <script is:inline define:vars={{ target }}>
+      location.replace(target);
+    </script>
+  </head>
+  <body>
+    <p>正在跳转到 <a href={target}>{target}</a> ...</p>
+  </body>
+</html>

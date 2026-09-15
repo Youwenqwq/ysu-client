@@ -1,8 +1,0 @@
----
-import ScreenshotCarousel from './ScreenshotCarousel';
-
-const locale = Astro.currentLocale ?? 'zh';
-const t = await import(`../i18n/${locale}.json`).then(m => m.default);
----
-
-<ScreenshotCarousel client:load title={t.screenshots.title} />

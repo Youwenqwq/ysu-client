@@ -1,5 +1,122 @@
 ---
-import FaqPage from '../components/FaqPage.astro';
+import Layout from '../layouts/Layout.astro';
 ---
 
-<FaqPage />
+<Layout title="常见问题 - 燕大终端">
+  <main class="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+    <h1 class="text-3xl font-bold">常见问题</h1>
+
+    <div class="mt-8 space-y-8">
+      <section class="rounded-2xl border border-border bg-card p-6">
+        <h2 class="text-xl font-semibold mb-4">WebView 兼容性说明</h2>
+        <p class="text-muted-foreground leading-relaxed mb-4">
+          本应用依赖 Android System WebView 来渲染界面。不同版本的 WebView 在功能支持和渲染行为上存在差异：
+        </p>
+        <ul class="space-y-3 mb-4">
+          <li class="text-muted-foreground">
+            <span class="font-medium text-foreground">WebView v111 以下</span>
+            最低支持版本。低于此版本可能会出现严重的样式错乱，甚至完全不渲染样式的情况。
+          </li>
+          <li class="text-muted-foreground">
+            <span class="font-medium text-foreground">WebView v111 ~ v118</span>
+            可正常使用，但存在标题栏等地的透明效果、部分卡片框线等样式未正确渲染的情况，不影响正常使用。
+          </li>
+          <li class="text-muted-foreground">
+            <span class="font-medium text-foreground">WebView v119+</span> 可正常渲染本应用全部样式。
+          </li>
+        </ul>
+        <p class="text-muted-foreground leading-relaxed">
+          推荐用户更新 WebView 版本至新版。新版 WebView 在新增支持更多特性、修复问题的同时，往往伴随更多的性能优化。
+        </p>
+
+        <div class="mt-6 pt-6 border-t border-border">
+          <h3 class="font-medium mb-3">版本检测说明</h3>
+          <p class="text-muted-foreground leading-relaxed mb-3">
+            App 启动时会检测系统 WebView 版本，若版本存在问题，会弹窗告知用户。
+          </p>
+          <p class="text-muted-foreground leading-relaxed mb-3">
+            检测方式为按固定列表顺序遍历包名，找到第一个存在的即返回其版本号。此检测完全不管系统实际选用的是哪个
+            WebView 实现。
+          </p>
+          <p class="text-muted-foreground leading-relaxed mb-2">
+            如果认为检测结果存在错误，或者遇到了「未知 WebView 版本」，可能是以下原因：
+          </p>
+          <ul class="list-disc list-inside text-muted-foreground space-y-1 mb-4">
+            <li>
+              用户安装了其他 WebView 实现（例如自行切换到了更新的 Beta 版），但 App
+              检测仍按第一个存在的包名来，通常是系统默认 WebView 包，从而导致实际结果偏差。
+            </li>
+            <li>
+              系统使用了厂商魔改的 WebView（例如 Huawei Webview），但 App
+              按固定包名列表查找，无法正确识别该类实现。
+            </li>
+          </ul>
+          <p class="text-muted-foreground leading-relaxed mb-3">
+            可以进入 Debug 菜单查看实际 User-Agent 提示的 Chrome 版本。进入方法：登录后，在「关于」页连续点击 7
+            次应用图标。
+          </p>
+          <div class="rounded-lg bg-muted p-4 mb-3">
+            <p class="text-muted-foreground leading-relaxed">
+              如果连登录页面看起来都渲染异常，说明 WebView 有问题。简单自测：登录框默认在屏幕上下居中，若发现登录框紧贴顶部，则说明
+              WebView 版本低于 v111。
+            </p>
+          </div>
+          <p class="text-muted-foreground leading-relaxed">
+            如果版本符合要求，可以放心勾选「不再提示」并忽略弹窗。
+          </p>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-border bg-card p-6">
+        <h2 class="text-xl font-semibold mb-4">如何更新 Android System WebView</h2>
+        <p class="text-muted-foreground leading-relaxed mb-6">
+          Android System WebView 是系统组件，负责在应用内渲染网页内容。保持 WebView
+          更新可以确保应用获得最新的安全补丁、性能改进和 Web 功能支持。
+        </p>
+
+        <div class="space-y-6">
+          <div>
+            <h3 class="font-medium mb-2">通过 Google Play 商店更新</h3>
+            <p class="text-muted-foreground leading-relaxed mb-2">若能够访问 Google Play 商店，可前往更新：</p>
+            <a
+              href="https://play.google.com/store/apps/details?id=com.google.android.webview"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-1 text-primary hover:underline"
+            >
+              在 Google Play 中打开 WebView 页面
+            </a>
+          </div>
+
+          <div>
+            <h3 class="font-medium mb-2">手动更新或厂商商店</h3>
+            <p class="text-muted-foreground leading-relaxed">
+              若无法打开 Play 商店，可尝试手动寻找并安装更新版本的 WebView，或在厂商的软件商店检查更新，查看是否有推送
+              WebView 更新。
+            </p>
+          </div>
+
+          <div class="rounded-lg bg-muted p-4">
+            <h3 class="font-medium mb-2">华为/荣耀机型特别说明</h3>
+            <p class="text-muted-foreground leading-relaxed">
+              由于厂商原因，此品牌部分型号系统 WebView 被固定为 Huawei Webview，且 Huawei Webview 本体的 Chromium
+              版本老旧（最新版本仅到 v114，且也遇见过 v99
+              的更老版本），这是无解的。建议更新至厂商提供的 v114 最新版本以最大化改善体验。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <p class="text-sm text-muted-foreground">
+        其他问题请前往
+        <a
+          href="https://github.com/Youwenqwq/ysu-client/issues"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-primary hover:underline">GitHub Issues</a
+        >
+        反馈。
+      </p>
+    </div>
+  </main>
+</Layout>
