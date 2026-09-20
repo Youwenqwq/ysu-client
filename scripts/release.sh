@@ -80,22 +80,18 @@ fi
 
 echo "Preflight checks passed."
 
-RELEASE_FLAGS=(--latest)
-if [[ "${IS_PRERELEASE}" == "true" ]]; then
-  RELEASE_FLAGS=(--prerelease)
-fi
-
-echo "Creating GitHub release ${TAG}..."
+echo "Creating GitHub release draft ${TAG}..."
 gh release create "${TAG}" \
   --target "$(git rev-parse HEAD)" \
   --title "${TAG}" \
   --generate-notes \
-  "${RELEASE_FLAGS[@]}"
+  --draft \
+  --prerelease="${IS_PRERELEASE}"
 
 TMP_NOTES=$(mktemp)
 trap 'rm -f "$TMP_NOTES"' EXIT
 
-gh release view "${TAG}" --json body -q '.body' > "$TMP_NOTES" || true
+gh release view "${TAG}" --json body -q '.body' > "$TMP_NOTES"
 
 if [[ -t 0 ]] && [[ -z "${CI:-}" ]]; then
   echo "Opening editor for release notes..."
@@ -103,6 +99,13 @@ if [[ -t 0 ]] && [[ -z "${CI:-}" ]]; then
 fi
 
 gh release edit "${TAG}" --notes-file "$TMP_NOTES"
+
+# Only publish after the final notes are saved; publishing triggers release.yml.
+RELEASE_FLAGS=(--latest)
+if [[ "${IS_PRERELEASE}" == "true" ]]; then
+  RELEASE_FLAGS=(--prerelease)
+fi
+gh release edit "${TAG}" --draft=false "${RELEASE_FLAGS[@]}"
 
 echo ""
 echo "Release ${TAG} published."

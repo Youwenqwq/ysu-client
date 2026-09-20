@@ -34,7 +34,7 @@ pnpm run release          # Preflight + 创建 GitHub Release（手写 notes）�
 
 `pnpm run start` serves the static production build from `dist/`; run `pnpm run build` first because `next.config.mjs` sets `distDir: 'dist'`.
 
-发版分两半：本地 `scripts/release.sh` 只做 preflight 和 `gh release create`（交互编辑 notes，保证 changelog 与 release 同步）；release 发布事件触发 `.github/workflows/release.yml` 构建 `dist.zip`、签名 APK、生成 `version.json` 并上传到该 release。prerelease 的合并 manifest 还会同步覆盖到最新 stable release，因为 OTA 检查固定走 `releases/latest/download/version.json`。
+发版分两半：本地 `scripts/release.sh` 做 preflight、`gh release create --draft`、交互编辑并保存 notes，最后通过 `gh release edit --draft=false` 发布；读取、编辑或保存 notes 失败时保留草稿，不触发构建。release 发布事件触发 `.github/workflows/release.yml` 构建 `dist.zip`、签名 APK、生成 `version.json` 并上传到该 release。prerelease 的合并 manifest 还会同步覆盖到最新 stable release，因为 OTA 检查固定走 `releases/latest/download/version.json`。
 
 ```bash
 cd website && pnpm dev       # Astro dev server
@@ -176,9 +176,9 @@ Rules:
 
 1. Bump version in `package.json` and `android/app/build.gradle`
 2. Run `pnpm run typecheck` — must pass
-3. Run `./scripts/release.sh` — preflight + `gh release create`（在编辑器里写好 notes）
+3. Run `./scripts/release.sh` — preflight + 创建草稿，在编辑器里写好 notes 并保存后才正式发布
 4. 用 `gh run watch` 确认 release.yml 构建完成，`gh release view` 确认 `dist.zip` / `app-release-*.apk` / `version.json` 三个产物已上传
-5. 如编辑 notes 耗时较长，re-run 一次 release.yml，让 version.json 里的 body 与最终 notes 同步
+5. 如正式发布后再次修改 notes，re-run 一次 release.yml，让 version.json 里的 body 与最新 notes 同步；草稿阶段的编辑不会提前触发构建
 
 ## Project Notes
 
