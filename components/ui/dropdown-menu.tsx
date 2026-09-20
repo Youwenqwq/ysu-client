@@ -4,10 +4,21 @@ import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { BackLayer, useBackOpenState } from "@/hooks/use-back-handler"
 import { CheckIcon, ChevronRightIcon } from "lucide-react"
 
-function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
-  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+function DropdownMenu(props: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
+  const { open, onOpenChange } = useBackOpenState(props)
+  return (
+    <BackLayer enabled={open} onBack={() => onOpenChange(false)}>
+      <DropdownMenuPrimitive.Root
+        data-slot="dropdown-menu"
+        {...props}
+        open={open}
+        onOpenChange={onOpenChange}
+      />
+    </BackLayer>
+  )
 }
 
 function DropdownMenuPortal({
@@ -187,8 +198,18 @@ function DropdownMenuShortcut({ className, ...props }: React.ComponentProps<"spa
   )
 }
 
-function DropdownMenuSub({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
-  return <DropdownMenuPrimitive.Sub data-slot="dropdown-menu-sub" {...props} />
+function DropdownMenuSub(props: React.ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
+  const { open, onOpenChange } = useBackOpenState(props)
+  return (
+    <BackLayer enabled={open} onBack={() => onOpenChange(false)}>
+      <DropdownMenuPrimitive.Sub
+        data-slot="dropdown-menu-sub"
+        {...props}
+        open={open}
+        onOpenChange={onOpenChange}
+      />
+    </BackLayer>
+  )
 }
 
 function DropdownMenuSubTrigger({

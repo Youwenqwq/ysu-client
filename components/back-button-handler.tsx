@@ -1,71 +1,45 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useLayoutEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { App } from "@capacitor/app"
 import { isCapacitor } from "@/lib/native/platform"
-
-/** Primary routes shown in the bottom navigation bar. */
-const PRIMARY_ROUTES = [
-  "/dashboard",
-  "/dashboard/schedule",
-  "/dashboard/grades",
-  "/dashboard/services",
-  "/dashboard/me",
-]
-
-/** Secondary anchor pages with fixed back targets. */
-const SECONDARY_BACK_TARGETS: Record<string, string> = {
-  "/dashboard/me/settings": "/dashboard/me",
-}
-
-function normalizePath(path: string): string {
-  return path.endsWith("/") && path !== "/" ? path.slice(0, -1) : path
-}
+import { requestBack, setNavigationBackHandler } from "@/lib/navigation/back"
+import { appHistoryDepth, backFallback, installBackHistory } from "@/lib/navigation/back-history"
 
 export function BackButtonHandler() {
   const pathname = usePathname()
   const router = useRouter()
-  const pathnameRef = useRef(pathname)
 
-  useEffect(() => {
-    pathnameRef.current = pathname
-  }, [pathname])
+  useEffect(() => installBackHistory(window.history), [])
+
+  useLayoutEffect(() => {
+    return setNavigationBackHandler((canGoBack) => {
+      const path = pathname.replace(/\/+$/, "") || "/"
+      // Never return to an authenticated page through the login page after logout.
+      if (path !== "/login" && canGoBack !== false && appHistoryDepth(window.history) > 0) {
+        router.back()
+        return
+      }
+      const fallback = backFallback(path)
+      if (fallback) router.replace(fallback)
+      else if (isCapacitor()) void App.exitApp()
+    })
+  }, [pathname, router])
 
   useEffect(() => {
     if (!isCapacitor()) return
-
-    let listenerHandle: { remove: () => Promise<void> } | null = null
-
-    App.addListener("backButton", () => {
-      const currentPath = normalizePath(pathnameRef.current)
-
-      if (currentPath === "/login") {
-        App.exitApp()
-        return
-      }
-
-      if (PRIMARY_ROUTES.includes(currentPath)) {
-        App.exitApp()
-        return
-      }
-
-      const secondaryBack = SECONDARY_BACK_TARGETS[currentPath]
-      if (secondaryBack) {
-        router.replace(secondaryBack)
-        return
-      }
-
-      // All other pages simply go back through history.
-      router.back()
-    }).then((handle) => {
-      listenerHandle = handle
+    let disposed = false
+    let listener: { remove: () => Promise<void> } | undefined
+    void App.addListener("backButton", ({ canGoBack }) => requestBack(canGoBack)).then((handle) => {
+      if (disposed) void handle.remove()
+      else listener = handle
     })
-
     return () => {
-      listenerHandle?.remove()
+      disposed = true
+      void listener?.remove()
     }
-  }, [router])
+  }, [])
 
   return null
 }

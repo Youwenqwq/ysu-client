@@ -20,6 +20,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { FilterDrawer, FilterTrigger } from "@/components/academic/filter-drawer"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useBackHandler } from "@/hooks/use-back-handler"
 import { useMobileHeaderLayout, useMobileHeaderRight } from "@/lib/stores/mobile-header"
 import { useEffectiveSchedule } from "@/providers/hooks/use-effective-schedule"
 import {
@@ -155,6 +156,14 @@ export default function SchedulePage() {
     mobileFullscreen,
     isMobile ? titleHint : null
   )
+
+  function finishEditing() {
+    setEditScope(null)
+    setPending(null)
+  }
+
+  useBackHandler(finishEditing, editing)
+  useBackHandler(() => setShowOriginal(false), showOriginal)
 
   function enterEditor() {
     if (!canEdit) return
@@ -379,13 +388,7 @@ export default function SchedulePage() {
       >
         <History />
       </Button>
-      <Button
-        size="sm"
-        onClick={() => {
-          setEditScope(null)
-          setPending(null)
-        }}
-      >
+      <Button size="sm" onClick={finishEditing}>
         <Check data-icon="inline-start" />
         {t("scheduleEditor.done")}
       </Button>

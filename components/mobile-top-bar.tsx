@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { requestBack } from "@/lib/navigation/back"
 import { useState } from "react"
 import { ArrowLeft, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -17,7 +17,6 @@ interface Props {
 }
 
 export function MobileTopBar({ title, showBack }: Props) {
-  const router = useRouter()
   const rightSlot = useMobileHeaderStore((s) => s.rightSlot)
   const titleOverride = useMobileHeaderStore((s) => s.titleOverride)
   const titleHint = useMobileHeaderStore((s) => s.titleHint)
@@ -36,7 +35,7 @@ export function MobileTopBar({ title, showBack }: Props) {
         {showBack && (
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={() => requestBack()}
             className="-ml-1 flex size-8 shrink-0 items-center justify-center rounded-full text-foreground transition-colors active:bg-muted"
             aria-label="Back"
           >

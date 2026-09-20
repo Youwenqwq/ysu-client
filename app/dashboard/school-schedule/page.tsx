@@ -47,6 +47,7 @@ import {
 } from "@/providers/hooks"
 import type { Course, SchoolClassInfo, ClassroomInfo } from "@/providers/types"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useBackHandler } from "@/hooks/use-back-handler"
 import { buildCourseColorMap } from "../schedule/course-color"
 import { ScheduleMobile } from "../schedule/schedule-mobile"
 import { ScheduleTablet } from "../schedule/schedule-tablet"
@@ -369,6 +370,7 @@ function ClassSchedulePanel() {
     className: string
   } | null>(null)
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
+  useBackHandler(() => setSelectedClass(null), selectedClass !== null)
 
   const gradeYearsQuery = useSchoolGradeYears()
   const departmentsQuery = useSchoolDepartments()
@@ -557,6 +559,7 @@ function RoomSchedulePanel({ freeRoomContext }: { freeRoomContext?: FreeRoomCont
     name: string
   } | null>(null)
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
+  useBackHandler(() => setSelectedRoom(null), selectedRoom !== null)
 
   const campusesQuery = useSchoolCampuses()
   const buildingsQuery = useSchoolBuildings(campus === ALL ? undefined : campus)

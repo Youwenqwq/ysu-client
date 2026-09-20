@@ -5,6 +5,7 @@ import { X } from "lucide-react"
 import { fetchStateless, headerSingle } from "@/lib/cookie"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useTranslation } from "@/lib/i18n/use-translation"
+import { useBackLayer } from "@/hooks/use-back-handler"
 
 /** 关闭动画时长，与过渡类 duration 匹配 */
 const LIGHTBOX_TRANSITION_MS = 200
@@ -65,6 +66,8 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
     setClosing(true)
     setTimeout(onClose, LIGHTBOX_TRANSITION_MS)
   }
+
+  useBackLayer(beginClose)
 
   function applyTransform(animate: boolean) {
     const el = wrapRef.current

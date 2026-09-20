@@ -7,6 +7,8 @@ import { Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { useGradeGachaStore, type PendingGrade } from "@/lib/stores/grade-gacha"
+import { useBackHandler } from "@/hooks/use-back-handler"
+import { BACK_PRIORITY } from "@/lib/navigation/back"
 import {
   letterOfScore,
   letterOfGradeLevel,
@@ -249,6 +251,8 @@ export function GradeGachaModal({
     if (!isPlay) commitPending()
     onClose()
   }
+
+  useBackHandler(close, open && pending.length > 0, BACK_PRIORITY.foreground)
 
   return (
     <AnimatePresence>

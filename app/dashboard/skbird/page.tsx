@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
 import { Bird, Search, Settings, User, Bell, X } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -19,6 +19,7 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
+import { useBackHandler } from "@/hooks/use-back-handler"
 import { SkbirdError, SKBIRD_ERRNO_TOKEN_INVALID } from "@/lib/extras/skbird/client"
 import { getSkbirdClient, useSkbirdStore } from "@/lib/extras/skbird/store"
 import type { SkbirdCategory, SkbirdThread } from "@/lib/extras/skbird/types"
@@ -65,6 +66,16 @@ export default function SkbirdPage() {
   const [unread, setUnread] = useState(0)
   const [range, setRange] = useState("all")
   const [searchOpen, setSearchOpen] = useState(false)
+  const mobileSearch = useSyncExternalStore(
+    (callback) => {
+      const query = window.matchMedia("(width < 640px)")
+      query.addEventListener("change", callback)
+      return () => query.removeEventListener("change", callback)
+    },
+    () => window.matchMedia("(width < 640px)").matches,
+    () => false
+  )
+  useBackHandler(() => setSearchOpen(false), mobileSearch && searchOpen)
   const cursorRef = useRef("0")
   const searchPageRef = useRef(1)
   const busyRef = useRef(false)

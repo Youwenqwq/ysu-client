@@ -15,6 +15,8 @@ import { ChevronLeft, ChevronRight, GripVertical, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useTranslation } from "@/lib/i18n/use-translation"
+import { useBackHandler } from "@/hooks/use-back-handler"
+import { BACK_PRIORITY } from "@/lib/navigation/back"
 import { cn } from "@/lib/utils"
 import {
   scheduleDate,
@@ -116,6 +118,8 @@ export function ScheduleDragProvider(props: ScheduleDragProviderProps) {
   }, [props])
   const root = useRef<HTMLDivElement>(null)
   const gesture = useRef<Gesture | null>(null)
+  const cancelGesture = useRef<(() => void) | null>(null)
+  const [hasGesture, setHasGesture] = useState(false)
   const suppressClickUntil = useRef(0)
   const overlay = useRef<HTMLDivElement>(null)
   const preview = useRef<HTMLDivElement>(null)
@@ -126,6 +130,11 @@ export function ScheduleDragProvider(props: ScheduleDragProviderProps) {
     valid: boolean
   } | null>(null)
   const [edgeDirection, setEdgeDirection] = useState(0)
+  useBackHandler(
+    () => cancelGesture.current?.(),
+    props.enabled && hasGesture,
+    BACK_PRIORITY.gesture
+  )
 
   // Keep ghost-click suppression alive while opening a dialog disables editing.
   useEffect(() => {
@@ -158,6 +167,7 @@ export function ScheduleDragProvider(props: ScheduleDragProviderProps) {
         touchTarget = null
       }
       gesture.current = null
+      setHasGesture(false)
       if (!g?.active) return
       suppressClickUntil.current = Date.now() + 450
       const drop = destination
@@ -340,6 +350,7 @@ export function ScheduleDragProvider(props: ScheduleDragProviderProps) {
         edge: 0,
         edgeAt: 0,
       }
+      setHasGesture(true)
       if (touch) {
         // Touch events keep their original target even after a week change detaches it.
         touchTarget = event.target
@@ -429,6 +440,7 @@ export function ScheduleDragProvider(props: ScheduleDragProviderProps) {
     function contextMenu(event: Event) {
       if (gesture.current) event.preventDefault()
     }
+    cancelGesture.current = cancel
     document.addEventListener("mousedown", begin, true)
     document.addEventListener("touchstart", begin, { capture: true, passive: true })
     document.addEventListener("mousemove", move, true)
@@ -439,6 +451,7 @@ export function ScheduleDragProvider(props: ScheduleDragProviderProps) {
     window.addEventListener("blur", cancel)
     return () => {
       cancel()
+      cancelGesture.current = null
       document.removeEventListener("mousedown", begin, true)
       document.removeEventListener("touchstart", begin, true)
       document.removeEventListener("mousemove", move, true)

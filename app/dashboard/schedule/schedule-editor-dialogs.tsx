@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useTranslation } from "@/lib/i18n/use-translation"
+import { useBackLayer } from "@/hooks/use-back-handler"
 import { cn } from "@/lib/utils"
 import {
   scheduleDate,
@@ -126,6 +127,7 @@ function ScheduleAdjustmentContent({
   const [classroom, setClassroom] = useState(first?.classroom ?? "")
   const [note, setNote] = useState("")
   const [clearing, setClearing] = useState(false)
+  useBackLayer(() => setClearing(false), clearing)
   const startSection = Number(section)
   const duration = first ? first.endSection - first.startSection : 0
   const endSection = startSection + duration
