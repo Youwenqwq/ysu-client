@@ -34,6 +34,29 @@ describe("computeExamBlocks", () => {
     expect(blocks).toMatchObject([{ day: 3, start: 2, end: 3 }])
   })
 
+  it("places absolute timestamps in Shanghai exam days and periods", () => {
+    const blocks = computeExamBlocks(
+      [
+        makeExam({
+          startTimestamp: Date.parse("2026-09-09T01:30:00Z"),
+          endTimestamp: Date.parse("2026-09-09T02:20:00Z"),
+        }),
+        makeExam({
+          startTimestamp: Date.parse("2026-09-06T16:30:00Z"),
+          endTimestamp: Date.parse("2026-09-06T17:00:00Z"),
+        }),
+      ],
+      periods,
+      { week: 1, weekday: 1, date: "2026-08-31" },
+      2
+    )
+
+    expect(blocks).toMatchObject([
+      { day: 3, start: 2, end: 3 },
+      { day: 1, start: 1, end: 1 },
+    ])
+  })
+
   it("falls back to the start time and clamps exams outside the timetable", () => {
     const blocks = computeExamBlocks(
       [

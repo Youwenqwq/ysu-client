@@ -51,13 +51,8 @@ export function buildSectionTimeMap(
 }
 
 function formatShortDate(value: string | undefined): string | null {
-  if (!value) return null
-  const parts = value.split("-").map(Number)
-  if (parts.length === 3 && parts.every(Number.isFinite)) {
-    return `${parts[1]}/${parts[2]}`
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
+  const date = parseLocalDate(value)
+  if (!date) return null
   return `${date.getMonth() + 1}/${date.getDate()}`
 }
 
@@ -67,33 +62,6 @@ function parseLocalDate(value: string | undefined): Date | null {
   if (!match) return null
   const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
   return Number.isNaN(date.getTime()) ? null : date
-}
-
-export function resolveInitialScheduleWeek(
-  currentWeek: CurrentWeek | null,
-  termStartDate?: string,
-  now = new Date()
-): number {
-  const firstDay = parseLocalDate(termStartDate)
-  if (firstDay && now.getTime() < firstDay.getTime()) return 1
-  if (currentWeek && Number.isFinite(currentWeek.week) && currentWeek.week >= 1) {
-    return currentWeek.week
-  }
-  if (firstDay) {
-    const elapsedDays = Math.floor((now.getTime() - firstDay.getTime()) / 86_400_000)
-    return Math.max(1, Math.floor(elapsedDays / 7) + 1)
-  }
-  return 1
-}
-
-export function resolveWidgetCurrentWeek(
-  currentWeek: CurrentWeek | null,
-  termStartDate?: string,
-  now = new Date()
-): CurrentWeek | null {
-  if (!currentWeek) return null
-  const week = resolveInitialScheduleWeek(currentWeek, termStartDate, now)
-  return currentWeek.week === week ? currentWeek : { ...currentWeek, week }
 }
 
 function weekLabelsFromStart(
@@ -121,27 +89,26 @@ export function computeWeekDateLabels(
 
   if (!currentWeek?.week) return Array(7).fill(null)
 
-  if (Array.isArray(currentWeek.weekDates) && currentWeek.weekDates.length === 7) {
-    if (selectedWeek === currentWeek.week) {
-      return currentWeek.weekDates.map(formatShortDate)
-    }
-    const start = currentWeek.weekStartDate ?? currentWeek.weekDates[0]
-    if (start) {
-      const base = new Date(start)
-      if (!Number.isNaN(base.getTime())) {
-        base.setDate(base.getDate() + (selectedWeek - currentWeek.week) * 7)
-        return Array.from({ length: 7 }, (_, idx) => {
-          const dt = new Date(base)
-          dt.setDate(base.getDate() + idx)
-          return `${dt.getMonth() + 1}/${dt.getDate()}`
-        })
-      }
-    }
+  if (
+    selectedWeek === currentWeek.week &&
+    Array.isArray(currentWeek.weekDates) &&
+    currentWeek.weekDates.length === 7
+  ) {
+    return currentWeek.weekDates.map(formatShortDate)
+  }
+  const start = parseLocalDate(currentWeek.weekStartDate ?? currentWeek.weekDates?.[0])
+  if (start) {
+    start.setDate(start.getDate() + (selectedWeek - currentWeek.week) * 7)
+    return Array.from({ length: 7 }, (_, idx) => {
+      const date = new Date(start)
+      date.setDate(start.getDate() + idx)
+      return `${date.getMonth() + 1}/${date.getDate()}`
+    })
   }
 
   if (!currentWeek.date || !currentWeek.weekday) return Array(7).fill(null)
-  const base = new Date(currentWeek.date)
-  if (Number.isNaN(base.getTime())) return Array(7).fill(null)
+  const base = parseLocalDate(currentWeek.date)
+  if (!base) return Array(7).fill(null)
   const mondayOffset = currentWeek.weekday - 1
   const weekDelta = selectedWeek - currentWeek.week
   const monday = new Date(base)
@@ -159,7 +126,7 @@ export function isCoursePast(
   timeMap: Record<number, [number, number]>
 ): boolean {
   const endRange = timeMap[courseEndSection(course)]
-  return !!endRange && nowMinutes > endRange[1]
+  return !!endRange && nowMinutes >= endRange[1]
 }
 
 export function isCourseCurrent(
@@ -169,7 +136,7 @@ export function isCourseCurrent(
 ): boolean {
   for (let s = courseStartSection(course); s <= courseEndSection(course); s++) {
     const range = timeMap[s]
-    if (range && nowMinutes >= range[0] && nowMinutes <= range[1]) {
+    if (range && nowMinutes >= range[0] && nowMinutes < range[1]) {
       return true
     }
   }

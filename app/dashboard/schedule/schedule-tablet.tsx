@@ -48,6 +48,8 @@ interface Props {
   periods: ClassPeriod[]
   currentWeekday: number
   currentWeek: CurrentWeek | null
+  /** Cached dated anchor for browsing labels, never used for current-day highlights. */
+  weekAnchor: CurrentWeek | null
   selectedWeek: number
   termStartDate?: string
   nowMinutes: number
@@ -66,6 +68,7 @@ export function ScheduleTablet({
   periods,
   currentWeekday,
   currentWeek,
+  weekAnchor,
   selectedWeek,
   termStartDate,
   nowMinutes,
@@ -94,8 +97,8 @@ export function ScheduleTablet({
   const isCurrentWeek = currentWeek?.week === selectedWeek
   const timeMap = useMemo(() => buildSectionTimeMap(periods), [periods])
   const weekDates = useMemo(
-    () => computeWeekDateLabels(currentWeek, selectedWeek, termStartDate),
-    [currentWeek, selectedWeek, termStartDate]
+    () => computeWeekDateLabels(weekAnchor, selectedWeek, termStartDate),
+    [weekAnchor, selectedWeek, termStartDate]
   )
 
   const isBlockCurrent = (block: ScheduleBlock): boolean => {

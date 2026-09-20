@@ -11,11 +11,15 @@ import { useAuthStore } from "../stores/auth"
 import { isCapacitor } from "./platform"
 import { NotifyPlugin } from "./notify-plugin"
 import { isCourseActiveInWeek } from "@/app/dashboard/schedule/schedule-utils"
+import { getAcademicClock, resolveAcademicWeek } from "@/lib/academic/academic-time"
+import { scheduleDate } from "@/lib/academic/schedule-patches"
+import { parseAcademicDateTime } from "@/lib/academic/time"
 import type {
   Course,
   CurrentWeek,
   ClassPeriod,
   ProviderNativeNotification,
+  TermCalendar,
 } from "@/providers/types"
 
 // Native mutations share one queue. Revisions invalidate work waiting on a token
@@ -338,20 +342,22 @@ export function computeClassAlarms(
   currentWeek: CurrentWeek | null,
   periods: ClassPeriod[],
   remindMinutes: number = 15,
-  days: number = 7
+  days: number = 7,
+  calendar?: TermCalendar
 ): ClassAlarmConfig[] {
   const alarms: ClassAlarmConfig[] = []
   const now = new Date()
   const periodMap = new Map(periods.map((p) => [p.section, p]))
-  const todayWeekday = now.getDay() === 0 ? 7 : now.getDay()
-  const baseWeek = currentWeek?.week ?? 1
+  const today = getAcademicClock(now).date
 
   for (let dayOffset = 0; dayOffset < days; dayOffset++) {
-    const targetWeekday = ((todayWeekday - 1 + dayOffset) % 7) + 1
-    const weekOverflow = Math.floor((todayWeekday - 1 + dayOffset) / 7)
-    const targetWeek = baseWeek + weekOverflow
+    const date = scheduleDate(today, 1, dayOffset + 1)
+    const targetWeek = resolveAcademicWeek(currentWeek, calendar, date, currentWeek?.semester)
+    if (!targetWeek) continue
+    const dayStart = parseAcademicDateTime(`${date}T00:00:00`)?.getTime()
+    if (dayStart === undefined) continue
     const dayCourses = courses.filter(
-      (c) => c.weekDay === targetWeekday && isCourseActiveInWeek(c, targetWeek)
+      (c) => c.weekDay === targetWeek.weekday && isCourseActiveInWeek(c, targetWeek.week)
     )
 
     for (const course of dayCourses) {
@@ -361,19 +367,14 @@ export function computeClassAlarms(
       if (!startTime) continue
 
       const startMinutes = parseTimeToMinutes(startTime)
-      const alarmMinutes = startMinutes - remindMinutes
-      if (alarmMinutes < 0) continue
+      // Subtract the reminder from school midnight, not device-local wall time.
+      const alarmTime = dayStart + (startMinutes - remindMinutes) * 60_000
+      if (!Number.isFinite(alarmTime) || alarmTime <= now.getTime()) continue
 
-      const targetDate = new Date(now)
-      targetDate.setDate(targetDate.getDate() + dayOffset)
-      targetDate.setHours(Math.floor(alarmMinutes / 60), alarmMinutes % 60, 0, 0)
-
-      if (targetDate.getTime() <= now.getTime()) continue
-
-      const alarmId = `${course.name}|${targetDate.toISOString().split("T")[0]}|${startSection}`
+      const alarmId = `${course.name}|${date}|${startSection}`
       alarms.push({
         alarmId,
-        alarmTime: targetDate.getTime(),
+        alarmTime,
         courseName: course.name,
         classroom: course.classroom || "",
         startTime,
@@ -390,22 +391,18 @@ let latestAlarmSchedule: {
   courses: Course[]
   currentWeek: CurrentWeek | null
   periods: ClassPeriod[]
-  monday: number
+  calendar?: TermCalendar
 } | null = null
-
-function currentMonday(): number {
-  const now = new Date()
-  return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7))
-}
 
 export function syncClassAlarmsToNative(
   courses: Course[],
   currentWeek: CurrentWeek | null,
-  periods: ClassPeriod[]
+  periods: ClassPeriod[],
+  calendar?: TermCalendar
 ): Promise<void> {
   if (!isCapacitor() || stopped || !useAuthStore.getState().isAuthenticated)
     return Promise.resolve()
-  latestAlarmSchedule = { courses, currentWeek, periods, monday: currentMonday() }
+  latestAlarmSchedule = { courses, currentWeek, periods, calendar }
   return refreshClassAlarms()
 }
 
@@ -431,19 +428,14 @@ function refreshClassAlarms(): Promise<void> {
       settings.setClassReminderEnabled(false)
       return
     }
-    const currentWeek = schedule.currentWeek && {
-      ...schedule.currentWeek,
-      week: schedule.currentWeek.week + (currentMonday() - schedule.monday) / (7 * 86400000),
-    }
-    const alarms = currentWeek
-      ? computeClassAlarms(
-          schedule.courses,
-          currentWeek,
-          schedule.periods,
-          settings.classReminderMinutes,
-          settings.classReminderDays
-        )
-      : []
+    const alarms = computeClassAlarms(
+      schedule.courses,
+      schedule.currentWeek,
+      schedule.periods,
+      settings.classReminderMinutes,
+      settings.classReminderDays,
+      schedule.calendar
+    )
     alarms.sort((a, b) => a.alarmId.localeCompare(b.alarmId) || a.alarmTime - b.alarmTime)
     const hash = JSON.stringify(alarms)
     if (hash === lastAlarmHash) return

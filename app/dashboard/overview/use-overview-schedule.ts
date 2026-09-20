@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo } from "react"
 import {
   useClassPeriods,
   useCurrentWeek,
@@ -15,6 +15,7 @@ import { compareExamStartTime, isExamCompleted } from "@/lib/academic/exam-utils
 import type { ClassPeriod, Course, CurrentWeek, Exam } from "@/providers/types"
 import type { ProviderQueryResult } from "@/providers/hooks"
 import { useEffectiveSchedule } from "@/providers/hooks/use-effective-schedule"
+import { useAcademicTime } from "@/hooks/use-academic-time"
 import {
   buildSectionTimeMap,
   courseEndSection,
@@ -22,11 +23,15 @@ import {
   courseWeekDay,
   isCourseActiveInWeek,
   periodIsInUse,
-  resolveWidgetCurrentWeek,
 } from "@/app/dashboard/schedule/schedule-utils"
 
+export type OverviewWeekQuery = Omit<ProviderQueryResult<CurrentWeek>, "data" | "mutate"> & {
+  data: CurrentWeek | null | undefined
+  mutate: () => Promise<unknown>
+}
+
 export interface OverviewSchedule {
-  currentWeek: ProviderQueryResult<CurrentWeek>
+  currentWeek: OverviewWeekQuery
   schedule: ProviderQueryResult<Course[]>
   exams: ProviderQueryResult<Exam[]>
   periodsRaw: ProviderQueryResult<ClassPeriod[]>
@@ -34,6 +39,9 @@ export interface OverviewSchedule {
   upcomingExams: Exam[]
   timeMap: Record<number, [number, number]>
   now: Date
+  date: string
+  weekday: number
+  semester?: string
   nowMinutes: number
   currentCourse: Course | null
   currentRange: [number, number] | null
@@ -43,46 +51,78 @@ export interface OverviewSchedule {
 
 /** Page-lifetime data and native synchronization, never tied to a visible card. */
 export function useOverviewSchedule(): OverviewSchedule {
-  const currentWeek = useCurrentWeek()
-  const termCalendar = useTermCalendar()
-  const schedule = useSchedule({ courseCategory: "all", includeLabSchedule: true })
-  const effective = useEffectiveSchedule(schedule.data, termCalendar.data, currentWeek.data ?? null)
+  const currentWeekQuery = useCurrentWeek()
+  const termCalendarQuery = useTermCalendar()
+  const scheduleQuery = useSchedule({ courseCategory: "all", includeLabSchedule: true })
+  const snapshot = currentWeekQuery.data ?? null
+  const termCalendar = termCalendarQuery.data
+  const nativeCalendar =
+    snapshot?.semester && termCalendar?.semester && snapshot.semester !== termCalendar.semester
+      ? undefined
+      : termCalendar
+  const effective = useEffectiveSchedule(scheduleQuery.data, nativeCalendar, snapshot)
+  const {
+    now,
+    date,
+    weekday,
+    nowMinutes,
+    currentWeek: liveWeek,
+  } = useAcademicTime(snapshot, termCalendar)
+  const currentWeek: OverviewWeekQuery = {
+    ...currentWeekQuery,
+    data: liveWeek ?? (snapshot || termCalendar ? null : undefined),
+    isLoading: currentWeekQuery.isLoading || termCalendarQuery.isLoading,
+    isValidating: currentWeekQuery.isValidating || termCalendarQuery.isValidating,
+    isStale: currentWeekQuery.isStale || termCalendarQuery.isStale,
+    isError: currentWeekQuery.isError || termCalendarQuery.isError,
+    error: currentWeekQuery.error ?? termCalendarQuery.error,
+    mutate: () => Promise.all([currentWeekQuery.mutate(), termCalendarQuery.mutate()]),
+  }
+  const schedule = {
+    ...scheduleQuery,
+    data: effective.ready
+      ? effective.courses
+      : currentWeek.data === null
+        ? scheduleQuery.data
+        : undefined,
+  }
   const exams = useExams()
   const periodsRaw = useClassPeriods()
   const reminderHours = useSettingsStore((s) => s.widgetSyncReminderHours)
   const showNextDay = useSettingsStore((s) => s.widgetShowNextDaySchedule)
-  const [now, setNow] = useState(() => new Date())
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60_000)
-    return () => clearInterval(timer)
-  }, [])
 
   const periods = useMemo(
     () => (periodsRaw.data ?? []).filter(periodIsInUse).sort((a, b) => a.section - b.section),
     [periodsRaw.data]
   )
   const timeMap = useMemo(() => buildSectionTimeMap(periods), [periods])
-  const widgetCurrentWeek = useMemo(
-    () => resolveWidgetCurrentWeek(currentWeek.data ?? null, termCalendar.data?.startDate),
-    [currentWeek.data, termCalendar.data?.startDate]
-  )
 
   useEffect(() => {
-    if (!effective.ready || !widgetCurrentWeek) return
+    if (!effective.ready && liveWeek) return
     void syncScheduleToWidget(
       effective.courses,
-      widgetCurrentWeek,
+      liveWeek,
       periods,
       reminderHours,
-      showNextDay
+      showNextDay,
+      nativeCalendar
     ).catch(() => {})
-  }, [effective.ready, effective.courses, widgetCurrentWeek, periods, reminderHours, showNextDay])
+  }, [
+    effective.ready,
+    effective.courses,
+    liveWeek,
+    periods,
+    reminderHours,
+    showNextDay,
+    nativeCalendar,
+  ])
 
   useEffect(() => {
-    if (!effective.ready) return
-    void syncClassAlarmsToNative(effective.courses, widgetCurrentWeek, periods).catch(() => {})
-  }, [effective.ready, effective.courses, widgetCurrentWeek, periods])
+    if (!effective.ready && liveWeek) return
+    void syncClassAlarmsToNative(effective.courses, liveWeek, periods, nativeCalendar).catch(
+      () => {}
+    )
+  }, [effective.ready, effective.courses, liveWeek, periods, nativeCalendar])
 
   useEffect(() => {
     // Empty results must also clear stale exams from the native widget.
@@ -90,18 +130,17 @@ export function useOverviewSchedule(): OverviewSchedule {
   }, [exams.data, reminderHours])
 
   const todayCourses = useMemo(() => {
-    if (!effective.ready || !currentWeek.data) return []
-    const { week, weekday } = currentWeek.data
+    if (!effective.ready || !liveWeek) return []
+    const { week, weekday } = liveWeek
     return effective.courses
       .filter((course) => courseWeekDay(course) === weekday && isCourseActiveInWeek(course, week))
       .sort((a, b) => courseStartSection(a) - courseStartSection(b))
-  }, [effective.ready, effective.courses, currentWeek.data])
+  }, [effective.ready, effective.courses, liveWeek])
   const upcomingExams = useMemo(
     () =>
       (exams.data ?? []).filter((exam) => !isExamCompleted(exam, now)).sort(compareExamStartTime),
     [exams.data, now]
   )
-  const nowMinutes = now.getHours() * 60 + now.getMinutes()
   const currentCourse =
     todayCourses.find((course) => {
       for (
@@ -110,7 +149,7 @@ export function useOverviewSchedule(): OverviewSchedule {
         section++
       ) {
         const range = timeMap[section]
-        if (range && nowMinutes >= range[0] && nowMinutes <= range[1]) return true
+        if (range && nowMinutes >= range[0] && nowMinutes < range[1]) return true
       }
       return false
     }) ?? null
@@ -140,6 +179,9 @@ export function useOverviewSchedule(): OverviewSchedule {
     upcomingExams,
     timeMap,
     now,
+    date,
+    weekday,
+    semester: termCalendar?.semester ?? snapshot?.semester,
     nowMinutes,
     currentCourse,
     currentRange,

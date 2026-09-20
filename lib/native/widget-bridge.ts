@@ -1,6 +1,7 @@
 import { registerPlugin } from "@capacitor/core"
-import type { Course, CurrentWeek, ClassPeriod, Exam } from "@/providers/types"
+import type { Course, CurrentWeek, ClassPeriod, Exam, TermCalendar } from "@/providers/types"
 import { parseWeeks } from "@/app/dashboard/schedule/schedule-utils"
+import { getAcademicClock, resolveAcademicWeek } from "@/lib/academic/academic-time"
 
 export interface WidgetBridgePlugin {
   syncSchedule(options: {
@@ -53,6 +54,7 @@ export interface WidgetWeekInfo {
   term?: string
   date?: string
   full_schedule: boolean
+  total_weeks?: number
 }
 
 export interface WidgetExam {
@@ -70,7 +72,8 @@ export async function syncScheduleToWidget(
   currentWeek: CurrentWeek | null,
   periods: ClassPeriod[],
   syncReminderHours: number = 24,
-  showNextDaySchedule: boolean = false
+  showNextDaySchedule: boolean = false,
+  calendar?: TermCalendar
 ): Promise<void> {
   try {
     const periodMap = new Map(periods.map((p) => [p.section, p]))
@@ -92,12 +95,28 @@ export async function syncScheduleToWidget(
       }
     })
 
-    const weekInfo: WidgetWeekInfo | null = currentWeek
+    const liveWeek = resolveAcademicWeek(
+      currentWeek,
+      calendar,
+      getAcademicClock().date,
+      currentWeek?.semester
+    )
+    const matchingCalendar =
+      calendar &&
+      (!calendar.semester || !liveWeek?.semester || calendar.semester === liveWeek.semester)
+        ? calendar
+        : undefined
+    const weekInfo: WidgetWeekInfo | null = liveWeek
       ? {
-          week: currentWeek.week,
-          weekday: currentWeek.weekday,
-          term: currentWeek.semester,
-          date: currentWeek.date,
+          week: liveWeek.week,
+          weekday: liveWeek.weekday,
+          term: liveWeek.semester,
+          date: liveWeek.date,
+          total_weeks: matchingCalendar
+            ? (matchingCalendar.totalWeeks > 0
+                ? matchingCalendar.totalWeeks
+                : matchingCalendar.teachingWeeks) || undefined
+            : undefined,
           full_schedule: true,
         }
       : null

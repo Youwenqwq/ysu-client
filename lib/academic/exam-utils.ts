@@ -1,10 +1,6 @@
 import type { Exam } from "@/providers/types"
 
-function parseLocalDateTime(value: string | undefined): Date | null {
-  if (!value) return null
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date
-}
+import { parseAcademicDateTime } from "./time"
 
 function dateFromTimestamp(value: number | undefined): Date | null {
   if (value === undefined) return null
@@ -19,12 +15,14 @@ function formatTimeFromDateTime(value: string | undefined): string | null {
 }
 
 export function getExamStartTime(exam: Exam): Date | null {
-  return dateFromTimestamp(exam.startTimestamp) ?? parseLocalDateTime(exam.startAt)
+  return dateFromTimestamp(exam.startTimestamp) ?? parseAcademicDateTime(exam.startAt)
 }
 
 export function getExamEndTime(exam: Exam): Date | null {
   return (
-    dateFromTimestamp(exam.endTimestamp) ?? parseLocalDateTime(exam.endAt) ?? getExamStartTime(exam)
+    dateFromTimestamp(exam.endTimestamp) ??
+    parseAcademicDateTime(exam.endAt) ??
+    getExamStartTime(exam)
   )
 }
 

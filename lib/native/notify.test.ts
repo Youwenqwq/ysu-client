@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { ClassAlarmConfig } from "./notify"
-import type { Course } from "@/providers/types"
+import type { Course, TermCalendar } from "@/providers/types"
 
 const native = vi.hoisted(() => ({
   alarms: [] as ClassAlarmConfig[],
@@ -75,7 +75,7 @@ let notify: typeof import("./notify")
 let auth: typeof import("../stores/auth").useAuthStore
 let settings: typeof import("../stores/settings").useSettingsStore
 let unsubscribe: () => void
-const week = { week: 1, weekday: 1 }
+const week = { week: 1, weekday: 1, date: "2026-09-07", semester: "2026-2027-1" }
 const periods = [{ section: 1, startTime: "10:00", isInUse: true }]
 const course: Course = {
   name: "Math",
@@ -89,7 +89,7 @@ const course: Course = {
 beforeEach(async () => {
   vi.resetModules()
   vi.useFakeTimers()
-  vi.setSystemTime(new Date(2026, 8, 7, 8))
+  vi.setSystemTime(new Date("2026-09-07T08:00:00+08:00"))
   native.alarms = []
   native.polling = null
   native.castgc = ""
@@ -169,7 +169,7 @@ describe("native notification lifecycle", () => {
     settings.setState({ classReminderDays: 14 })
     await notify.syncNativeNotifications()
     expect(native.alarms.map((alarm) => alarm.alarmTime)).toEqual([
-      new Date(2026, 8, 15, 9, 45).getTime(),
+      new Date("2026-09-15T09:45:00+08:00").getTime(),
     ])
   })
 
@@ -258,5 +258,62 @@ describe("native notification lifecycle", () => {
     expect(await enabling).toBe(false)
     expect(settings.getState().classReminderEnabled).toBe(false)
     await notify.syncNativeNotifications()
+  })
+})
+
+describe("school-time class alarms", () => {
+  const calendar: TermCalendar = {
+    semester: week.semester,
+    startDate: "2026-09-07",
+    totalWeeks: 2,
+    teachingWeeks: 3,
+    isInUse: true,
+  }
+
+  it("uses Shanghai's date and class time when the device is still on Sunday", () => {
+    vi.setSystemTime(new Date("2026-09-06T17:00:00Z"))
+    const alarms = notify.computeClassAlarms([{ ...course, weekDay: 1 }], week, periods, 15, 1)
+    expect(alarms.map(({ alarmId, alarmTime }) => ({ alarmId, alarmTime }))).toEqual([
+      {
+        alarmId: "Math|2026-09-07|1",
+        alarmTime: Date.parse("2026-09-07T01:45:00Z"),
+      },
+    ])
+  })
+
+  it("does not treat a dated offline snapshot as the current week at first sync", async () => {
+    vi.setSystemTime(new Date("2026-09-14T08:00:00+08:00"))
+    settings.setState({ classReminderEnabled: true })
+    await notify.syncClassAlarmsToNative([{ ...course, weekList: [2] }], week, periods)
+    expect(native.alarms.map((alarm) => alarm.alarmTime)).toEqual([
+      Date.parse("2026-09-15T01:45:00Z"),
+    ])
+  })
+
+  it("derives a stale anchor again when permissions refresh after a week rollover", async () => {
+    await notify.syncClassAlarmsToNative([{ ...course, weekList: [2] }], week, periods)
+    vi.setSystemTime(new Date("2026-09-14T08:00:00+08:00"))
+    await notify.setNotificationEnabled("classes", true)
+    expect(native.alarms.map((alarm) => alarm.alarmTime)).toEqual([
+      Date.parse("2026-09-15T01:45:00Z"),
+    ])
+  })
+
+  it("does not invent week one without a dated anchor", () => {
+    expect(notify.computeClassAlarms([course], null, periods)).toEqual([])
+    expect(notify.computeClassAlarms([course], { week: 1, weekday: 1 }, periods)).toEqual([])
+  })
+
+  it("uses a calendar anchor but excludes alarms beyond its final week", () => {
+    vi.setSystemTime(new Date("2026-09-20T08:00:00+08:00"))
+    const courses = [
+      { ...course, weekDay: 7 },
+      { ...course, weekDay: 1 },
+    ]
+    expect(
+      notify
+        .computeClassAlarms(courses, null, periods, 15, 7, calendar)
+        .map((alarm) => alarm.alarmTime)
+    ).toEqual([Date.parse("2026-09-20T01:45:00Z")])
   })
 })

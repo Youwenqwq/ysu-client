@@ -7,6 +7,7 @@
  */
 import type { ClassPeriod, CurrentWeek, Exam } from "@/providers/types"
 import { getExamEndTime, getExamStartTime } from "@/lib/academic/exam-utils"
+import { getAcademicClock } from "@/lib/academic/academic-time"
 import { buildSectionTimeMap } from "./schedule-utils"
 export interface ExamBlock {
   exam: Exam
@@ -22,37 +23,26 @@ function mondayOfWeek(
   currentWeek: CurrentWeek | null,
   selectedWeek: number,
   termStartDate?: string
-): Date | null {
+): number | null {
   if (termStartDate) {
-    const firstMonday = new Date(`${termStartDate}T00:00:00`)
-    if (!Number.isNaN(firstMonday.getTime())) {
-      firstMonday.setDate(firstMonday.getDate() + (selectedWeek - 1) * 7)
-      return firstMonday
+    const firstMonday = Date.parse(termStartDate)
+    if (Number.isFinite(firstMonday)) {
+      return firstMonday + (selectedWeek - 1) * 7 * 86_400_000
     }
   }
   if (!currentWeek) return null
-  const start = currentWeek.weekStartDate ?? currentWeek.weekDates?.[0]
-  if (!start) return null
-  const monday = new Date(`${start}T00:00:00`)
-  if (Number.isNaN(monday.getTime())) return null
-  monday.setDate(monday.getDate() + (selectedWeek - currentWeek.week) * 7)
-  return monday
-}
-
-function toMinutes(d: Date): number {
-  return d.getHours() * 60 + d.getMinutes()
+  const anchor = currentWeek.weekStartDate ?? currentWeek.weekDates?.[0]
+  const start = Date.parse(anchor ?? currentWeek.date ?? "")
+  if (!Number.isFinite(start)) return null
+  const weekdayOffset = anchor ? 0 : currentWeek.weekday - 1
+  return start + ((selectedWeek - currentWeek.week) * 7 - weekdayOffset) * 86_400_000
 }
 
 function mapExamToSections(
-  exam: Exam,
+  startMin: number,
+  endMin: number,
   timeMap: Record<number, [number, number]>
 ): { start: number; end: number } | null {
-  const start = getExamStartTime(exam)
-  const end = getExamEndTime(exam)
-  if (!start || !end) return null
-  const startMin = toMinutes(start)
-  const endMin = toMinutes(end)
-
   const sections = Object.keys(timeMap)
     .map(Number)
     .sort((a, b) => a - b)
@@ -89,19 +79,19 @@ export function computeExamBlocks(
 ): ExamBlock[] {
   if (selectedWeek <= 0 || (!termStartDate && !currentWeek?.week)) return []
   const monday = mondayOfWeek(currentWeek, selectedWeek, termStartDate)
-  if (!monday) return []
+  if (monday === null) return []
 
   const timeMap = buildSectionTimeMap(periods)
   const blocks: ExamBlock[] = []
   for (const exam of exams) {
     const date = getExamStartTime(exam)
     if (!date) continue
-    const dayDiff = Math.floor(
-      (new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() - monday.getTime()) /
-        86_400_000
-    )
+    const start = getAcademicClock(date)
+    const dayDiff = (Date.parse(start.date) - monday) / 86_400_000
     if (dayDiff < 0 || dayDiff > 6) continue
-    const sections = mapExamToSections(exam, timeMap)
+    const end = getExamEndTime(exam)
+    if (!end) continue
+    const sections = mapExamToSections(start.minutes, getAcademicClock(end).minutes, timeMap)
     if (!sections) continue
     blocks.push({ exam, day: dayDiff + 1, ...sections })
   }

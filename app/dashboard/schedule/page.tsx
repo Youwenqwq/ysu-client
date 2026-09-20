@@ -21,6 +21,7 @@ import { FilterDrawer, FilterTrigger } from "@/components/academic/filter-drawer
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useBackHandler } from "@/hooks/use-back-handler"
+import { useAcademicTime } from "@/hooks/use-academic-time"
 import { useMobileHeaderLayout, useMobileHeaderRight } from "@/lib/stores/mobile-header"
 import { useEffectiveSchedule } from "@/providers/hooks/use-effective-schedule"
 import {
@@ -52,13 +53,7 @@ import {
   TriangleAlert,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import {
-  isCourseActiveInWeek,
-  parseTimeToMinutes,
-  periodIsInUse,
-  resolveInitialScheduleWeek,
-  resolveWidgetCurrentWeek,
-} from "./schedule-utils"
+import { isCourseActiveInWeek, parseTimeToMinutes, periodIsInUse } from "./schedule-utils"
 import { computeExamBlocks } from "./exam-blocks"
 import { buildCourseColorMap } from "./course-color"
 import { ScheduleTablet } from "./schedule-tablet"
@@ -75,7 +70,8 @@ export default function SchedulePage() {
   const compactMode = useSettingsStore((s) => s.scheduleCompactMode)
   const setCompactMode = useSettingsStore((s) => s.setScheduleCompactMode)
   const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours)
-  const [selectedWeek, setSelectedWeek] = useState<number>(0)
+  // null follows the live academic week; a number is an explicit browsing selection.
+  const [weekOverride, setWeekOverride] = useState<number | null>(null)
   const [term, setTerm] = useState("")
   const [queriedTerm, setQueriedTerm] = useState("")
   const isDefaultTerm = queriedTerm === ""
@@ -101,9 +97,16 @@ export default function SchedulePage() {
   const examsQuery = useExams({ semester: queriedTerm || undefined })
 
   const rawCourses = useMemo(() => scheduleQuery.data ?? [], [scheduleQuery.data])
-  const currentWeek = currentWeekQuery.data ?? null
-  const termCalendar = termCalendarQuery.data
-  const effective = useEffectiveSchedule(scheduleQuery.data, termCalendar, currentWeek, queriedTerm)
+  const snapshot = currentWeekQuery.data ?? null
+  const rawCalendar = termCalendarQuery.data
+  const semester = queriedTerm || snapshot?.semester
+  const termCalendar =
+    semester && rawCalendar?.semester && rawCalendar.semester !== semester ? undefined : rawCalendar
+  const weekAnchor =
+    queriedTerm && snapshot?.semester && snapshot.semester !== queriedTerm ? null : snapshot
+  const { currentWeek, weekday, nowMinutes } = useAcademicTime(snapshot, rawCalendar, queriedTerm)
+  const selectedWeek = weekOverride ?? currentWeek?.week ?? 1
+  const effective = useEffectiveSchedule(scheduleQuery.data, termCalendar, snapshot, queriedTerm)
   const canEdit = effective.ready && !!periodsQuery.data?.some(periodIsInUse)
   const editing =
     effective.ready && editScope !== null && editScope === effective.scope && !showOriginal
@@ -167,7 +170,7 @@ export default function SchedulePage() {
 
   function enterEditor() {
     if (!canEdit) return
-    setSelectedWeek((week) => Math.min(effective.totalWeeks, Math.max(1, week)))
+    setWeekOverride(Math.min(effective.totalWeeks, Math.max(1, selectedWeek)))
     setShowOriginal(false)
     setFilterDrawerOpen(false)
     setEditScope(effective.scope)
@@ -219,10 +222,6 @@ export default function SchedulePage() {
     }
   }
 
-  const widgetCurrentWeek = useMemo(
-    () => resolveWidgetCurrentWeek(currentWeek, termCalendar?.startDate),
-    [currentWeek, termCalendar?.startDate]
-  )
   const loading =
     scheduleQuery.isLoading ||
     scheduleQuery.isValidating ||
@@ -259,31 +258,14 @@ export default function SchedulePage() {
     return periodsQuery.data.filter(periodIsInUse).sort((a, b) => a.section - b.section)
   }, [periodsQuery.data])
 
-  const [nowMinutes, setNowMinutes] = useState(() => {
-    const now = new Date()
-    return now.getHours() * 60 + now.getMinutes()
-  })
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      const now = new Date()
-      setNowMinutes(now.getHours() * 60 + now.getMinutes())
-    }, 60_000)
-    return () => clearInterval(id)
-  }, [])
-
-  function shiftWeek(delta: number) {
-    setSelectedWeek((w) =>
-      Math.min(effective.totalWeeks || Infinity, Math.max(1, (w || 1) + delta))
-    )
+  function selectWeek(week: number) {
+    const nextWeek = Math.max(1, week)
+    setWeekOverride(!editing && nextWeek === currentWeek?.week ? null : nextWeek)
   }
 
-  useEffect(() => {
-    if (!currentWeek && !termCalendar?.startDate) return
-    setSelectedWeek((curr) =>
-      curr <= 0 ? resolveInitialScheduleWeek(currentWeek, termCalendar?.startDate) : curr
-    )
-  }, [currentWeek, termCalendar?.startDate])
+  function shiftWeek(delta: number) {
+    selectWeek(Math.min(effective.totalWeeks || Infinity, Math.max(1, selectedWeek + delta)))
+  }
 
   useEffect(() => {
     const errors = [
@@ -305,20 +287,23 @@ export default function SchedulePage() {
   ])
 
   useEffect(() => {
-    if (!isDefaultTerm || !effective.ready || !widgetCurrentWeek) return
+    if (!isDefaultTerm || (!effective.ready && currentWeek)) return
     syncScheduleToWidget(
       effective.courses,
-      widgetCurrentWeek,
+      currentWeek,
       periods,
       useSettingsStore.getState().widgetSyncReminderHours,
-      useSettingsStore.getState().widgetShowNextDaySchedule
+      useSettingsStore.getState().widgetShowNextDaySchedule,
+      termCalendar
     ).catch(() => {})
-  }, [isDefaultTerm, effective.ready, effective.courses, widgetCurrentWeek, periods])
+  }, [isDefaultTerm, effective.ready, effective.courses, currentWeek, periods, termCalendar])
 
   useEffect(() => {
-    if (!isDefaultTerm || !effective.ready) return
-    void syncClassAlarmsToNative(effective.courses, widgetCurrentWeek, periods).catch(() => {})
-  }, [isDefaultTerm, effective.ready, effective.courses, widgetCurrentWeek, periods])
+    if (!isDefaultTerm || (!effective.ready && currentWeek)) return
+    void syncClassAlarmsToNative(effective.courses, currentWeek, periods, termCalendar).catch(
+      () => {}
+    )
+  }, [isDefaultTerm, effective.ready, effective.courses, currentWeek, periods, termCalendar])
 
   useEffect(() => {
     if (!isDefaultTerm || !examsQuery.data) return
@@ -337,12 +322,12 @@ export default function SchedulePage() {
       ])
     } else {
       setQueriedTerm(nextTerm)
-      setSelectedWeek(0)
+      setWeekOverride(null)
     }
     setFilterDrawerOpen(false)
   }
 
-  const headerWeekday = currentWeek?.weekday ?? 0
+  const headerWeekday = weekday
   const currentSection = useMemo(() => {
     if (headerWeekday <= 0) return null
     for (const p of periods) {
@@ -466,14 +451,14 @@ export default function SchedulePage() {
       computeExamBlocks(
         examsQuery.data ?? [],
         periods,
-        currentWeek,
+        weekAnchor,
         selectedWeek,
         termCalendar?.startDate
       ),
-    [examsQuery.data, periods, currentWeek, selectedWeek, termCalendar?.startDate]
+    [examsQuery.data, periods, weekAnchor, selectedWeek, termCalendar?.startDate]
   )
 
-  const currentWeekday = currentWeek?.weekday ?? 0
+  const currentWeekday = weekday
 
   if (loading && courses.length === 0) {
     return (
@@ -512,7 +497,7 @@ export default function SchedulePage() {
               id={`${idPrefix}-week`}
               type="number"
               value={selectedWeek || ""}
-              onChange={(e) => setSelectedWeek(parseInt(e.target.value, 10) || 0)}
+              onChange={(e) => selectWeek(parseInt(e.target.value, 10) || 1)}
               placeholder={t("schedule.weeks")}
               className="w-20 text-center"
             />
@@ -665,6 +650,7 @@ export default function SchedulePage() {
               periods={periods}
               currentWeekday={currentWeekday}
               currentWeek={currentWeek}
+              weekAnchor={weekAnchor}
               selectedWeek={selectedWeek}
               termStartDate={termCalendar?.startDate}
               nowMinutes={nowMinutes}
@@ -684,6 +670,7 @@ export default function SchedulePage() {
                 periods={periods}
                 currentWeekday={currentWeekday}
                 currentWeek={currentWeek}
+                weekAnchor={weekAnchor}
                 selectedWeek={selectedWeek}
                 termStartDate={termCalendar?.startDate}
                 nowMinutes={nowMinutes}
@@ -718,7 +705,7 @@ export default function SchedulePage() {
           else requestUndo(id, false)
         }}
         onJump={(date) => {
-          setSelectedWeek(scheduleWeek(date, effective.termStartDate).week)
+          selectWeek(scheduleWeek(date, effective.termStartDate).week)
           setManager(null)
         }}
         onShowOriginal={() => {

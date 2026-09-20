@@ -48,6 +48,8 @@ interface Props {
   periods: ClassPeriod[]
   currentWeekday: number
   currentWeek: CurrentWeek | null
+  /** Cached dated anchor for browsing labels, never used for current-day highlights. */
+  weekAnchor: CurrentWeek | null
   selectedWeek: number
   termStartDate?: string
   nowMinutes: number
@@ -93,6 +95,7 @@ export function ScheduleMobile({
   periods,
   currentWeekday,
   currentWeek,
+  weekAnchor,
   selectedWeek,
   termStartDate,
   nowMinutes,
@@ -331,6 +334,7 @@ export function ScheduleMobile({
                 periods={periods}
                 currentWeekday={currentWeekday}
                 currentWeek={currentWeek}
+                weekAnchor={weekAnchor}
                 termStartDate={termStartDate}
                 nowMinutes={nowMinutes}
                 compact={compact}
@@ -454,6 +458,7 @@ interface WeekGridProps {
   periods: ClassPeriod[]
   currentWeekday: number
   currentWeek: CurrentWeek | null
+  weekAnchor: CurrentWeek | null
   termStartDate?: string
   nowMinutes: number
   compact: boolean
@@ -471,6 +476,7 @@ const WeekGrid = memo(function WeekGrid({
   periods,
   currentWeekday,
   currentWeek,
+  weekAnchor,
   termStartDate,
   nowMinutes,
   compact,
@@ -492,12 +498,12 @@ const WeekGrid = memo(function WeekGrid({
     [courses, week]
   )
   const examBlocks = useMemo(
-    () => computeExamBlocks(exams, periods, currentWeek, week, termStartDate),
-    [exams, periods, currentWeek, week, termStartDate]
+    () => computeExamBlocks(exams, periods, weekAnchor, week, termStartDate),
+    [exams, periods, weekAnchor, week, termStartDate]
   )
   const weekDates = useMemo(
-    () => computeWeekDateLabels(currentWeek, week, termStartDate),
-    [currentWeek, week, termStartDate]
+    () => computeWeekDateLabels(weekAnchor, week, termStartDate),
+    [weekAnchor, week, termStartDate]
   )
 
   const isCurrentWeek = currentWeek?.week === week

@@ -32,7 +32,8 @@ class ScheduleWidgetHelper(private val context: Context, private val showTomorro
         val weekday: Int,
         val term: String?,
         val date: String?,
-        val fullSchedule: Boolean = false
+        val fullSchedule: Boolean = false,
+        val totalWeeks: Int? = null
     )
 
     fun updateAllWidgets() {
@@ -59,25 +60,25 @@ class ScheduleWidgetHelper(private val context: Context, private val showTomorro
         // Old caches only contain this week's courses; never present them as a complete
         // next-week schedule. Opening the app migrates them through the existing bridge.
         val hasSynced = hasCachedSchedule && (!showTomorrow || cachedWeek?.fullSchedule == true) &&
-            (cachedWeek?.fullSchedule != true || cachedWeek.week > 0)
-        val today = Calendar.getInstance()
-        val todayCourses = coursesForDate(courses, today, cachedWeek, syncInfo.lastSyncTime)
+            cachedWeek != null
+        val today = schoolCalendar()
+        val todayCourses = coursesForDate(courses, today, cachedWeek)
         val hasCoursesToday = !showTomorrow && todayCourses.isNotEmpty()
         var targetDay: Calendar? = if (showTomorrow) {
             (today.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, 1) }
         } else null
         var remainingCourses = when {
             !hasSynced -> emptyList()
-            showTomorrow -> coursesForDate(courses, targetDay!!, cachedWeek, syncInfo.lastSyncTime)
+            showTomorrow -> coursesForDate(courses, targetDay!!, cachedWeek)
             else -> getRemainingCourses(todayCourses)
         }
         if (!showTomorrow && hasSynced && remainingCourses.isEmpty() && loadShowNextDaySchedule()) {
-            findNextDayWithCourses(courses, cachedWeek, syncInfo.lastSyncTime)?.let { (day, dayCourses) ->
+            findNextDayWithCourses(courses, cachedWeek)?.let { (day, dayCourses) ->
                 targetDay = day
                 remainingCourses = dayCourses
             }
         }
-        val displayWeek = weekForDate(cachedWeek, targetDay ?: today, syncInfo.lastSyncTime)
+        val displayWeek = weekForDate(cachedWeek, targetDay ?: today)
         val weekInfo = displayWeek?.let { cachedWeek?.copy(week = it) }
 
         val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
@@ -121,7 +122,7 @@ class ScheduleWidgetHelper(private val context: Context, private val showTomorro
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.schedule_widget_small)
 
-        val displayCalendar = targetDay ?: Calendar.getInstance()
+        val displayCalendar = targetDay ?: schoolCalendar()
         val weekdayName = getWeekdayName(displayCalendar.get(Calendar.DAY_OF_WEEK))
         views.setTextViewText(
             R.id.widget_weekday,
@@ -232,7 +233,7 @@ class ScheduleWidgetHelper(private val context: Context, private val showTomorro
         syncInfo: SyncInfo,
         targetDay: Calendar? = null
     ) {
-        val calendar = targetDay ?: Calendar.getInstance()
+        val calendar = targetDay ?: schoolCalendar()
         val month = calendar.get(Calendar.MONTH) + 1
         val day = calendar.get(Calendar.DAY_OF_MONTH)
         val weekdayName = getWeekdayName(calendar.get(Calendar.DAY_OF_WEEK))
@@ -353,13 +354,12 @@ class ScheduleWidgetHelper(private val context: Context, private val showTomorro
      */
     private fun findNextDayWithCourses(
         courses: List<WidgetCourse>,
-        weekInfo: WidgetWeekInfo?,
-        lastSyncTime: Long
+        weekInfo: WidgetWeekInfo?
     ): Pair<Calendar, List<WidgetCourse>>? {
-        val target = Calendar.getInstance()
+        val target = schoolCalendar()
         repeat(7) {
             target.add(Calendar.DAY_OF_MONTH, 1)
-            val dayCourses = coursesForDate(courses, target, weekInfo, lastSyncTime)
+            val dayCourses = coursesForDate(courses, target, weekInfo)
             if (dayCourses.isNotEmpty()) return target to dayCourses
         }
         return null
@@ -406,7 +406,8 @@ class ScheduleWidgetHelper(private val context: Context, private val showTomorro
                 weekday = obj.optInt("weekday", 0),
                 term = obj.optString("term").takeIf { it.isNotEmpty() },
                 date = obj.optString("date").takeIf { it.isNotEmpty() },
-                fullSchedule = obj.optBoolean("full_schedule", false)
+                fullSchedule = obj.optBoolean("full_schedule", false),
+                totalWeeks = if (obj.has("total_weeks")) obj.optInt("total_weeks") else null
             )
         } catch (_: Exception) {
             null
@@ -414,63 +415,63 @@ class ScheduleWidgetHelper(private val context: Context, private val showTomorro
     }
 
     companion object {
+        private val schoolTimeZone = TimeZone.getTimeZone("Asia/Shanghai")
+        private val datePattern = Regex("\\d{4}-\\d{2}-\\d{2}")
+
+        internal fun schoolCalendar(timeInMillis: Long = System.currentTimeMillis()): Calendar =
+            Calendar.getInstance(schoolTimeZone).apply { this.timeInMillis = timeInMillis }
+
         internal fun coursesForDate(
             courses: List<WidgetCourse>,
             target: Calendar,
-            weekInfo: WidgetWeekInfo?,
-            lastSyncTime: Long
+            weekInfo: WidgetWeekInfo?
         ): List<WidgetCourse> {
-            val weekday = mapAndroidWeekday(target.get(Calendar.DAY_OF_WEEK))
-            val week = weekForDate(weekInfo, target, lastSyncTime)
+            val day = schoolCalendar(target.timeInMillis)
+            val weekday = mapAndroidWeekday(day.get(Calendar.DAY_OF_WEEK))
+            val week = weekForDate(weekInfo, day) ?: return emptyList()
+            // Legacy caches contain only the anchor week's courses.
+            if (weekInfo?.fullSchedule != true && week != weekInfo?.week) return emptyList()
             return courses.filter { course ->
-                course.weekDay == weekday && (
-                    weekInfo?.fullSchedule != true || course.weeks.isEmpty() ||
-                        (week != null && week in course.weeks)
-                    )
+                course.weekDay == weekday && (course.weeks.isEmpty() || week in course.weeks)
             }.sortedBy { it.startSection }
         }
 
         internal fun weekForDate(
             weekInfo: WidgetWeekInfo?,
-            target: Calendar,
-            lastSyncTime: Long
+            target: Calendar
         ): Int? {
-            if (weekInfo == null || weekInfo.week <= 0) return null
-            val anchor = Calendar.getInstance(target.timeZone)
-            val anchorDate = weekInfo.date?.let { value ->
-                try {
-                    SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply {
-                        isLenient = false
-                        timeZone = target.timeZone
-                    }.parse(value.take(10))
-                } catch (_: Exception) {
-                    null
-                }
-            }
-            if (anchorDate != null) {
-                anchor.time = anchorDate
-            } else if (lastSyncTime > 0) {
-                anchor.timeInMillis = lastSyncTime
-            } else {
-                return null
-            }
-            val elapsedWeeks = (mondayMillis(target) - mondayMillis(anchor)) / (7 * 86_400_000L)
-            return weekInfo.week + elapsedWeeks.toInt()
+            if (weekInfo == null || weekInfo.week <= 0 || weekInfo.weekday !in 1..7) return null
+            val value = weekInfo.date ?: return null
+            if (!datePattern.matches(value)) return null
+            val anchorDate = try {
+                SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply {
+                    isLenient = false
+                    timeZone = schoolTimeZone
+                }.parse(value)
+            } catch (_: Exception) {
+                null
+            } ?: return null
+            val anchor = schoolCalendar(anchorDate.time)
+            if (mapAndroidWeekday(anchor.get(Calendar.DAY_OF_WEEK)) != weekInfo.weekday) return null
+            val day = schoolCalendar(target.timeInMillis)
+            val elapsedDays = (dateMillis(day) - dateMillis(anchor)) / 86_400_000L
+            val elapsedWeeks = Math.floorDiv(elapsedDays + weekInfo.weekday - 1, 7L)
+            val week = weekInfo.week + elapsedWeeks.toInt()
+            return week.takeIf { it >= 1 && (weekInfo.totalWeeks == null || it <= weekInfo.totalWeeks) }
         }
 
         // Compare calendar dates in UTC so a DST transition cannot turn seven days into six.
-        private fun mondayMillis(day: Calendar): Long =
+        private fun dateMillis(day: Calendar): Long =
             Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
                 clear()
                 set(day.get(Calendar.YEAR), day.get(Calendar.MONTH), day.get(Calendar.DAY_OF_MONTH))
-                add(Calendar.DAY_OF_MONTH, 1 - mapAndroidWeekday(day.get(Calendar.DAY_OF_WEEK)))
             }.timeInMillis
 
         private fun mapAndroidWeekday(day: Int): Int = (day + 5) % 7 + 1
     }
 
     private fun getRemainingCourses(courses: List<WidgetCourse>): List<WidgetCourse> {
-        val calendar = Calendar.getInstance()
+        val calendar = schoolCalendar()
         val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
         val currentMinute = calendar.get(Calendar.MINUTE)
         val currentTimeMinutes = currentHour * 60 + currentMinute

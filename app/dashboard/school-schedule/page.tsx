@@ -48,32 +48,14 @@ import {
 import type { Course, SchoolClassInfo, ClassroomInfo } from "@/providers/types"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useBackHandler } from "@/hooks/use-back-handler"
+import { useAcademicTime } from "@/hooks/use-academic-time"
 import { buildCourseColorMap } from "../schedule/course-color"
 import { ScheduleMobile } from "../schedule/schedule-mobile"
 import { ScheduleTablet } from "../schedule/schedule-tablet"
-import {
-  isCourseActiveInWeek,
-  periodIsInUse,
-  resolveInitialScheduleWeek,
-} from "../schedule/schedule-utils"
+import { isCourseActiveInWeek, periodIsInUse } from "../schedule/schedule-utils"
 import { ArrowLeft, CalendarSearch, ChevronLeft, ChevronRight, Search } from "lucide-react"
 
 const ALL = "__all__"
-
-function useNowMinutes(): number {
-  const [nowMinutes, setNowMinutes] = useState(() => {
-    const now = new Date()
-    return now.getHours() * 60 + now.getMinutes()
-  })
-  useEffect(() => {
-    const id = setInterval(() => {
-      const now = new Date()
-      setNowMinutes(now.getHours() * 60 + now.getMinutes())
-    }, 60_000)
-    return () => clearInterval(id)
-  }, [])
-  return nowMinutes
-}
 
 /** 全校课表详情：复用个人课表的网格展示模板，按周过滤渲染。 */
 function CourseScheduleView({
@@ -96,18 +78,21 @@ function CourseScheduleView({
   const periodsQuery = useClassPeriods()
   useErrorToast(currentWeekQuery.error ?? termCalendarQuery.error ?? periodsQuery.error)
 
-  const currentWeek = currentWeekQuery.data ?? null
-  const termStartDate = termCalendarQuery.data?.startDate
+  const snapshot = currentWeekQuery.data ?? null
+  const calendar = termCalendarQuery.data
+  const { currentWeek, weekday, nowMinutes } = useAcademicTime(snapshot, calendar)
+  const termStartDate =
+    snapshot?.semester && calendar?.semester && snapshot.semester !== calendar.semester
+      ? undefined
+      : calendar?.startDate
   const periods = useMemo(() => {
     if (!periodsQuery.data) return []
     return periodsQuery.data.filter(periodIsInUse).sort((a, b) => a.section - b.section)
   }, [periodsQuery.data])
 
-  const [weekOverride, setWeekOverride] = useState(0)
-  const selectedWeek =
-    weekOverride > 0 ? weekOverride : resolveInitialScheduleWeek(currentWeek, termStartDate)
+  const [weekOverride, setWeekOverride] = useState<number | null>(null)
+  const selectedWeek = weekOverride ?? currentWeek?.week ?? 1
 
-  const nowMinutes = useNowMinutes()
   const colorMap = useMemo(() => buildCourseColorMap(courses), [courses])
   const weekCourses = useMemo(
     () => courses.filter((c) => isCourseActiveInWeek(c, selectedWeek)),
@@ -117,7 +102,8 @@ function CourseScheduleView({
   const isCurrentWeek = currentWeek?.week === selectedWeek
 
   function shiftWeek(delta: number) {
-    setWeekOverride(Math.max(1, selectedWeek + delta))
+    const nextWeek = Math.max(1, selectedWeek + delta)
+    setWeekOverride(nextWeek === currentWeek?.week ? null : nextWeek)
   }
 
   const detailRows = useMemo(() => {
@@ -189,8 +175,9 @@ function CourseScheduleView({
               courses={courses}
               colorMap={colorMap}
               periods={periods}
-              currentWeekday={currentWeek?.weekday ?? 0}
+              currentWeekday={weekday}
               currentWeek={currentWeek}
+              weekAnchor={snapshot}
               selectedWeek={selectedWeek}
               termStartDate={termStartDate}
               nowMinutes={nowMinutes}
@@ -203,8 +190,9 @@ function CourseScheduleView({
               courses={weekCourses}
               colorMap={colorMap}
               periods={periods}
-              currentWeekday={currentWeek?.weekday ?? 0}
+              currentWeekday={weekday}
               currentWeek={currentWeek}
+              weekAnchor={snapshot}
               selectedWeek={selectedWeek}
               termStartDate={termStartDate}
               nowMinutes={nowMinutes}

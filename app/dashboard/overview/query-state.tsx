@@ -27,7 +27,7 @@ export function QueryState({
   compact?: boolean
 }) {
   const { t } = useTranslation()
-  const missing = queries.filter((query) => query.data == null)
+  const missing = queries.filter((query) => query.data === undefined)
   const errors = queries.filter((query) => query.error)
   const refreshing = queries.some((query) => query.isValidating)
   const stale = queries.some((query) => query.isStale)

@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { cn } from "@/lib/utils"
 import { formatExamTime, getExamStartTime } from "@/lib/academic/exam-utils"
+import { getAcademicClock } from "@/lib/academic/academic-time"
 import {
   courseEndSection,
   courseStartSection,
@@ -52,6 +53,9 @@ export function CourseProgressWidget({ data }: { data: OverviewSchedule }) {
       </CardHeader>
       <CardContent>
         <QueryState queries={[data.schedule, data.currentWeek, data.periodsRaw]}>
+          {data.currentWeek.data === null && (
+            <p className="text-sm text-muted-foreground">{t("overviewData.unavailableShort")}</p>
+          )}
           {course && range && (
             <div className="flex flex-col gap-2">
               <Link
@@ -103,7 +107,9 @@ export function TodayCoursesWidget({ data }: { data: OverviewSchedule }) {
       </CardHeader>
       <CardContent>
         <QueryState queries={[data.schedule, data.currentWeek]}>
-          {data.todayCourses.length === 0 ? (
+          {data.currentWeek.data === null ? (
+            <p className="text-sm text-muted-foreground">{t("overviewData.unavailableShort")}</p>
+          ) : data.todayCourses.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("dashboard.noCoursesToday")}</p>
           ) : (
             <div className="flex flex-col gap-3">
@@ -153,7 +159,7 @@ export function TodayCoursesWidget({ data }: { data: OverviewSchedule }) {
 
 export function UpcomingExamsWidget({ data }: { data: OverviewSchedule }) {
   const { t } = useTranslation()
-  const today = new Date(data.now.getFullYear(), data.now.getMonth(), data.now.getDate()).getTime()
+  const today = Date.parse(data.date)
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
@@ -179,11 +185,7 @@ export function UpcomingExamsWidget({ data }: { data: OverviewSchedule }) {
               {data.upcomingExams.map((exam, index) => {
                 const date = getExamStartTime(exam)
                 const dayDiff = date
-                  ? Math.round(
-                      (new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() -
-                        today) /
-                        86_400_000
-                    )
+                  ? Math.round((Date.parse(getAcademicClock(date).date) - today) / 86_400_000)
                   : null
                 return (
                   <div

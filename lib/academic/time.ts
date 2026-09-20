@@ -14,3 +14,16 @@ export function formatTimeRange(start?: string, end?: string): string {
   if (s && e) return `${s} ~ ${e}`
   return s || e
 }
+
+/** Offset-less university timestamps are Shanghai wall time, not device-local time. */
+export function parseAcademicDateTime(value?: string): Date | null {
+  if (!value) return null
+  const normalized = value.trim().replace(" ", "T")
+  const explicitZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized)
+  const date = new Date(
+    explicitZone
+      ? normalized
+      : `${normalized.length === 10 ? `${normalized}T00:00:00` : normalized}+08:00`
+  )
+  return Number.isNaN(date.getTime()) ? null : date
+}

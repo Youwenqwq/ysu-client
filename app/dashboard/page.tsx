@@ -28,7 +28,7 @@ export default function DashboardPage() {
   const renderSummary = (id: SummaryWidgetId, compact: boolean) => {
     switch (id) {
       case "week":
-        return <WeekSummary query={schedule.currentWeek} compact={compact} />
+        return <WeekSummary data={schedule} compact={compact} />
       case "ecard":
         return <EcardSummary compact={compact} />
       case "gpa":

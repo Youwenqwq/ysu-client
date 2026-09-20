@@ -11,8 +11,9 @@ import { useStoredMediaUrl } from "@/lib/storage/media"
 import { loadAvatarImage } from "@/lib/storage/avatar"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { useGPAStats, useStudentInfo, type ProviderQueryResult } from "@/providers/hooks"
-import type { CurrentWeek, EvaluationTask } from "@/providers/types"
+import type { EvaluationTask } from "@/providers/types"
 import { QueryState } from "./query-state"
+import type { OverviewSchedule } from "./use-overview-schedule"
 
 export function ProfileWidget({ compact, children }: { compact: boolean; children?: ReactNode }) {
   const { t } = useTranslation()
@@ -47,14 +48,9 @@ export function ProfileWidget({ compact, children }: { compact: boolean; childre
   )
 }
 
-export function WeekSummary({
-  query,
-  compact,
-}: {
-  query: ProviderQueryResult<CurrentWeek>
-  compact: boolean
-}) {
+export function WeekSummary({ data, compact }: { data: OverviewSchedule; compact: boolean }) {
   const { t } = useTranslation()
+  const query = data.currentWeek
   if (compact)
     return (
       <div className="flex min-w-0 flex-col gap-1">
@@ -64,7 +60,9 @@ export function WeekSummary({
         </span>
         <QueryState queries={[query]} compact>
           <span className="text-base font-semibold tabular-nums">
-            {t("dashboard.currentWeek", { week: query.data?.week ?? "-" })}
+            {query.data
+              ? t("dashboard.currentWeek", { week: query.data.week })
+              : t("overviewData.unavailableShort")}
           </span>
         </QueryState>
       </div>
@@ -80,13 +78,15 @@ export function WeekSummary({
       <CardContent>
         <QueryState queries={[query]}>
           <p className="text-lg font-semibold tabular-nums">
-            {t("dashboard.currentWeek", { week: query.data?.week ?? "-" })}
+            {query.data
+              ? t("dashboard.currentWeek", { week: query.data.week })
+              : t("overviewData.unavailableShort")}
           </p>
-          <p className="text-xs text-muted-foreground">
-            {query.data?.weekday ? t(`dashboard.weekdayNames.${query.data.weekday}`) : "-"}
-          </p>
-          <p className="text-xs text-muted-foreground">{query.data?.semester}</p>
         </QueryState>
+        <p className="text-xs text-muted-foreground">
+          {data.date} · {t(`dashboard.weekdayNames.${data.weekday}`)}
+        </p>
+        <p className="text-xs text-muted-foreground">{data.semester}</p>
       </CardContent>
     </>
   )
