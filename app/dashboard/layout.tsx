@@ -442,7 +442,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           "flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] md:overflow-auto md:pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] md:pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom))]",
           mobileFullscreen
             ? "h-dvh min-h-0 overflow-hidden pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))] md:h-auto"
-            : "pb-[calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))]"
+            : "pb-[var(--mobile-bottom-nav-height,calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))))]"
         )}
       >
         <MobileTopBar title={pageTitle} showBack={showBack} />

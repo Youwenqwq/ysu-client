@@ -1,5 +1,6 @@
 "use client"
 
+import { useLayoutEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Calendar, GraduationCap, LayoutDashboard, User } from "lucide-react"
@@ -12,6 +13,25 @@ export function MobileBottomNav() {
   const pathname = rawPathname.replace(/\/$/, "")
   const { t } = useTranslation()
   const hasBackground = useSettingsStore((s) => !!s.backgroundImage)
+  const navRef = useRef<HTMLElement>(null)
+
+  useLayoutEffect(() => {
+    const nav = navRef.current
+    if (!nav) return
+    const root = document.documentElement
+    // Share the actual border-box height, including labels and the native safe area.
+    const updateHeight = () => {
+      const height = nav.getBoundingClientRect().height
+      if (height > 0) root.style.setProperty("--mobile-bottom-nav-height", `${height}px`)
+    }
+    updateHeight()
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(nav, { box: "border-box" })
+    return () => {
+      observer.disconnect()
+      root.style.removeProperty("--mobile-bottom-nav-height")
+    }
+  }, [])
 
   const tabs = [
     { href: "/dashboard", label: t("app.overview"), icon: LayoutDashboard },
@@ -22,6 +42,7 @@ export function MobileBottomNav() {
 
   return (
     <nav
+      ref={navRef}
       className={cn(
         "fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))] backdrop-blur md:hidden",
         hasBackground

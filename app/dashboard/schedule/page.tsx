@@ -651,7 +651,12 @@ export default function SchedulePage() {
               compactMode && "min-h-0 flex-1 overflow-hidden"
             )}
             style={
-              compactMode || mobileFullscreen ? undefined : { minHeight: "calc(100dvh - 102px)" }
+              compactMode || mobileFullscreen
+                ? undefined
+                : {
+                    minHeight:
+                      "calc(100dvh - 3rem - var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) - var(--mobile-bottom-nav-height, calc(4rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))))",
+                  }
             }
           >
             <ScheduleMobile
