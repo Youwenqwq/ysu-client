@@ -30,6 +30,16 @@ import {
 import { courseBgClass, type CourseColorMap } from "./course-color"
 import { ActivityModal } from "./activity-modal"
 import { SigninModal } from "./signin-modal"
+import { scheduleDate } from "@/lib/academic/schedule-patches"
+import {
+  ScheduleDayHandle,
+  ScheduleDayLabel,
+  ScheduleGridTraces,
+  SchedulePatchedLabel,
+  courseHasScheduleTrace,
+  scheduleOccurrence,
+  useScheduleEditor,
+} from "./schedule-drag"
 
 interface Props {
   courses: Course[]
@@ -62,6 +72,12 @@ export function ScheduleTablet({
   onCourseTap,
 }: Props) {
   const { t } = useTranslation()
+  const editor = useScheduleEditor()
+  const dateForDay = (day: number) =>
+    editor.termStartDate ? scheduleDate(editor.termStartDate, selectedWeek, day) : undefined
+  const hasTraces = editor.traces.some((trace) =>
+    DAYS.some((day) => dateForDay(day) === trace.date)
+  )
   const [overlapDialog, setOverlapDialog] = useState<{
     day: number
     section: number
@@ -69,6 +85,7 @@ export function ScheduleTablet({
   } | null>(null)
   const [examDialog, setExamDialog] = useState<ExamBlock | null>(null)
   const [activityCourse, setActivityCourse] = useState<Course | null>(null)
+  const [activityWeek, setActivityWeek] = useState(selectedWeek)
   const [activityOpen, setActivityOpen] = useState(false)
   const [signinActivityId, setSigninActivityId] = useState<string | null>(null)
   const [signinType, setSigninType] = useState(1)
@@ -127,6 +144,19 @@ export function ScheduleTablet({
 
   const mergedBlocks = useMemo(() => computeMergedBlocks(courses, periods), [courses, periods])
 
+  function openCourse(course: Course) {
+    if (editor.editing && !editor.enabled) return
+    if (editor.selectCourse(course)) return
+    const occurrence = scheduleOccurrence(course)
+    const sourceCourse = occurrence?.source.course ?? course
+    if (onCourseTap) onCourseTap(sourceCourse)
+    else {
+      setActivityCourse(sourceCourse)
+      setActivityWeek(occurrence?.source.week ?? selectedWeek)
+      setActivityOpen(true)
+    }
+  }
+
   function blockStyle(block: { day: number; start: number; end: number }) {
     const startRow = sectionToRow.get(block.start)
     const endRow = sectionToRow.get(block.end)
@@ -137,7 +167,7 @@ export function ScheduleTablet({
     }
   }
 
-  if (courses.length === 0 && examBlocks.length === 0) {
+  if (courses.length === 0 && examBlocks.length === 0 && !editor.editing && !hasTraces) {
     return (
       <Empty>
         <EmptyHeader>
@@ -154,6 +184,7 @@ export function ScheduleTablet({
       <div className="overflow-auto">
         <div
           className="grid w-full"
+          data-schedule-grid={selectedWeek}
           style={{
             gridTemplateColumns: `minmax(48px, 0.4fr) repeat(7, minmax(0, 1fr))`,
             gridTemplateRows,
@@ -172,10 +203,11 @@ export function ScheduleTablet({
                   : "text-muted-foreground"
               )}
             >
-              <span className="text-[11px]">{t(`dashboard.weekdayShort.${d}`)}</span>
+              <ScheduleDayLabel week={selectedWeek} day={d} />
               {weekDates[d - 1] && (
                 <span className="text-[9px] opacity-70">{weekDates[d - 1]}</span>
               )}
+              <ScheduleDayHandle week={selectedWeek} day={d} />
             </div>
           ))}
 
@@ -220,6 +252,8 @@ export function ScheduleTablet({
               return (
                 <div
                   key={`cell-${d}-${p.section}`}
+                  data-schedule-date={dateForDay(d)}
+                  data-schedule-section={p.section}
                   className={cn(
                     "border-b border-border",
                     d < 7 && "border-r",
@@ -237,22 +271,21 @@ export function ScheduleTablet({
               return (
                 <button
                   key={`block-${idx}`}
+                  type="button"
+                  data-schedule-course={
+                    editor.enabled ? scheduleOccurrence(c)?.occurrenceId : undefined
+                  }
                   className={cn(
                     "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1.5 text-left transition-opacity active:opacity-60",
                     courseBgClass(colorMap, c),
+                    courseHasScheduleTrace(c, editor.traces) && "pb-7",
                     isBlockCurrent(block) && "ring-1 ring-primary"
                   )}
                   style={blockStyle(block)}
-                  onClick={() => {
-                    if (onCourseTap) {
-                      onCourseTap(c)
-                    } else {
-                      setActivityCourse(c)
-                      setActivityOpen(true)
-                    }
-                  }}
+                  onClick={() => openCourse(c)}
                 >
                   <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">
+                    <SchedulePatchedLabel course={c} />
                     {c.name}
                   </span>
                   {c.classroom && (
@@ -271,7 +304,11 @@ export function ScheduleTablet({
             return (
               <button
                 key={`block-${idx}`}
-                className="relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60"
+                className={cn(
+                  "relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60",
+                  block.courses.some((course) => courseHasScheduleTrace(course, editor.traces)) &&
+                    "pb-7"
+                )}
                 style={blockStyle(block)}
                 onClick={() =>
                   setOverlapDialog({
@@ -289,6 +326,7 @@ export function ScheduleTablet({
               </button>
             )
           })}
+          <ScheduleGridTraces week={selectedWeek} sectionToRow={sectionToRow} />
           {examBlocks.map((block, idx) => (
             <button
               key={`exam-${idx}`}
@@ -370,19 +408,26 @@ export function ScheduleTablet({
               return (
                 <Card
                   key={i}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      setOverlapDialog(null)
+                      openCourse(c)
+                    }
+                  }}
                   className="cursor-pointer transition-colors hover:bg-accent/50"
                   onClick={() => {
                     setOverlapDialog(null)
-                    if (onCourseTap) {
-                      onCourseTap(c)
-                    } else {
-                      setActivityCourse(c)
-                      setActivityOpen(true)
-                    }
+                    openCourse(c)
                   }}
                 >
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">{c.name}</CardTitle>
+                    <CardTitle className="text-base">
+                      <SchedulePatchedLabel course={c} />
+                      {c.name}
+                    </CardTitle>
                     <CardDescription>
                       {c.teacher} · {c.classroom}
                     </CardDescription>
@@ -400,7 +445,7 @@ export function ScheduleTablet({
 
       <ActivityModal
         course={activityCourse}
-        week={selectedWeek}
+        week={activityWeek}
         open={activityOpen}
         onOpenChange={setActivityOpen}
         onSigninActivity={(id, type) => {

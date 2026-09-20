@@ -14,6 +14,7 @@ import { syncClassAlarmsToNative } from "@/lib/native/notify"
 import { compareExamStartTime, isExamCompleted } from "@/lib/academic/exam-utils"
 import type { ClassPeriod, Course, CurrentWeek, Exam } from "@/providers/types"
 import type { ProviderQueryResult } from "@/providers/hooks"
+import { useEffectiveSchedule } from "@/providers/hooks/use-effective-schedule"
 import {
   buildSectionTimeMap,
   courseEndSection,
@@ -45,6 +46,7 @@ export function useOverviewSchedule(): OverviewSchedule {
   const currentWeek = useCurrentWeek()
   const termCalendar = useTermCalendar()
   const schedule = useSchedule({ courseCategory: "all", includeLabSchedule: true })
+  const effective = useEffectiveSchedule(schedule.data, termCalendar.data, currentWeek.data ?? null)
   const exams = useExams()
   const periodsRaw = useClassPeriods()
   const reminderHours = useSettingsStore((s) => s.widgetSyncReminderHours)
@@ -67,20 +69,20 @@ export function useOverviewSchedule(): OverviewSchedule {
   )
 
   useEffect(() => {
-    if (!schedule.data || !widgetCurrentWeek) return
+    if (!effective.ready || !widgetCurrentWeek) return
     void syncScheduleToWidget(
-      schedule.data,
+      effective.courses,
       widgetCurrentWeek,
       periods,
       reminderHours,
       showNextDay
     ).catch(() => {})
-  }, [schedule.data, widgetCurrentWeek, periods, reminderHours, showNextDay])
+  }, [effective.ready, effective.courses, widgetCurrentWeek, periods, reminderHours, showNextDay])
 
   useEffect(() => {
-    if (!schedule.data) return
-    void syncClassAlarmsToNative(schedule.data, widgetCurrentWeek, periods).catch(() => {})
-  }, [schedule.data, widgetCurrentWeek, periods])
+    if (!effective.ready) return
+    void syncClassAlarmsToNative(effective.courses, widgetCurrentWeek, periods).catch(() => {})
+  }, [effective.ready, effective.courses, widgetCurrentWeek, periods])
 
   useEffect(() => {
     // Empty results must also clear stale exams from the native widget.
@@ -88,12 +90,12 @@ export function useOverviewSchedule(): OverviewSchedule {
   }, [exams.data, reminderHours])
 
   const todayCourses = useMemo(() => {
-    if (!currentWeek.data) return []
+    if (!effective.ready || !currentWeek.data) return []
     const { week, weekday } = currentWeek.data
-    return (schedule.data ?? [])
+    return effective.courses
       .filter((course) => courseWeekDay(course) === weekday && isCourseActiveInWeek(course, week))
       .sort((a, b) => courseStartSection(a) - courseStartSection(b))
-  }, [schedule.data, currentWeek.data])
+  }, [effective.ready, effective.courses, currentWeek.data])
   const upcomingExams = useMemo(
     () =>
       (exams.data ?? []).filter((exam) => !isExamCompleted(exam, now)).sort(compareExamStartTime),

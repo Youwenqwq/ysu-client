@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { useAuthStore } from "@/lib/stores/auth"
+import { useMobileHeaderStore } from "@/lib/stores/mobile-header"
+import { cn } from "@/lib/utils"
 import { useSettingsStore } from "@/lib/stores/settings"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import {
@@ -146,6 +148,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = rawPathname.replace(/\/$/, "")
   const { isAuthenticated, hasHydrated, username, sessionExpired } = useAuthStore()
   const { t } = useTranslation()
+  const fullscreenRequested = useMobileHeaderStore((s) => s.fullscreen)
+  const mobileFullscreen = pathname === "/dashboard/schedule" && fullscreenRequested
 
   const backgroundImage = useSettingsStore((s) => s.backgroundImage)
   const avatarImage = useSettingsStore((s) => s.avatarImage)
@@ -433,7 +437,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
         </SidebarFooter>
       </Sidebar>
-      <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] pb-[calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))] md:overflow-auto md:pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] md:pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom))]">
+      <main
+        className={cn(
+          "flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] md:overflow-auto md:pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] md:pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom))]",
+          mobileFullscreen
+            ? "h-dvh min-h-0 overflow-hidden pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))] md:h-auto"
+            : "pb-[calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))]"
+        )}
+      >
         <MobileTopBar title={pageTitle} showBack={showBack} />
         {sessionExpired && (
           <Alert variant="destructive" className="mx-4 mt-4 w-auto md:mx-6 md:mt-6">
@@ -499,12 +510,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
         <div
           key={pathname}
-          className="flex flex-1 animate-in flex-col p-4 duration-500 fade-in slide-in-from-bottom-2 md:p-8"
+          className={cn(
+            "flex flex-1 flex-col md:p-8",
+            mobileFullscreen
+              ? "min-h-0 overflow-hidden"
+              : "animate-in p-4 duration-500 fade-in slide-in-from-bottom-2"
+          )}
         >
           {children}
         </div>
       </main>
-      <MobileBottomNav />
+      {!mobileFullscreen && <MobileBottomNav />}
     </SidebarProvider>
   )
 }

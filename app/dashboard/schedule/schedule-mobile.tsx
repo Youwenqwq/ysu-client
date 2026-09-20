@@ -28,6 +28,16 @@ import {
 import { courseBgClass, type CourseColorMap } from "./course-color"
 import { ActivityModal } from "./activity-modal"
 import { SigninModal } from "./signin-modal"
+import { scheduleDate } from "@/lib/academic/schedule-patches"
+import {
+  ScheduleDayHandle,
+  ScheduleDayLabel,
+  ScheduleGridTraces,
+  SchedulePatchedLabel,
+  courseHasScheduleTrace,
+  scheduleOccurrence,
+  useScheduleEditor,
+} from "./schedule-drag"
 
 interface Props {
   /** 全学期课程（组件内按面板周过滤，用于跟手滑动时预渲染相邻周） */
@@ -42,6 +52,8 @@ interface Props {
   termStartDate?: string
   nowMinutes: number
   compact?: boolean
+  /** Constrain the schedule to the mobile shell and scroll rows within it. */
+  fullscreen?: boolean
   onPrevWeek?: () => void
   onNextWeek?: () => void
   /** 提供时替代默认的活动弹窗，用于只读课表（如全校课表） */
@@ -85,11 +97,13 @@ export function ScheduleMobile({
   termStartDate,
   nowMinutes,
   compact = false,
+  fullscreen = false,
   onPrevWeek,
   onNextWeek,
   onCourseTap,
 }: Props) {
   const { t } = useTranslation()
+  const editor = useScheduleEditor()
   const [overlapDrawer, setOverlapDrawer] = useState<OverlapState>(null)
   const [examDrawer, setExamDrawer] = useState<ExamBlock | null>(null)
   const [activityCourse, setActivityCourse] = useState<Course | null>(null)
@@ -190,6 +204,7 @@ export function ScheduleMobile({
   )
 
   function handleTouchStart(e: React.TouchEvent) {
+    if (editor.isDragging() || (editor.editing && !editor.enabled)) return
     // 打断进行中的归位动画：立即结算（提交或回弹），新手势从稳定状态开始
     if (animatingRef.current) finishSettle()
     const t = e.touches[0]
@@ -198,6 +213,10 @@ export function ScheduleMobile({
   }
 
   function handleTouchMove(e: React.TouchEvent) {
+    if (editor.isDragging() || (editor.editing && !editor.enabled)) {
+      gestureRef.current = null
+      return
+    }
     const g = gestureRef.current
     const track = trackRef.current
     if (!g || !track) return
@@ -222,6 +241,10 @@ export function ScheduleMobile({
   }
 
   function handleTouchEnd() {
+    if (editor.isDragging() || (editor.editing && !editor.enabled)) {
+      gestureRef.current = null
+      return
+    }
     const g = gestureRef.current
     gestureRef.current = null
     if (!g || !g.dragging) return
@@ -250,15 +273,19 @@ export function ScheduleMobile({
 
   const handleCoursePress = useCallback(
     (course: Course, week: number) => {
+      if (editor.editing && !editor.enabled) return
+      if (editor.selectCourse(course)) return
+      const occurrence = scheduleOccurrence(course)
+      const sourceCourse = occurrence?.source.course ?? course
       if (onCourseTap) {
-        onCourseTap(course)
+        onCourseTap(sourceCourse)
         return
       }
-      setActivityCourse(course)
-      setActivityWeek(week)
+      setActivityCourse(sourceCourse)
+      setActivityWeek(occurrence?.source.week ?? week)
       setActivityOpen(true)
     },
-    [onCourseTap]
+    [onCourseTap, editor]
   )
   const handleOverlapPress = useCallback((day: number, section: number, list: Course[]) => {
     setOverlapDrawer({ day, section, courses: list })
@@ -271,16 +298,25 @@ export function ScheduleMobile({
     <>
       <div
         ref={viewportRef}
-        className="flex min-h-0 flex-1 touch-pan-y flex-col overflow-hidden select-none"
+        className={cn(
+          "flex min-h-0 flex-1 touch-pan-y flex-col select-none",
+          editor.editing || fullscreen ? "overflow-x-hidden overflow-y-auto" : "overflow-hidden"
+        )}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
+        onTouchCancel={() => {
+          gestureRef.current = null
+          startSettle(0)
+        }}
         onClickCapture={handleClickCapture}
       >
         <div
           ref={trackRef}
-          className="flex min-h-0 flex-1 will-change-transform"
+          className={cn(
+            "flex flex-1 will-change-transform",
+            editor.editing || fullscreen ? "min-h-min" : "min-h-0"
+          )}
           style={{ transform: "translateX(-100%)" }}
           onTransitionEnd={(e) => {
             if (e.target === trackRef.current) finishSettle()
@@ -373,7 +409,10 @@ export function ScheduleMobile({
                     courseBgClass(colorMap, c)
                   )}
                 >
-                  <span className="text-sm font-medium text-foreground">{c.name}</span>
+                  <span className="text-sm font-medium text-foreground">
+                    <SchedulePatchedLabel course={c} />
+                    {c.name}
+                  </span>
                   {(c.teacher || c.classroom) && (
                     <span className="text-xs text-foreground/70">
                       {[c.teacher, c.classroom].filter(Boolean).join(" · ")}
@@ -441,6 +480,12 @@ const WeekGrid = memo(function WeekGrid({
   onExamPress,
 }: WeekGridProps) {
   const { t } = useTranslation()
+  const editor = useScheduleEditor()
+  const dateForDay = (day: number) =>
+    editor.termStartDate ? scheduleDate(editor.termStartDate, week, day) : undefined
+  const hasTraces = editor.traces.some((trace) =>
+    DAYS.some((day) => dateForDay(day) === trace.date)
+  )
 
   const weekCourses = useMemo(
     () => (week >= 1 ? courses.filter((c) => isCourseActiveInWeek(c, week)) : []),
@@ -510,7 +555,7 @@ const WeekGrid = memo(function WeekGrid({
   }
 
   // 课程为空但本周有考试时仍渲染网格，避免考试块被空态吞掉
-  if (weekCourses.length === 0 && examBlocks.length === 0) {
+  if (weekCourses.length === 0 && examBlocks.length === 0 && !editor.editing && !hasTraces) {
     return (
       <div className="flex flex-1">
         <Empty>
@@ -538,6 +583,7 @@ const WeekGrid = memo(function WeekGrid({
   return (
     <div
       className="grid w-full flex-1"
+      data-schedule-grid={week}
       style={{
         gridTemplateColumns: compact
           ? "minmax(28px, 0.4fr) repeat(7, minmax(0, 1fr))"
@@ -559,8 +605,9 @@ const WeekGrid = memo(function WeekGrid({
               : "text-muted-foreground"
           )}
         >
-          <span className="text-[11px]">{t(`dashboard.weekdayShort.${d}`)}</span>
+          <ScheduleDayLabel week={week} day={d} />
           {weekDates[d - 1] && <span className="text-[9px] opacity-70">{weekDates[d - 1]}</span>}
+          <ScheduleDayHandle week={week} day={d} />
         </div>
       ))}
 
@@ -605,6 +652,8 @@ const WeekGrid = memo(function WeekGrid({
           return (
             <div
               key={`cell-${d}-${p.section}`}
+              data-schedule-date={dateForDay(d)}
+              data-schedule-section={p.section}
               className={cn(
                 "border-b border-border",
                 d < 7 && "border-r",
@@ -623,6 +672,9 @@ const WeekGrid = memo(function WeekGrid({
             <button
               key={`block-${idx}`}
               type="button"
+              data-schedule-course={
+                editor.enabled ? scheduleOccurrence(c)?.occurrenceId : undefined
+              }
               onClick={(e) => {
                 e.currentTarget.blur()
                 onCoursePress(c, week)
@@ -630,11 +682,13 @@ const WeekGrid = memo(function WeekGrid({
               className={cn(
                 "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1 text-left transition-opacity active:opacity-60",
                 courseBgClass(colorMap, c),
+                courseHasScheduleTrace(c, editor.traces) && "pb-7",
                 isBlockCurrent(block) && "ring-1 ring-primary"
               )}
               style={blockStyle(block)}
             >
               <span className="line-clamp-4 text-[10.5px] leading-tight font-medium text-foreground">
+                <SchedulePatchedLabel course={c} />
                 {c.name}
               </span>
               {c.classroom && (
@@ -663,7 +717,11 @@ const WeekGrid = memo(function WeekGrid({
               e.currentTarget.blur()
               onOverlapPress(block.day, block.start, block.courses)
             }}
-            className="relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60"
+            className={cn(
+              "relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60",
+              block.courses.some((course) => courseHasScheduleTrace(course, editor.traces)) &&
+                "pb-7"
+            )}
             style={blockStyle(block)}
           >
             <Layers className="size-3 text-muted-foreground" />
@@ -672,6 +730,7 @@ const WeekGrid = memo(function WeekGrid({
           </button>
         )
       })}
+      <ScheduleGridTraces week={week} sectionToRow={sectionToRow} />
       {examBlocks.map((block, idx) => (
         <button
           key={`exam-${idx}`}
