@@ -1,3 +1,5 @@
+import { hasCapability } from "./capabilities"
+import { ProviderError, ProviderErrorCode } from "./errors"
 import type {
   AcademicCapabilities,
   AcademicCompletion,
@@ -76,6 +78,17 @@ import type {
   WechatQrPollResult,
 } from "./types"
 
+/**
+ * Base class for academic providers.
+ *
+ * Auth-core methods (login/logout/status) stay abstract — the login page and
+ * sdk-provider call them unconditionally, so every provider must implement them.
+ *
+ * Capability-gated methods default to throwing FEATURE_NOT_SUPPORTED: providers
+ * only override what they support and declare it in `capabilities`. Declaring a
+ * capability without overriding the method is an implementation bug and throws a
+ * distinct message at call time.
+ */
 export abstract class BaseProvider implements AcademicProvider {
   abstract readonly id: string
   abstract readonly name: string
@@ -102,82 +115,283 @@ export abstract class BaseProvider implements AcademicProvider {
 
   protected async onReset(): Promise<void> {}
 
+  private unsupported(capability: keyof AcademicCapabilities, method: string): never {
+    if (hasCapability(this.capabilities, capability)) {
+      throw new ProviderError(
+        ProviderErrorCode.FEATURE_NOT_SUPPORTED,
+        `Provider "${this.id}" declares capability "${capability}" but does not implement ${method}()`,
+        undefined,
+        501
+      )
+    }
+    throw new ProviderError(
+      ProviderErrorCode.FEATURE_NOT_SUPPORTED,
+      `Provider "${this.id}" does not support ${method}()`,
+      undefined,
+      501
+    )
+  }
+
+  // ─── Auth (core: abstract) ───────────────────────────────────────────── //
+
   abstract prepareLogin(): Promise<void>
   abstract resetLoginSession(): Promise<void> | void
-  abstract getCaptchaUrl(): string | null
-  abstract checkCaptchaNeeded(username: string): Promise<boolean>
   abstract login(credential: Credential): Promise<void>
   abstract loginStep1(input: LoginStep1Input): Promise<LoginStep1Result>
-  abstract requestMfaCode(input: MfaRequestInput): Promise<MfaChallenge>
-  abstract submitMfaCode(input: MfaSubmitInput): Promise<string>
-  abstract initiateWechatMfa(): Promise<WechatMfaContext>
-  abstract pollWechatMfaQr(
-    uuid: string,
-    lastErrcode?: number,
-    signal?: AbortSignal
-  ): Promise<WechatQrPollResult>
-  abstract completeWechatMfa(code: string, state: string): Promise<string>
   abstract checkAuthStatus(): Promise<AuthStatus>
   abstract logout(): Promise<void>
   abstract isAuthenticated(): boolean
-  abstract getStudentInfo(): Promise<StudentInfo>
-  abstract getGrades(options?: GradeQueryOptions): Promise<Grade[]>
-  abstract getGPAStats(options?: GPAQueryOptions): Promise<GPAStats>
-  abstract getGradeStatistics(options?: GradeAnalyticsQueryOptions): Promise<GradeStatistics>
-  abstract getGradeDistribution(options?: GradeAnalyticsQueryOptions): Promise<GradeDistribution[]>
-  abstract getGradeRanking(options?: GradeRankingQueryOptions): Promise<GradeRanking>
-  abstract getSchedule(options?: ScheduleQueryOptions): Promise<Course[]>
-  abstract getUnscheduledCourses(options?: UnscheduledCourseQueryOptions): Promise<Course[]>
-  abstract getClassPeriods(): Promise<ClassPeriod[]>
-  abstract getTermCalendar(options?: TermCalendarQueryOptions): Promise<TermCalendar>
-  abstract getCurrentWeek(options?: CurrentWeekQueryOptions): Promise<CurrentWeek>
-  abstract getCurrentWeekNumber(options?: CurrentWeekQueryOptions): Promise<number>
-  abstract getExams(options?: ExamQueryOptions): Promise<Exam[]>
-  abstract getMakeupExamBatches(options?: ExamQueryOptions): Promise<MakeupExamBatch[]>
-  abstract getMakeupExamCourses(options?: MakeupExamCourseQueryOptions): Promise<MakeupExamCourse[]>
-  abstract signupMakeupExam(input: MakeupExamSignupInput): Promise<void>
-  abstract getLaborRecords(): Promise<LaborRecord[]>
-  abstract getLaborSummary(): Promise<LaborSummary>
-  abstract getLaborActivities(): Promise<EnrollableActivity[]>
-  abstract getCreditBatches(): Promise<CreditBatch[]>
-  abstract getCreditDeclarations(options?: CreditQueryOptions): Promise<CreditDeclaration[]>
-  abstract getCreditRecords(options?: CreditQueryOptions): Promise<CreditRecord[]>
-  abstract getAllCreditRecords(): Promise<CreditRecord[]>
-  abstract getCreditSummary(): Promise<CreditSummary>
-  abstract getCreditCompetitions(options?: CatalogQueryOptions): Promise<CatalogPage<Competition>>
-  abstract getCreditLibraryActivities(
-    options?: CatalogQueryOptions
-  ): Promise<CatalogPage<LibraryActivity>>
-  abstract getComprehensiveTerms(): Promise<ComprehensiveTerm[]>
-  abstract getComprehensiveResult(options?: ComprehensiveQueryOptions): Promise<ComprehensiveResult>
-  abstract getComprehensiveIndicators(
-    options?: ComprehensiveQueryOptions
-  ): Promise<ComprehensiveIndicatorDetail[]>
-  abstract getComprehensiveRadar(
-    options?: ComprehensiveQueryOptions
-  ): Promise<ComprehensiveRadarItem[]>
-  abstract getComprehensiveYearScores(): Promise<ComprehensiveYearScore[]>
-  abstract getComprehensiveReportYears(): Promise<ComprehensiveReportYears>
-  abstract getComprehensiveReport(options?: { year?: string }): Promise<ComprehensiveReportPage>
-  abstract getSchoolGradeYears(): Promise<CodeItem[]>
-  abstract getSchoolDepartments(): Promise<CodeItem[]>
-  abstract getSchoolMajors(department?: string): Promise<MajorInfo[]>
-  abstract getSchoolClasses(options?: SchoolClassQueryOptions): Promise<SchoolClassInfo[]>
-  abstract getSchoolClassSchedule(classId: string, options?: ExamQueryOptions): Promise<Course[]>
-  abstract getSchoolCampuses(): Promise<CodeItem[]>
-  abstract getSchoolBuildings(campus?: string): Promise<CodeItem[]>
-  abstract getSchoolClassrooms(options?: ClassroomQueryOptions): Promise<ClassroomInfo[]>
-  abstract getSchoolClassroomSchedule(code: string, options?: ExamQueryOptions): Promise<Course[]>
-  abstract getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]>
-  abstract getAcademicCompletion(): Promise<AcademicCompletion>
-  abstract getAcademicWarnings(): Promise<AcademicWarning[]>
-  abstract getEvaluationTypes(options?: TermQueryOptions): Promise<EvaluationType[]>
-  abstract getPendingEvaluations(
-    evalType: string,
-    options?: TermQueryOptions
-  ): Promise<EvaluationTask[]>
-  abstract getEvaluationTasks(options?: TermQueryOptions): Promise<EvaluationTask[]>
-  abstract getEvaluationDetail(query: EvaluationDetailQuery): Promise<EvaluationDetail>
-  abstract calculateEvaluationScore(input: EvaluationScoreInput): Promise<Record<string, unknown>>
-  abstract submitEvaluation(input: EvaluationSubmitInput): Promise<void>
+
+  // ─── Auth (capability-gated) ─────────────────────────────────────────── //
+
+  getCaptchaUrl(): string | null {
+    this.unsupported("captcha", "getCaptchaUrl")
+  }
+
+  async checkCaptchaNeeded(_username: string): Promise<boolean> {
+    // Called unconditionally on login submit: no-captcha providers must answer false.
+    if (!hasCapability(this.capabilities, "captcha")) return false
+    this.unsupported("captcha", "checkCaptchaNeeded")
+  }
+
+  async requestMfaCode(_input: MfaRequestInput): Promise<MfaChallenge> {
+    this.unsupported("mfa", "requestMfaCode")
+  }
+
+  async submitMfaCode(_input: MfaSubmitInput): Promise<string> {
+    this.unsupported("mfa", "submitMfaCode")
+  }
+
+  async initiateWechatMfa(): Promise<WechatMfaContext> {
+    this.unsupported("wechatMfa", "initiateWechatMfa")
+  }
+
+  async pollWechatMfaQr(
+    _uuid: string,
+    _lastErrcode?: number,
+    _signal?: AbortSignal
+  ): Promise<WechatQrPollResult> {
+    this.unsupported("wechatMfa", "pollWechatMfaQr")
+  }
+
+  async completeWechatMfa(_code: string, _state: string): Promise<string> {
+    this.unsupported("wechatMfa", "completeWechatMfa")
+  }
+
+  // ─── Academics ───────────────────────────────────────────────────────── //
+
+  async getStudentInfo(): Promise<StudentInfo> {
+    this.unsupported("studentInfo", "getStudentInfo")
+  }
+
+  async getGrades(_options?: GradeQueryOptions): Promise<Grade[]> {
+    this.unsupported("grades", "getGrades")
+  }
+
+  async getGPAStats(_options?: GPAQueryOptions): Promise<GPAStats> {
+    this.unsupported("gpa", "getGPAStats")
+  }
+
+  async getGradeStatistics(_options?: GradeAnalyticsQueryOptions): Promise<GradeStatistics> {
+    this.unsupported("gradeAnalytics", "getGradeStatistics")
+  }
+
+  async getGradeDistribution(_options?: GradeAnalyticsQueryOptions): Promise<GradeDistribution[]> {
+    this.unsupported("gradeAnalytics", "getGradeDistribution")
+  }
+
+  async getGradeRanking(_options?: GradeRankingQueryOptions): Promise<GradeRanking> {
+    this.unsupported("gradeAnalytics", "getGradeRanking")
+  }
+
+  async getSchedule(_options?: ScheduleQueryOptions): Promise<Course[]> {
+    this.unsupported("schedule", "getSchedule")
+  }
+
+  async getUnscheduledCourses(_options?: UnscheduledCourseQueryOptions): Promise<Course[]> {
+    this.unsupported("schedule", "getUnscheduledCourses")
+  }
+
+  async getClassPeriods(): Promise<ClassPeriod[]> {
+    this.unsupported("classPeriods", "getClassPeriods")
+  }
+
+  async getTermCalendar(_options?: TermCalendarQueryOptions): Promise<TermCalendar> {
+    this.unsupported("termCalendar", "getTermCalendar")
+  }
+
+  async getCurrentWeek(_options?: CurrentWeekQueryOptions): Promise<CurrentWeek> {
+    this.unsupported("currentWeek", "getCurrentWeek")
+  }
+
+  async getCurrentWeekNumber(_options?: CurrentWeekQueryOptions): Promise<number> {
+    this.unsupported("currentWeek", "getCurrentWeekNumber")
+  }
+
+  async getExams(_options?: ExamQueryOptions): Promise<Exam[]> {
+    this.unsupported("exams", "getExams")
+  }
+
+  async getMakeupExamBatches(_options?: ExamQueryOptions): Promise<MakeupExamBatch[]> {
+    this.unsupported("makeupExams", "getMakeupExamBatches")
+  }
+
+  async getMakeupExamCourses(_options?: MakeupExamCourseQueryOptions): Promise<MakeupExamCourse[]> {
+    this.unsupported("makeupExams", "getMakeupExamCourses")
+  }
+
+  async signupMakeupExam(_input: MakeupExamSignupInput): Promise<void> {
+    this.unsupported("makeupExams", "signupMakeupExam")
+  }
+
+  async getLaborRecords(): Promise<LaborRecord[]> {
+    this.unsupported("laborEducation", "getLaborRecords")
+  }
+
+  async getLaborSummary(): Promise<LaborSummary> {
+    this.unsupported("laborEducation", "getLaborSummary")
+  }
+
+  async getLaborActivities(): Promise<EnrollableActivity[]> {
+    this.unsupported("laborEducation", "getLaborActivities")
+  }
+
+  async getCreditBatches(): Promise<CreditBatch[]> {
+    this.unsupported("innovationCredits", "getCreditBatches")
+  }
+
+  async getCreditDeclarations(_options?: CreditQueryOptions): Promise<CreditDeclaration[]> {
+    this.unsupported("innovationCredits", "getCreditDeclarations")
+  }
+
+  async getCreditRecords(_options?: CreditQueryOptions): Promise<CreditRecord[]> {
+    this.unsupported("innovationCredits", "getCreditRecords")
+  }
+
+  async getAllCreditRecords(): Promise<CreditRecord[]> {
+    this.unsupported("innovationCredits", "getAllCreditRecords")
+  }
+
+  async getCreditSummary(): Promise<CreditSummary> {
+    this.unsupported("innovationCredits", "getCreditSummary")
+  }
+
+  async getCreditCompetitions(_options?: CatalogQueryOptions): Promise<CatalogPage<Competition>> {
+    this.unsupported("innovationCredits", "getCreditCompetitions")
+  }
+
+  async getCreditLibraryActivities(
+    _options?: CatalogQueryOptions
+  ): Promise<CatalogPage<LibraryActivity>> {
+    this.unsupported("innovationCredits", "getCreditLibraryActivities")
+  }
+
+  async getComprehensiveTerms(): Promise<ComprehensiveTerm[]> {
+    this.unsupported("comprehensiveEval", "getComprehensiveTerms")
+  }
+
+  async getComprehensiveResult(_options?: ComprehensiveQueryOptions): Promise<ComprehensiveResult> {
+    this.unsupported("comprehensiveEval", "getComprehensiveResult")
+  }
+
+  async getComprehensiveIndicators(
+    _options?: ComprehensiveQueryOptions
+  ): Promise<ComprehensiveIndicatorDetail[]> {
+    this.unsupported("comprehensiveEval", "getComprehensiveIndicators")
+  }
+
+  async getComprehensiveRadar(
+    _options?: ComprehensiveQueryOptions
+  ): Promise<ComprehensiveRadarItem[]> {
+    this.unsupported("comprehensiveEval", "getComprehensiveRadar")
+  }
+
+  async getComprehensiveYearScores(): Promise<ComprehensiveYearScore[]> {
+    this.unsupported("comprehensiveEval", "getComprehensiveYearScores")
+  }
+
+  async getComprehensiveReportYears(): Promise<ComprehensiveReportYears> {
+    this.unsupported("comprehensiveEval", "getComprehensiveReportYears")
+  }
+
+  async getComprehensiveReport(_options?: { year?: string }): Promise<ComprehensiveReportPage> {
+    this.unsupported("comprehensiveEval", "getComprehensiveReport")
+  }
+
+  async getSchoolGradeYears(): Promise<CodeItem[]> {
+    this.unsupported("schoolSchedule", "getSchoolGradeYears")
+  }
+
+  async getSchoolDepartments(): Promise<CodeItem[]> {
+    this.unsupported("schoolSchedule", "getSchoolDepartments")
+  }
+
+  async getSchoolMajors(_department?: string): Promise<MajorInfo[]> {
+    this.unsupported("schoolSchedule", "getSchoolMajors")
+  }
+
+  async getSchoolClasses(_options?: SchoolClassQueryOptions): Promise<SchoolClassInfo[]> {
+    this.unsupported("schoolSchedule", "getSchoolClasses")
+  }
+
+  async getSchoolClassSchedule(_classId: string, _options?: ExamQueryOptions): Promise<Course[]> {
+    this.unsupported("schoolSchedule", "getSchoolClassSchedule")
+  }
+
+  async getSchoolCampuses(): Promise<CodeItem[]> {
+    this.unsupported("schoolSchedule", "getSchoolCampuses")
+  }
+
+  async getSchoolBuildings(_campus?: string): Promise<CodeItem[]> {
+    this.unsupported("schoolSchedule", "getSchoolBuildings")
+  }
+
+  async getSchoolClassrooms(_options?: ClassroomQueryOptions): Promise<ClassroomInfo[]> {
+    this.unsupported("schoolSchedule", "getSchoolClassrooms")
+  }
+
+  async getSchoolClassroomSchedule(_code: string, _options?: ExamQueryOptions): Promise<Course[]> {
+    this.unsupported("schoolSchedule", "getSchoolClassroomSchedule")
+  }
+
+  async getTrainingPlan(_options?: PageQueryOptions): Promise<TrainingPlan[]> {
+    this.unsupported("trainingPlan", "getTrainingPlan")
+  }
+
+  async getAcademicCompletion(): Promise<AcademicCompletion> {
+    this.unsupported("trainingPlan", "getAcademicCompletion")
+  }
+
+  async getAcademicWarnings(): Promise<AcademicWarning[]> {
+    this.unsupported("trainingPlan", "getAcademicWarnings")
+  }
+
+  // ─── Evaluation ──────────────────────────────────────────────────────── //
+
+  async getEvaluationTypes(_options?: TermQueryOptions): Promise<EvaluationType[]> {
+    this.unsupported("evaluation", "getEvaluationTypes")
+  }
+
+  async getPendingEvaluations(
+    _evalType: string,
+    _options?: TermQueryOptions
+  ): Promise<EvaluationTask[]> {
+    this.unsupported("evaluation", "getPendingEvaluations")
+  }
+
+  async getEvaluationTasks(_options?: TermQueryOptions): Promise<EvaluationTask[]> {
+    this.unsupported("evaluation", "getEvaluationTasks")
+  }
+
+  async getEvaluationDetail(_query: EvaluationDetailQuery): Promise<EvaluationDetail> {
+    this.unsupported("evaluation", "getEvaluationDetail")
+  }
+
+  async calculateEvaluationScore(_input: EvaluationScoreInput): Promise<Record<string, unknown>> {
+    this.unsupported("evaluationScorePreview", "calculateEvaluationScore")
+  }
+
+  async submitEvaluation(_input: EvaluationSubmitInput): Promise<void> {
+    this.unsupported("evaluation", "submitEvaluation")
+  }
 }
