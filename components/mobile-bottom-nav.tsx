@@ -7,6 +7,9 @@ import { Calendar, GraduationCap, LayoutDashboard, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { useSettingsStore } from "@/lib/stores/settings"
+import { useProviderCapabilities } from "@/providers/use-provider"
+import { hasCapability } from "@/providers/capabilities"
+import type { AcademicCapabilities } from "@/providers/types"
 
 export function MobileBottomNav() {
   const rawPathname = usePathname()
@@ -33,22 +36,38 @@ export function MobileBottomNav() {
     }
   }, [])
 
+  const capabilities = useProviderCapabilities()
   const tabs = [
     { href: "/dashboard", label: t("app.overview"), icon: LayoutDashboard },
-    { href: "/dashboard/schedule", label: t("app.schedule"), icon: Calendar },
-    { href: "/dashboard/grades", label: t("app.grades"), icon: GraduationCap },
+    {
+      href: "/dashboard/schedule",
+      label: t("app.schedule"),
+      icon: Calendar,
+      capability: "schedule",
+    },
+    {
+      href: "/dashboard/grades",
+      label: t("app.grades"),
+      icon: GraduationCap,
+      capability: "grades",
+    },
     { href: "/dashboard/me", label: t("app.me"), icon: User },
-  ]
+  ].filter(
+    (tab) =>
+      !("capability" in tab) ||
+      hasCapability(capabilities, tab.capability as keyof AcademicCapabilities)
+  )
 
   return (
     <nav
       ref={navRef}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))] backdrop-blur md:hidden",
+        "fixed inset-x-0 bottom-0 z-40 grid border-t border-border pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))] backdrop-blur md:hidden",
         hasBackground
           ? "bg-background/60 supports-[backdrop-filter]:bg-background/40"
           : "bg-background/95 supports-[backdrop-filter]:bg-background/80"
       )}
+      style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
       aria-label="Primary"
     >
       {tabs.map((tab) => {

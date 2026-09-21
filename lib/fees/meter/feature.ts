@@ -7,4 +7,5 @@ export const meterFeature: DashboardFeature = {
   titleKeys: {
     "/dashboard/meter": "meter.title",
   },
+  capability: "meter",
 }

@@ -8,21 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  BookOpen,
-  CalendarDays,
-  ChevronRight,
-  ClipboardCheck,
-  FilePenLine,
-  FileText,
-  Gauge,
-  Hammer,
-  Lightbulb,
-  LogIn,
-  Settings,
-  Sun,
-  Moon,
-} from "lucide-react"
+import { ChevronRight, LogIn, Settings, Sun, Moon } from "lucide-react"
 import { useAuthStore } from "@/lib/stores/auth"
 import { useSettingsStore } from "@/lib/stores/settings"
 import { cn } from "@/lib/utils"
@@ -37,6 +23,9 @@ import { useTheme } from "next-themes"
 import { APP_VERSION, APP_BUILD } from "@/lib/version"
 import { EXTRA_FEATURES } from "@/lib/extras/registry"
 import { FEE_FEATURES } from "@/lib/fees/registry"
+import { ACADEMIC_NAV_GROUPS } from "@/lib/dashboard-nav"
+import { isDashboardFeatureAvailable } from "@/lib/dashboard-features"
+import { useProviderCapabilities } from "@/providers/use-provider"
 
 export default function MePage() {
   const router = useRouter()
@@ -109,46 +98,26 @@ export default function MePage() {
   const displayName = student.data?.name || username || t("me.profileFallback")
   const initials = (student.data?.name || username || "U").slice(-2)
 
-  const academicItems = [
-    { href: "/dashboard/exams", label: t("app.exams"), icon: FileText },
-    {
-      href: "/dashboard/makeup-exams",
-      label: t("app.makeupExams"),
-      icon: FilePenLine,
-    },
-    {
-      href: "/dashboard/training-plan",
-      label: t("app.trainingPlan"),
-      icon: BookOpen,
-    },
-    {
-      href: "/dashboard/evaluation",
-      label: t("app.evaluation"),
-      icon: ClipboardCheck,
-    },
-  ]
+  const capabilities = useProviderCapabilities()
+  const academicItems = (
+    ACADEMIC_NAV_GROUPS.find((g) => g.labelKey === "me.sectionAcademic")?.features ?? []
+  )
+    .filter((f) => isDashboardFeatureAvailable(f, capabilities))
+    .map((f) => ({ href: f.nav.url, label: t(f.nav.titleKey), icon: f.nav.icon }))
 
-  const platformItems = [
-    { href: "/dashboard/labor", label: t("app.labor"), icon: Hammer },
-    { href: "/dashboard/credits", label: t("app.credits"), icon: Lightbulb },
-    {
-      href: "/dashboard/comprehensive",
-      label: t("app.comprehensive"),
-      icon: Gauge,
-    },
-    {
-      href: "/dashboard/school-schedule",
-      label: t("app.schoolSchedule"),
-      icon: CalendarDays,
-    },
-  ]
+  const platformItems = (
+    ACADEMIC_NAV_GROUPS.find((g) => g.labelKey === "me.sectionPlatforms")?.features ?? []
+  )
+    .filter((f) => isDashboardFeatureAvailable(f, capabilities))
+    .map((f) => ({ href: f.nav.url, label: t(f.nav.titleKey), icon: f.nav.icon }))
 
-  const feeItems = FEE_FEATURES.map((f) => ({
-    href: f.nav.url,
-    label: t(f.nav.titleKey),
-    icon: f.nav.icon,
-  }))
-
+  const feeItems = FEE_FEATURES.filter((f) => isDashboardFeatureAvailable(f, capabilities)).map(
+    (f) => ({
+      href: f.nav.url,
+      label: t(f.nav.titleKey),
+      icon: f.nav.icon,
+    })
+  )
   // 玩具箱入口（移动端经"我的"页进入；桌面端走侧边栏）
   const extraItems = EXTRA_FEATURES.map((f) => ({
     href: f.nav.url,
@@ -197,17 +166,23 @@ export default function MePage() {
         </Card>
       </Link>
 
-      <Section title={t("me.sectionAcademic")}>
-        <LinkCard items={academicItems} />
-      </Section>
+      {academicItems.length > 0 && (
+        <Section title={t("me.sectionAcademic")}>
+          <LinkCard items={academicItems} />
+        </Section>
+      )}
 
-      <Section title={t("me.sectionPlatforms")}>
-        <LinkCard items={platformItems} />
-      </Section>
+      {platformItems.length > 0 && (
+        <Section title={t("me.sectionPlatforms")}>
+          <LinkCard items={platformItems} />
+        </Section>
+      )}
 
-      <Section title={t("fees.nav")}>
-        <LinkCard items={feeItems} />
-      </Section>
+      {feeItems.length > 0 && (
+        <Section title={t("fees.nav")}>
+          <LinkCard items={feeItems} />
+        </Section>
+      )}
 
       {extraItems.length > 0 && (
         <Section title={t("extras.nav")}>

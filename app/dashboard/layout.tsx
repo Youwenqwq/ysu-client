@@ -37,18 +37,9 @@ import { toast } from "sonner"
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service"
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
 import {
-  BookOpen,
-  Calendar,
-  CalendarDays,
-  ClipboardCheck,
-  FilePenLine,
-  FileText,
-  Gauge,
+  CircleOff,
   GraduationCap,
-  Hammer,
   Info,
-  LayoutDashboard,
-  Lightbulb,
   LogIn,
   LogOut,
   Settings,
@@ -61,6 +52,14 @@ import { RefreshIndicator } from "@/components/refresh-indicator"
 import { StaleIndicator } from "@/components/stale-indicator"
 import { EXTRA_FEATURES } from "@/lib/extras/registry"
 import { FEE_FEATURES } from "@/lib/fees/registry"
+import {
+  ACADEMIC_FEATURES,
+  ACADEMIC_NAV_GROUPS,
+  blockedCapabilityForPath,
+} from "@/lib/dashboard-nav"
+import { isDashboardFeatureAvailable } from "@/lib/dashboard-features"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { useProviderCapabilities } from "@/providers/use-provider"
 import { UpdateDialog } from "@/components/update-dialog"
 import { APP_VERSION, APP_BUILD } from "@/lib/version"
 import { useStoredMediaUrl } from "@/lib/storage/media"
@@ -187,64 +186,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [])
 
+  const capabilities = useProviderCapabilities()
   const navGroups = [
-    {
-      label: t("app.nav"),
-      items: [
-        { title: t("app.overview"), url: "/dashboard", icon: LayoutDashboard },
-        {
-          title: t("app.grades"),
-          url: "/dashboard/grades",
-          icon: GraduationCap,
-        },
-        {
-          title: t("app.schedule"),
-          url: "/dashboard/schedule",
-          icon: Calendar,
-        },
-      ],
-    },
-    {
-      label: t("me.sectionAcademic"),
-      items: [
-        { title: t("app.exams"), url: "/dashboard/exams", icon: FileText },
-        {
-          title: t("app.makeupExams"),
-          url: "/dashboard/makeup-exams",
-          icon: FilePenLine,
-        },
-        {
-          title: t("app.trainingPlan"),
-          url: "/dashboard/training-plan",
-          icon: BookOpen,
-        },
-        {
-          title: t("app.evaluation"),
-          url: "/dashboard/evaluation",
-          icon: ClipboardCheck,
-        },
-      ],
-    },
-    {
-      label: t("me.sectionPlatforms"),
-      items: [
-        { title: t("app.labor"), url: "/dashboard/labor", icon: Hammer },
-        { title: t("app.credits"), url: "/dashboard/credits", icon: Lightbulb },
-        {
-          title: t("app.comprehensive"),
-          url: "/dashboard/comprehensive",
-          icon: Gauge,
-        },
-        {
-          title: t("app.schoolSchedule"),
-          url: "/dashboard/school-schedule",
-          icon: CalendarDays,
-        },
-      ],
-    },
+    ...ACADEMIC_NAV_GROUPS.map((group) => ({
+      label: t(group.labelKey),
+      items: group.features
+        .filter((f) => isDashboardFeatureAvailable(f, capabilities))
+        .map((f) => ({ title: t(f.nav.titleKey), url: f.nav.url, icon: f.nav.icon })),
+    })),
     {
       label: t("fees.nav"),
-      items: FEE_FEATURES.map((f) => ({
+      items: FEE_FEATURES.filter((f) => isDashboardFeatureAvailable(f, capabilities)).map((f) => ({
         title: t(f.nav.titleKey),
         url: f.nav.url,
         icon: f.nav.icon,
@@ -259,25 +211,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         icon: f.nav.icon,
       })),
     },
-  ]
+  ].filter((group) => group.items.length > 0)
 
   const titleByPath: Record<string, string> = {
     ...Object.fromEntries(
-      [...FEE_FEATURES, ...EXTRA_FEATURES].flatMap((f) =>
+      [...ACADEMIC_FEATURES, ...FEE_FEATURES, ...EXTRA_FEATURES].flatMap((f) =>
         Object.entries(f.titleKeys).map(([path, key]) => [path, t(key)])
       )
     ),
-    "/dashboard": t("app.overview"),
-    "/dashboard/grades": t("app.grades"),
-    "/dashboard/schedule": t("app.schedule"),
-    "/dashboard/exams": t("app.exams"),
-    "/dashboard/makeup-exams": t("app.makeupExams"),
-    "/dashboard/labor": t("app.labor"),
-    "/dashboard/credits": t("app.credits"),
-    "/dashboard/comprehensive": t("app.comprehensive"),
-    "/dashboard/school-schedule": t("app.schoolSchedule"),
-    "/dashboard/training-plan": t("app.trainingPlan"),
-    "/dashboard/evaluation": t("app.evaluation"),
     "/dashboard/me": t("app.me"),
     "/dashboard/me/student": t("app.studentInfo"),
     "/dashboard/me/background": t("app.backgroundSettings"),
@@ -295,6 +236,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     "/dashboard/me",
   ])
   const showBack = !primaryPaths.has(pathname)
+  const blockedCapability = blockedCapabilityForPath(pathname, capabilities)
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated) {
@@ -517,7 +459,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               : "animate-in p-4 duration-500 fade-in slide-in-from-bottom-2"
           )}
         >
-          {children}
+          {blockedCapability ? (
+            <Empty className="flex-1 justify-center">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <CircleOff />
+                </EmptyMedia>
+                <EmptyTitle>{t("app.featureUnavailable")}</EmptyTitle>
+                <EmptyDescription>{t("app.featureUnavailableDesc")}</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            children
+          )}
         </div>
       </main>
       {!mobileFullscreen && <MobileBottomNav />}

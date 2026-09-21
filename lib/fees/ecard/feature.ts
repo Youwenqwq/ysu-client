@@ -7,4 +7,5 @@ export const ecardFeature: DashboardFeature = {
   titleKeys: {
     "/dashboard/ecard": "ecard.title",
   },
+  capability: "ecard",
 }

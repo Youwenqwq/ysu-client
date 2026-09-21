@@ -179,6 +179,9 @@ function ysuCapabilities(): AcademicCapabilities {
     classPeriods: true,
     termCalendar: true,
     mobileSignin: isFeatureAvailable("hasMobile"),
+    ecard: true,
+    meter: true,
+    epay: true,
   }
 }
 

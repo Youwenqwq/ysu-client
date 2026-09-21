@@ -7,4 +7,5 @@ export const epayFeature: DashboardFeature = {
   titleKeys: {
     "/dashboard/epay": "epay.title",
   },
+  capability: "epay",
 }

@@ -31,6 +31,12 @@ export interface AcademicCapabilities {
   classPeriods: boolean
   termCalendar: boolean
   mobileSignin: boolean
+  /** 一卡通余额查询（学校专属缴费平台，无契约方法）。 */
+  ecard: boolean
+  /** 宿舍电费查询（学校专属缴费平台，无契约方法）。 */
+  meter: boolean
+  /** 在线缴费记录查询（学校专属缴费平台，无契约方法）。 */
+  epay: boolean
 }
 
 /** Login credential supplied by the user. */

@@ -5,6 +5,7 @@ import useSWR from "swr"
 import { getSchoolConfigScope } from "@/lib/server-config"
 import { useAuthStore } from "@/lib/stores/auth"
 import { ProviderError, ProviderErrorCode } from "../errors"
+import { hasCapability } from "../capabilities"
 import { useProvider, useProviderReady } from "../use-provider"
 import { fetchEcardBalance, type EcardSessionStatus } from "../ysu/ecard-access"
 import { providerQueryKey } from "./use-provider-query"
@@ -22,7 +23,7 @@ export function useEcardBalance() {
   const credential = useAuthStore((s) => s.credential)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const schoolConfigScope = getSchoolConfigScope()
-  const available = provider.id === "ysu"
+  const available = hasCapability(provider.capabilities, "ecard")
   const enabled =
     available && isReady && hasHydrated && !!username && !!credential && isAuthenticated
   const {

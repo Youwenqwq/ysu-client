@@ -29,6 +29,9 @@ export const ALL_CAPABILITIES: AcademicCapabilities = {
   classPeriods: true,
   termCalendar: true,
   mobileSignin: true,
+  ecard: true,
+  meter: true,
+  epay: true,
 }
 
 export const NO_CAPABILITIES: AcademicCapabilities = {
@@ -55,6 +58,9 @@ export const NO_CAPABILITIES: AcademicCapabilities = {
   classPeriods: false,
   termCalendar: false,
   mobileSignin: false,
+  ecard: false,
+  meter: false,
+  epay: false,
 }
 
 export function hasCapability(

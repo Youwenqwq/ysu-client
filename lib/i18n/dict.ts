@@ -59,6 +59,8 @@ export const zh = {
     staleDataTooltip: "当前显示缓存数据，刷新失败",
     cacheStorageFull: "存储空间不足，部分数据无法缓存",
     cacheStorageFullDesc: "请清理设备存储空间后重试",
+    featureUnavailable: "当前学校暂不支持此功能",
+    featureUnavailableDesc: "该功能依赖的学校平台在当前学校不可用",
   },
   activation: {
     title: "激活应用",
@@ -1158,6 +1160,9 @@ export const en = {
     staleDataTooltip: "Showing cached data, refresh failed",
     cacheStorageFull: "Storage full, unable to cache data",
     cacheStorageFullDesc: "Please free up device storage and try again",
+    featureUnavailable: "Not available for your school",
+    featureUnavailableDesc:
+      "The school platform behind this feature is unavailable at your school.",
   },
   activation: {
     title: "Activate App",
@@ -1697,8 +1702,7 @@ export const en = {
     viewedWeek: "Week {week}",
     adjustDay: "Adjust a day",
     adjustCourse: "Adjust one lesson",
-    confirmDescription:
-      "Changes affect your personal schedule only",
+    confirmDescription: "Changes affect your personal schedule only",
     source: "Original arrangement",
     targetDate: "Target date",
     startSection: "Target start section",
@@ -1715,8 +1719,7 @@ export const en = {
     moveCourse: "Move to target",
     clearInstead: "Cancel these lessons instead…",
     clearConfirm: "Cancel the selected lessons?",
-    clearExplanation:
-      "Selected cource will be marked as cancelled, not showing in widgets",
+    clearExplanation: "Selected cource will be marked as cancelled, not showing in widgets",
     confirmClear: "Cancel lessons",
     cancel: "Cancel",
     confirm: "Confirm",
@@ -1725,12 +1728,10 @@ export const en = {
     saveFailed: "Could not save adjustment",
     undone: "Adjustment undone; recalculated from current university data",
     undo: "Undo",
-    managementDescription:
-      "You can manually adjust your personal schedule",
+    managementDescription: "You can manually adjust your personal schedule",
     showOriginal: "View university timetable",
     originalTitle: "Schedule - Original",
-    originalNotice:
-      "This is the original arrangement from the university",
+    originalNotice: "This is the original arrangement from the university",
     showEffective: "Back to personal schedule",
     noAdjustments: "No personal adjustments this term",
     disabled: "Disabled",
@@ -1740,8 +1741,7 @@ export const en = {
     operation_move: "Move",
     operation_clear: "Cancel lessons",
     undoConfirm: "Restore the original arrangement?",
-    undoExplanation:
-      "Restore the original arrangement and delete {count} dependencies.",
+    undoExplanation: "Restore the original arrangement and delete {count} dependencies.",
     undoAffected: "The following {count} adjustments will be deleted:",
     disableAffected: "The following {count} adjustments will be disabled:",
     confirmUndo: "Confirm undo",
