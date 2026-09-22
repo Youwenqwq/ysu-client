@@ -1,10 +1,10 @@
 import { CapacitorUpdater } from "@capgo/capacitor-updater"
 import { App } from "@capacitor/app"
-import { registerPlugin } from "@capacitor/core"
 import { clean, compare, gt, prerelease, valid } from "semver"
 import { getLocalStorageItemWithFallback, STORAGE_KEYS } from "./storage/keys"
 import { APP_VERSION } from "./version"
 import { isCapacitor } from "./native/platform"
+import { YsuFile } from "./native/ysu-file"
 
 export type UpdateChannel = "stable" | "prerelease"
 
@@ -277,18 +277,6 @@ export function openApkDownload(url: string): void {
 // ---------------------------------------------------------------------------
 // In-app APK download via native YsuFile plugin
 // ---------------------------------------------------------------------------
-
-interface YsuFilePlugin {
-  downloadApk(options: { url: string; fileName?: string }): Promise<{ path: string }>
-  installApk(options: { path: string }): Promise<void>
-  clearDirectory(options: { path?: string }): Promise<void>
-  addListener(
-    eventName: "downloadProgress",
-    listener: (state: { percent: number }) => void
-  ): Promise<{ remove: () => void }>
-}
-
-const YsuFile = registerPlugin<YsuFilePlugin>("YsuFile")
 
 /** Path of the last successfully downloaded APK (kept in module scope). */
 let lastDownloadedApkPath: string | null = null

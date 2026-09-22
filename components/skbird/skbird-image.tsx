@@ -2,10 +2,23 @@
 
 import { useEffect, useRef, useState } from "react"
 import { X } from "lucide-react"
+import { toast } from "sonner"
 import { fetchStateless, headerSingle } from "@/lib/cookie"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { useBackLayer } from "@/hooks/use-back-handler"
+import { isCapacitor } from "@/lib/native/platform"
+import { YsuFile } from "@/lib/native/ysu-file"
 
 /** 关闭动画时长，与过渡类 duration 匹配 */
 const LIGHTBOX_TRANSITION_MS = 200
@@ -17,6 +30,30 @@ const ZOOM_STEP = 2.5
 const DOUBLE_TAP_MS = 300
 /** 位移小于该值视为点按而非拖拽 */
 const TAP_SLOP_PX = 8
+
+/** 长按触发保存的延迟 */
+const LONG_PRESS_MS = 500
+
+/** Blob → 纯 base64（无 data: 前缀），分块拼接避免爆栈 */
+function blobToBase64(blob: Blob): Promise<string> {
+  return blob.arrayBuffer().then((buffer) => {
+    const bytes = new Uint8Array(buffer)
+    let binary = ""
+    const CHUNK = 0x8000
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+    }
+    return btoa(binary)
+  })
+}
+
+/** 从 MIME 类型推导文件扩展名 */
+function extForMime(mime: string): string {
+  const sub = mime.split("/")[1]?.toLowerCase() ?? ""
+  if (!sub || sub === "jpeg") return "jpg"
+  if (sub === "svg+xml") return "svg"
+  return sub
+}
 
 function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: () => void }) {
   const { t } = useTranslation()
@@ -39,11 +76,22 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
     lastTapX: 0,
     lastTapY: 0,
   })
+  /** 长按保存计时器句柄（仅原生端触屏） */
+  const longPressTimerRef = useRef<number | undefined>(undefined)
+  const [saving, setSaving] = useState(false)
+  const [saveSheetOpen, setSaveSheetOpen] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const native = isCapacitor()
 
   // 挂载后下一帧进入，触发开启过渡
   useEffect(() => {
     const raf = requestAnimationFrame(() => setEntered(true))
     return () => cancelAnimationFrame(raf)
+  }, [])
+
+  // 卸载时清理长按计时器
+  useEffect(() => {
+    return () => clearTimeout(longPressTimerRef.current)
   }, [])
 
   // 打开期间锁定背景滚动 + Esc 关闭
@@ -115,6 +163,67 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
     zoomAt(clientX, clientY, tfRef.current.scale > MIN_SCALE ? MIN_SCALE : ZOOM_STEP, true)
   }
 
+  /** 取消挂起的长按保存 */
+  function cancelLongPress() {
+    clearTimeout(longPressTimerRef.current)
+    longPressTimerRef.current = undefined
+  }
+
+  /** 长按弹出保存确认（仅原生端触屏）：按住 500ms 未移动即触发 */
+  function startLongPress() {
+    cancelLongPress()
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTimerRef.current = undefined
+      // 已按长按处理，抬手不再视为点按/双击
+      const g = gestureRef.current
+      g.moved = true
+      g.lastTapTime = 0
+      // 触觉反馈（WebView 无权限时静默失败）
+      navigator.vibrate?.(15)
+      setSaveSheetOpen(true)
+      setSaved(false)
+    }, LONG_PRESS_MS)
+  }
+
+  /** 取当前展示图片的二进制：优先复用 object URL，退回 fetchStateless 拉取 */
+  async function loadDisplayedBlob(): Promise<Blob> {
+    const img = wrapRef.current?.querySelector("img")
+    const src = img?.currentSrc || img?.src
+    if (src?.startsWith("blob:")) {
+      const blob = await (await fetch(src)).blob()
+      if (blob.size > 0) return blob
+    }
+    const res = await fetchStateless({
+      method: "GET",
+      url,
+      redirect: "manual",
+      responseType: "arraybuffer",
+    })
+    if (res.status !== 200) throw new Error(`HTTP ${res.status}`)
+    const type = headerSingle(res.headers, "content-type") ?? "image/jpeg"
+    return new Blob([await res.arrayBuffer()], { type })
+  }
+
+  async function saveImage() {
+    if (saving) return
+    setSaving(true)
+    try {
+      const blob = await loadDisplayedBlob()
+      await YsuFile.saveImageToGallery({
+        base64: await blobToBase64(blob),
+        mimeType: blob.type || "image/jpeg",
+        fileName: `skbird_${Date.now()}.${extForMime(blob.type || "image/jpeg")}`,
+      })
+      toast.success(t("skbird.imageSaved"))
+      setSaved(true)
+    } catch (err) {
+      console.warn("[skbird] 保存图片失败:", err)
+      toast.error(t("skbird.imageSaveFailed"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     e.preventDefault()
     wrapRef.current?.setPointerCapture(e.pointerId)
@@ -124,7 +233,9 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
       g.downX = g.lastX = e.clientX
       g.downY = g.lastY = e.clientY
       g.moved = false
+      if (native && e.pointerType === "touch") startLongPress()
     } else if (pointersRef.current.size === 2) {
+      cancelLongPress()
       const [a, b] = [...pointersRef.current.values()]
       g.pinchDist = Math.hypot(a!.x - b!.x, a!.y - b!.y)
       g.pinchScale = tfRef.current.scale
@@ -157,6 +268,7 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
       g.lastY = e.clientY
       if (!g.moved && Math.hypot(e.clientX - g.downX, e.clientY - g.downY) > TAP_SLOP_PX) {
         g.moved = true
+        cancelLongPress()
       }
       if (tf.scale > MIN_SCALE) {
         tf.x += dx
@@ -171,6 +283,7 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
     const g = gestureRef.current
     const wasTap = pointersRef.current.size === 1 && !g.moved
     pointersRef.current.delete(e.pointerId)
+    cancelLongPress()
     if (pointersRef.current.size === 1) {
       // 双指抬起一只：以剩余手指位置重启单指拖拽
       const [rest] = [...pointersRef.current.values()]
@@ -217,7 +330,7 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
       >
         <X className="size-5" />
       </button>
-      {/* 图片区：点击不关闭；桌面点击/滚轮缩放、拖拽平移，移动端双击/捏合/拖动 */}
+      {/* 图片区：点击不关闭；桌面点击/滚轮缩放、拖拽平移，移动端双击/捏合/拖动，原生端长按弹出保存抽屉 */}
       <div
         ref={wrapRef}
         onClick={(e) => e.stopPropagation()}
@@ -225,6 +338,7 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
         onPointerMove={onPointerMove}
         onPointerUp={onPointerEnd}
         onPointerCancel={onPointerEnd}
+        onContextMenu={native ? (e) => e.preventDefault() : undefined}
         onWheel={(e) => {
           const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
           zoomAt(e.clientX, e.clientY, tfRef.current.scale * factor, false)
@@ -242,13 +356,36 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
           }`}
         />
       </div>
+      {native ? (
+        <Drawer open={saveSheetOpen} onOpenChange={setSaveSheetOpen}>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>{t("skbird.saveImageTitle")}</DrawerTitle>
+              <DrawerDescription>{t("skbird.saveImageDesc")}</DrawerDescription>
+            </DrawerHeader>
+            <DrawerFooter className="flex-row gap-3">
+              <DrawerClose asChild>
+                <Button variant="outline" className="flex-1">
+                  {t("skbird.saveImageCancel")}
+                </Button>
+              </DrawerClose>
+              <Button
+                className="flex-1"
+                disabled={saving || saved}
+                onClick={() => void saveImage()}
+              >
+                {t(saved ? "skbird.imageSaved" : "skbird.saveImageConfirm")}
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : null}
     </div>
   )
 }
 
 /**
  * 森空鸟 CDN 图片。双端统一走 fetchStateless 拉取后转 object URL：
- * - Web：<img> 无法携带 activation 头，且 CDN 为明文 HTTP（mixed content）；
  * - Native：WebView 默认拦截 https 页面加载 http 子资源（mixed content）。
  *
  * 例外：HTTPS 直链（如微信头像 thirdwx.qlogo.cn）无 mixed content 问题，
@@ -256,6 +393,7 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
  *
  * zoomable：点击打开全屏查看器。桌面端点击/滚轮以光标为焦点缩放、拖拽平移；
  * 移动端双击缩放、捏合缩放、单指拖动；点击空白处或 Esc 关闭。
+ * 原生端（Capacitor）触屏长按图片弹出抽屉确认后保存到系统相册（Web 端用浏览器自带的长按菜单）。
  * zoomUrl 指定放大用的大图（未指定则复用当前 src，无额外请求）。
  */
 export function SkbirdImage({
