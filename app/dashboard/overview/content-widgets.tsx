@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { BookOpen, Calendar, ChevronRight, ClipboardCheck, Clock } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,13 +10,16 @@ import { useTranslation } from "@/lib/i18n/use-translation"
 import { cn } from "@/lib/utils"
 import { formatExamTime, getExamStartTime } from "@/lib/academic/exam-utils"
 import { getAcademicClock } from "@/lib/academic/academic-time"
+import type { ScheduleOccurrence } from "@/lib/academic/schedule-patches"
 import {
   courseEndSection,
   courseStartSection,
   isCoursePast,
 } from "@/app/dashboard/schedule/schedule-utils"
+import { ActivityModal } from "@/app/dashboard/schedule/activity-modal"
+import { SigninModal } from "@/app/dashboard/schedule/signin-modal"
 import type { ProviderQueryResult } from "@/providers/hooks"
-import type { EvaluationTask } from "@/providers/types"
+import type { Course, EvaluationTask } from "@/providers/types"
 import type { OverviewSchedule } from "./use-overview-schedule"
 import { QueryState } from "./query-state"
 
@@ -90,70 +94,106 @@ export function CourseProgressWidget({ data }: { data: OverviewSchedule }) {
 
 export function TodayCoursesWidget({ data }: { data: OverviewSchedule }) {
   const { t } = useTranslation()
+  const [activityCourse, setActivityCourse] = useState<Course | null>(null)
+  const [activityWeek, setActivityWeek] = useState(1)
+  const [activityOpen, setActivityOpen] = useState(false)
+  const [signinActivityId, setSigninActivityId] = useState("")
+  const [signinType, setSigninType] = useState(1)
+  const [signinOpen, setSigninOpen] = useState(false)
+
+  const openCourse = (course: Course) => {
+    const occurrence =
+      "occurrenceId" in course && "source" in course ? (course as ScheduleOccurrence) : null
+    setActivityCourse(occurrence?.source.course ?? course)
+    setActivityWeek(occurrence?.source.week ?? data.currentWeek.data?.week ?? 1)
+    setActivityOpen(true)
+  }
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="flex items-center gap-2">
-          <BookOpen className="size-4 text-primary" />
-          {t("dashboard.todayCourses")}
-        </CardTitle>
-        <Link
-          href="/dashboard/schedule"
-          aria-label={t("app.schedule")}
-          className="rounded-sm p-2 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <ChevronRight className="size-4" />
-        </Link>
-      </CardHeader>
-      <CardContent>
-        <QueryState queries={[data.schedule, data.currentWeek]}>
-          {data.currentWeek.data === null ? (
-            <p className="text-sm text-muted-foreground">{t("overviewData.unavailableShort")}</p>
-          ) : data.todayCourses.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("dashboard.noCoursesToday")}</p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {data.todayCourses.map((course, index) => {
-                const isCurrent = course === data.currentCourse
-                const isPast = !isCurrent && isCoursePast(course, data.nowMinutes, data.timeMap)
-                const range = data.courseTimeRange(course)
-                return (
-                  <div
-                    key={`${course.scheduleId ?? course.name}-${course.startSection}-${index}`}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg border p-3",
-                      isCurrent && "border-primary bg-primary/5",
-                      isPast && "opacity-50"
-                    )}
-                  >
-                    {range && (
-                      <div className="flex w-11 shrink-0 flex-col text-xs leading-tight text-muted-foreground">
-                        <span>{clockText(range[0])}</span>
-                        <span>{clockText(range[1])}</span>
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen className="size-4 text-primary" />
+            {t("dashboard.todayCourses")}
+          </CardTitle>
+          <Link
+            href="/dashboard/schedule"
+            aria-label={t("app.schedule")}
+            className="rounded-sm p-2 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ChevronRight className="size-4" />
+          </Link>
+        </CardHeader>
+        <CardContent>
+          <QueryState queries={[data.schedule, data.currentWeek]}>
+            {data.currentWeek.data === null ? (
+              <p className="text-sm text-muted-foreground">{t("overviewData.unavailableShort")}</p>
+            ) : data.todayCourses.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("dashboard.noCoursesToday")}</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {data.todayCourses.map((course, index) => {
+                  const isCurrent = course === data.currentCourse
+                  const isPast = !isCurrent && isCoursePast(course, data.nowMinutes, data.timeMap)
+                  const range = data.courseTimeRange(course)
+                  return (
+                    <button
+                      key={`${course.scheduleId ?? course.name}-${course.startSection}-${index}`}
+                      type="button"
+                      onClick={() => openCourse(course)}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring",
+                        isCurrent && "border-primary bg-primary/5",
+                        isPast && "opacity-50"
+                      )}
+                    >
+                      {range && (
+                        <div className="flex w-11 shrink-0 flex-col text-xs leading-tight text-muted-foreground">
+                          <span>{clockText(range[0])}</span>
+                          <span>{clockText(range[1])}</span>
+                        </div>
+                      )}
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-sm font-medium">{course.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {[course.teacher, course.classroom].filter(Boolean).join(" · ")}
+                        </span>
                       </div>
-                    )}
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="truncate text-sm font-medium">{course.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {[course.teacher, course.classroom].filter(Boolean).join(" · ")}
-                      </span>
-                    </div>
-                    <Badge variant={isCurrent ? "default" : "outline"} className="shrink-0">
-                      {isCurrent
-                        ? t("dashboard.ongoingNow")
-                        : t("dashboard.sectionRange", {
-                            start: courseStartSection(course),
-                            end: courseEndSection(course),
-                          })}
-                    </Badge>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </QueryState>
-      </CardContent>
-    </Card>
+                      <Badge variant={isCurrent ? "default" : "outline"} className="shrink-0">
+                        {isCurrent
+                          ? t("dashboard.ongoingNow")
+                          : t("dashboard.sectionRange", {
+                              start: courseStartSection(course),
+                              end: courseEndSection(course),
+                            })}
+                      </Badge>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </QueryState>
+        </CardContent>
+      </Card>
+      <ActivityModal
+        course={activityCourse}
+        week={activityWeek}
+        open={activityOpen}
+        onOpenChange={setActivityOpen}
+        onSigninActivity={(activityId, type) => {
+          setSigninActivityId(activityId)
+          setSigninType(type)
+          setSigninOpen(true)
+        }}
+      />
+      <SigninModal
+        activityId={signinActivityId}
+        signinType={signinType}
+        open={signinOpen}
+        onOpenChange={setSigninOpen}
+      />
+    </>
   )
 }
 
