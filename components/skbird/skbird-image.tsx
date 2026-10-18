@@ -80,7 +80,6 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
   const longPressTimerRef = useRef<number | undefined>(undefined)
   const [saving, setSaving] = useState(false)
   const [saveSheetOpen, setSaveSheetOpen] = useState(false)
-  const [saved, setSaved] = useState(false)
   const native = isCapacitor()
 
   // 挂载后下一帧进入，触发开启过渡
@@ -181,7 +180,6 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
       // 触觉反馈（WebView 无权限时静默失败）
       navigator.vibrate?.(15)
       setSaveSheetOpen(true)
-      setSaved(false)
     }, LONG_PRESS_MS)
   }
 
@@ -215,7 +213,6 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
         fileName: `skbird_${Date.now()}.${extForMime(blob.type || "image/jpeg")}`,
       })
       toast.success(t("skbird.imageSaved"))
-      setSaved(true)
     } catch (err) {
       console.warn("[skbird] 保存图片失败:", err)
       toast.error(t("skbird.imageSaveFailed"))
@@ -315,72 +312,95 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
   const shown = entered && !closing
 
   return (
-    <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/85 transition-opacity duration-200 ${
-        shown ? "opacity-100" : "opacity-0"
-      }`}
-      onClick={beginClose}
-      role="presentation"
-    >
-      <button
-        type="button"
-        aria-label={t("skbird.closeImage")}
-        onClick={beginClose}
-        className="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/25"
-      >
-        <X className="size-5" />
-      </button>
-      {/* 图片区：点击不关闭；桌面点击/滚轮缩放、拖拽平移，移动端双击/捏合/拖动，原生端长按弹出保存抽屉 */}
+    <>
       <div
-        ref={wrapRef}
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerEnd}
-        onPointerCancel={onPointerEnd}
-        onContextMenu={native ? (e) => e.preventDefault() : undefined}
-        onWheel={(e) => {
-          const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
-          zoomAt(e.clientX, e.clientY, tfRef.current.scale * factor, false)
-        }}
-        className={`max-h-full max-w-full touch-none select-none ${
-          zoomedIn ? "cursor-move" : "cursor-zoom-in"
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-black/85 transition-opacity duration-200 ${
+          shown ? "opacity-100" : "opacity-0"
         }`}
+        onClick={beginClose}
         role="presentation"
       >
-        <SkbirdImage
-          url={url}
-          alt={alt}
-          className={`max-h-[90vh] max-w-[92vw] object-contain transition-opacity duration-200 ${
-            shown ? "opacity-100" : "opacity-0"
+        <button
+          type="button"
+          aria-label={t("skbird.closeImage")}
+          onClick={beginClose}
+          className="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/25"
+        >
+          <X className="size-5" />
+        </button>
+        {/* 图片区：点击不关闭；桌面点击/滚轮缩放、拖拽平移，移动端双击/捏合/拖动，原生端长按弹出保存抽屉 */}
+        <div
+          ref={wrapRef}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerEnd}
+          onPointerCancel={onPointerEnd}
+          onContextMenu={native ? (e) => e.preventDefault() : undefined}
+          onWheel={(e) => {
+            const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
+            zoomAt(e.clientX, e.clientY, tfRef.current.scale * factor, false)
+          }}
+          className={`max-h-full max-w-full touch-none select-none ${
+            zoomedIn ? "cursor-move" : "cursor-zoom-in"
           }`}
-        />
+          role="presentation"
+        >
+          <SkbirdImage
+            url={url}
+            alt={alt}
+            className={`max-h-[90vh] max-w-[92vw] object-contain transition-opacity duration-200 ${
+              shown ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        </div>
       </div>
       {native ? (
-        <Drawer open={saveSheetOpen} onOpenChange={setSaveSheetOpen}>
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>{t("skbird.saveImageTitle")}</DrawerTitle>
-              <DrawerDescription>{t("skbird.saveImageDesc")}</DrawerDescription>
-            </DrawerHeader>
-            <DrawerFooter className="flex-row gap-3">
-              <DrawerClose asChild>
-                <Button variant="outline" className="flex-1">
-                  {t("skbird.saveImageCancel")}
-                </Button>
-              </DrawerClose>
-              <Button
-                className="flex-1"
-                disabled={saving || saved}
-                onClick={() => void saveImage()}
-              >
-                {t(saved ? "skbird.imageSaved" : "skbird.saveImageConfirm")}
-              </Button>
-            </DrawerFooter>
-          </DrawerContent>
-        </Drawer>
+        <SaveSheet
+          open={saveSheetOpen}
+          onOpenChange={setSaveSheetOpen}
+          saving={saving}
+          onSave={() => void saveImage()}
+        />
       ) : null}
-    </div>
+    </>
+  )
+}
+
+/** 保存确认抽屉。平级于大图根节点渲染：portal 点击事件不再冒泡到大图背景的
+ * 关闭处理器（React 合成事件会穿过 portal 沿 React 树冒泡，放在根节点内会让
+ * 点“保存/取消”连带关闭大图）。 */
+function SaveSheet({
+  open,
+  onOpenChange,
+  saving,
+  onSave,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  saving: boolean
+  onSave: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>{t("skbird.saveImageTitle")}</DrawerTitle>
+          <DrawerDescription>{t("skbird.saveImageDesc")}</DrawerDescription>
+        </DrawerHeader>
+        <DrawerFooter className="flex-row gap-3">
+          <DrawerClose asChild>
+            <Button variant="outline" className="flex-1">
+              {t("skbird.saveImageCancel")}
+            </Button>
+          </DrawerClose>
+          <Button className="flex-1" disabled={saving} onClick={() => onSave()}>
+            {t("skbird.saveImageConfirm")}
+          </Button>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   )
 }
 
