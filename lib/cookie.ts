@@ -384,6 +384,21 @@ export function getActivateUrl(): string {
   return "/api/activate"
 }
 
+/**
+ * 去掉 URL 的片段部分。EdgeOne 的 Edge Functiosn 会错误地
+ * 把 `#...` 透传给上游，导致发出坏请求（愤怒喵）
+ */
+function stripUrlFragment(url: string): string {
+  try {
+    const parsed = new URL(url)
+    parsed.hash = ""
+    return parsed.toString()
+  } catch {
+    const hashIndex = url.indexOf("#")
+    return hashIndex === -1 ? url : url.slice(0, hashIndex)
+  }
+}
+
 async function proxyHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
   const headers = new Headers()
   for (const [k, v] of Object.entries(req.headers ?? {})) {
@@ -429,7 +444,8 @@ async function proxyHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<Ht
   }
 
   const proxyBase = process.env.NEXT_PUBLIC_PROXY_BASE_URL || "/api/proxy"
-  const proxyUrl = `${proxyBase}?url=${encodeURIComponent(req.url)}`
+  // 片段（#...）不应在 HTTP 请求中，Edge Functions 的 Fetch 未正确剥离，这里处理一下
+  const proxyUrl = `${proxyBase}?url=${encodeURIComponent(stripUrlFragment(req.url))}`
   const response = await fetch(proxyUrl, {
     method: req.method,
     headers,

@@ -243,6 +243,11 @@ export async function onRequest({ request, env }) {
     return errorResponse(400, 'url userinfo not allowed', origin);
   }
 
+  // 片段不属于 HTTP 请求目标。EdgeOne fetch 会把 URL 里的 #fragment 原样带进
+  // 请求行，Tomcat 直接以 400 Bad Request 拒绝（jwmobile 登录跳转
+  // /jwmobile/index#/?token=... 就会命中）。这里统一剥离，客户端侧也有兜底。
+  target.hash = '';
+
   // ── 构造上游请求 ──────────────────────────────────────────────────────
   const upstreamHeaders = new Headers();
   request.headers.forEach((value, name) => {

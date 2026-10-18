@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest"
-import { SimpleCookieJar } from "@/lib/cookie"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import { SimpleCookieJar, fetchWithJar } from "@/lib/cookie"
 
 describe("SimpleCookieJar cookie matching", () => {
   it("发送 Path 以 / 结尾的 cookie 到嵌套路径（RFC 6265 前缀匹配）", async () => {
@@ -65,5 +65,29 @@ describe("SimpleCookieJar deletion & empty-value cookies", () => {
     )
     const header = await jar.getCookieString("https://cer.ysu.edu.cn/authserver/login")
     expect(header).not.toContain("route")
+  })
+})
+
+describe("Web 代理传输", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("上游 URL 的 fragment 不会进入代理请求（jwmobile 登录跳转 #/?token=）", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => {
+      return new Response("", { status: 200, headers: { "x-proxy-status": "200" } })
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await fetchWithJar(new SimpleCookieJar(), {
+      method: "GET",
+      url: "https://jwxt.ysu.edu.cn/jwmobile/index#/?token=abc.def",
+      redirect: "manual",
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const proxyUrl = new URL(String(fetchMock.mock.calls[0]![0]), "https://ysu.welain.com")
+    expect(proxyUrl.pathname).toBe("/api/proxy")
+    expect(proxyUrl.searchParams.get("url")).toBe("https://jwxt.ysu.edu.cn/jwmobile/index")
   })
 })
