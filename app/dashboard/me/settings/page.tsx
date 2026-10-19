@@ -31,6 +31,7 @@ import { setNotificationEnabled } from "@/lib/native/notify"
 import { NotifyPlugin } from "@/lib/native/notify-plugin"
 import {
   LayoutDashboard,
+  LayoutGrid,
   Calendar,
   ChevronRight,
   LogIn,
@@ -302,6 +303,20 @@ export default function SettingsPage() {
                   {t("settings.widget")}
                 </h3>
 
+                <Link
+                  href="/dashboard/me/settings/widgets"
+                  className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
+                >
+                  <LayoutGrid className="size-5 shrink-0 text-muted-foreground" />
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-sm">{t("settings.addWidget")}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {t("settings.addWidgetDesc")}
+                    </span>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </Link>
+
                 {/* 课表同步提醒阈值 */}
                 <SettingNumberInput
                   icon={Clock}
@@ -314,6 +329,7 @@ export default function SettingsPage() {
                   min={0}
                   max={168}
                   unit={t("settings.widgetSyncReminderUnit")}
+                  bordered
                 />
 
                 {/* 无课显示下一有课日 */}

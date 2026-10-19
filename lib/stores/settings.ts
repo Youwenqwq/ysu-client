@@ -14,6 +14,22 @@ export type CardStyle = "solid" | "translucent" | "glass"
 export type BackgroundStyle = "overlay" | "blur-overlay"
 export type LandingPage = "overview" | "schedule"
 
+export interface WidgetAssistantPosition {
+  x: number
+  y: number
+}
+
+function normalizeWidgetAssistantPosition(value: unknown): WidgetAssistantPosition | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null
+  const { x, y } = value as Record<string, unknown>
+  if (typeof x !== "number" || typeof y !== "number") return null
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+  return {
+    x: Math.min(1, Math.max(0, x)),
+    y: Math.min(1, Math.max(0, y)),
+  }
+}
+
 interface EpayAccountSettings {
   lastCheckedAt: number
 }
@@ -30,6 +46,8 @@ interface SettingsState {
   defaultLandingPage: LandingPage
   widgetSyncReminderHours: number
   widgetShowNextDaySchedule: boolean
+  widgetAssistantHidden: boolean
+  widgetAssistantPosition: WidgetAssistantPosition | null
   avatarImage: string
   customUserAgent: string
   customUserAgentEnabled: boolean
@@ -67,6 +85,8 @@ interface SettingsState {
   setDefaultLandingPage: (page: LandingPage) => void
   setWidgetSyncReminderHours: (hours: number) => void
   setWidgetShowNextDaySchedule: (v: boolean) => void
+  setWidgetAssistantHidden: (v: boolean) => void
+  setWidgetAssistantPosition: (position: WidgetAssistantPosition | null) => void
   setAvatarImage: (image: string) => void
   setCustomUserAgent: (ua: string) => void
   setCustomUserAgentEnabled: (v: boolean) => void
@@ -107,6 +127,8 @@ export const useSettingsStore = create<SettingsState>()(
       defaultLandingPage: "overview",
       widgetSyncReminderHours: 24,
       widgetShowNextDaySchedule: false,
+      widgetAssistantHidden: false,
+      widgetAssistantPosition: null,
       avatarImage: "",
       customUserAgent: "",
       customUserAgentEnabled: false,
@@ -143,6 +165,8 @@ export const useSettingsStore = create<SettingsState>()(
       setWidgetSyncReminderHours: (widgetSyncReminderHours) => set({ widgetSyncReminderHours }),
       setWidgetShowNextDaySchedule: (widgetShowNextDaySchedule) =>
         set({ widgetShowNextDaySchedule }),
+      setWidgetAssistantHidden: (widgetAssistantHidden) => set({ widgetAssistantHidden }),
+      setWidgetAssistantPosition: (widgetAssistantPosition) => set({ widgetAssistantPosition }),
       setAvatarImage: (avatarImage) => set({ avatarImage }),
       setCustomUserAgent: (customUserAgent) => set({ customUserAgent }),
       setCustomUserAgentEnabled: (customUserAgentEnabled) => set({ customUserAgentEnabled }),
@@ -194,6 +218,7 @@ export const useSettingsStore = create<SettingsState>()(
           ...current,
           ...saved,
           overviewLayout: normalizeOverviewLayout(saved.overviewLayout),
+          widgetAssistantPosition: normalizeWidgetAssistantPosition(saved.widgetAssistantPosition),
           hasHydrated: false,
         }
       },

@@ -224,6 +224,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     "/dashboard/me/background": t("app.backgroundSettings"),
     "/dashboard/me/settings": t("settings.title"),
     "/dashboard/me/settings/overview": t("overviewLayout.customize"),
+    "/dashboard/me/settings/widgets": t("desktopWidgets.title"),
     "/dashboard/me/avatar": t("app.avatarSettings"),
     "/dashboard/me/about": t("about.title"),
   }
