@@ -1,5 +1,8 @@
 import type { AcademicCompletion as ProtocolAcademicCompletion } from "./protocol/jwxt"
 import { useAuthStore } from "@/lib/stores/auth"
+import { isHarmony } from "@/lib/native/harmony"
+import { HarmonySecureStorage } from "@/lib/storage/harmony-secure"
+import { STORAGE_KEYS } from "@/lib/storage/keys"
 import { getSchoolConfig, isFeatureAvailable } from "@/lib/server-config"
 import { BaseProvider } from "../base-provider"
 import { ProviderError, ProviderErrorCode } from "../errors"
@@ -159,16 +162,16 @@ function ysuCapabilities(): AcademicCapabilities {
     auth: true,
     captcha: true,
     mfa: isFeatureAvailable("hasMfa"),
-    wechatMfa: isFeatureAvailable("hasMfa"),
+    wechatMfa: !isHarmony() && isFeatureAvailable("hasMfa"),
     grades: true,
     gradeAnalytics: true,
     schedule: true,
     labSchedule: isFeatureAvailable("hasLabSchedule"),
     exams: true,
     makeupExams: true,
-    laborEducation: getSchoolConfig().ldxt !== undefined,
-    innovationCredits: getSchoolConfig().scxt !== undefined,
-    comprehensiveEval: getSchoolConfig().xgxt !== undefined,
+    laborEducation: !isHarmony() && getSchoolConfig().ldxt !== undefined,
+    innovationCredits: !isHarmony() && getSchoolConfig().scxt !== undefined,
+    comprehensiveEval: !isHarmony() && getSchoolConfig().xgxt !== undefined,
     schoolSchedule: true,
     gpa: true,
     evaluation: true,
@@ -178,9 +181,9 @@ function ysuCapabilities(): AcademicCapabilities {
     currentWeek: true,
     classPeriods: true,
     termCalendar: true,
-    mobileSignin: isFeatureAvailable("hasMobile"),
+    mobileSignin: !isHarmony() && isFeatureAvailable("hasMobile"),
     ecard: true,
-    meter: true,
+    meter: !isHarmony(),
     epay: true,
   }
 }
@@ -482,6 +485,7 @@ export class YSUProvider extends BaseProvider {
   async logout(): Promise<void> {
     await this.reset()
     useAuthStore.getState().clearCredential()
+    if (isHarmony()) await HarmonySecureStorage.removeItem(STORAGE_KEYS.auth)
   }
 
   isAuthenticated(): boolean {
@@ -722,6 +726,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async signupMakeupExam(input: MakeupExamSignupInput): Promise<void> {
+    if (isHarmony()) throw new Error("当前版本仅支持查询，不能提交补考报名")
     await signupMakeupExam({ taskId: input.taskId, batchId: input.batchId })
   }
 
@@ -1156,6 +1161,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async recalculateAcademicCompletion(): Promise<AcademicCompletion> {
+    if (isHarmony()) throw new Error("当前版本仅支持查询，不能触发服务器重算")
     const completion = await recalculateAcademicCompletionImpl()
     return mapCompletion(completion)
   }

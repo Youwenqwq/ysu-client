@@ -10,6 +10,7 @@ export interface AnnouncementInfo {
 }
 
 import { getLocalStorageItemWithFallback, STORAGE_KEYS } from "./storage/keys"
+import { isHarmony } from "./native/harmony"
 
 const ANNOUNCEMENT_URL = "https://ysu.welain.com/updates/announcement.json"
 const LAST_DISMISSED_KEY = STORAGE_KEYS.lastDismissedAnnouncementId
@@ -24,6 +25,7 @@ function isFuture(publishedAt: string): boolean {
 }
 
 export async function checkAnnouncement(): Promise<AnnouncementInfo | null> {
+  if (isHarmony()) return null
   try {
     const res = await fetch(ANNOUNCEMENT_URL)
     if (!res.ok) return null

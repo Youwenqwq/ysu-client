@@ -1,4 +1,17 @@
 # dependencies
+/harmony/node_modules/
+/harmony/oh_modules/
+/harmony/.hvigor/
+/harmony/entry/build/
+/harmony/build/
+/harmony/local.properties
+/harmony/resource-verification.json
+/harmony/entry/src/main/resources/rawfile/www/
+/harmony/entry/src/main/resources/rawfile/security-policy.json
+/harmony/**/*.p12
+/harmony/**/*.pfx
+/harmony/**/*.p7b
+/harmony/**/*.key
 /node_modules
 /.pnp
 .pnp.*
@@ -18,6 +31,11 @@
 # production
 /build
 /dist
+/.hvigor/
+/.codex-harmony-diagnostic/
+/artifacts/
+*.hap
+*.hsp
 
 /android/*
 !/android/build.gradle
@@ -55,6 +73,8 @@ pnpm-debug.log*
 # env files
 .env
 .env*.local
+.env.*
+!.env.example
 *.pem
 
 # typescript

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "build:harmony": "node scripts/build-harmony.mjs",
+    "build:harmony:hap": "node scripts/build-harmony-native.mjs",
     "postbuild": "node scripts/generate-pwa-shell.mjs",
     "start": "next start",
     "lint": "eslint",

@@ -27,7 +27,7 @@ import { getActiveProvider } from "@/providers/provider-service"
 import type { WechatQrPollResult } from "@/providers/types"
 import type { YSUMfaMethod } from "@/providers/ysu"
 import { useAuthStore } from "@/lib/stores/auth"
-import { isTablet } from "@/lib/native/platform"
+import { isTablet, isHarmony } from "@/lib/native/platform"
 import { toast } from "sonner"
 
 const COUNTDOWN_SECONDS = 120
@@ -43,7 +43,7 @@ export function MFAModal() {
     submitMFA,
     completeWechatMFA: storeComplete,
   } = useMFAModalStore()
-  const showWechat = isTablet()
+  const showWechat = !isHarmony() && isTablet()
   const defaultMethod = showWechat ? "weixin" : "sms"
   const [mfaMethod, setMfaMethod] = useState<YSUMfaMethod>(defaultMethod)
   const [code, setCode] = useState("")

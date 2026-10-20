@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react"
 import { toast } from "sonner"
 
 import { useTranslation } from "@/lib/i18n/use-translation"
-import { isCapacitor } from "@/lib/native/platform"
+import { isNativeApp } from "@/lib/native/platform"
 import { initializePwaInstallCapture } from "@/lib/pwa-install"
 import {
   PWA_UPDATE_CHECK_INTERVAL_MS,
@@ -29,7 +29,7 @@ export function PwaRegister() {
       process.env.NODE_ENV !== "production" ||
       !window.isSecureContext ||
       !("serviceWorker" in navigator) ||
-      isCapacitor()
+      isNativeApp()
     ) {
       return
     }

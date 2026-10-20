@@ -9,7 +9,7 @@ import { useAuthStore } from "@/lib/stores/auth"
 import { useSettingsStore } from "@/lib/stores/settings"
 import { useUpdateStore } from "@/lib/stores/update"
 import { useTranslation } from "@/lib/i18n/use-translation"
-import { isCapacitor } from "@/lib/native/platform"
+import { isCapacitor, isHarmony } from "@/lib/native/platform"
 import { blurActiveElement } from "@/lib/utils"
 import { initSafeArea } from "@/lib/native/webview-compat"
 import { trackAppLaunch } from "@/lib/analytics"
@@ -108,7 +108,9 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
 
         // Show analytics consent prompt if user hasn't made a choice yet
         const analyticsPromptVersion = useSettingsStore.getState().analyticsPromptVersion
-        if (!analyticsPromptVersion) {
+        if (isHarmony()) {
+          // Local-only build has no analytics, announcement, update or activation traffic.
+        } else if (!analyticsPromptVersion) {
           blurActiveElement()
           setShowAnalyticsPrompt(true)
         } else {

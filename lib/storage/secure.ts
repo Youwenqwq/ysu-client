@@ -6,9 +6,13 @@
  * - Remember-me credentials (username + password)
  * - CASTGC cookie persistence
  */
-import { SecureStorage } from "@aparajita/capacitor-secure-storage"
+import { SecureStorage as CapacitorSecureStorage } from "@aparajita/capacitor-secure-storage"
+import { isHarmony } from "@/lib/native/harmony"
+import { HarmonySecureStorage } from "./harmony-secure"
 import { toast } from "sonner"
 import { STORAGE_KEYS } from "./keys"
+
+const SecureStorage = isHarmony() ? HarmonySecureStorage : CapacitorSecureStorage
 
 // ─── Key constants ──────────────────────────────────────────────────────── //
 
@@ -32,6 +36,7 @@ function legacySecureStorageKey(name: string): string | null {
 export const secureStorage = {
   getItem: async (name: string): Promise<string | null> => {
     if (!isBrowser) return null
+    if (isHarmony()) return HarmonySecureStorage.getItem(name)
     try {
       const value = await SecureStorage.getItem(name)
       if (value !== null && value !== undefined) return value
@@ -50,6 +55,7 @@ export const secureStorage = {
   },
   setItem: async (name: string, value: string): Promise<void> => {
     if (!isBrowser) return
+    if (isHarmony()) return HarmonySecureStorage.setItem(name, value)
     try {
       await SecureStorage.setItem(name, value)
       const legacyKey = legacySecureStorageKey(name)
@@ -60,6 +66,7 @@ export const secureStorage = {
   },
   removeItem: async (name: string): Promise<void> => {
     if (!isBrowser) return
+    if (isHarmony()) return HarmonySecureStorage.removeItem(name)
     try {
       await SecureStorage.removeItem(name)
       const legacyKey = legacySecureStorageKey(name)
@@ -74,6 +81,7 @@ export const secureStorage = {
 
 export async function saveRememberedCredentials(username: string, password: string): Promise<void> {
   if (!isBrowser) return
+  if (isHarmony()) return HarmonySecureStorage.set(REMEMBER_KEY, { username, password })
   try {
     await SecureStorage.set(REMEMBER_KEY, { username, password })
     await SecureStorage.remove(LEGACY_REMEMBER_KEY).catch(() => {})
@@ -108,6 +116,7 @@ export async function loadRememberedCredentials(): Promise<{
 
 export async function clearRememberedCredentials(): Promise<void> {
   if (!isBrowser) return
+  if (isHarmony()) return HarmonySecureStorage.remove(REMEMBER_KEY)
   try {
     await SecureStorage.remove(REMEMBER_KEY)
     await SecureStorage.remove(LEGACY_REMEMBER_KEY).catch(() => {})
@@ -120,6 +129,7 @@ export async function clearRememberedCredentials(): Promise<void> {
 
 export async function saveAuthToken(value: string): Promise<void> {
   if (!isBrowser) return
+  if (isHarmony()) return HarmonySecureStorage.set(AUTH_TOKEN_KEY, value)
   try {
     await SecureStorage.set(AUTH_TOKEN_KEY, value)
     await SecureStorage.remove(LEGACY_AUTH_TOKEN_KEY).catch(() => {})
@@ -148,6 +158,7 @@ export async function loadAuthToken(): Promise<string | null> {
 
 export async function removeAuthToken(): Promise<void> {
   if (!isBrowser) return
+  if (isHarmony()) return HarmonySecureStorage.remove(AUTH_TOKEN_KEY)
   try {
     await SecureStorage.remove(AUTH_TOKEN_KEY)
     await SecureStorage.remove(LEGACY_AUTH_TOKEN_KEY).catch(() => {})

@@ -28,7 +28,8 @@ import {
   clearRememberedCredentials,
 } from "@/lib/storage/secure"
 import { checkRateLimit, rateLimitMessage } from "@/lib/rate-limit"
-import { isCapacitor } from "@/lib/native/platform"
+import { isNativeApp, isHarmony } from "@/lib/native/platform"
+import { loadHarmonyCaptcha } from "@/providers/ysu/cas-auth"
 import { useMFAModalStore } from "@/lib/stores/mfa-modal"
 import { getActiveProvider, setActiveProviderSchool } from "@/providers/provider-service"
 
@@ -51,10 +52,10 @@ export default function LoginPage() {
 
   // Web 端 secure-storage 退化为明文 localStorage，刻意不提供"记住密码"，
   // 避免账号密码明文落盘；会话 cookie 的持久化与教务系统本身的安全模型一致。
-  const canRemember = isCapacitor()
+  const canRemember = isNativeApp()
 
   useEffect(() => {
-    if (!isCapacitor()) return
+    if (!isNativeApp()) return
     loadRememberedCredentials().then((r) => {
       if (r) {
         setUsername(r.username)
@@ -87,12 +88,21 @@ export default function LoginPage() {
 
   function showCaptcha() {
     setNeedsCaptcha(true)
-    const captchaUrl = getActiveProvider().getCaptchaUrl()
-    setCaptchaUrl(captchaUrl ? `${captchaUrl}?${Date.now()}` : null)
+    if (isHarmony()) {
+      void loadHarmonyCaptcha()
+        .then(setCaptchaUrl)
+        .catch(() => {
+          setCaptchaUrl(null)
+          toast.error("验证码加载失败，请重试")
+        })
+    } else {
+      const captchaUrl = getActiveProvider().getCaptchaUrl()
+      setCaptchaUrl(captchaUrl ? `${captchaUrl}?${Date.now()}` : null)
+    }
   }
 
   async function syncRememberedLoginPreference() {
-    if (!isCapacitor()) return
+    if (!isNativeApp()) return
     if (remember) {
       await saveRememberedCredentials(username, password)
     } else {

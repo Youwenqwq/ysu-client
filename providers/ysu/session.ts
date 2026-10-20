@@ -33,7 +33,7 @@ import { initServerConfig } from "@/lib/server-config"
 import { STORAGE_KEYS } from "@/lib/storage/keys"
 import { clearAllCache, cleanStaleCacheVersions } from "@/lib/storage/cache"
 import { useRefreshStore } from "@/lib/stores/refresh"
-import { isCapacitor } from "@/lib/native/platform"
+import { isCapacitor, isHarmony } from "@/lib/native/platform"
 import { stopNotify } from "@/lib/native/notify"
 import { clearWidgetDataFromNative } from "@/lib/native/widget-bridge"
 import { removeCASTGC } from "@/lib/storage/secure"
@@ -168,7 +168,8 @@ export async function resetSession(): Promise<void> {
       stopNotify()
       // Clear account-specific data kept by home-screen widgets.
       void clearWidgetDataFromNative()
-      await removeCASTGC().catch(() => {})
+      if (isHarmony()) await removeCASTGC()
+      else await removeCASTGC().catch(() => {})
     }
   })
 }

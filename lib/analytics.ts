@@ -1,10 +1,11 @@
 import { useSettingsStore } from "@/lib/stores/settings"
 import { APP_VERSION } from "@/lib/version"
-import { isCapacitor } from "@/lib/native/platform"
+import { isCapacitor, isHarmony } from "@/lib/native/platform"
 
 const STATS_ENDPOINT = "https://ysu.welain.com/api/stats"
 
 export async function trackAppLaunch(): Promise<void> {
+  if (isHarmony()) return
   const store = useSettingsStore.getState()
   if (!store.analyticsConsent) return
 

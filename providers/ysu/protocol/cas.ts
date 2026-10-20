@@ -17,7 +17,7 @@ import {
 } from "@/lib/cookie"
 import { saveCASTGC as saveCASTGCSecure, loadCASTGC } from "@/lib/storage/secure"
 import { serverConfig, casUrls, getCasCookieDomain, getSchoolConfig } from "@/lib/server-config"
-import { isCapacitor } from "@/lib/native/platform"
+import { isCapacitor, isHarmony } from "@/lib/native/platform"
 import type { YSUMfaMethod } from "../types"
 
 // ─── Constants ────────────────────────────────────────────────────────── //
@@ -358,6 +358,10 @@ export async function saveCASTGC(): Promise<void> {
 export async function restoreCASCookies(): Promise<void> {
   const tgc = await loadCASTGC()
   if (!tgc) return
+  if (isHarmony()) {
+    await casJar.setCookie(`CASTGC=${tgc}; Path=/authserver; Secure`, serverConfig.cerBaseUrl)
+    return
+  }
 
   const capCore = await getCapacitorCore()
   if (!capCore) return
@@ -425,6 +429,7 @@ export async function prepareLogin(): Promise<void> {
 }
 
 async function syncJarCookiesToWebView(): Promise<void> {
+  if (isHarmony()) return // Captcha uses the same native HTTP channel and in-memory jar.
   const capCore = await getCapacitorCore()
   if (!capCore) return
 

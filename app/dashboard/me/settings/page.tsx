@@ -20,7 +20,7 @@ import { useSettingsStore, type LandingPage } from "@/lib/stores/settings"
 import { Input } from "@/components/ui/input"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service"
-import { isCapacitor } from "@/lib/native/platform"
+import { isCapacitor, isHarmony } from "@/lib/native/platform"
 import { cn } from "@/lib/utils"
 
 import { syncWidgetSettingsToWidget } from "@/lib/native/widget-bridge"
@@ -553,20 +553,24 @@ export default function SettingsPage() {
         </Card>
       </Section>
 
-      <div className="flex flex-col gap-2">
-        <Card>
-          <CardContent className="flex flex-col py-1">
-            <div className="flex items-center gap-3 py-3">
-              <BarChart3 className="size-5 shrink-0 text-muted-foreground" />
-              <div className="flex flex-1 flex-col">
-                <span className="text-sm">{t("settings.analyticsEnabled")}</span>
-                <span className="text-xs text-muted-foreground">{t("settings.analyticsDesc")}</span>
+      {!isHarmony() && (
+        <div className="flex flex-col gap-2">
+          <Card>
+            <CardContent className="flex flex-col py-1">
+              <div className="flex items-center gap-3 py-3">
+                <BarChart3 className="size-5 shrink-0 text-muted-foreground" />
+                <div className="flex flex-1 flex-col">
+                  <span className="text-sm">{t("settings.analyticsEnabled")}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t("settings.analyticsDesc")}
+                  </span>
+                </div>
+                <Switch checked={analyticsConsent} onCheckedChange={setAnalyticsConsent} />
               </div>
-              <Switch checked={analyticsConsent} onCheckedChange={setAnalyticsConsent} />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Section title={t("about.title")}>
         <Card>

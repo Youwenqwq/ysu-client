@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useActivationStore } from "@/lib/stores/activation"
-import { isCapacitor } from "@/lib/native/platform"
+import { isNativeApp } from "@/lib/native/platform"
 import { getActivateUrl } from "@/lib/cookie"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { Button } from "@/components/ui/button"
@@ -24,7 +24,7 @@ export function ActivationGate({ children }: { children: React.ReactNode }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<"invalid" | "network" | null>(null)
 
-  if (isCapacitor() || process.env.NODE_ENV !== "production") {
+  if (isNativeApp() || process.env.NODE_ENV !== "production") {
     return <>{children}</>
   }
   // 水合完成前不渲染，避免已激活用户看到激活页闪烁

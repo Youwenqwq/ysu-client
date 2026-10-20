@@ -4,6 +4,8 @@
 
 <h1 align="center">燕大终端</h1>
 
+鸿蒙本地直连移植原型的安全边界、构建与设备验收说明见 [harmony/README.md](harmony/README.md)。鸿蒙原型尚未完成签名和真实账号的设备验收。
+
 <p align="center">
   <a href="README.zh-CN.md">详细文档（中文）</a> · <a href="README.en.md">English</a>
 </p>

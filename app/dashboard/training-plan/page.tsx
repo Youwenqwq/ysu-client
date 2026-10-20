@@ -1,5 +1,7 @@
 "use client"
 
+import { isHarmony } from "@/lib/native/harmony"
+
 import { ResponsiveSelect } from "@/components/responsive-select"
 import { useMemo, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -184,7 +186,7 @@ export default function TrainingPlanPage() {
               <CardTitle>{t("academic.completionTitle")}</CardTitle>
               <CardDescription>{t("academic.completionDescription")}</CardDescription>
             </div>
-            {completion.data && provider.recalculateAcademicCompletion && (
+            {!isHarmony() && completion.data && provider.recalculateAcademicCompletion && (
               <Button
                 variant="ghost"
                 size="sm"

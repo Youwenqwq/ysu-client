@@ -1,4 +1,12 @@
-/** 检测当前是否在 Capacitor 原生环境中运行。 */
+import { isHarmony } from "./harmony"
+
+export { isHarmony }
+
+export function isNativeApp(): boolean {
+  return isHarmony() || isCapacitor()
+}
+
+/** Capacitor plugins remain disabled on the independent Harmony host. */
 
 export function isCapacitor(): boolean {
   try {

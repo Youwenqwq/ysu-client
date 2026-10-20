@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
     "android/app/src/main/assets/public/**",
     // Separate project
     "website/**",
+    "harmony/**",
 	// Configs
 	".edgeone/**",
 	"docs/**",

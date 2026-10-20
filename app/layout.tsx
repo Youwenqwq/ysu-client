@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { I18nProvider } from "@/lib/i18n/context"
 import { SDKProvider } from "@/components/sdk-provider"
 import { ActivationGate } from "@/components/activation-gate"
+import { HarmonySecurityGate } from "@/components/harmony-security-gate"
 import { MFAModal } from "@/components/mfa-modal"
 import { BackgroundImage } from "@/components/background-image"
 import { BackButtonHandler } from "@/components/back-button-handler"
@@ -40,6 +41,7 @@ export const metadata: Metadata = {
   applicationName: "燕大终端",
   authors: [{ name: "ysu-client contributors" }],
   keywords: ["燕大终端", "YSU Terminal", "燕山大学", "YSU", "教务系统"],
+  other: { "ysu-platform": process.env.NEXT_PUBLIC_APP_PLATFORM || "web" },
   appleWebApp: {
     capable: true,
     title: "燕大终端",
@@ -72,19 +74,21 @@ export default function RootLayout({
           <PwaUpdatePrompt />
           <ThemeProvider>
             <ProviderProvider>
-              <ActivationGate>
-                <SDKProvider>
-                  <TooltipProvider>
-                    <BackgroundImage />
-                    <BackButtonHandler />
-                    <DeepLinkHandler />
-                    <NotifyProvider />
-                    {children}
-                    <Toaster />
-                    <MFAModal />
-                  </TooltipProvider>
-                </SDKProvider>
-              </ActivationGate>
+              <HarmonySecurityGate>
+                <ActivationGate>
+                  <SDKProvider>
+                    <TooltipProvider>
+                      <BackgroundImage />
+                      <BackButtonHandler />
+                      <DeepLinkHandler />
+                      <NotifyProvider />
+                      {children}
+                      <Toaster />
+                      <MFAModal />
+                    </TooltipProvider>
+                  </SDKProvider>
+                </ActivationGate>
+              </HarmonySecurityGate>
             </ProviderProvider>
           </ThemeProvider>
         </I18nProvider>

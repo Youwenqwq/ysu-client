@@ -341,6 +341,8 @@ export async function fetchStateless(req: HttpRequest): Promise<HttpResponse> {
 }
 
 import { isCapacitor } from "./native/platform"
+import { isHarmony } from "./native/harmony"
+import { harmonyHttpSend } from "./native/harmony-http"
 import { getCustomUserAgent } from "./custom-user-agent"
 import { useActivationStore } from "./stores/activation"
 
@@ -354,6 +356,7 @@ async function getCapacitorCore(): Promise<any> {
 }
 
 async function send(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
+  if (isHarmony()) return harmonyHttpSend(jar, req)
   if (isCapacitor()) {
     return capacitorHttpSend(jar, req)
   }
@@ -684,7 +687,7 @@ async function followRedirects(jar: SimpleCookieJar, req: HttpRequest): Promise<
   throw new Error(`exceeded max redirects (${MAX_REDIRECTS}) for ${req.url}`)
 }
 
-function splitSetCookie(raw: string): string[] {
+export function splitSetCookie(raw: string): string[] {
   if (!raw) return []
   const out: string[] = []
   let current = raw

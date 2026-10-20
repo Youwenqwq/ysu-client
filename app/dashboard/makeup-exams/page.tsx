@@ -1,5 +1,7 @@
 "use client"
 
+import { isHarmony } from "@/lib/native/harmony"
+
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -198,7 +200,7 @@ export default function MakeupExamsPage() {
                       <span>{course.note}</span>
                     </div>
                   )}
-                  {tab === "available" && course.taskId && course.batchId && (
+                  {!isHarmony() && tab === "available" && course.taskId && course.batchId && (
                     <Button
                       size="sm"
                       className="mt-1 self-start"

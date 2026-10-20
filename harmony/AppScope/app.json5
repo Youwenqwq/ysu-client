@@ -1,0 +1,10 @@
+{
+  "app": {
+    "bundleName": "com.youwenqwq.ysuclient.harmony",
+    "vendor": "ysu-client contributors",
+    "versionCode": 10000,
+    "versionName": "0.1.0",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name"
+  }
+}

@@ -6,6 +6,7 @@
  */
 
 import { getLocalStorageItemWithFallback, STORAGE_KEYS } from "./storage/keys"
+import { isHarmony } from "./native/harmony"
 import {
   DEFAULT_SCHOOL_ID,
   getSchoolConfigById,
@@ -139,14 +140,17 @@ export function getAvailableSchools(): Array<{
   name: string
   nameEn: string
 }> {
-  return getVisibleSchoolConfigs().map((c) => ({
-    id: c.id,
-    name: c.name,
-    nameEn: c.nameEn,
-  }))
+  return getVisibleSchoolConfigs()
+    .filter((c) => !isHarmony() || c.id === "ysu")
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      nameEn: c.nameEn,
+    }))
 }
 
 export function setSchoolConfig(schoolId: string): boolean {
+  if (isHarmony() && schoolId !== "ysu") return false
   const config = getSchoolConfigById(schoolId)
   if (!config) return false
   currentSchoolId = schoolId
@@ -195,6 +199,10 @@ export function getJwxtCookieDomain(): string {
 // ─── Init / reset ──────────────────────────────────────────────────────── //
 
 export function initServerConfig(): void {
+  if (isHarmony()) {
+    setSchoolConfig("ysu")
+    return
+  }
   try {
     const raw = getLocalStorageItemWithFallback(STORAGE_KEYS.settings, STORAGE_KEYS.legacySettings)
     if (!raw) return
@@ -223,6 +231,7 @@ export function resetServerConfig(): void {
 }
 
 export function applyServerConfig(cerBaseUrl: string, jwxtBaseUrl: string): void {
+  if (isHarmony()) throw new Error("鸿蒙版仅使用内置学校官方地址")
   serverConfig._customCerBaseUrl = cerBaseUrl
   serverConfig._customJwxtBaseUrl = jwxtBaseUrl
 }

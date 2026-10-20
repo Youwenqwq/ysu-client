@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { App } from "@capacitor/app"
-import { isCapacitor } from "@/lib/native/platform"
+import { isCapacitor, isHarmony } from "@/lib/native/platform"
 import { requestBack, setNavigationBackHandler } from "@/lib/navigation/back"
 import { appHistoryDepth, backFallback, installBackHistory } from "@/lib/navigation/back-history"
 
@@ -12,6 +12,13 @@ export function BackButtonHandler() {
   const router = useRouter()
 
   useEffect(() => installBackHistory(window.history), [])
+
+  useEffect(() => {
+    if (!isHarmony()) return
+    const back = () => requestBack()
+    window.addEventListener("ysu-native-back", back)
+    return () => window.removeEventListener("ysu-native-back", back)
+  }, [])
 
   useLayoutEffect(() => {
     return setNavigationBackHandler((canGoBack) => {

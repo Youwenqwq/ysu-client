@@ -31,6 +31,8 @@ import {
 import { checkRateLimit, recordLoginAttempt } from "@/lib/rate-limit"
 import { useAuthStore } from "@/lib/stores/auth"
 import { casUrls } from "@/lib/server-config"
+import { fetchWithJar } from "@/lib/cookie"
+import { isHarmony } from "@/lib/native/harmony"
 import { getText } from "@/lib/i18n/get-text"
 import { withAuthTransition } from "./auth-transition"
 import { ProviderError, ProviderErrorCode, wrapError } from "../errors"
@@ -88,6 +90,22 @@ function mapCASError(e: unknown): ProviderError {
 
 export function getCaptchaUrl(): string {
   return casUrls.captcha
+}
+
+export async function loadHarmonyCaptcha(): Promise<string> {
+  if (!isHarmony()) throw new Error("仅用于鸿蒙验证码加载")
+  const response = await fetchWithJar(getCasJar(), {
+    method: "GET",
+    url: `${casUrls.captcha}?_=${Date.now()}`,
+    redirect: "follow",
+    responseType: "arraybuffer",
+  })
+  if (response.status !== 200) throw new Error("验证码加载失败")
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (bytes.length > 1024 * 1024) throw new Error("验证码内容过大")
+  let binary = ""
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return `data:image/jpeg;base64,${btoa(binary)}`
 }
 
 export async function prepareLogin(): Promise<void> {

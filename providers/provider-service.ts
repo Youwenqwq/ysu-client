@@ -5,8 +5,10 @@ import { DEFAULT_SCHOOL_ID, hasSchoolConfig } from "@/lib/school-configs"
 import type { AcademicProvider } from "./types"
 import { createProvider, hasProvider } from "./provider-registry"
 import { stopNotify, syncNativeNotifications } from "@/lib/native/notify"
+import { isHarmony } from "@/lib/native/harmony"
 
 function resolveSupportedSchoolId(schoolId: string): string {
+  if (isHarmony()) return "ysu"
   if (hasSchoolConfig(schoolId) && hasProvider(schoolId)) {
     return schoolId
   }

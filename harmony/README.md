@@ -1,0 +1,71 @@
+# 燕大终端 HarmonyOS 本地直连移植
+
+目标设备系统：HarmonyOS 7。本目录提供独立 ArkTS + ArkWeb 外壳。网页界面、认证协议、查询解析和缓存仍在设备本地执行，原生层仅承载受限的学校网络请求和系统安全存储。
+
+## 已实现的安全边界
+
+- 鸿蒙构建通过 `NEXT_PUBLIC_APP_PLATFORM=harmony` 固定识别平台。缺失原生桥接时直接报错，不转用 Web 代理或 Capacitor 网页安全存储。
+- 原生请求只允许 `security-policy.json` 中逐个审核的 HTTPS 域名、路径与方法，当前为学校的 cer/jwxt/epay/ehall 四个域名。
+- 强制 RCP `proxy: 'no-proxy'`，禁用自动重定向。应用每跟随一跳都会重新检查请求目标，Cookie 仅按目标域名和路径匹配后发送。
+- 认证的 service/success 回调也必须落在已审核的学校入口，拒绝重复回调参数。没有自定义服务器地址和任意 URL 的代理能力。
+- 除认证和学生评教外，只放行已审核的查询端点；查询使用 POST 并不代表允许任意 POST。补考报名、课程签到/签退、服务器重算、充值和支付均不放行。
+- 密码、CASTGC、Zustand 登录状态和会话均通过 Asset Store Kit 保存。设置 DEVICE_UNLOCKED、SyncType.NEVER，保持默认 IS_PERSISTENT=false（不申请卸载后保留权限），无 Preferences/文件/localStorage 明文降级。
+- 超过单条资产长度的凭据按 1024 字节分块；先提交完整的新版本，再原子替换清单。读、写、删除按队列执行，写入失败保留旧版本。
+- ArkWeb 仅承载包内的 `https://ysu.local/` 虚拟资源；该名称不对应外部应用服务器。资源拦截器拒绝其他地址，CSP 同时阻止外部连接、图片、框架和表单提交。验证码通过学校直连通道加载成内存图片。
+- 关闭统计、远程公告、激活、网络热更新和第三方玩具箱功能。不向控制台转发原生错误详情、请求内容或凭据；关闭 Web 调试。
+- 当前只声明网络权限，无后台常驻、位置、通讯录或共享存储权限。
+
+本策略保证的是客户端实现的传输与存储边界。真实学校服务器接口行为、设备安全存储和系统运行表现仍需实际设备验收，不能由编译成功推定。
+
+## 当前功能范围
+
+保留 CAS 密码登录、验证码、短信/今日校园 MFA、课表、成绩、考试、补考信息查询、绩点、培养方案、学业查询、全校课表、一卡通余额、缴费状态查询和学生评教的现有逻辑。实际账号链路尚待设备验证。
+
+暂不开放微信 MFA、劳动平台、双创、综测、第三方电表查询、第三方社区、后台成绩监听、上课提醒和服务卡片。双创上游使用明文 HTTP，第三方电表不在学校域名内；其余扩展端点尚未纳入本次审核清单，不能自动放行。此版本不宣称与 Android 全功能对齐。
+
+## 构建
+
+在仓库根目录安装锁定依赖后执行：
+
+```powershell
+pnpm run build:harmony
+```
+
+该命令构建专用前端、同步资源、注入 CSP，并检查平台标记和打包策略一致性。它不会发布网页、连接学校账号或上传应用数据。普通 `pnpm run build` 保留上游 Android/Web 行为，不能作为鸿蒙资源直接打包。
+
+用 DevEco Studio 打开本目录，完成同步，构建 entry。当前使用 DevEco Studio 26.0 / SDK API 26 编译；最低兼容版本和目标版本均设为 26.0.0（API 26），不声明兼容旧系统。官方版本对应说明见 [华为开发者月刊](https://developer.huawei.com/consumer/cn/monthly/202609)。
+
+本机命令行构建示例（根据安装位置调整）：
+
+```powershell
+$env:JAVA_HOME = 'D:\DevEco Studio\jbr'
+$env:DEVECO_SDK_HOME = 'D:\DevEco Studio\sdk'
+& 'D:\DevEco Studio\tools\node\node.exe' `
+  'D:\DevEco Studio\tools\hvigor\bin\hvigorw.js' `
+  --mode module -p product=default -p buildMode=debug assembleHap --no-daemon
+```
+
+Hvigor 使用 DevEco 自带的 `@ohos/hvigor` 和 `@ohos/hvigor-ohos-plugin`。本机 `node_modules/@ohos` 的目录联接仅引用本地工具，不是产品运行依赖，也不应提交。换机器优先通过 DevEco 同步；`local.properties` 和签名文件不应提交。
+
+Windows 上也可在仓库根目录执行 `pnpm run build:harmony:hap` 一次完成专用前端与原生包构建。默认 DevEco 安装目录为 `D:\DevEco Studio`，可通过 `DEVECOSTUDIO_HOME` 指定其他目录。
+
+产物：`entry/build/default/outputs/default/entry-default-unsigned.hap`。当前没有账号签名配置，产物未签名，不能直接作为可安装发行包。请在 DevEco 使用自己的开发者签名配置后构建设备包；无需把证书密码或学校密码交给聊天。
+
+## 验证
+
+仓库根目录执行 `pnpm run test`、`pnpm run typecheck`。新增测试覆盖：代理与第三方域名拒绝、学校写操作拒绝、认证回调限制、逐跳重定向、多 Cookie/Expires/二进制响应、安全存储失败关闭。另执行真正的 ArkTS 安全类，模拟系统接口验证大凭据、失败回滚和并发删除；这不等于 Asset 服务真机测试。
+
+HarmonyOS 7 模拟器已验证不含账号密码的学校 HTTPS 请求、系统安全存储读写和 302 空响应经原生桥接返回页面。回归测试同时覆盖连续点号的合法构建脚本文件名，以及空响应不传入会拒绝空字节的 Base64 接口。真实账号的密码登录、二次认证和教务查询仍需设备验收。
+
+最终 HAP 还应核对安全策略和每个 HTML 的 CSP，确保未混入普通 Web 构建。
+
+## 设备验收
+
+1. 无账号启动显示登录页；安全存储不可用或锁屏时不静默降级。
+2. 使用测试者本人的账号完成验证码、短信/今日校园 MFA、课表/成绩/考试只读查询；密码不出现在日志中。
+3. 重启能恢复会话；会话到期保留本地缓存并要求重新认证；退出后重启不能恢复已退出会话；切换账号不混入旧数据。
+4. 核对流量仅访问已审核的学校域名，不连接 EdgeOne、统计、公告、更新或第三方服务。设置系统网络代理时，原生请求仍不走代理。
+5. 补考报名、签到、重算、支付等入口不可用，主动调用原生桥接也会拒绝。评教是允许的唯一教务数据修改例外，验证时应由用户主动操作。
+6. 核对返回手势、键盘、图片、深色模式、离线缓存、进程终止和设备锁屏行为。
+
+以上验收通过前，产物属于编译通过的移植原型，不能称为已验证安全的正式发行版。许可证继续遵守上游 GPL-3.0。
