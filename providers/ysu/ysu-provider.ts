@@ -80,7 +80,7 @@ import type {
 import {
   checkCaptchaNeeded,
   completeWechatMFA,
-  getCaptchaUrl,
+  getCaptchaImage,
   initiateWechatMFA,
   isAuthenticated as checkCASAuthenticated,
   loginStep1,
@@ -368,8 +368,8 @@ export class YSUProvider extends BaseProvider {
     await resetLoginSession()
   }
 
-  getCaptchaUrl(): string | null {
-    return getCaptchaUrl()
+  getCaptchaImage(): Promise<string | null> {
+    return getCaptchaImage()
   }
 
   async checkCaptchaNeeded(username: string): Promise<boolean> {
@@ -377,18 +377,6 @@ export class YSUProvider extends BaseProvider {
   }
 
   async login(credential: Credential): Promise<void> {
-    await this.prepareLogin()
-
-    const needsCaptcha = await this.checkCaptchaNeeded(credential.username)
-    if (needsCaptcha && typeof credential.metadata?.captcha !== "string") {
-      throw new ProviderError(
-        ProviderErrorCode.AUTH_CAPTCHA_REQUIRED,
-        "Captcha required",
-        undefined,
-        403
-      )
-    }
-
     const result = await this.loginStep1({
       username: credential.username,
       password: credential.password,

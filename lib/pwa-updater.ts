@@ -1,4 +1,5 @@
 import { isCapacitor } from "./native/platform"
+import { isMacOSApp } from "./native/macos"
 import { STORAGE_KEYS } from "./storage/keys"
 import { usePwaUpdateStore } from "./stores/pwa-update"
 
@@ -18,7 +19,8 @@ export function isPwaSupported(): boolean {
     typeof window !== "undefined" &&
     window.isSecureContext &&
     "serviceWorker" in navigator &&
-    !isCapacitor()
+    !isCapacitor() &&
+    !isMacOSApp
   )
 }
 

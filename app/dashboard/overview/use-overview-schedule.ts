@@ -11,6 +11,7 @@ import {
 import { useSettingsStore } from "@/lib/stores/settings"
 import { syncScheduleToWidget, syncExamsToWidget } from "@/lib/native/widget-bridge"
 import { syncClassAlarmsToNative } from "@/lib/native/notify"
+import { syncStatusBarClasses } from "@/lib/native/status-bar"
 import { compareExamStartTime, isExamCompleted } from "@/lib/academic/exam-utils"
 import type { ClassPeriod, Course, CurrentWeek, Exam } from "@/providers/types"
 import type { ProviderQueryResult } from "@/providers/hooks"
@@ -122,6 +123,7 @@ export function useOverviewSchedule(): OverviewSchedule {
     void syncClassAlarmsToNative(effective.courses, liveWeek, periods, nativeCalendar).catch(
       () => {}
     )
+    void syncStatusBarClasses(effective.courses, liveWeek, periods, nativeCalendar).catch(() => {})
   }, [effective.ready, effective.courses, liveWeek, periods, nativeCalendar])
 
   useEffect(() => {

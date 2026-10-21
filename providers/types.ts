@@ -88,6 +88,7 @@ export interface MfaSubmitInput {
 export interface WechatMfaContext {
   uuid: string
   state: string
+  /** Session-independent QR image, fetched through platform transport as a data URL. */
   qrImageUrl: string
   oauthUrl: string
 }
@@ -893,7 +894,8 @@ export interface ProviderLifecycle {
 export interface ProviderAuth {
   prepareLogin(): Promise<void>
   resetLoginSession(): Promise<void> | void
-  getCaptchaUrl(): string | null
+  /** Fetch through the CAS jar; never expose a remote <img> URL. */
+  getCaptchaImage(): Promise<string | null>
   checkCaptchaNeeded(username: string): Promise<boolean>
   login(credential: Credential): Promise<void>
   loginStep1(input: LoginStep1Input): Promise<LoginStep1Result>

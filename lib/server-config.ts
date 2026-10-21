@@ -13,6 +13,7 @@ import {
   registerSchoolConfig as registerBundledSchoolConfig,
 } from "./school-configs"
 import type { SchoolConfig } from "./school-configs/types"
+import { isMacOSApp } from "./native/macos"
 
 const defaultSchoolConfig = getSchoolConfigById(DEFAULT_SCHOOL_ID)
 if (!defaultSchoolConfig) {
@@ -72,7 +73,9 @@ export const casUrls = {
     return `${serverConfig.cerBaseUrl}/authserver/callback`
   },
   get defaultLoginService() {
-    return `${serverConfig.cerBaseUrl}/personalInfo/personCenter/index.html`
+    return isMacOSApp
+      ? mobileUrls.auth
+      : `${serverConfig.cerBaseUrl}/personalInfo/personCenter/index.html`
   },
 }
 
@@ -94,6 +97,9 @@ export const jwxtUrls = {
 export const mobileUrls = {
   get apiBase() {
     return `${serverConfig.jwxtBaseUrl}/jwmobile/biz/v410`
+  },
+  get userInfo() {
+    return `${serverConfig.jwxtBaseUrl}/jwmobile/biz/user/info`
   },
   get auth() {
     return `${serverConfig.jwxtBaseUrl}/jwmobile/auth/index`
