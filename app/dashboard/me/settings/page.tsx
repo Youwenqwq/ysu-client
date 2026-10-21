@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service"
 import { isCapacitor } from "@/lib/native/platform"
+import { isMacOSNative } from "@/lib/native/macos"
 import { cn } from "@/lib/utils"
 
 import { syncWidgetSettingsToWidget } from "@/lib/native/widget-bridge"
@@ -90,6 +91,11 @@ export default function SettingsPage() {
   const [batteryIgnored, setBatteryIgnored] = useState<boolean | null>(null)
   const [autoStartDialogOpen, setAutoStartDialogOpen] = useState(false)
   const [notificationPermissionPending, setNotificationPermissionPending] = useState(false)
+  const [macNative, setMacNative] = useState(false)
+
+  useEffect(() => {
+    setMacNative(isMacOSNative())
+  }, [])
 
   async function handleNotificationToggle(kind: "polling" | "classes", enabled: boolean) {
     setNotificationPermissionPending(true)
@@ -337,11 +343,13 @@ export default function SettingsPage() {
         </Card>
       </Section>
 
-      {/* 通知设置 — 仅 Capacitor 平台 */}
-      {isCapacitor() && (
+      {/* 通知设置 — Capacitor 全量；macOS 仅上课提醒 */}
+      {(isCapacitor() || macNative) && (
         <Section title={t("settings.notifyTitle")}>
           <Card>
             <CardContent className="flex flex-col py-1">
+              {isCapacitor() && (
+                <>
               {/* 系统权限 */}
               <h3 className="flex items-center gap-2 px-0.5 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">
                 {t("settings.systemPermissions")}
@@ -464,6 +472,8 @@ export default function SettingsPage() {
               )}
 
               {/* 上课提醒 */}
+              </>
+              )}
               <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
                 {t("settings.classReminderTitle")}
               </h3>

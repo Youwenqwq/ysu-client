@@ -35,6 +35,7 @@ import { clearAllCache, cleanStaleCacheVersions } from "@/lib/storage/cache"
 import { useRefreshStore } from "@/lib/stores/refresh"
 import { isCapacitor } from "@/lib/native/platform"
 import { stopNotify } from "@/lib/native/notify"
+import { clearStatusBarClasses } from "@/lib/native/status-bar"
 import { clearWidgetDataFromNative } from "@/lib/native/widget-bridge"
 import { removeCASTGC } from "@/lib/storage/secure"
 import { withAuthTransition } from "./auth-transition"
@@ -166,6 +167,7 @@ export async function resetSession(): Promise<void> {
       useRefreshStore.setState({ count: 0, stale: 0 })
       // Stop all notification services on logout
       stopNotify()
+      await clearStatusBarClasses().catch(() => {})
       // Clear account-specific data kept by home-screen widgets.
       void clearWidgetDataFromNative()
       await removeCASTGC().catch(() => {})

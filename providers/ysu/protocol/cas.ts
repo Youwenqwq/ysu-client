@@ -16,8 +16,9 @@ import {
   type HttpResponse,
 } from "@/lib/cookie"
 import { saveCASTGC as saveCASTGCSecure, loadCASTGC } from "@/lib/storage/secure"
-import { serverConfig, casUrls, getCasCookieDomain, getSchoolConfig } from "@/lib/server-config"
+import { serverConfig, casUrls, mobileUrls, getCasCookieDomain, getSchoolConfig } from "@/lib/server-config"
 import { isCapacitor } from "@/lib/native/platform"
+import { bytesToBase64, isMacOSApp } from "@/lib/native/macos"
 import type { YSUMfaMethod } from "../types"
 
 // ─── Constants ────────────────────────────────────────────────────────── //
@@ -219,15 +220,6 @@ export async function encryptPassword(password: string, salt: string): Promise<s
   return bytesToBase64(new Uint8Array(cipherBuffer))
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = ""
-  const chunkSize = 0x8000
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
-  }
-  return btoa(binary)
-}
-
 // ─── Parser (DOMParser, no linkedom) ──────────────────────────────────── //
 
 const REAUTH_KEYWORDS: readonly string[] = ["reAuthCheck", "Multifactor", "reAuthType", "二次认证"]
@@ -356,6 +348,7 @@ export async function saveCASTGC(): Promise<void> {
  * Must be called on startup before any CAS requests.
  */
 export async function restoreCASCookies(): Promise<void> {
+  if (!isCapacitor()) return
   const tgc = await loadCASTGC()
   if (!tgc) return
 
@@ -414,43 +407,32 @@ async function _fetch(req: Parameters<typeof fetchWithJar>[1]): Promise<HttpResp
   return fetchWithJar(casJar, req)
 }
 
+async function imageDataUrl(response: HttpResponse): Promise<string> {
+  const mime = headerSingle(response.headers, "content-type")?.split(";")[0]?.trim().toLowerCase()
+  if (response.status < 200 || response.status >= 300 || !mime?.startsWith("image/")) {
+    throw new CASProtocolError("Image request did not return an image")
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  return `data:${mime};base64,${bytesToBase64(bytes)}`
+}
+
+/** Captcha and form submission share the CAS jar on every platform. */
+export async function getCaptchaImage(): Promise<string> {
+  return imageDataUrl(await _fetch({
+    method: "GET",
+    url: `${casUrls.captcha}?_=${Date.now()}`,
+    headers: { Referer: casUrls.authLogin },
+    redirect: "follow",
+    timeoutMs,
+    responseType: "arraybuffer",
+  }))
+}
+
 // ─── Public API ───────────────────────────────────────────────────────── //
 
 /** 访问登录页以建立 CAS session (获取 JSESSIONID cookie)。 */
 export async function prepareLogin(): Promise<void> {
   await getLoginPage()
-  // Sync JSESSIONID from jar → WebView cookie store so that
-  // <img src="getCaptcha.htl"> uses the same session as the login POST.
-  await syncJarCookiesToWebView()
-}
-
-async function syncJarCookiesToWebView(): Promise<void> {
-  const capCore = await getCapacitorCore()
-  if (!capCore) return
-
-  const CapacitorCookies = (capCore as Record<string, unknown>)["CapacitorCookies"] as
-    | {
-        setCookie?: (opts: {
-          url: string
-          key: string
-          value: string
-          path?: string
-        }) => Promise<void>
-      }
-    | undefined
-  if (!CapacitorCookies?.setCookie) return
-  const cookies = await casJar.getAllCookies()
-  for (const c of cookies) {
-    if (!c.value) continue
-    const host = c.domain.replace(/^\./, "")
-    if (!host.includes(getCasCookieDomain())) continue
-    await CapacitorCookies.setCookie({
-      url: `https://${host}${c.path}`,
-      key: c.name,
-      value: c.value,
-      path: c.path,
-    })
-  }
 }
 
 function isUnauthenticatedLocation(url: string): boolean {
@@ -798,10 +780,20 @@ export async function initiateWechatMFA(): Promise<WechatMFAContext> {
   }
 
   const uuid = qrMatch[1]!
+  // WK's image loader does not share the JS/native transport cookie jar.
+  // Keep QR loading on the same platform transport as the OAuth page too.
+  const qrImageUrl = await imageDataUrl(await fetchStateless({
+    method: "GET",
+    url: `https://open.weixin.qq.com/connect/qrcode/${uuid}`,
+    headers: { Referer: wxOAuthUrl, "User-Agent": DESKTOP_UA },
+    redirect: "follow",
+    timeoutMs: 8_000,
+    responseType: "arraybuffer",
+  }))
   return {
     uuid,
     state,
-    qrImageUrl: `https://open.weixin.qq.com/connect/qrcode/${uuid}`,
+    qrImageUrl,
     oauthUrl: wxOAuthUrl,
   }
 }
@@ -921,7 +913,7 @@ export async function pollWechatQR(
   code?: string
   errcode?: number
 }> {
-  const { errcode, code } = isCapacitor()
+  const { errcode, code } = isMacOSApp || isCapacitor()
     ? await pollWechatQrViaHttp(uuid, lastErrcode, signal)
     : await pollWechatQrViaScriptTag(uuid, lastErrcode, signal)
 
@@ -1012,7 +1004,9 @@ export async function authorize(
   await (await CASCredential.fromJar(source)).apply(target)
 
   const encoded = encodeURIComponent(serviceUrl)
-  const url = `${casUrls.authLogin}?service=${encoded}`
+  const url = isMacOSApp && serviceUrl === mobileUrls.auth
+    ? serviceUrl
+    : `${casUrls.authLogin}?service=${encoded}`
 
   let resp: HttpResponse
   try {
@@ -1075,12 +1069,13 @@ async function getLoginPage(): Promise<{ html: string; finalUrl: string }> {
   loginPageInflight = (async () => {
     try {
       loginPageCache = null
-      const url = `${casUrls.authLogin}?service=${encodeURIComponent(casUrls.defaultLoginService)}`
+      const url = isMacOSApp
+        ? mobileUrls.auth
+        : `${casUrls.authLogin}?service=${encodeURIComponent(casUrls.defaultLoginService)}`
 
-      // Follow redirects so we land on the actual destination.
-      // If TGC is valid, CAS 302s to the service page (already authenticated).
-      // If TGC is stale, CAS 302s to login with a fresh session cookie.
-      let resp = await _fetch({
+      // Mac enters through the same jwmobile authorization endpoint as the official page.
+      // Follow the school's redirect so the form and POST share that service and jar.
+      const resp = await _fetch({
         method: "GET",
         url,
         redirect: "follow",
@@ -1088,30 +1083,21 @@ async function getLoginPage(): Promise<{ html: string; finalUrl: string }> {
       })
 
       if (resp.url.includes("/authserver/login")) {
-        // TGC was stale — CAS bounced us back to login.
-        // Only retry when a TGC actually existed; a normal unauthenticated request
-        // already returned a clean login page and should not pay for a second chain.
+        // Drop rejected TGC cookies without issuing a second authentication request.
+        // The returned login form already belongs to the fresh JSESSIONID in this jar.
         const staleTgc = await collectCookies(casJar, (e) => e.name === "CASTGC")
         if (staleTgc.length > 0) {
           for (const c of staleTgc) {
             await casJar.removeCookie(c.domain, c.path, c.name)
           }
-          resp = await _fetch({
-            method: "GET",
-            url,
-            redirect: "follow",
-            timeoutMs,
-          })
         }
-        if (resp.url.includes("/authserver/login")) {
-          const body = await resp.text()
-          if (resp.status !== 200) {
-            throw new CASProtocolError(`login page returned status ${resp.status}`)
-          }
-          const result = { html: body, finalUrl: resp.url }
-          loginPageCache = { ...result, ts: Date.now() }
-          return result
+        const body = await resp.text()
+        if (resp.status !== 200) {
+          throw new CASProtocolError(`login page returned status ${resp.status}`)
         }
+        const result = { html: body, finalUrl: resp.url }
+        loginPageCache = { ...result, ts: Date.now() }
+        return result
       }
 
       // Either already authenticated (landed on service page) or

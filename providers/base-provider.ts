@@ -144,8 +144,8 @@ export abstract class BaseProvider implements AcademicProvider {
 
   // ─── Auth (capability-gated) ─────────────────────────────────────────── //
 
-  getCaptchaUrl(): string | null {
-    this.unsupported("captcha", "getCaptchaUrl")
+  async getCaptchaImage(): Promise<string | null> {
+    this.unsupported("captcha", "getCaptchaImage")
   }
 
   async checkCaptchaNeeded(_username: string): Promise<boolean> {

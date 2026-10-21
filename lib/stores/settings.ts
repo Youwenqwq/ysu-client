@@ -10,8 +10,8 @@ import {
 
 migrateLocalStorageKey(STORAGE_KEYS.settings, STORAGE_KEYS.legacySettings)
 
-export type CardStyle = "solid" | "translucent" | "glass"
-export type BackgroundStyle = "overlay" | "blur-overlay"
+export type CardStyle = "solid" | "translucent" | "glass" | "apple"
+export type BackgroundStyle = "overlay" | "blur-overlay" | "apple"
 export type LandingPage = "overview" | "schedule"
 
 interface EpayAccountSettings {
@@ -179,7 +179,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: STORAGE_KEYS.settings,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => window.localStorage),
       merge: (persisted, current) => {
         const saved: Partial<SettingsState> = {}
         if (typeof persisted === "object" && persisted !== null && !Array.isArray(persisted)) {

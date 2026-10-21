@@ -62,6 +62,7 @@ import { ScheduleDragProvider } from "./schedule-drag"
 import { ScheduleAdjustmentDialog, ScheduleAdjustmentsDialog } from "./schedule-editor-dialogs"
 import { syncExamsToWidget, syncScheduleToWidget } from "@/lib/native/widget-bridge"
 import { syncClassAlarmsToNative } from "@/lib/native/notify"
+import { syncStatusBarClasses } from "@/lib/native/status-bar"
 import { useSettingsStore } from "@/lib/stores/settings"
 
 export default function SchedulePage() {
@@ -301,6 +302,9 @@ export default function SchedulePage() {
   useEffect(() => {
     if (!isDefaultTerm || (!effective.ready && currentWeek)) return
     void syncClassAlarmsToNative(effective.courses, currentWeek, periods, termCalendar).catch(
+      () => {}
+    )
+    void syncStatusBarClasses(effective.courses, currentWeek, periods, termCalendar).catch(
       () => {}
     )
   }, [isDefaultTerm, effective.ready, effective.courses, currentWeek, periods, termCalendar])

@@ -381,7 +381,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </Sidebar>
       <main
         className={cn(
-          "flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] md:overflow-auto md:pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] md:pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom))]",
+          "flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] md:min-h-0 md:overflow-x-hidden md:overflow-y-auto md:overscroll-contain md:pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] md:pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom))]",
           mobileFullscreen
             ? "h-dvh min-h-0 overflow-hidden pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))] md:h-auto"
             : "pb-[var(--mobile-bottom-nav-height,calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))))]"
@@ -451,12 +451,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
         <div
-          key={pathname}
           className={cn(
             "flex flex-1 flex-col md:p-8",
-            mobileFullscreen
-              ? "min-h-0 overflow-hidden"
-              : "animate-in p-4 duration-500 fade-in slide-in-from-bottom-2"
+            mobileFullscreen ? "min-h-0 overflow-hidden" : "p-4"
           )}
         >
           {blockedCapability ? (
