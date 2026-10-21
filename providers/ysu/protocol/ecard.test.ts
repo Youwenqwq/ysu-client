@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { HttpResponse } from "@/lib/cookie"
 import type * as CookieModule from "@/lib/cookie"
 import type * as CasModule from "./cas"
@@ -113,6 +113,8 @@ function response(body: unknown, status = 200, url = BALANCE_URL): HttpResponse 
 }
 
 describe("ecard session and response handling", () => {
+  afterEach(() => vi.unstubAllEnvs())
+
   beforeEach(() => {
     resetEcard()
     vi.resetAllMocks()
@@ -130,6 +132,57 @@ describe("ecard session and response handling", () => {
       .mockResolvedValueOnce(response(REAL))
 
     expect((await getEcardBalance()).balance?.balance).toBe(18.55)
+  })
+
+  it("omits diagnostics from ordinary builds", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ECARD_DIAGNOSTICS", "")
+    mocks.fetchWithJar.mockResolvedValue(response(REAL))
+
+    expect(await getEcardBalance()).not.toHaveProperty("diagnostics")
+  })
+
+  it("reports conflicting balance fields from each new response without changing selection", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ECARD_DIAGNOSTICS", "1")
+    mocks.fetchWithJar
+      .mockResolvedValueOnce(response(REAL))
+      .mockResolvedValueOnce(response({ ...REAL, datas: { ...REAL.datas, KNYE: 27.5 } }))
+
+    expect((await getEcardBalance()).diagnostics?.knye.value).toBe(18.55)
+    const next = await getEcardBalance()
+    expect(next.balance?.balance).toBe(18.55)
+    expect(next.diagnostics).toEqual({
+      remining: { present: true, value: 18.55 },
+      knye: { present: true, value: 27.5 },
+      selectedField: "remining",
+    })
+    expect(mocks.fetchWithJar).toHaveBeenCalledTimes(2)
+    expect(mocks.authorize).toHaveBeenCalledTimes(1)
+  })
+
+  it("identifies a zero balance selected from the fallback field", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ECARD_DIAGNOSTICS", "1")
+    mocks.fetchWithJar.mockResolvedValue(response({ code: 200, datas: { KNYE: "0.00" } }))
+
+    const result = await getEcardBalance()
+    expect(result.balance?.balance).toBe(0)
+    expect(result.diagnostics).toEqual({
+      remining: { present: false, value: null },
+      knye: { present: true, value: 0 },
+      selectedField: "datas.KNYE",
+    })
+  })
+
+  it("retains only numeric balances, excluding identifiers and unexpected field contents", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ECARD_DIAGNOSTICS", "1")
+    mocks.fetchWithJar.mockResolvedValue(
+      response({ ...REAL, privateData: "private-response-data", datas: { KNYE: "private-value" } })
+    )
+
+    expect((await getEcardBalance()).diagnostics).toEqual({
+      remining: { present: true, value: 18.55 },
+      knye: { present: true, value: null },
+      selectedField: "remining",
+    })
   })
 
   it("keeps a renewed session usable when an older request reports expiry later", async () => {

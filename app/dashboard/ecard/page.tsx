@@ -3,7 +3,7 @@
 import { CreditCard, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useTranslation } from "@/lib/i18n/use-translation"
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils"
 export default function EcardPage() {
   const { t, locale } = useTranslation()
   const {
+    data,
     balance,
     updatedAt,
     error: queryError,
@@ -163,6 +164,53 @@ export default function EcardPage() {
           )}
         </CardContent>
       </Card>
+      {process.env.NEXT_PUBLIC_ECARD_DIAGNOSTICS === "1" && data?.diagnostics && (
+        <Card aria-busy={loading}>
+          <CardHeader>
+            <CardTitle>{t("ecard.diagnosticTitle")}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-xs text-muted-foreground">ECARD-DIAG-20261021-1</p>
+            <p className="text-sm text-muted-foreground">{t("ecard.diagnosticHint")}</p>
+            {loading && <p role="status">{t("ecard.diagnosticLoading")}</p>}
+            {error && (
+              <p className="text-destructive" role="status">
+                {t("ecard.diagnosticStale")}
+              </p>
+            )}
+            <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 text-sm">
+              {(
+                [
+                  ["remining", data.diagnostics.remining],
+                  ["datas.KNYE", data.diagnostics.knye],
+                ] as const
+              ).map(([field, result]) => (
+                <div key={field} className="contents">
+                  <dt className="font-mono break-all">{field}</dt>
+                  <dd className="text-right tabular-nums">
+                    {!result.present
+                      ? t("ecard.diagnosticMissing")
+                      : result.value === null
+                        ? t("ecard.diagnosticInvalid")
+                        : `¥${result.value.toFixed(2)}`}
+                  </dd>
+                </div>
+              ))}
+              <dt>{t("ecard.diagnosticSelected")}</dt>
+              <dd className="text-right font-mono">{data.diagnostics.selectedField}</dd>
+              <dt>{t("ecard.diagnosticDisplayed")}</dt>
+              <dd className="text-right tabular-nums">¥{balance.balance.toFixed(2)}</dd>
+            </dl>
+            {updatedAt !== undefined && (
+              <p className="text-xs text-muted-foreground">
+                {t("ecard.diagnosticQueriedAt", {
+                  time: new Date(updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US"),
+                })}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

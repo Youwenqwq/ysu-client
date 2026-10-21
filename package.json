@@ -8,6 +8,7 @@
     "build": "next build",
     "build:harmony": "node scripts/build-harmony.mjs",
     "build:harmony:hap": "node scripts/build-harmony-native.mjs",
+    "build:harmony:ecard-diagnostic": "node scripts/build-harmony-ecard-diagnostic.mjs",
     "postbuild": "node scripts/generate-pwa-shell.mjs",
     "start": "next start",
     "lint": "eslint",

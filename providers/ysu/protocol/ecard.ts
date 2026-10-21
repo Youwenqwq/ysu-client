@@ -39,6 +39,14 @@ export interface EcardSessionStatus {
   ready: boolean
   /** 余额；无则 null */
   balance: EcardBalance | null
+  diagnostics?: EcardBalanceDiagnostics
+}
+
+/** Only numeric balance fields are retained; never retain the raw response. */
+export interface EcardBalanceDiagnostics {
+  remining: { present: boolean; value: number | null }
+  knye: { present: boolean; value: number | null }
+  selectedField: "remining" | "datas.KNYE" | "none"
 }
 
 // ─── Exceptions ───────────────────────────────────────────────────────── //
@@ -160,6 +168,15 @@ function parseBalance(value: unknown): number {
   return balance
 }
 
+function diagnosticBalance(value: unknown): { present: boolean; value: number | null } {
+  const present = value !== undefined && value !== null
+  try {
+    return { present, value: present ? parseBalance(value) : null }
+  } catch {
+    return { present, value: null }
+  }
+}
+
 /**
  * 解析 loadSmartCardBillMain.do 返回的余额结构。
  * 顶层 remining/availdate/cardstatusname 或 datas.KNYE/KYXQ/MC。
@@ -257,6 +274,20 @@ export async function getEcardBalance(): Promise<EcardSessionStatus> {
     ) {
       throw new EcardProtocolError("unrecognized ecard response")
     }
-    return { ready: true, balance: toEcardBalance(body) }
+    const balance = toEcardBalance(body)
+    if (process.env.NEXT_PUBLIC_ECARD_DIAGNOSTICS === "1") {
+      const remining = diagnosticBalance(body.remining)
+      const knye = diagnosticBalance(asRecord(body.datas).KNYE)
+      return {
+        ready: true,
+        balance,
+        diagnostics: {
+          remining,
+          knye,
+          selectedField: remining.present ? "remining" : knye.present ? "datas.KNYE" : "none",
+        },
+      }
+    }
+    return { ready: true, balance }
   })
 }

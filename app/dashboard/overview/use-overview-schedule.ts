@@ -78,14 +78,11 @@ export function useOverviewSchedule(): OverviewSchedule {
     error: currentWeekQuery.error ?? termCalendarQuery.error,
     mutate: () => Promise.all([currentWeekQuery.mutate(), termCalendarQuery.mutate()]),
   }
-  const schedule = {
-    ...scheduleQuery,
-    data: effective.ready
-      ? effective.courses
-      : currentWeek.data === null
-        ? scheduleQuery.data
-        : undefined,
-  }
+  // Reading the timetable must not depend on the stricter prerequisites for
+  // local adjustments (a complete term, account scope and hydrated patches).
+  // Match the schedule page: show provider courses until adjustments are ready.
+  const courses = effective.ready ? effective.courses : scheduleQuery.data
+  const schedule = { ...scheduleQuery, data: courses }
   const exams = useExams()
   const periodsRaw = useClassPeriods()
   const reminderHours = useSettingsStore((s) => s.widgetSyncReminderHours)
@@ -130,12 +127,12 @@ export function useOverviewSchedule(): OverviewSchedule {
   }, [exams.data, reminderHours])
 
   const todayCourses = useMemo(() => {
-    if (!effective.ready || !liveWeek) return []
+    if (!courses || !liveWeek) return []
     const { week, weekday } = liveWeek
-    return effective.courses
+    return courses
       .filter((course) => courseWeekDay(course) === weekday && isCourseActiveInWeek(course, week))
       .sort((a, b) => courseStartSection(a) - courseStartSection(b))
-  }, [effective.ready, effective.courses, liveWeek])
+  }, [courses, liveWeek])
   const upcomingExams = useMemo(
     () =>
       (exams.data ?? []).filter((exam) => !isExamCompleted(exam, now)).sort(compareExamStartTime),

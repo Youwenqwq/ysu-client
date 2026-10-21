@@ -1102,6 +1102,15 @@ export const zh = {
     notAvailable: "暂无可显示的一卡通信息",
     refreshFailed: "刷新失败，显示上次余额",
     unsupportedProvider: "当前学校暂不支持一卡通查询",
+    diagnosticTitle: "一卡通查询诊断（临时）",
+    diagnosticHint: "点击右上角刷新，等待查询完成后，只截此诊断卡片反馈。",
+    diagnosticLoading: "正在查询，下面仍是上次结果…",
+    diagnosticStale: "本次查询失败，下面仍是上次成功结果。",
+    diagnosticMissing: "未返回",
+    diagnosticInvalid: "非有效金额",
+    diagnosticSelected: "采用字段",
+    diagnosticDisplayed: "页面显示余额",
+    diagnosticQueriedAt: "本次查询成功时间：{time}（不代表学校数据更新时间）",
   },
 } as const
 
@@ -2250,6 +2259,16 @@ export const en = {
     notAvailable: "No e-card info available",
     refreshFailed: "Refresh failed; showing last balance",
     unsupportedProvider: "E-card queries are unavailable for this school",
+    diagnosticTitle: "E-card query diagnostics (temporary)",
+    diagnosticHint:
+      "Refresh using the top-right button, wait for completion, and capture only this diagnostic card.",
+    diagnosticLoading: "Query in progress; the previous result is still shown…",
+    diagnosticStale: "This query failed; the last successful result is still shown.",
+    diagnosticMissing: "Not returned",
+    diagnosticInvalid: "Invalid amount",
+    diagnosticSelected: "Selected field",
+    diagnosticDisplayed: "Displayed balance",
+    diagnosticQueriedAt: "Query succeeded at {time} (not the school's data update time)",
   },
 }
 
