@@ -154,6 +154,25 @@
 
 @custom-media --mobile (max-width: 767px);
 
+/* Harmony renders the page beneath transparent system bars. Existing header/nav
+   safe-area padding keeps controls clear while their glass covers the full screen. */
+html[data-harmony-edge-to-edge] .native-safe-horizontal {
+  padding-left: var(--safe-area-inset-left, 0px);
+  padding-right: var(--safe-area-inset-right, 0px);
+}
+
+html[data-harmony-edge-to-edge] .native-safe-top-bar {
+  padding-left: max(1rem, var(--safe-area-inset-left, 0px));
+  padding-right: max(1rem, var(--safe-area-inset-right, 0px));
+}
+
+html[data-harmony-edge-to-edge] .native-safe-screen {
+  padding-top: calc(1.5rem + var(--safe-area-inset-top, 0px));
+  padding-right: calc(1.5rem + var(--safe-area-inset-right, 0px));
+  padding-bottom: calc(1.5rem + var(--safe-area-inset-bottom, 0px));
+  padding-left: calc(1.5rem + var(--safe-area-inset-left, 0px));
+}
+
 @media (--mobile) {
   * {
     scrollbar-width: none;

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
@@ -58,10 +58,15 @@ export function ActivityModal({ course, week, open, onOpenChange, onSigninActivi
   const provider = useProvider()
   const [loading, setLoading] = useState(false)
   const [lesson, setLesson] = useState<CurrentLesson | null>(null)
+  const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null)
+  const [retry, setRetry] = useState(0)
 
   useEffect(() => {
+    let cancelled = false
+    setLesson(null)
+    setError(null)
+    setLoading(false)
     if (!open || !course) {
-      setLesson(null)
       return
     }
 
@@ -69,8 +74,12 @@ export function ActivityModal({ course, week, open, onOpenChange, onSigninActivi
     async function load() {
       const classType = c.classType || "1"
       const teachClassId = classType === "1" ? c.classId : c.syxzdm
-      if (!teachClassId || !c?.scheduleId || !provider.mobile) {
-        toast.error(t("activity.errorNoCourseInfo"))
+      if (!provider.mobile) {
+        setError({ message: t("activity.unsupported"), retryable: false })
+        return
+      }
+      if (!teachClassId || !c.scheduleId) {
+        setError({ message: t("activity.errorNoCourseInfo"), retryable: false })
         return
       }
       setLoading(true)
@@ -84,15 +93,23 @@ export function ActivityModal({ course, week, open, onOpenChange, onSigninActivi
           startNode: c.startSection,
           endNode: c.endSection,
         })
-        setLesson(result)
+        if (!cancelled) setLesson(result)
       } catch (err) {
-        toast.error((err as Error).message || t("activity.loadFailed"))
+        if (!cancelled) {
+          setError({
+            message: (err as Error).message || t("activity.loadFailed"),
+            retryable: true,
+          })
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     load()
-  }, [open, course, week, provider.mobile, t])
+    return () => {
+      cancelled = true
+    }
+  }, [open, course, week, provider.mobile, t, retry])
 
   const signinActivities = lesson?.activityList.filter((a) => a.signClazz === "1") ?? []
   const signoutActivities = lesson?.activityList.filter((a) => a.signClazz === "2") ?? []
@@ -139,7 +156,12 @@ export function ActivityModal({ course, week, open, onOpenChange, onSigninActivi
           {!loading && lesson === null && (
             <div className="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
               <Signpost className="size-8 opacity-40" />
-              <span>{t("activity.noData")}</span>
+              <span className="text-center">{error?.message ?? t("activity.noData")}</span>
+              {error?.retryable && (
+                <Button variant="outline" size="sm" onClick={() => setRetry((value) => value + 1)}>
+                  {t("activity.retry")}
+                </Button>
+              )}
             </div>
           )}
 

@@ -302,6 +302,8 @@ export interface HttpRequest {
   readonly headers?: Readonly<Record<string, string>>
   readonly body?: string | URLSearchParams
   readonly redirect: "manual" | "follow"
+  /** Stop before following a redirect consumed by the caller (e.g. a mobile login token). */
+  readonly stopOnRedirect?: (response: HttpResponse) => boolean
   readonly timeoutMs?: number
   /**
    * 可选中止信号。Web 传输层（proxyHttpSend）真实取消请求；
@@ -671,6 +673,8 @@ async function followRedirects(jar: SimpleCookieJar, req: HttpRequest): Promise<
     if (!location) {
       return resp
     }
+
+    if (req.stopOnRedirect?.(resp)) return resp
 
     currentUrl = new URL(location, currentUrl).toString()
 

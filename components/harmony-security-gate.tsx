@@ -23,7 +23,7 @@ export function HarmonySecurityGate({ children }: { children: React.ReactNode })
   }, [initialize])
   if (!isHarmony() || status === "ready") return <>{children}</>
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-4 p-6 text-center">
+    <div className="native-safe-screen flex min-h-svh flex-col items-center justify-center gap-4 p-6 text-center">
       <p>{status === "loading" ? "正在准备安全存储…" : "安全存储暂不可用"}</p>
       {status === "error" && (
         <>

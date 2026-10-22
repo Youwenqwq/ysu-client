@@ -234,7 +234,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center p-6">
+    <div className="native-safe-screen flex min-h-svh items-center justify-center p-6">
       <Card className="w-full max-w-sm animate-in duration-500 zoom-in-95 fade-in">
         <CardHeader>
           <CardTitle>{t("login.title")}</CardTitle>

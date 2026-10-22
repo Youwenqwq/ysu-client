@@ -10,8 +10,23 @@ const policyBytes = readFileSync(join(root, "harmony/security-policy.json"))
 if (!policyBytes.equals(readFileSync(join(raw, "security-policy.json")))) throw new Error("Packaged policy differs from reviewed source")
 const policy = JSON.parse(policyBytes)
 if (policy.routes.some((route) => !/^https:\/\/(cer|jwxt|epay|ehall)\.ysu\.edu\.cn$/.test(route.origin) ||
-  !["GET", "POST"].includes(route.method) || /bysc|xgksrwxs|signin|recharge|payment/i.test(route.path))) {
+  !["GET", "POST"].includes(route.method) || /bysc|xgksrwxs|recharge|payment/i.test(route.path))) {
   throw new Error("Unexpected host or modifying action in request policy")
+}
+const mobileRoutes = [
+  ["GET", "/jwmobile/auth/index"],
+  ["GET", "/jwmobile/biz/v410/"],
+  ["POST", "/jwmobile/biz/v410/lesson/queryCurrentLesson"],
+  ["POST", "/jwmobile/biz/v410/signin/detail"],
+  ["POST", "/jwmobile/biz/v410/signin/querySigninDetail"],
+  ["POST", "/jwmobile/biz/v410/signin/sign"],
+]
+if (policy.routes.some((route) => /\/jwmobile(?:\/|$)|signin/i.test(route.path) &&
+  (route.origin !== "https://jwxt.ysu.edu.cn" ||
+    !mobileRoutes.some(([method, path]) => route.method === method && route.path === path))) ||
+  mobileRoutes.some(([method, path]) => !policy.routes.some((route) =>
+    route.origin === "https://jwxt.ysu.edu.cn" && route.method === method && route.path === path))) {
+  throw new Error("Unexpected or missing mobile sign-in endpoint in request policy")
 }
 let pages = 0
 let bytes = 0

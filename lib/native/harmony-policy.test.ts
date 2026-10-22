@@ -34,7 +34,7 @@ describe("Harmony local-only security policy", () => {
   it.each([
     "/jwapp/sys/bkbl/modules/bkbm/xgksrwxs.do",
     "/jwapp/sys/xywccx/modules/xywccx/bysc.do",
-    "/jwmobile/biz/v410/signin/sign",
+    "/jwmobile/biz/v410/signin/delete",
     "/jwapp/sys/cjcx/modules/cjcx/delete.do",
     "/jwapp/sys/cjcx/modules/cjcx/%78scjcx.do",
   ])("rejects unreviewed actions even on the official host: %s", (path) => {
@@ -73,10 +73,41 @@ describe("Harmony local-only security policy", () => {
       assertHarmonyRequest("DELETE", `${official}/jwapp/sys/cjcx/modules/cjcx/xscjcx.do`)
     ).toThrow()
     expect(
-      policy.routes.filter((route) => /bysc|xgksrwxs|signin|payment|recharge/.test(route.path))
+      policy.routes.filter((route) => /bysc|xgksrwxs|payment|recharge/.test(route.path))
     ).toEqual([])
     expect(
       policy.routes.every((route) => /^https:\/\/[a-z]+\.ysu\.edu\.cn$/.test(route.origin))
     ).toBe(true)
+  })
+
+  it("allows only the six reviewed mobile auth, activity and sign-in routes", () => {
+    const expected = [
+      ["GET", "/jwmobile/auth/index"],
+      ["GET", "/jwmobile/biz/v410/"],
+      ["POST", "/jwmobile/biz/v410/lesson/queryCurrentLesson"],
+      ["POST", "/jwmobile/biz/v410/signin/detail"],
+      ["POST", "/jwmobile/biz/v410/signin/querySigninDetail"],
+      ["POST", "/jwmobile/biz/v410/signin/sign"],
+    ]
+    expect(
+      policy.routes
+        .filter((route) => route.path.startsWith("/jwmobile/"))
+        .map((route) => [route.method, route.path])
+    ).toEqual(expected)
+    for (const [method, path] of expected) {
+      expect(() => assertHarmonyRequest(method, `${official}${path}`)).not.toThrow()
+      expect(() =>
+        assertHarmonyRequest(method === "GET" ? "POST" : "GET", `${official}${path}`)
+      ).toThrow()
+    }
+    expect(() =>
+      assertHarmonyRequest(
+        "GET",
+        `https://cer.ysu.edu.cn/authserver/login?service=${encodeURIComponent(`${official}/jwmobile/auth/index`)}`
+      )
+    ).not.toThrow()
+    expect(() =>
+      assertHarmonyRequest("GET", `${official}/jwmobile/index.html?token=test`)
+    ).toThrow()
   })
 })

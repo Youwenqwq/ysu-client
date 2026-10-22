@@ -5,6 +5,7 @@ import { rcp } from '@kit.RemoteCommunicationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { RequestPolicy } from '../security/RequestPolicy';
 import { SecureStore } from '../security/SecureStore';
+import { WindowSafeArea } from '../WindowAppearance';
 
 interface Params {
   url?: string;
@@ -14,11 +15,12 @@ interface Params {
   timeoutMs?: number;
   key?: string;
   value?: string;
+  theme?: string;
 }
 interface Message { id: string; method: string; params: Params; }
 interface NativeResponse { status: number; headers: Record<string, string | string[]>; bodyBase64: string; }
 interface SecretResponse { value: string | null; }
-interface Reply { id: string; ok: boolean; data?: NativeResponse | SecretResponse | boolean; error?: string; }
+interface Reply { id: string; ok: boolean; data?: NativeResponse | SecretResponse | WindowSafeArea | boolean; error?: string; }
 
 /** Only fixed descriptions and numeric system codes may cross into the page. */
 class RequestFailure extends Error {
@@ -36,10 +38,17 @@ export class NativeBridge {
   private policy?: RequestPolicy;
   private store: SecureStore = new SecureStore();
   private active: Set<string> = new Set();
+  private setTheme?: (dark: boolean) => Promise<void>;
+  private getSafeArea?: () => Promise<WindowSafeArea>;
 
   constructor(controller: webview.WebviewController) { this.controller = controller; }
 
-  initialize(manager: resourceManager.ResourceManager): void { this.policy = new RequestPolicy(manager); }
+  initialize(manager: resourceManager.ResourceManager, setTheme?: (dark: boolean) => Promise<void>,
+    getSafeArea?: () => Promise<WindowSafeArea>): void {
+    this.policy = new RequestPolicy(manager);
+    this.setTheme = setTheme;
+    this.getSafeArea = getSafeArea;
+  }
 
   private trusted(): boolean {
     const current = this.controller.getUrl();
@@ -74,6 +83,16 @@ export class NativeBridge {
 
   private async dispatch(message: Message): Promise<Reply> {
     const params = message.params;
+    if (message.method === 'appearance.getSafeArea' && this.getSafeArea) {
+      return { id: message.id, ok: true, data: await this.getSafeArea() };
+    }
+    if (message.method === 'appearance.setTheme') {
+      if ((params.theme !== 'light' && params.theme !== 'dark') || !this.setTheme) {
+        throw new Error('Unsupported theme');
+      }
+      await this.setTheme(params.theme === 'dark');
+      return { id: message.id, ok: true, data: true };
+    }
     if (message.method === 'http.request') {
       return { id: message.id, ok: true, data: await this.request(params) };
     }

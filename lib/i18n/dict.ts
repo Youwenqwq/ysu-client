@@ -657,6 +657,8 @@ export const zh = {
     codeInputPlaceholder: "输入二维码中的 code",
     loadFailed: "加载失败",
     errorNoCourseInfo: "课程信息不完整，无法查询活动",
+    unsupported: "当前学校或平台暂不支持课程活动查询",
+    unsupportedSignin: "暂不支持此签到方式，请使用学校官方入口完成签到",
     retry: "重试",
   },
   debug: {
@@ -1810,6 +1812,8 @@ export const en = {
     codeInputPlaceholder: "Enter code from QR",
     loadFailed: "Failed to load",
     errorNoCourseInfo: "Incomplete course info, cannot query activities",
+    unsupported: "Course activities are not supported by this school or platform",
+    unsupportedSignin: "This sign-in method is not supported. Please use the official school app.",
     retry: "Retry",
   },
   debug: {

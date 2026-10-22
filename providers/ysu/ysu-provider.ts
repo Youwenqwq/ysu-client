@@ -181,7 +181,7 @@ function ysuCapabilities(): AcademicCapabilities {
     currentWeek: true,
     classPeriods: true,
     termCalendar: true,
-    mobileSignin: !isHarmony() && isFeatureAvailable("hasMobile"),
+    mobileSignin: isFeatureAvailable("hasMobile"),
     ecard: true,
     meter: !isHarmony(),
     epay: true,

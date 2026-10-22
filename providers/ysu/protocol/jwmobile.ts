@@ -11,6 +11,7 @@ import {
   cookieEntryFromJSON,
   fetchWithJar,
   headerSingle,
+  type HttpResponse,
 } from "@/lib/cookie"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 import { authorize } from "./cas"
@@ -191,6 +192,28 @@ export function resetMobileAuth(): void {
 
 // ─── Internal helpers ─────────────────────────────────────────────────── //
 
+function tokenFromRedirect(resp: HttpResponse): string | null {
+  if (!MOBILE_REDIRECT_STATUSES.has(resp.status)) return null
+  const location = headerSingle(resp.headers, "location")
+  if (!location) return null
+  const target = new URL(location, resp.url)
+  // Consume the token locally; never request its landing page or accept a third-party token.
+  if (
+    target.origin !== new URL(mobileUrls.auth).origin ||
+    target.username ||
+    target.password ||
+    !target.pathname.startsWith("/jwmobile/")
+  )
+    return null
+  const token = `${target.search}${target.hash}`.match(/[?&]token=([^&#]+)/)?.[1]
+  if (!token) return null
+  try {
+    return decodeURIComponent(token)
+  } catch {
+    throw new MobileProtocolError("Invalid mobile authorization token")
+  }
+}
+
 async function captureMobileToken(): Promise<string | null> {
   let url = mobileUrls.auth
   let redirects = 0
@@ -206,10 +229,8 @@ async function captureMobileToken(): Promise<string | null> {
 
     const location = headerSingle(resp.headers, "location") ?? ""
     if (location) {
-      const tokenMatch = location.match(/[?&]token=([^&#]+)/)
-      if (tokenMatch) {
-        return decodeURIComponent(tokenMatch[1]!)
-      }
+      const token = tokenFromRedirect(resp)
+      if (token) return token
 
       if (MOBILE_REDIRECT_STATUSES.has(resp.status)) {
         url = new URL(location, url).toString()
@@ -280,10 +301,14 @@ export async function ensureMobileAuthorized(verify = false): Promise<void> {
     }
 
     // Step 1: Complete CAS SSO to obtain JSESSIONID.
-    await authorize(mobileUrls.auth, mobileJar)
+    let token: string | null = null
+    await authorize(mobileUrls.auth, mobileJar, (response) => {
+      token = tokenFromRedirect(response)
+      return token !== null
+    })
 
-    // Step 2: Capture JWT token from the redirect chain.
-    const token = await captureMobileToken()
+    // Step 2: Capture JWT locally without fetching the token-bearing landing page.
+    token ??= await captureMobileToken()
     if (!token) {
       throw new MobileProtocolError("Failed to obtain mobile JWT token")
     }

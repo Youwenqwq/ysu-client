@@ -42,14 +42,24 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
   const [countdown, setCountdown] = useState(0)
   const [code, setCode] = useState("")
   const codeInputRef = useRef<HTMLInputElement>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
+  const requestVersion = useRef(0)
+  const submissionPending = useRef(false)
 
   useEffect(() => {
+    let cancelled = false
+    const version = ++requestVersion.current
+    submissionPending.current = false
+    setDetail(null)
+    setStatus(null)
+    setResult(null)
+    setCountdown(0)
+    setCode("")
+    setLoadError(null)
+    setSigning(false)
+    setLoading(false)
     if (!open || !activityId || !provider.mobile) {
-      setDetail(null)
-      setStatus(null)
-      setResult(null)
-      setCountdown(0)
-      setCode("")
       return
     }
 
@@ -67,19 +77,22 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
             title: t("activity.signin"),
           }),
         ])
+        if (cancelled) return
         setDetail(d)
         setStatus(s)
-        if (d.leftSeconds > 0) {
-          setCountdown(d.leftSeconds)
-        }
+        setCountdown(Math.max(0, d.leftSeconds))
       } catch (err) {
-        toast.error((err as Error).message || t("activity.loadFailed"))
+        if (!cancelled) setLoadError((err as Error).message || t("activity.loadFailed"))
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     load()
-  }, [open, activityId, provider.mobile, t])
+    return () => {
+      cancelled = true
+      requestVersion.current = version + 1
+    }
+  }, [open, activityId, provider.mobile, t, retry])
 
   useEffect(() => {
     if (countdown <= 0) return
@@ -96,7 +109,25 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
   }, [countdown])
 
   async function handleSign(codeValue?: string) {
-    if (!activityId || !provider.mobile) return
+    if (
+      !open ||
+      !activityId ||
+      !provider.mobile ||
+      !detail ||
+      !status ||
+      loadError ||
+      result ||
+      countdown <= 0 ||
+      alreadySigned ||
+      submissionPending.current
+    )
+      return
+    const submittedCode = codeValue?.trim()
+    if (activeSigninType === 2 && !/^\d{4}$/.test(submittedCode ?? "")) return
+    if (activeSigninType === 3 && !submittedCode) return
+    if (![1, 2, 3].includes(activeSigninType)) return
+    const version = requestVersion.current
+    submissionPending.current = true
     setSigning(true)
     try {
       const res = await provider.mobile.doStudentSign({
@@ -104,8 +135,9 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
         accuracy: 0,
         latitude: 0,
         longitude: 0,
-        code: codeValue,
+        code: submittedCode,
       })
+      if (requestVersion.current !== version) return
       if (res.signOrder > 0 || res.signStatus !== 0) {
         setResult({
           success: true,
@@ -119,13 +151,20 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
         })
       }
     } catch (err) {
-      toast.error((err as Error).message || t("activity.signinFailed"))
+      if (requestVersion.current === version) {
+        toast.error((err as Error).message || t("activity.signinFailed"))
+        setCode("")
+      }
     } finally {
-      setSigning(false)
+      if (requestVersion.current === version) {
+        submissionPending.current = false
+        setSigning(false)
+      }
     }
   }
 
   function handleCodeChange(value: string) {
+    if (submissionPending.current) return
     const digits = value.replace(/\D/g, "").slice(0, 4)
     setCode(digits)
     if (digits.length === 4) {
@@ -139,8 +178,9 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
     return `${m}:${String(s).padStart(2, "0")}`
   }
 
-  const alreadySigned = status && status.signStatus !== 0
-  const expired = detail && detail.leftSeconds <= 0 && !alreadySigned
+  const activeSigninType = detail?.signinType || signinType
+  const alreadySigned = status && (status.signStatus !== 0 || status.signOrder > 0)
+  const expired = detail && countdown <= 0 && !alreadySigned
 
   return (
     <ResponsiveModal open={open} onOpenChange={onOpenChange}>
@@ -161,13 +201,21 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
             <SigninResult
               result={result}
               onRetry={() => {
-                setResult(null)
-                setCode("")
+                setRetry((value) => value + 1)
               }}
             />
           )}
 
-          {!loading && !result && (
+          {!loading && loadError && (
+            <div className="flex flex-col items-center gap-3 py-4 text-center">
+              <p className="text-sm text-muted-foreground">{loadError}</p>
+              <Button variant="outline" size="sm" onClick={() => setRetry((value) => value + 1)}>
+                {t("activity.retry")}
+              </Button>
+            </div>
+          )}
+
+          {!loading && !loadError && !result && (
             <div className="flex flex-col gap-4">
               {alreadySigned && status && (
                 <div className="flex flex-col items-center gap-3 py-4">
@@ -203,7 +251,7 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                     </div>
                   )}
 
-                  {signinType === 1 && (
+                  {activeSigninType === 1 && (
                     <Button
                       size="lg"
                       className="w-full gap-2"
@@ -219,7 +267,7 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                     </Button>
                   )}
 
-                  {signinType === 2 && (
+                  {activeSigninType === 2 && (
                     <div className="flex flex-col items-center gap-3">
                       <div className="flex gap-2">
                         {[0, 1, 2, 3].map((i) => (
@@ -243,6 +291,7 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                         inputMode="numeric"
                         maxLength={4}
                         value={code}
+                        disabled={signing || countdown <= 0}
                         onChange={(e) => handleCodeChange(e.target.value)}
                         className="absolute opacity-0"
                         style={{ pointerEvents: "auto" }}
@@ -254,7 +303,7 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                     </div>
                   )}
 
-                  {signinType === 3 && (
+                  {activeSigninType === 3 && (
                     <div className="flex flex-col items-center gap-3">
                       <QrCode className="size-12 text-muted-foreground" />
                       <p className="text-center text-sm text-muted-foreground">
@@ -264,13 +313,14 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                         name="signin-code"
                         placeholder={t("activity.codeInputPlaceholder")}
                         value={code}
+                        disabled={signing || countdown <= 0}
                         onChange={(e) => setCode(e.target.value)}
                         className="text-center"
                       />
                       <Button
                         className="w-full"
                         onClick={() => handleSign(code)}
-                        disabled={signing || !code}
+                        disabled={signing || !code.trim() || countdown <= 0}
                       >
                         {signing ? (
                           <Spinner data-icon="inline-start" />
@@ -280,6 +330,11 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                         {t("activity.signinButton")}
                       </Button>
                     </div>
+                  )}
+                  {![1, 2, 3].includes(activeSigninType) && (
+                    <p className="text-center text-sm text-muted-foreground">
+                      {t("activity.unsupportedSignin")}
+                    </p>
                   )}
                 </>
               )}

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Reviewed exact endpoints: auth, reads and student evaluation only. No proxy or other mutations.",
+  "description": "Reviewed exact endpoints: auth, reads, student evaluation and user-initiated course sign-in/out. No proxy or other mutations.",
   "appIds": [
     "d71f7b57b4f348368f06c3e9a2a0988f",
     "377b6493556d4f0b86d116ca00cd1b6e",
@@ -15,6 +15,36 @@
     "d4145d3276744d9da8bf609da4702ae8"
   ],
   "routes": [
+    {
+      "origin": "https://jwxt.ysu.edu.cn",
+      "method": "GET",
+      "path": "/jwmobile/auth/index"
+    },
+    {
+      "origin": "https://jwxt.ysu.edu.cn",
+      "method": "GET",
+      "path": "/jwmobile/biz/v410/"
+    },
+    {
+      "origin": "https://jwxt.ysu.edu.cn",
+      "method": "POST",
+      "path": "/jwmobile/biz/v410/lesson/queryCurrentLesson"
+    },
+    {
+      "origin": "https://jwxt.ysu.edu.cn",
+      "method": "POST",
+      "path": "/jwmobile/biz/v410/signin/detail"
+    },
+    {
+      "origin": "https://jwxt.ysu.edu.cn",
+      "method": "POST",
+      "path": "/jwmobile/biz/v410/signin/querySigninDetail"
+    },
+    {
+      "origin": "https://jwxt.ysu.edu.cn",
+      "method": "POST",
+      "path": "/jwmobile/biz/v410/signin/sign"
+    },
     {
       "origin": "https://cer.ysu.edu.cn",
       "method": "GET",

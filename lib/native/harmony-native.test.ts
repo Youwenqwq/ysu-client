@@ -69,6 +69,65 @@ class NativeURL extends URL {
 }
 const nativeUrl = { URL: NativeURL, URLParams: URLSearchParams }
 
+describe("native immersive window appearance", () => {
+  function appearance() {
+    return loadNative("../WindowAppearance", {
+      "@kit.ArkUI": {
+        window: {
+          AvoidAreaType: { TYPE_SYSTEM: 0, TYPE_CUTOUT: 1, TYPE_NAVIGATION_INDICATOR: 4 },
+        },
+      },
+    }) as {
+      readWindowSafeArea(window: object): { top: number; right: number; bottom: number; left: number }
+      applyWindowTheme(window: object, dark: boolean): Promise<void>
+    }
+  }
+
+  it("merges overlapping system areas without counting the keyboard and rereads after rotation", () => {
+    const area = (top = 0, right = 0, bottom = 0, left = 0) => ({
+      topRect: { height: top },
+      rightRect: { width: right },
+      bottomRect: { height: bottom },
+      leftRect: { width: left },
+    })
+    const areas = new Map([
+      [0, area(100, 0, 70)],
+      [1, area(120, 0, 0, 50)],
+      [4, area(0, 0, 90)],
+    ])
+    const mainWindow = {
+      getWindowAvoidArea(type: number) {
+        const result = areas.get(type)
+        if (!result) throw new Error("Unexpected area (including keyboard)")
+        return result
+      },
+    }
+    const { readWindowSafeArea } = appearance()
+    expect(readWindowSafeArea(mainWindow)).toEqual({ top: 120, right: 0, bottom: 90, left: 50 })
+    areas.set(0, area(0, 0, 0, 100))
+    areas.set(1, area(0, 0, 0, 120))
+    areas.set(4, area(0, 90))
+    expect(readWindowSafeArea(mainWindow)).toEqual({ top: 0, right: 90, bottom: 0, left: 120 })
+  })
+
+  it("keeps system backgrounds transparent in both themes and changes icon contrast", async () => {
+    const setWindowSystemBarProperties = vi.fn(async () => {})
+    const { applyWindowTheme } = appearance()
+    await applyWindowTheme({ setWindowSystemBarProperties }, false)
+    await applyWindowTheme({ setWindowSystemBarProperties }, true)
+    for (const [index, foreground] of ["#000000", "#ffffff"].entries()) {
+      expect(setWindowSystemBarProperties.mock.calls[index]).toEqual([
+        expect.objectContaining({
+          statusBarColor: "#00000000",
+          navigationBarColor: "#00000000",
+          statusBarContentColor: foreground,
+          navigationBarContentColor: foreground,
+        }),
+      ])
+    }
+  })
+})
+
 describe("actual ArkTS bundled resource policy", () => {
   const resolvePath = loadNative("ResourcePolicy", {}).localResourcePath as (
     input: string,
@@ -213,11 +272,15 @@ describe("actual ArkTS request policy", () => {
     expect(() => native.validate("GET", `${mfaPage}?service=https://evil.example`)).toThrow()
     for (const url of [
       "https://ysu.welain.com/api/proxy",
-      "https://jwxt.ysu.edu.cn/jwmobile/biz/v410/signin/sign",
+      "https://jwxt.ysu.edu.cn/jwmobile/biz/v410/signin/delete",
       "http://jwxt.ysu.edu.cn/authserver/login",
       "https://jwxt.ysu.edu.cn/jwapp/sys/bkbl/modules/bkbm/xgksrwxs.do",
     ]) {
       expect(() => native.validate("POST", url)).toThrow()
+    }
+    for (const route of policy.routes.filter((item) => item.path.startsWith("/jwmobile/"))) {
+      expect(() => native.validate(route.method, `${route.origin}${route.path}`)).not.toThrow()
+      expect(() => native.validate(route.method === "GET" ? "POST" : "GET", `${route.origin}${route.path}`)).toThrow()
     }
     expect(() =>
       native.validate("GET", "https://cer.ysu.edu.cn/authserver/login?service=https://evil.example")

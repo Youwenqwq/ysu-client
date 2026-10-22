@@ -15,7 +15,7 @@ export function assertHarmonyRequest(
     (route) =>
       route.origin === parsed.origin && route.method === method && route.path === parsed.pathname
   )
-  if (!allowed) throw new Error("仅允许直接访问已审核的学校认证、查询与评教接口")
+  if (!allowed) throw new Error("仅允许直接访问已审核的学校认证、查询、评教与签到接口")
   if (
     parsed.pathname === "/jwapp/sys/emaphome/appShow.do" &&
     !policy.appIds.includes(parsed.searchParams.get("id") ?? "")

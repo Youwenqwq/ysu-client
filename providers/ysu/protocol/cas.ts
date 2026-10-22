@@ -1009,7 +1009,8 @@ export async function completeWechatMFA(code: string, state: string): Promise<CA
 
 export async function authorize(
   serviceUrl: string,
-  targetJar?: SimpleCookieJar
+  targetJar?: SimpleCookieJar,
+  acceptServiceRedirect?: (response: HttpResponse) => boolean
 ): Promise<SimpleCookieJar> {
   const source = casJar
   const target = targetJar ?? new SimpleCookieJar()
@@ -1020,12 +1021,28 @@ export async function authorize(
   const url = `${casUrls.authLogin}?service=${encoded}`
 
   let resp: HttpResponse
+  let acceptedRedirect = false
   try {
     resp = await fetchWithJar(target, {
       method: "GET",
       url,
       redirect: "follow",
       timeoutMs,
+      stopOnRedirect: acceptServiceRedirect
+        ? (response) => {
+            const current = new URL(response.url)
+            const service = new URL(serviceUrl)
+            // Only the exact service endpoint may complete authorization with a redirect.
+            if (
+              !REDIRECT_STATUSES.has(response.status) ||
+              current.origin !== service.origin ||
+              current.pathname !== service.pathname
+            )
+              return false
+            acceptedRedirect = acceptServiceRedirect(response)
+            return acceptedRedirect
+          }
+        : undefined,
     })
   } catch (e) {
     throw new CASProtocolError(`authorize redirect chain failed: ${(e as Error).message}`)
@@ -1037,7 +1054,7 @@ export async function authorize(
   if (resp.status >= 400 && resp.status !== 401 && resp.status !== 403) {
     throw new CASProtocolError(`CAS authorization returned HTTP ${resp.status}`)
   }
-  if (!resp.url || resp.status < 200 || resp.status >= 300) {
+  if (!resp.url || (!acceptedRedirect && (resp.status < 200 || resp.status >= 300))) {
     throw new NotAuthenticatedError("CAS authorization did not complete")
   }
   const finalUrl = new URL(resp.url)
