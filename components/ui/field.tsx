@@ -30,7 +30,7 @@ function FieldLegend({
       data-slot="field-legend"
       data-variant={variant}
       className={cn(
-        "mb-1.5 font-medium data-[variant=label]:text-sm data-[variant=legend]:text-base",
+        "mb-1.5 font-mono text-[0.7rem] tracking-[0.14em] uppercase data-[variant=label]:text-[0.7rem] data-[variant=legend]:font-semibold",
         className
       )}
       {...props}
@@ -94,7 +94,7 @@ function FieldContent({ className, ...props }: React.ComponentProps<"div">) {
 
 function FieldLabel({ className, htmlFor, ...props }: React.ComponentProps<typeof Label>) {
   const classes = cn(
-    "group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50 has-data-checked:border-primary/30 has-data-checked:bg-primary/5 has-[>[data-slot=field]]:rounded-lg has-[>[data-slot=field]]:border *:data-[slot=field]:p-2.5 dark:has-data-checked:border-primary/20 dark:has-data-checked:bg-primary/10",
+    "group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50 has-data-checked:border-brand has-data-checked:bg-brand/10 has-[>[data-slot=field]]:rounded-none has-[>[data-slot=field]]:border-2 has-[>[data-slot=field]]:border-edge *:data-[slot=field]:p-2.5 dark:has-data-checked:bg-brand/15",
     "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col",
     className
   )
@@ -163,7 +163,7 @@ function FieldSeparator({
       <Separator className="absolute inset-0 top-1/2" />
       {children && (
         <span
-          className="relative mx-auto block w-fit bg-background px-2 text-muted-foreground"
+          className="relative mx-auto block w-fit border border-edge/30 bg-card px-2 font-mono text-[0.65rem] tracking-[0.14em] text-muted-foreground uppercase"
           data-slot="field-separator-content"
         >
           {children}
