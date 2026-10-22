@@ -87,7 +87,7 @@ export function FilterOptionList({
             onClick={() => onChange(item.value)}
             className={cn(
               "flex items-center gap-3 py-3 text-left text-sm transition-colors active:bg-muted/60",
-              active && "font-medium text-primary"
+              active && "font-medium text-brand"
             )}
           >
             <span className="flex-1">{item.label}</span>

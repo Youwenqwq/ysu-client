@@ -170,7 +170,7 @@ function ThreadDetail() {
               <SkbirdImage
                 url={skbirdImageUrl(thread.avatarUrl, { w: 64, h: 64 })}
                 alt={thread.nickname}
-                className="size-6 shrink-0 rounded-full object-cover"
+                className="size-6 shrink-0 rounded-none object-cover"
               />
             ) : null}
             <span className="truncate">{thread.nickname}</span>
@@ -211,7 +211,7 @@ function ThreadDetail() {
                   url={skbirdImageUrl(p, { w: 200, h: 200 })}
                   zoomUrl={skbirdImageUrl(p, "original")}
                   alt=""
-                  className="size-25 rounded-md object-cover"
+                  className="size-25 rounded-none object-cover"
                   zoomable
                 />
               ))}
@@ -224,7 +224,7 @@ function ThreadDetail() {
               type="button"
               onClick={handleLike}
               disabled={likePending}
-              className={`inline-flex items-center gap-1 ${thread.likeHas ? "text-primary" : ""}`}
+              className={`inline-flex items-center gap-1 ${thread.likeHas ? "text-brand" : ""}`}
             >
               <ThumbsUp className="size-4" />
               {thread.likeCount}
@@ -233,7 +233,7 @@ function ThreadDetail() {
               type="button"
               onClick={handleMark}
               disabled={markPending}
-              className={`inline-flex items-center gap-1 ${thread.markHas ? "text-primary" : ""}`}
+              className={`inline-flex items-center gap-1 ${thread.markHas ? "text-brand" : ""}`}
             >
               <Bookmark className="size-4" />
               {thread.markHas ? t("skbird.marked") : t("skbird.mark")}

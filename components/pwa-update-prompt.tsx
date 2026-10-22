@@ -27,7 +27,7 @@ export function PwaUpdatePrompt() {
   return (
     <div
       role="status"
-      className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur md:bottom-4"
+      className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md items-center gap-3 rounded-none border bg-background/95 p-3 shadow-lg backdrop-blur md:bottom-4"
     >
       <RefreshCw className="size-4 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1 text-sm">{t("update.pwaReady")}</span>

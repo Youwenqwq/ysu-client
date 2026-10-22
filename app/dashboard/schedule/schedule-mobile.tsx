@@ -25,7 +25,7 @@ import {
   periodStartTime,
   type ScheduleBlock,
 } from "./schedule-utils"
-import { courseBgClass, type CourseColorMap } from "./course-color"
+import { courseBgClass, courseInkClass, type CourseColorMap } from "./course-color"
 import { ActivityModal } from "./activity-modal"
 import { SigninModal } from "./signin-modal"
 import { scheduleDate } from "@/lib/academic/schedule-patches"
@@ -409,8 +409,8 @@ export function ScheduleMobile({
                     handleCoursePress(c, safeWeek)
                   }}
                   className={cn(
-                    "flex flex-col gap-1 rounded-lg p-3 text-left transition-opacity active:opacity-60",
-                    courseBgClass(colorMap, c)
+                    "flex flex-col gap-1 rounded-none border-l-[3px] p-3 text-left transition-opacity active:opacity-60",
+                    cn(courseBgClass(colorMap, c), courseInkClass(colorMap, c))
                   )}
                 >
                   <span className="text-sm font-medium text-foreground">
@@ -597,22 +597,24 @@ const WeekGrid = memo(function WeekGrid({
         gridTemplateRows,
       }}
     >
-      <div className="border-r border-b border-border" />
+      <div className="border-r-2 border-b border-edge/40" />
 
       {DAYS.map((d, idx) => (
         <div
           key={d}
           className={cn(
-            "flex flex-col items-center justify-center border-b border-border text-[10px] font-medium",
+            "flex flex-col items-center justify-center border-b border-edge/30 font-mono text-[0.6rem] font-medium tracking-wider uppercase",
             compact ? "gap-0 py-0.5" : "gap-0.5 py-1.5",
-            idx < 6 && "border-r",
+            idx < 6 && "border-r border-edge/20",
             isCurrentWeek && d === currentWeekday
-              ? "bg-primary/5 text-primary"
+              ? "bg-brand/10 text-brand [box-shadow:inset_0_-2px_0_0_var(--brand)]"
               : "text-muted-foreground"
           )}
         >
           <ScheduleDayLabel week={week} day={d} />
-          {weekDates[d - 1] && <span className="text-[9px] opacity-70">{weekDates[d - 1]}</span>}
+          {weekDates[d - 1] && (
+            <span className="hud-data text-[0.55rem] opacity-70">{weekDates[d - 1]}</span>
+          )}
           <ScheduleDayHandle week={week} day={d} />
         </div>
       ))}
@@ -623,10 +625,12 @@ const WeekGrid = memo(function WeekGrid({
         return (
           <div
             key={p.section}
-            className="flex flex-col items-center justify-center gap-0.5 border-r border-b border-border py-1 text-[9px] leading-tight text-muted-foreground"
+            className="flex flex-col items-center justify-center gap-0.5 border-r-2 border-b border-edge/20 border-r-edge/40 py-1 font-mono text-[0.55rem] leading-tight text-muted-foreground"
             style={{ gridRow: row, gridColumn: 1 }}
           >
-            <span className="text-xs font-semibold text-foreground">{p.section}</span>
+            <span className="hud-data text-[0.7rem] font-semibold text-foreground">
+              {String(p.section).padStart(2, "0")}
+            </span>
             {!compact && periodStartTime(p) && <span>{periodStartTime(p)}</span>}
             {!compact && periodEndTime(p) && <span>{periodEndTime(p)}</span>}
           </div>
@@ -635,7 +639,7 @@ const WeekGrid = memo(function WeekGrid({
 
       {lunchRow !== null && !compact && (
         <div
-          className="flex items-center justify-center border-b border-border bg-muted/40 text-[9px] font-medium text-muted-foreground"
+          className="flex items-center justify-center gap-2 border-b border-edge/20 bg-muted/40 font-mono text-[0.55rem] tracking-widest text-muted-foreground uppercase"
           style={{ gridRow: lunchRow, gridColumn: "1 / -1" }}
         >
           {t("schedule.lunchBreak")}
@@ -644,7 +648,7 @@ const WeekGrid = memo(function WeekGrid({
 
       {dinnerRow !== null && !compact && (
         <div
-          className="flex items-center justify-center border-b border-border bg-muted/40 text-[9px] font-medium text-muted-foreground"
+          className="flex items-center justify-center gap-2 border-b border-edge/20 bg-muted/40 font-mono text-[0.55rem] tracking-widest text-muted-foreground uppercase"
           style={{ gridRow: dinnerRow, gridColumn: "1 / -1" }}
         >
           {t("schedule.dinnerBreak")}
@@ -661,9 +665,9 @@ const WeekGrid = memo(function WeekGrid({
               data-schedule-date={dateForDay(d)}
               data-schedule-section={p.section}
               className={cn(
-                "border-b border-border",
-                d < 7 && "border-r",
-                isCurrentWeek && d === currentWeekday && "bg-primary/5"
+                "border-b border-edge/15",
+                d < 7 && "border-r border-edge/15",
+                isCurrentWeek && d === currentWeekday && "bg-brand/[0.06]"
               )}
               style={{ gridRow: row, gridColumn: d + 1 }}
             />
@@ -686,14 +690,14 @@ const WeekGrid = memo(function WeekGrid({
                 onCoursePress(c, week)
               }}
               className={cn(
-                "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1 text-left transition-opacity active:opacity-60",
-                courseBgClass(colorMap, c),
+                "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-none border-y border-r border-l-[3px] border-y-edge/30 border-r-edge/30 p-1 text-left transition-opacity active:opacity-60",
+                cn(courseBgClass(colorMap, c), courseInkClass(colorMap, c)),
                 courseHasScheduleTrace(c, editor.traces) && "pb-7",
-                isBlockCurrent(block) && "ring-1 ring-primary"
+                isBlockCurrent(block) && "outline-2 outline-offset-[-2px] outline-edge"
               )}
               style={blockStyle(block)}
             >
-              <span className="line-clamp-4 text-[10.5px] leading-tight font-medium text-foreground">
+              <span className="line-clamp-4 text-[0.68rem] leading-tight font-medium text-foreground">
                 <SchedulePatchedLabel course={c} />
                 {c.name}
               </span>
@@ -724,7 +728,7 @@ const WeekGrid = memo(function WeekGrid({
               onOverlapPress(block.day, block.start, block.courses)
             }}
             className={cn(
-              "relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60",
+              "relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-none bg-accent p-1 text-center transition-opacity active:opacity-60",
               block.courses.some((course) => courseHasScheduleTrace(course, editor.traces)) &&
                 "pb-7"
             )}
@@ -745,10 +749,10 @@ const WeekGrid = memo(function WeekGrid({
             e.currentTarget.blur()
             onExamPress(block)
           }}
-          className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md border border-amber-500/50 bg-amber-500/15 p-1 text-left transition-opacity active:opacity-60"
+          className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-none border-2 border-hazard/60 bg-hazard/10 p-1 text-left transition-opacity active:opacity-60"
           style={blockStyle(block)}
         >
-          <span className="line-clamp-1 text-[9px] font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
+          <span className="line-clamp-1 text-[9px] font-semibold tracking-[0.12em] text-hazard uppercase">
             {t("schedule.examTag")}
           </span>
           <span className="line-clamp-3 text-[10.5px] leading-tight font-medium text-foreground">

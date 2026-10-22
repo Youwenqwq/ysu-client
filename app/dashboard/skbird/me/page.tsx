@@ -92,7 +92,7 @@ export default function SkbirdMePage() {
         <CardContent className="flex items-center gap-3 p-4">
           {user === null ? (
             <>
-              <Skeleton className="size-14 rounded-full" />
+              <Skeleton className="size-14 rounded-none" />
               <Skeleton className="h-5 w-32" />
             </>
           ) : (
@@ -101,7 +101,7 @@ export default function SkbirdMePage() {
                 <SkbirdImage
                   url={skbirdImageUrl(user.avatarUrl, { w: 100, h: 100 })}
                   alt={user.nickname}
-                  className="size-14 rounded-full object-cover"
+                  className="size-14 rounded-none object-cover"
                 />
               ) : null}
               <div className="flex min-w-0 flex-col gap-1">

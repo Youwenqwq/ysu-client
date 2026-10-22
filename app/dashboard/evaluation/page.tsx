@@ -78,7 +78,7 @@ function renderScoreBlock(
         {v.map((item, idx) => {
           const obj = item as Record<string, unknown>
           return (
-            <div key={idx} className="flex flex-col gap-1 overflow-hidden rounded-md border p-2">
+            <div key={idx} className="flex flex-col gap-1 overflow-hidden rounded-none border p-2">
               {Object.entries(obj).map(([ik, iv]) => (
                 <div key={ik} className="grid grid-cols-[1fr_1fr] items-center gap-2 text-sm">
                   <span className="truncate text-muted-foreground">
@@ -995,7 +995,7 @@ export default function EvaluationPage() {
                 .map((task) => (
                   <div
                     key={task.wid}
-                    className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 hover:bg-muted/50"
+                    className="flex cursor-pointer items-start gap-3 rounded-none border p-3 hover:bg-muted/50"
                     onClick={() => toggleTaskSelection(task.wid || "")}
                   >
                     <Checkbox
@@ -1059,19 +1059,19 @@ export default function EvaluationPage() {
                   },
                   filling: {
                     label: t("evaluation.batchTaskStatusProcessing"),
-                    color: "text-primary",
+                    color: "text-brand",
                   },
                   filled: {
                     label: t("evaluation.batchTaskStatusSuccess"),
-                    color: "text-primary",
+                    color: "text-rarity-2",
                   },
                   submitting: {
                     label: t("evaluation.batchTaskStatusProcessing"),
-                    color: "text-primary",
+                    color: "text-brand",
                   },
                   submitted: {
                     label: t("evaluation.batchTaskStatusSuccess"),
-                    color: "text-primary",
+                    color: "text-rarity-2",
                   },
                   failed: {
                     label: t("evaluation.batchTaskStatusFailed"),
@@ -1082,7 +1082,7 @@ export default function EvaluationPage() {
                 return (
                   <div
                     key={idx}
-                    className="flex items-center justify-between gap-2 rounded-lg border p-2 text-sm"
+                    className="flex items-center justify-between gap-2 rounded-none border p-2 text-sm"
                   >
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="truncate font-medium">{r.task.courseName}</span>
@@ -1198,7 +1198,7 @@ export default function EvaluationPage() {
                     </ResponsiveModalHeader>
                     <ResponsiveModalBody className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto text-sm">
                       {r.status === "filled" && r.scoreResult && (
-                        <div className="flex flex-col gap-2 rounded-md bg-muted/50 p-3">
+                        <div className="flex flex-col gap-2 rounded-none bg-muted/50 p-3">
                           {Object.entries(r.scoreResult).map(([k, v]) => (
                             <div key={k} className="flex flex-col gap-1">
                               <span className="text-xs text-muted-foreground">

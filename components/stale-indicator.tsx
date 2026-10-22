@@ -17,7 +17,7 @@ export function StaleIndicator({ className }: { className?: string }) {
       <TooltipTrigger asChild>
         <span
           className={cn(
-            "inline-flex items-center justify-center rounded-md p-1 text-muted-foreground",
+            "inline-flex items-center justify-center rounded-none p-1 text-muted-foreground",
             className
           )}
           aria-label={t("app.staleDataTooltip")}

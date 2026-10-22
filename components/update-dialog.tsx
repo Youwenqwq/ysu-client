@@ -134,7 +134,7 @@ export function UpdateDialog() {
       a: ({ children, href }: { children?: React.ReactNode; href?: string }) => (
         <a
           href={href}
-          className="text-primary underline underline-offset-2"
+          className="text-brand underline underline-offset-2"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -142,10 +142,14 @@ export function UpdateDialog() {
         </a>
       ),
       code: ({ children }: { children?: React.ReactNode }) => (
-        <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">{children}</code>
+        <code className="rounded-none border border-edge/30 bg-muted px-1 py-0.5 font-mono text-xs">
+          {children}
+        </code>
       ),
       pre: ({ children }: { children?: React.ReactNode }) => (
-        <pre className="overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs">{children}</pre>
+        <pre className="overflow-x-auto rounded-none bg-muted p-2 font-mono text-xs">
+          {children}
+        </pre>
       ),
       strong: ({ children }: { children?: React.ReactNode }) => (
         <strong className="font-semibold text-foreground">{children}</strong>

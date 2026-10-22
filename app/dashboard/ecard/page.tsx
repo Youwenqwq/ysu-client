@@ -129,33 +129,33 @@ export default function EcardPage() {
         </Alert>
       )}
       <Card className="overflow-hidden">
-        <div className="bg-gradient-to-br from-primary/15 to-primary/5 p-6">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="hud-hatch relative border-b-2 border-edge bg-brand/5 p-6">
+          <div className="hud-label flex items-center gap-2">
             <CreditCard className="size-4" />
             <span>{t("ecard.balance")}</span>
           </div>
-          <p className="mt-3 text-4xl font-bold">
+          <p className="hud-data mt-3 text-4xl font-bold tracking-tight">
             ¥{balance.balance.toFixed(2)}
-            <span className="ml-2 text-base font-normal text-muted-foreground">
+            <span className="ml-2 font-mono text-base font-normal text-muted-foreground">
               {t("ecard.balanceUnit")}
             </span>
           </p>
         </div>
         <CardContent className="flex flex-col gap-3 pt-4">
-          <div className="flex items-center justify-between border-b border-border pb-2 text-sm">
-            <span className="text-muted-foreground">{t("ecard.cardNo")}</span>
-            <span className="font-mono">{balance.cardNum}</span>
+          <div className="flex items-center justify-between border-b border-edge/25 pb-2 text-sm">
+            <span className="hud-label">{t("ecard.cardNo")}</span>
+            <span className="hud-data">{balance.cardNum}</span>
           </div>
-          <div className="flex items-center justify-between border-b border-border pb-2 text-sm">
-            <span className="text-muted-foreground">{t("ecard.validUntil")}</span>
-            <span>{balance.availableDate}</span>
+          <div className="flex items-center justify-between border-b border-edge/25 pb-2 text-sm">
+            <span className="hud-label">{t("ecard.validUntil")}</span>
+            <span className="hud-data">{balance.availableDate}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{t("ecard.cardStatus")}</span>
+            <span className="hud-label">{t("ecard.cardStatus")}</span>
             <span>{balance.cardStatusName}</span>
           </div>
           {updatedAt !== undefined && (
-            <p className="text-xs text-muted-foreground">
+            <p className="font-mono text-[0.65rem] tracking-wide text-muted-foreground">
               {t("ecard.updatedAt", {
                 time: new Date(updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US"),
               })}

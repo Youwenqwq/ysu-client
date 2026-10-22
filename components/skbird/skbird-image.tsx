@@ -324,7 +324,7 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
           type="button"
           aria-label={t("skbird.closeImage")}
           onClick={beginClose}
-          className="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/25"
+          className="absolute top-4 right-4 z-10 rounded-none bg-white/10 p-2 text-white transition-colors hover:bg-white/25"
         >
           <X className="size-5" />
         </button>

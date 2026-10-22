@@ -298,7 +298,7 @@ function ClassRow({
       type="button"
       onClick={() => onSelect({ classId: cls.classId, className: cls.className })}
       className={cn(
-        "flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5 text-left transition-colors active:bg-muted/60",
+        "flex items-center justify-between gap-2 rounded-none border border-edge/25 px-3 py-2.5 text-left transition-colors active:bg-muted/60",
         unscheduled && "opacity-60"
       )}
     >
@@ -488,7 +488,7 @@ function RoomRow({
       type="button"
       onClick={() => onSelect({ code: room.code, name: room.name })}
       className={cn(
-        "flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5 text-left transition-colors active:bg-muted/60",
+        "flex items-center justify-between gap-2 rounded-none border border-edge/25 px-3 py-2.5 text-left transition-colors active:bg-muted/60",
         unscheduled && "opacity-60"
       )}
     >
@@ -648,8 +648,8 @@ function RoomSchedulePanel({ freeRoomContext }: { freeRoomContext?: FreeRoomCont
   return (
     <div className="flex flex-col gap-4">
       {freeRoomContext && (
-        <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-          <CalendarSearch className="size-4 shrink-0 text-primary" />
+        <div className="flex items-center gap-2 border border-l-[3px] border-brand/40 border-l-brand bg-brand/5 px-3 py-2 text-sm">
+          <CalendarSearch className="size-4 shrink-0 text-brand" />
           <span>
             {t("schoolSchedule.freeRoomContext", {
               week: freeRoomContext.week,

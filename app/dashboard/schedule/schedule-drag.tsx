@@ -535,7 +535,7 @@ export function ScheduleDragProvider(props: ScheduleDragProviderProps) {
         inert={props.editing && !props.enabled}
       >
         {props.editing && (
-          <div className="flex shrink-0 flex-col gap-1 border-b border-border px-2 py-2">
+          <div className="flex shrink-0 flex-col gap-1 border-b border-edge/20 px-2 py-2">
             <div className="flex items-center justify-between gap-2">
               <Button
                 variant="ghost"
@@ -571,11 +571,11 @@ export function ScheduleDragProvider(props: ScheduleDragProviderProps) {
           <>
             <div
               ref={preview}
-              className="pointer-events-none fixed z-50 rounded border-2 border-dashed"
+              className="pointer-events-none fixed z-50 rounded-none border-2 border-dashed"
             />
             <div
               ref={overlay}
-              className="pointer-events-none fixed top-0 left-0 z-50 flex w-44 flex-col gap-1 rounded-lg border border-border bg-popover p-3 text-sm text-popover-foreground shadow-lg"
+              className="pointer-events-none fixed top-0 left-0 z-50 flex w-44 flex-col gap-1 rounded-none border border-edge/25 bg-popover p-3 text-sm text-popover-foreground shadow-lg"
             >
               <span className="font-medium">
                 {active.kind === "day"
@@ -584,7 +584,7 @@ export function ScheduleDragProvider(props: ScheduleDragProviderProps) {
               </span>
               {edgeDirection !== 0 && (
                 <span
-                  className="flex items-center gap-1 text-xs font-semibold text-primary"
+                  className="flex items-center gap-1 text-xs font-semibold text-brand"
                   role="status"
                 >
                   {edgeDirection < 0 ? (
@@ -617,7 +617,7 @@ function ScheduleAdjustmentBadge({ kind }: { kind: SchedulePatch["kind"] }) {
   return (
     <Badge
       variant="secondary"
-      className="mr-0.5 h-[11px] rounded-[3px] px-0.5 py-0 align-baseline text-[8px] leading-none"
+      className="mr-0.5 h-[11px] rounded-none px-0.5 py-0 align-baseline text-[8px] leading-none"
       title={label}
       aria-label={label}
     >
@@ -649,7 +649,7 @@ export function ScheduleDayHandle({ week, day }: { week: number; day: number }) 
       type="button"
       data-schedule-day={date}
       disabled={!editor.enabled}
-      className="flex min-h-7 w-full touch-none items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-ring enabled:hover:bg-accent disabled:opacity-50"
+      className="flex min-h-7 w-full touch-none items-center justify-center rounded-none focus-visible:outline-2 focus-visible:outline-ring enabled:hover:bg-accent disabled:opacity-50"
       aria-label={t("scheduleEditor.dragDay", { date })}
       onClick={() => editor.selectDay(date)}
     >
@@ -703,7 +703,7 @@ export function ScheduleGridTraces({
       <div
         key={key}
         className={cn(
-          "pointer-events-none relative z-30 m-0.5 flex flex-col gap-0.5 rounded-md",
+          "pointer-events-none relative z-30 m-0.5 flex flex-col gap-0.5 rounded-none",
           occupied
             ? "justify-end"
             : "justify-center border border-dashed border-muted-foreground/60"
@@ -716,7 +716,7 @@ export function ScheduleGridTraces({
             type="button"
             disabled={editor.editing && !editor.enabled}
             className={cn(
-              "pointer-events-auto flex flex-col rounded-sm bg-background/95 px-0.5 py-0.5 text-left text-[9px] leading-tight text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
+              "pointer-events-auto flex flex-col rounded-none bg-background/95 px-0.5 py-0.5 text-left text-[9px] leading-tight text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
               occupied && "border border-dashed border-muted-foreground/60"
             )}
             title={`${trace.name} · ${t(`scheduleEditor.${trace.kind}`)} · ${trace.targetDate}`}

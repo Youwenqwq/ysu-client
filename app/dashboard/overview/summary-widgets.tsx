@@ -71,7 +71,7 @@ export function WeekSummary({ data, compact }: { data: OverviewSchedule; compact
     <>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Calendar className="size-4 shrink-0 text-primary" />
+          <Calendar className="size-4 shrink-0 text-brand" />
           {t("overviewData.term")}
         </CardTitle>
       </CardHeader>
@@ -104,7 +104,7 @@ export function GpaSummary({ compact }: { compact: boolean }) {
         onClick={() => setVisible(!visible)}
         aria-label={t(visible ? "overviewData.hideGpa" : "overviewData.showGpa")}
         aria-pressed={visible}
-        className="flex w-full min-w-0 flex-col gap-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
+        className="flex w-full min-w-0 flex-col gap-1 rounded-none text-left outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
       >
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           <span className="truncate">{t("dashboard.gpaInitial")}</span>
@@ -121,7 +121,7 @@ export function GpaSummary({ compact }: { compact: boolean }) {
     <>
       <CardHeader className="flex flex-row items-center justify-between gap-1">
         <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="size-4 shrink-0 text-primary" />
+          <BarChart3 className="size-4 shrink-0 text-brand" />
           {t("dashboard.gpaInitial")}
         </CardTitle>
         <Button
@@ -164,7 +164,7 @@ export function EvaluationSummary({
     return (
       <Link
         href="/dashboard/evaluation"
-        className="flex min-w-0 flex-col gap-1 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-w-0 flex-col gap-1 rounded-none outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           <ClipboardCheck className="size-3.5 shrink-0" />
@@ -179,7 +179,7 @@ export function EvaluationSummary({
     <>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <ClipboardCheck className="size-4 shrink-0 text-primary" />
+          <ClipboardCheck className="size-4 shrink-0 text-brand" />
           {t("app.evaluation")}
         </CardTitle>
       </CardHeader>
@@ -187,7 +187,7 @@ export function EvaluationSummary({
         <QueryState queries={[query]}>
           <Link
             href="/dashboard/evaluation"
-            className="flex flex-col gap-1 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex flex-col gap-1 rounded-none outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span className="text-2xl font-semibold tabular-nums">{count}</span>
             <span className="text-xs text-muted-foreground">

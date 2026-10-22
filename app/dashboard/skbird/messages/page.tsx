@@ -137,7 +137,7 @@ export default function SkbirdMessagesPage() {
                     <SkbirdImage
                       url={skbirdImageUrl(m.avatarUrl, { w: 64, h: 64 })}
                       alt={m.nickname}
-                      className="size-9 shrink-0 rounded-full object-cover"
+                      className="size-9 shrink-0 rounded-none object-cover"
                     />
                   ) : null}
                   <div className="flex min-w-0 flex-col gap-0.5">

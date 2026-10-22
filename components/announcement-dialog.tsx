@@ -21,9 +21,10 @@ interface AnnouncementDialogProps {
 }
 
 const levelBadgeClass: Record<AnnouncementLevel, string> = {
-  info: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100",
-  warning: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 hover:bg-amber-100",
-  critical: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-100",
+  info: "border-2 border-brand/60 bg-brand/10 text-brand hover:bg-brand/10",
+  warning: "border-2 border-hazard/60 bg-hazard/10 text-hazard hover:bg-hazard/10",
+  critical:
+    "border-2 border-destructive/60 bg-destructive/10 text-destructive hover:bg-destructive/10",
 }
 
 const levelLabelKey: Record<AnnouncementLevel, string> = {
@@ -78,7 +79,7 @@ export function AnnouncementDialog({ onDismissed }: AnnouncementDialogProps) {
       a: ({ children, href }: { children?: React.ReactNode; href?: string }) => (
         <a
           href={href}
-          className="text-primary underline underline-offset-2"
+          className="text-brand underline underline-offset-2"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -86,10 +87,14 @@ export function AnnouncementDialog({ onDismissed }: AnnouncementDialogProps) {
         </a>
       ),
       code: ({ children }: { children?: React.ReactNode }) => (
-        <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">{children}</code>
+        <code className="rounded-none border border-edge/30 bg-muted px-1 py-0.5 font-mono text-xs">
+          {children}
+        </code>
       ),
       pre: ({ children }: { children?: React.ReactNode }) => (
-        <pre className="overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs">{children}</pre>
+        <pre className="overflow-x-auto rounded-none bg-muted p-2 font-mono text-xs">
+          {children}
+        </pre>
       ),
       strong: ({ children }: { children?: React.ReactNode }) => (
         <strong className="font-semibold text-foreground">{children}</strong>

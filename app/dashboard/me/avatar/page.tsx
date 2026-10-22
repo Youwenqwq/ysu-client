@@ -74,7 +74,7 @@ export default function AvatarSettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center gap-6">
-            <Avatar className="size-24">
+            <Avatar className="size-24 border-2 border-edge shadow-sm">
               {avatarUrl ? <AvatarImage src={avatarUrl} alt="avatar" /> : null}
               <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
             </Avatar>
@@ -100,7 +100,9 @@ export default function AvatarSettingsPage() {
               )}
             </div>
 
-            <p className="text-center text-xs text-muted-foreground">{t("app.avatarCropHint")}</p>
+            <p className="text-center font-mono text-[0.65rem] tracking-wide text-muted-foreground">
+              {t("app.avatarCropHint")}
+            </p>
           </div>
         </CardContent>
       </Card>

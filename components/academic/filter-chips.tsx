@@ -23,10 +23,10 @@ export function FilterChips({
           type="button"
           onClick={() => onChange(item.value)}
           className={cn(
-            "rounded-full border px-3 py-1.5 text-sm transition-colors",
+            "h-7 rounded-none border-2 px-2.5 font-mono text-[0.7rem] tracking-wide transition-colors",
             item.value === value
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-background text-foreground active:bg-muted/60"
+              ? "border-edge bg-primary text-primary-foreground shadow-[2px_2px_0_0_var(--shadow-color)]"
+              : "border-edge/35 bg-background text-foreground hover:border-edge/60 hover:bg-accent active:bg-accent"
           )}
         >
           {item.label}

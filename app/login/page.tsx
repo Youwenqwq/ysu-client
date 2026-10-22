@@ -224,95 +224,126 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center p-6">
-      <Card className="w-full max-w-sm animate-in duration-500 zoom-in-95 fade-in">
-        <CardHeader>
-          <CardTitle>{t("login.title")}</CardTitle>
-          <CardDescription>{t("login.usernamePlaceholder")}</CardDescription>
-          {schools.length > 1 && (
-            <div className="pt-2">
-              <Select value={selectedSchool} onValueChange={handleSchoolChange}>
-                <SelectTrigger className="w-full" size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {schools.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit}>
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="username">{t("login.usernameLabel")}</FieldLabel>
-                <Input
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder={t("login.usernamePlaceholder")}
-                  autoComplete="username"
-                  onBlur={handleCheckCaptcha}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="password">{t("login.passwordLabel")}</FieldLabel>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t("login.passwordPlaceholder")}
-                  autoComplete="current-password"
-                />
-              </Field>
-              {needsCaptcha && captchaUrl && (
+    <div className="relative flex min-h-svh items-center justify-center p-6">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(-45deg, var(--edge) 0 2px, transparent 2px 14px)",
+        }}
+      />
+      <div className="w-full max-w-sm">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div className="flex flex-col">
+            <span className="hud-label">ACCESS // 终端接入</span>
+            <span className="font-heading text-2xl leading-none font-bold tracking-tight">
+              YSU TERMINAL
+            </span>
+          </div>
+          <span className="mb-1 flex items-center gap-1.5 border border-edge/40 px-1.5 py-0.5 font-mono text-[0.6rem] tracking-wider text-muted-foreground">
+            <span className="size-1.5 bg-brand" />
+            ONLINE
+          </span>
+        </div>
+        <Card className="w-full animate-in shadow-md duration-500 zoom-in-95 fade-in">
+          <CardHeader className="border-b-2 border-edge/20 pb-4">
+            <CardTitle>{t("login.title")}</CardTitle>
+            <CardDescription>{t("login.usernamePlaceholder")}</CardDescription>
+            {schools.length > 1 && (
+              <div className="pt-2">
+                <Select value={selectedSchool} onValueChange={handleSchoolChange}>
+                  <SelectTrigger className="w-full" size="sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {schools.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit}>
+              <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="captcha">{t("login.captchaLabel")}</FieldLabel>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={captchaUrl}
-                    alt="captcha"
-                    className="cursor-pointer rounded-md border transition-opacity hover:opacity-80"
-                    onClick={() => showCaptcha()}
-                  />
+                  <FieldLabel htmlFor="username">{t("login.usernameLabel")}</FieldLabel>
                   <Input
-                    id="captcha"
-                    value={captcha}
-                    onChange={(e) => setCaptcha(e.target.value)}
-                    placeholder={t("login.captchaPlaceholder")}
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder={t("login.usernamePlaceholder")}
+                    autoComplete="username"
+                    onBlur={handleCheckCaptcha}
                   />
                 </Field>
-              )}
-              {canRemember && (
-                <Field orientation="horizontal">
-                  <Checkbox
-                    id="remember"
-                    checked={remember}
-                    onCheckedChange={(c) => setRemember(c === true)}
+                <Field>
+                  <FieldLabel htmlFor="password">{t("login.passwordLabel")}</FieldLabel>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={t("login.passwordPlaceholder")}
+                    autoComplete="current-password"
                   />
-                  <FieldLabel htmlFor="remember" className="cursor-pointer text-sm font-normal">
-                    {t("login.remember")}
-                  </FieldLabel>
                 </Field>
-              )}
-              <Button type="submit" disabled={loading || countdown > 0}>
-                {loading && <Spinner data-icon="inline-start" />}
-                {loading
-                  ? t("login.loggingIn")
-                  : countdown > 0
-                    ? t("login.retryAfter", { seconds: countdown })
-                    : t("login.submit")}
-              </Button>
-            </FieldGroup>
-          </form>
-        </CardContent>
-      </Card>
+                {needsCaptcha && captchaUrl && (
+                  <Field>
+                    <FieldLabel htmlFor="captcha">{t("login.captchaLabel")}</FieldLabel>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={captchaUrl}
+                      alt="captcha"
+                      className="cursor-pointer rounded-none border transition-opacity hover:opacity-80"
+                      onClick={() => showCaptcha()}
+                    />
+                    <Input
+                      id="captcha"
+                      value={captcha}
+                      onChange={(e) => setCaptcha(e.target.value)}
+                      placeholder={t("login.captchaPlaceholder")}
+                    />
+                  </Field>
+                )}
+                {canRemember && (
+                  <Field orientation="horizontal">
+                    <Checkbox
+                      id="remember"
+                      checked={remember}
+                      onCheckedChange={(c) => setRemember(c === true)}
+                    />
+                    <FieldLabel htmlFor="remember" className="cursor-pointer text-sm font-normal">
+                      {t("login.remember")}
+                    </FieldLabel>
+                  </Field>
+                )}
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full"
+                  disabled={loading || countdown > 0}
+                >
+                  {loading && <Spinner data-icon="inline-start" />}
+                  {loading
+                    ? t("login.loggingIn")
+                    : countdown > 0
+                      ? t("login.retryAfter", { seconds: countdown })
+                      : t("login.submit")}
+                </Button>
+              </FieldGroup>
+            </form>
+          </CardContent>
+        </Card>
+        <p className="mt-3 flex items-center justify-between gap-2 font-mono text-[0.6rem] tracking-wider text-muted-foreground">
+          <span>THIRD-PARTY CLIENT</span>
+          <span>{t("app.name")}</span>
+        </p>
+      </div>
     </div>
   )
 }

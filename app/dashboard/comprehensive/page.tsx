@@ -133,7 +133,7 @@ function RadarPanel({ year, term }: { year: string; term: string }) {
         <CardContent className="flex flex-col gap-5 py-5">
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-4 rounded-full bg-primary" />
+              <span className="h-2 w-4 border border-edge/40 bg-brand" />
               {t("comprehensive.personal")}
             </span>
             <span className="flex items-center gap-1.5">
@@ -158,9 +158,9 @@ function RadarPanel({ year, term }: { year: string; term: string }) {
                     </span>
                   </span>
                 </div>
-                <div className="relative h-2 rounded-full bg-muted">
+                <div className="relative h-2 border border-edge/30 bg-muted">
                   <div
-                    className="h-full rounded-full bg-primary"
+                    className="hud-meter h-full bg-brand"
                     style={{ width: `${pct(personal)}%` }}
                   />
                   {max > 0 && average > 0 && (
@@ -199,7 +199,7 @@ function YearsPanel() {
             <div
               key={`${item.year}-${item.term}`}
               className={`flex items-center justify-between py-3 ${
-                idx > 0 ? "border-t border-border" : ""
+                idx > 0 ? "border-t border-edge/20" : ""
               }`}
             >
               <span className="text-sm">
@@ -259,7 +259,7 @@ function ReportPanel() {
                 <div
                   key={`${entry.courseName}-${idx}`}
                   className={`flex items-center justify-between gap-2 py-3 ${
-                    idx > 0 ? "border-t border-border" : ""
+                    idx > 0 ? "border-t border-edge/20" : ""
                   }`}
                 >
                   <div className="flex min-w-0 flex-col">

@@ -86,7 +86,7 @@ export function ResponsiveSelect({
         }}
         className={cn(
           // 外观与 SelectTrigger 保持一致
-          "flex h-8 w-full items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none dark:bg-input/30",
+          "flex h-8 w-full items-center justify-between gap-1.5 rounded-none border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none dark:bg-input/30",
           className
         )}
       >

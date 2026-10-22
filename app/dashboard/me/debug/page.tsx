@@ -711,7 +711,7 @@ export default function DebugPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-32 rounded-md border bg-muted/30 p-2">
+              <ScrollArea className="h-32 rounded-none border bg-muted/30 p-2">
                 {diag.authCookies.cookies.length === 0 ? (
                   <span className="text-xs text-muted-foreground">{t("debug.empty")}</span>
                 ) : (
@@ -735,7 +735,7 @@ export default function DebugPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-32 rounded-md border bg-muted/30 p-2">
+              <ScrollArea className="h-32 rounded-none border bg-muted/30 p-2">
                 {diag.academicCookies.cookies.length === 0 ? (
                   <span className="text-xs text-muted-foreground">{t("debug.empty")}</span>
                 ) : (
@@ -840,7 +840,7 @@ export default function DebugPage() {
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-muted-foreground">通知权限:</span>
                   {nativePermGranted ? (
-                    <span className="text-green-600">已授予</span>
+                    <span className="text-rarity-2">已授予</span>
                   ) : (
                     <span className="text-destructive">未授予</span>
                   )}
@@ -848,7 +848,7 @@ export default function DebugPage() {
               )}
 
               {nativeTestLog.length > 0 && (
-                <ScrollArea className="h-48 rounded-md border bg-muted/30 p-2">
+                <ScrollArea className="h-48 rounded-none border bg-muted/30 p-2">
                   <pre className="font-mono text-[10px] whitespace-pre-wrap">
                     {nativeTestLog.join("\n")}
                   </pre>

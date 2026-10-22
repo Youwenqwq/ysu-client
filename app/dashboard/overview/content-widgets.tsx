@@ -16,6 +16,7 @@ import {
   courseStartSection,
   isCoursePast,
 } from "@/app/dashboard/schedule/schedule-utils"
+import { buildCourseColorMap, courseInkClass } from "@/app/dashboard/schedule/course-color"
 import { ActivityModal } from "@/app/dashboard/schedule/activity-modal"
 import { SigninModal } from "@/app/dashboard/schedule/signin-modal"
 import type { ProviderQueryResult } from "@/providers/hooks"
@@ -44,8 +45,13 @@ export function CourseProgressWidget({ data }: { data: OverviewSchedule }) {
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2">
-          <Clock className="size-4 text-primary" />
-          {t(currentCourse ? "dashboard.ongoingNow" : "dashboard.nextCourse")}
+          <Clock className="size-4 text-brand" />
+          <span className="flex flex-col">
+            <span className="hud-label leading-none">{t("app.schedule")}</span>
+            <span className="leading-tight">
+              {t(currentCourse ? "dashboard.ongoingNow" : "dashboard.nextCourse")}
+            </span>
+          </span>
         </CardTitle>
         {range && (
           <Badge variant={currentCourse ? "default" : "secondary"}>
@@ -64,11 +70,11 @@ export function CourseProgressWidget({ data }: { data: OverviewSchedule }) {
             <div className="flex flex-col gap-2">
               <Link
                 href="/dashboard/schedule"
-                className="rounded-sm text-lg font-semibold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-none font-heading text-lg leading-tight font-semibold tracking-tight outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
               >
                 {course.name}
               </Link>
-              <p className="text-sm text-muted-foreground">
+              <p className="font-mono text-[0.7rem] tracking-wide text-muted-foreground">
                 {[course.teacher, course.classroom].filter(Boolean).join(" · ")}
               </p>
               {currentCourse && (
@@ -81,8 +87,8 @@ export function CourseProgressWidget({ data }: { data: OverviewSchedule }) {
                   className="h-1.5"
                 />
               )}
-              <p className="text-xs text-muted-foreground">
-                {clockText(range[0])} - {clockText(range[1])}
+              <p className="font-mono text-[0.7rem] tracking-wider text-muted-foreground tabular-nums">
+                {clockText(range[0])} — {clockText(range[1])}
               </p>
             </div>
           )}
@@ -101,6 +107,8 @@ export function TodayCoursesWidget({ data }: { data: OverviewSchedule }) {
   const [signinType, setSigninType] = useState(1)
   const [signinOpen, setSigninOpen] = useState(false)
 
+  const colorMap = buildCourseColorMap(data.todayCourses)
+
   const openCourse = (course: Course) => {
     const occurrence =
       "occurrenceId" in course && "source" in course ? (course as ScheduleOccurrence) : null
@@ -114,13 +122,16 @@ export function TodayCoursesWidget({ data }: { data: OverviewSchedule }) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
-            <BookOpen className="size-4 text-primary" />
-            {t("dashboard.todayCourses")}
+            <BookOpen className="size-4 text-brand" />
+            <span className="flex flex-col">
+              <span className="hud-label leading-none">{t("app.schedule")}</span>
+              <span className="leading-tight">{t("dashboard.todayCourses")}</span>
+            </span>
           </CardTitle>
           <Link
             href="/dashboard/schedule"
             aria-label={t("app.schedule")}
-            className="rounded-sm p-2 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex size-7 items-center justify-center border border-edge/40 text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             <ChevronRight className="size-4" />
           </Link>
@@ -143,20 +154,21 @@ export function TodayCoursesWidget({ data }: { data: OverviewSchedule }) {
                       type="button"
                       onClick={() => openCourse(course)}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring",
-                        isCurrent && "border-primary bg-primary/5",
+                        "flex w-full items-center gap-3 border-y border-r border-l-[3px] border-edge/25 border-y-edge/25 border-r-edge/25 bg-background/40 p-3 text-left transition-colors outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-brand/40",
+                        courseInkClass(colorMap, course),
+                        isCurrent && "border-y-brand/40 border-r-brand/40 bg-brand/10",
                         isPast && "opacity-50"
                       )}
                     >
                       {range && (
-                        <div className="flex w-11 shrink-0 flex-col text-xs leading-tight text-muted-foreground">
+                        <div className="hud-data flex w-11 shrink-0 flex-col text-[0.65rem] leading-tight text-muted-foreground">
                           <span>{clockText(range[0])}</span>
                           <span>{clockText(range[1])}</span>
                         </div>
                       )}
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="truncate text-sm font-medium">{course.name}</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="font-mono text-[0.65rem] tracking-wide text-muted-foreground">
                           {[course.teacher, course.classroom].filter(Boolean).join(" · ")}
                         </span>
                       </div>
@@ -204,12 +216,15 @@ export function UpcomingExamsWidget({ data }: { data: OverviewSchedule }) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2">
-          <Calendar className="size-4 text-primary" />
-          {t("dashboard.upcomingExams")}
+          <Calendar className="size-4 text-brand" />
+          <span className="flex flex-col">
+            <span className="hud-label leading-none">{t("app.academic")}</span>
+            <span className="leading-tight">{t("dashboard.upcomingExams")}</span>
+          </span>
         </CardTitle>
         <Link
           href="/dashboard/exams"
-          className="rounded-sm p-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded-none p-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <Badge variant="secondary">
             {t("dashboard.examCount", { count: data.upcomingExams.length })}
@@ -230,11 +245,11 @@ export function UpcomingExamsWidget({ data }: { data: OverviewSchedule }) {
                 return (
                   <div
                     key={`${exam.name}-${exam.startAt}-${index}`}
-                    className="flex items-center justify-between gap-2 rounded-lg border p-3"
+                    className="flex items-center justify-between gap-2 border border-l-2 border-edge/25 border-l-hazard bg-background/40 p-2.5"
                   >
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="text-sm font-medium">{exam.name}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-[0.8rem] font-medium">{exam.name}</span>
+                      <span className="font-mono text-[0.65rem] tracking-wide text-muted-foreground">
                         {[
                           formatExamTime(exam),
                           exam.examLocation,
@@ -273,7 +288,7 @@ export function EvaluationTasksWidget({ query }: { query: ProviderQueryResult<Ev
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <ClipboardCheck className="size-4 text-primary" />
+          <ClipboardCheck className="size-4 text-brand" />
           {t("app.evaluation")}
         </CardTitle>
       </CardHeader>
@@ -281,7 +296,7 @@ export function EvaluationTasksWidget({ query }: { query: ProviderQueryResult<Ev
         <QueryState queries={[query]}>
           <Link
             href="/dashboard/evaluation"
-            className="flex items-center gap-3 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex items-center gap-3 rounded-none outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             <span className="flex-1 text-sm">
               {t("dashboard.pendingEvaluation", { count: tasks.length })}

@@ -238,8 +238,8 @@ export default function MeterPage() {
                       use: String(d.use),
                     })}
                     className={cn(
-                      "min-w-1 flex-1 rounded-sm transition-colors",
-                      d.date === today ? "bg-primary" : "bg-primary/25 hover:bg-primary/50"
+                      "min-w-1 flex-1 rounded-none transition-colors",
+                      d.date === today ? "bg-brand" : "bg-brand/25 hover:bg-brand/50"
                     )}
                     style={{
                       height: `${maxDaily > 0 ? Math.max(3, (d.use / maxDaily) * 100) : 3}%`,
@@ -276,7 +276,7 @@ export default function MeterPage() {
                       <span className="text-xs text-muted-foreground tabular-nums">{r.time}</span>
                     </div>
                     <div className="ml-auto flex shrink-0 items-baseline gap-2">
-                      <span className="font-semibold text-primary tabular-nums">
+                      <span className="hud-data font-semibold text-brand">
                         +{r.amount} {t("meter.unit")}
                       </span>
                       {r.fare > 0 ? (

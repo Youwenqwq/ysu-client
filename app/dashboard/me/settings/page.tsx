@@ -171,7 +171,7 @@ export default function SettingsPage() {
 
   // 新成绩抽卡开关：Web 端直接跟在背景图下方，Capacitor 端位于小组件小节内
   const gradeGachaRow = (
-    <div className="flex items-center gap-3 border-t border-border py-3">
+    <div className="flex items-center gap-3 border-t border-edge/20 py-3 pl-0.5">
       <Sparkles className="size-5 shrink-0 text-muted-foreground" />
       <div className="flex flex-1 flex-col">
         <span className="text-sm">{t("settings.gradeGacha")}</span>
@@ -189,7 +189,7 @@ export default function SettingsPage() {
         <Card>
           <CardContent className="flex flex-col py-1">
             {/* 通用 */}
-            <h3 className="flex items-center gap-2 px-0.5 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">
+            <h3 className="hud-label flex items-center gap-2 px-0.5 pt-1 pb-0.5">
               {t("settings.general")}
             </h3>
 
@@ -217,7 +217,7 @@ export default function SettingsPage() {
 
             <Link
               href="/dashboard/me/settings/overview"
-              className="flex items-center gap-3 border-t border-border py-3 transition-colors active:bg-muted/60"
+              className="flex items-center gap-3 border-t border-edge/20 py-3 pl-0.5 transition-colors hover:bg-muted/40 active:bg-muted/60"
             >
               <LayoutDashboard className="size-5 shrink-0 text-muted-foreground" />
               <div className="flex min-w-0 flex-1 flex-col">
@@ -230,7 +230,7 @@ export default function SettingsPage() {
             </Link>
 
             {/* 主题 */}
-            <div className="flex items-center gap-3 border-t border-border py-3">
+            <div className="flex items-center gap-3 border-t border-edge/20 py-3 pl-0.5">
               <Sun className="size-5 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-sm">{t("app.theme")}</span>
               <ToggleGroup
@@ -253,7 +253,7 @@ export default function SettingsPage() {
             </div>
 
             {/* 语言 */}
-            <div className="flex items-center gap-3 border-t border-border py-3">
+            <div className="flex items-center gap-3 border-t border-edge/20 py-3 pl-0.5">
               <Globe className="size-5 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-sm">{t("app.language")}</span>
               <ToggleGroup
@@ -275,7 +275,7 @@ export default function SettingsPage() {
             {/* 头像 */}
             <Link
               href="/dashboard/me/avatar"
-              className="flex items-center gap-3 border-t border-border py-3 transition-colors active:bg-muted/60"
+              className="flex items-center gap-3 border-t border-edge/20 py-3 pl-0.5 transition-colors hover:bg-muted/40 active:bg-muted/60"
             >
               <UserCircle className="size-5 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-sm">{t("app.avatarSettings")}</span>
@@ -285,7 +285,7 @@ export default function SettingsPage() {
             {/* 背景图 */}
             <Link
               href="/dashboard/me/background"
-              className="flex items-center gap-3 border-t border-border py-3 transition-colors active:bg-muted/60"
+              className="flex items-center gap-3 border-t border-edge/20 py-3 pl-0.5 transition-colors hover:bg-muted/40 active:bg-muted/60"
             >
               <ImageIcon className="size-5 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-sm">{t("app.backgroundImage")}</span>
@@ -298,7 +298,7 @@ export default function SettingsPage() {
             {/* 小组件 — 仅 Capacitor 平台 */}
             {isCapacitor() && (
               <>
-                <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
+                <h3 className="flex items-center gap-2 border-t border-edge/20 px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
                   {t("settings.widget")}
                 </h3>
 
@@ -317,7 +317,7 @@ export default function SettingsPage() {
                 />
 
                 {/* 无课显示下一有课日 */}
-                <div className="flex items-center gap-3 border-t border-border py-3">
+                <div className="flex items-center gap-3 border-t border-edge/20 py-3 pl-0.5">
                   <CalendarClock className="size-5 shrink-0 text-muted-foreground" />
                   <span className="flex-1 text-sm">{t("settings.widgetShowNextDay")}</span>
                   <Switch
@@ -343,7 +343,7 @@ export default function SettingsPage() {
           <Card>
             <CardContent className="flex flex-col py-1">
               {/* 系统权限 */}
-              <h3 className="flex items-center gap-2 px-0.5 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">
+              <h3 className="hud-label flex items-center gap-2 px-0.5 pt-1 pb-0.5">
                 {t("settings.systemPermissions")}
               </h3>
 
@@ -361,9 +361,7 @@ export default function SettingsPage() {
                   </span>
                 </div>
                 {batteryIgnored !== null && (
-                  <span
-                    className={`text-xs ${batteryIgnored ? "text-green-600" : "text-orange-500"}`}
-                  >
+                  <span className={`text-xs ${batteryIgnored ? "text-rarity-2" : "text-hazard"}`}>
                     {batteryIgnored
                       ? t("settings.batteryOptimizationIgnored")
                       : t("settings.batteryOptimizationNotIgnored")}
@@ -376,7 +374,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={() => setAutoStartDialogOpen(true)}
-                className="flex items-center gap-3 border-t border-border py-3 text-left transition-colors active:bg-muted/60"
+                className="flex items-center gap-3 border-t border-edge/20 py-3 text-left transition-colors active:bg-muted/60"
               >
                 <ShieldCheck className="size-5 shrink-0 text-muted-foreground" />
                 <div className="flex flex-1 flex-col">
@@ -389,7 +387,7 @@ export default function SettingsPage() {
               </button>
 
               {/* 成绩/考试通知 */}
-              <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
+              <h3 className="flex items-center gap-2 border-t border-edge/20 px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
                 {t("settings.notifyContentTitle")}
               </h3>
 
@@ -426,7 +424,7 @@ export default function SettingsPage() {
 
               {/* 监听内容 */}
               {notifyEnabled && (
-                <div className="flex items-center gap-3 border-t border-border py-3">
+                <div className="flex items-center gap-3 border-t border-edge/20 py-3 pl-0.5">
                   <CalendarClock className="size-5 shrink-0 text-muted-foreground" />
                   <span className="flex-1 text-sm">{t("settings.notifyContent")}</span>
                   <ToggleGroup
@@ -451,7 +449,7 @@ export default function SettingsPage() {
 
               {/* 网络错误提醒 */}
               {notifyEnabled && (
-                <div className="flex items-center gap-3 border-t border-border py-3">
+                <div className="flex items-center gap-3 border-t border-edge/20 py-3 pl-0.5">
                   <WifiOff className="size-5 shrink-0 text-muted-foreground" />
                   <div className="flex flex-1 flex-col">
                     <span className="text-sm">{t("settings.notifyNetworkError")}</span>
@@ -464,7 +462,7 @@ export default function SettingsPage() {
               )}
 
               {/* 上课提醒 */}
-              <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
+              <h3 className="flex items-center gap-2 border-t border-edge/20 px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
                 {t("settings.classReminderTitle")}
               </h3>
               <div className="flex items-center gap-3 py-3">
@@ -544,7 +542,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={() => setLogoutDialogOpen(true)}
-              className="flex items-center gap-3 border-t border-border py-3 text-destructive transition-colors active:bg-destructive/10"
+              className="flex items-center gap-3 border-t border-edge/20 py-3 text-destructive transition-colors active:bg-destructive/10"
             >
               <LogOut className="size-5 shrink-0" />
               <span className="flex-1 text-left text-sm">{t("app.logout")}</span>
@@ -577,7 +575,7 @@ export default function SettingsPage() {
             >
               <Info className="size-5 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-sm">{t("about.title")}</span>
-              {hasUpdate && <span className="size-2 rounded-full bg-destructive" />}
+              {hasUpdate && <span className="size-2 border border-background bg-destructive" />}
               <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
             </Link>
           </CardContent>
@@ -619,9 +617,7 @@ export default function SettingsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {title}
-      </h2>
+      <h2 className="hud-label px-1">{title}</h2>
       {children}
     </section>
   )
@@ -658,7 +654,7 @@ function SettingNumberInput({
   }
 
   return (
-    <div className={cn("flex items-center gap-3 py-3", bordered && "border-t border-border")}>
+    <div className={cn("flex items-center gap-3 py-3", bordered && "border-t border-edge/20")}>
       <Icon className="size-5 shrink-0 text-muted-foreground" />
       <div className="flex flex-1 flex-col">
         <span className="text-sm">{label}</span>

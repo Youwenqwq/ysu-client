@@ -124,25 +124,30 @@ export default function ExamsPage() {
           {upcomingExams.length > 0 && (
             <div className="grid gap-4 md:grid-cols-2">
               {upcomingExams.map((exam) => (
-                <Card key={`${exam.name}-${exam.startAt ?? ""}-${exam.examLocation ?? ""}`}>
+                <Card
+                  key={`${exam.name}-${exam.startAt ?? ""}-${exam.examLocation ?? ""}`}
+                  className="border-l-[3px] border-l-hazard"
+                >
                   <CardHeader>
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-2">
                       <CardTitle className="text-base">{exam.name}</CardTitle>
-                      <Badge variant="default">{t("exams.upcomingExams")}</Badge>
+                      <Badge variant="hazard">{t("exams.upcomingExams")}</Badge>
                     </div>
-                    <CardDescription>{exam.examName}</CardDescription>
+                    <CardDescription className="font-mono text-[0.7rem] tracking-wide">
+                      {exam.examName}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col gap-2 text-sm">
                     <div className="flex items-center gap-2">
-                      <Clock className="size-4 text-muted-foreground" />
-                      <span>{formatExamTime(exam)}</span>
+                      <Clock className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="hud-data">{formatExamTime(exam)}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <MapPin className="size-4 text-muted-foreground" />
-                      <span>{exam.examLocation}</span>
+                      <MapPin className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="hud-data">{exam.examLocation}</span>
                     </div>
                     {exam.seatNumber && (
-                      <Badge variant="outline">
+                      <Badge variant="outline" className="w-fit">
                         {t("exams.seatNumber")}: {exam.seatNumber}
                       </Badge>
                     )}
@@ -154,36 +159,36 @@ export default function ExamsPage() {
 
           {completedExams.length > 0 && (
             <>
-              <h3 className="text-sm font-medium text-muted-foreground">
-                {t("exams.completedExams")}
-              </h3>
+              <h3 className="hud-label">{t("exams.completedExams")}</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 {completedExams.map((exam) => (
                   <Card
                     key={`${exam.name}-${exam.startAt ?? ""}-${exam.examLocation ?? ""}`}
-                    className="opacity-60"
+                    className="border-l-[3px] border-l-edge/30 opacity-60"
                   >
                     <CardHeader>
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between gap-2">
                         <CardTitle className="text-base">{exam.name}</CardTitle>
                         <Badge variant="secondary" className="gap-1">
                           <CheckCircle2 className="size-3" />
                           {t("exams.completed")}
                         </Badge>
                       </div>
-                      <CardDescription>{exam.examName}</CardDescription>
+                      <CardDescription className="font-mono text-[0.7rem] tracking-wide">
+                        {exam.examName}
+                      </CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-2 text-sm">
                       <div className="flex items-center gap-2">
-                        <Clock className="size-4 text-muted-foreground" />
-                        <span>{formatExamTime(exam)}</span>
+                        <Clock className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="hud-data">{formatExamTime(exam)}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <MapPin className="size-4 text-muted-foreground" />
-                        <span>{exam.examLocation}</span>
+                        <MapPin className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="hud-data">{exam.examLocation}</span>
                       </div>
                       {exam.seatNumber && (
-                        <Badge variant="outline">
+                        <Badge variant="outline" className="w-fit">
                           {t("exams.seatNumber")}: {exam.seatNumber}
                         </Badge>
                       )}

@@ -139,7 +139,7 @@ function RecordGroup({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground transition-colors active:bg-muted/60"
+        className="flex items-center gap-2 rounded-none px-1 py-1 text-sm font-medium text-muted-foreground transition-colors active:bg-muted/60"
       >
         {open ? (
           <ChevronDown className="size-4 shrink-0" />

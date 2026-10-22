@@ -175,7 +175,7 @@ export function AboutContent() {
           <button
             type="button"
             onClick={handleIconClick}
-            className="size-24 overflow-hidden rounded-3xl shadow-sm ring-1 ring-border transition-transform active:scale-95"
+            className="size-24 overflow-hidden rounded-none shadow-sm ring-1 ring-border transition-transform active:scale-95"
           >
             <Image
               src={appIcon}
@@ -240,7 +240,7 @@ export function AboutContent() {
                         href={c.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                        className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline"
                       >
                         {c.name}
                         <ExternalLink className="size-3" />
@@ -264,7 +264,7 @@ export function AboutContent() {
                       href={c.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-medium text-primary underline underline-offset-3"
+                      className="font-medium text-brand underline underline-offset-3"
                     >
                       {c.name}
                     </a>

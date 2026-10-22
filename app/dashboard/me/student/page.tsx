@@ -72,9 +72,12 @@ export default function StudentPage() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
             {fields.map((f) => (
-              <div key={f.label} className="flex flex-col gap-1">
-                <span className="text-sm text-muted-foreground">{f.label}</span>
-                <span className="font-medium">{f.value || "-"}</span>
+              <div
+                key={f.label}
+                className="flex flex-col gap-1 border-l-[3px] border-l-edge/25 pl-2.5"
+              >
+                <span className="hud-label">{f.label}</span>
+                <span className="text-sm font-medium">{f.value || "-"}</span>
               </div>
             ))}
           </div>
