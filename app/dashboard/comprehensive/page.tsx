@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   EmptyState,
   LoadingCards,
+  QueryError,
   useErrorToast,
   ValidatingList,
 } from "@/components/academic/list-state"
@@ -33,10 +34,11 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
   const result = resultQuery.data
   const indicators = indicatorsQuery.data ?? []
 
-  useErrorToast(resultQuery.error)
+  useErrorToast(resultQuery.error, !!result)
   useErrorToast(indicatorsQuery.error)
 
   if (resultQuery.isLoading && !result) return <LoadingCards />
+  if (resultQuery.error && !result) return <QueryError error={resultQuery.error} />
   if (!result) return <EmptyState title={t("comprehensive.noResult")} />
 
   return (
@@ -120,9 +122,10 @@ function RadarPanel({ year, term }: { year: string; term: string }) {
   const opts = useMemo(() => ({ year, term }), [year, term])
   const radarQuery = useComprehensiveRadar(opts)
   const items = radarQuery.data ?? []
-  useErrorToast(radarQuery.error)
+  useErrorToast(radarQuery.error, items.length > 0)
 
   if (radarQuery.isLoading && items.length === 0) return <LoadingCards />
+  if (radarQuery.error && items.length === 0) return <QueryError error={radarQuery.error} />
   if (items.length === 0) return <EmptyState title={t("comprehensive.noRadar")} />
 
   return (
@@ -184,9 +187,10 @@ function YearsPanel() {
   const { t } = useTranslation()
   const query = useComprehensiveYearScores()
   const items = query.data ?? []
-  useErrorToast(query.error)
+  useErrorToast(query.error, items.length > 0)
 
   if (query.isLoading && items.length === 0) return <LoadingCards />
+  if (query.error && items.length === 0) return <QueryError error={query.error} />
   if (items.length === 0) return <EmptyState title={t("comprehensive.noYearScores")} />
 
   return (
@@ -230,7 +234,7 @@ function ReportPanel() {
   const entries = reportQuery.data?.entries ?? []
 
   useErrorToast(yearsQuery.error)
-  useErrorToast(reportQuery.error)
+  useErrorToast(reportQuery.error, entries.length > 0)
 
   return (
     <div className="flex flex-col gap-4">
@@ -245,7 +249,9 @@ function ReportPanel() {
         />
       )}
 
-      {(reportQuery.isLoading || reportQuery.isValidating) && entries.length === 0 ? (
+      {reportQuery.error && entries.length === 0 ? (
+        <QueryError error={reportQuery.error} />
+      ) : (reportQuery.isLoading || reportQuery.isValidating) && entries.length === 0 ? (
         <LoadingCards />
       ) : entries.length === 0 ? (
         <EmptyState title={t("comprehensive.noReport")} />
@@ -296,7 +302,7 @@ export default function ComprehensivePage() {
     }
   }, [terms, selected])
 
-  useErrorToast(termsQuery.error)
+  useErrorToast(termsQuery.error, terms.length > 0)
 
   const termLabel = (item: (typeof terms)[number]) =>
     [item.yearDisplay, item.termDisplay].filter(Boolean).join(" ") || `${item.year}-${item.term}`
@@ -330,7 +336,9 @@ export default function ComprehensivePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {terms.length === 0 ? (
+      {termsQuery.error && terms.length === 0 ? (
+        <QueryError error={termsQuery.error} />
+      ) : terms.length === 0 ? (
         <EmptyState title={t("comprehensive.noTerms")} />
       ) : (
         <div className="hidden md:block">

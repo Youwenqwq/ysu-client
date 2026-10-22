@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   EmptyState,
+  InlineError,
   LoadingCards,
+  QueryError,
   useErrorToast,
   ValidatingList,
 } from "@/components/academic/list-state"
@@ -21,10 +23,13 @@ function RecordsPanel() {
   const { t } = useTranslation()
   const recordsQuery = useLaborRecords()
   const records = recordsQuery.data ?? []
-  useErrorToast(recordsQuery.error)
+  useErrorToast(recordsQuery.error, records.length > 0)
 
   if ((recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0) {
     return <LoadingCards className="h-28" />
+  }
+  if (recordsQuery.error && records.length === 0) {
+    return <QueryError error={recordsQuery.error} />
   }
   if (records.length === 0) {
     return <EmptyState title={t("labor.noRecords")} />
@@ -89,10 +94,13 @@ function ActivitiesPanel() {
   const { t } = useTranslation()
   const activitiesQuery = useLaborActivities()
   const activities = activitiesQuery.data ?? []
-  useErrorToast(activitiesQuery.error)
+  useErrorToast(activitiesQuery.error, activities.length > 0)
 
   if ((activitiesQuery.isLoading || activitiesQuery.isValidating) && activities.length === 0) {
     return <LoadingCards className="h-28" />
+  }
+  if (activitiesQuery.error && activities.length === 0) {
+    return <QueryError error={activitiesQuery.error} />
   }
   if (activities.length === 0) {
     return <EmptyState title={t("labor.noActivities")} />
@@ -164,7 +172,7 @@ export default function LaborPage() {
 
   const summaryQuery = useLaborSummary()
   const summary = summaryQuery.data
-  useErrorToast(summaryQuery.error)
+  useErrorToast(summaryQuery.error, !!summary)
 
   return (
     <div className="flex flex-col gap-6">
@@ -175,6 +183,8 @@ export default function LaborPage() {
               <Skeleton className="h-12 w-24" />
               <Skeleton className="h-12 w-24" />
             </div>
+          ) : summaryQuery.error && !summary ? (
+            <InlineError error={summaryQuery.error} />
           ) : summary ? (
             <div
               className={cn(
