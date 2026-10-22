@@ -248,7 +248,7 @@ function ThreadDetail() {
 
       <Separator />
       <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-muted-foreground">
+        <h2 className="hud-label">
           {t("skbird.commentsTitle")}
           {thread.commentCount > 0 ? ` (${thread.commentCount})` : ""}
         </h2>

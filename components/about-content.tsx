@@ -255,7 +255,7 @@ export function AboutContent() {
           <Separator />
 
           <div className="flex flex-col gap-2 py-3">
-            <h3 className="text-sm font-medium">{t("about.credits")}</h3>
+            <h3 className="hud-label">{t("about.credits")}</h3>
             <ul className="flex flex-col gap-2">
               {APP_PEOPLE.map((c) => (
                 <li key={c.name} className="text-sm">

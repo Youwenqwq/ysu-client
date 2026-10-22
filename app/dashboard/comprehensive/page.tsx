@@ -72,9 +72,7 @@ function ResultPanel({ year, term }: { year: string; term: string }) {
 
       {indicators.length > 0 && (
         <>
-          <h3 className="text-sm font-medium text-muted-foreground">
-            {t("comprehensive.indicatorsTitle")}
-          </h3>
+          <h3 className="hud-label">{t("comprehensive.indicatorsTitle")}</h3>
           {indicators.map((ind, idx) => {
             const rank = result.indicators.find((i) => i.name === ind.name)?.rank
             return (

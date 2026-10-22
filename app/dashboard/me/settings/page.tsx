@@ -183,8 +183,6 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
-
       <Section title={t("me.sectionPreferences")}>
         <Card>
           <CardContent className="flex flex-col py-1">

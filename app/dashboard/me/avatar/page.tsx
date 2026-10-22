@@ -66,8 +66,6 @@ export default function AvatarSettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold">{t("app.avatarSettings")}</h1>
-
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t("app.avatarPreview")}</CardTitle>

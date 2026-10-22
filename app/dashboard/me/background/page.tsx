@@ -117,8 +117,6 @@ export default function BackgroundSettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold">{t("app.backgroundSettings")}</h1>
-
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t("app.backgroundUpload")}</CardTitle>
