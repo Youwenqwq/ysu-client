@@ -57,39 +57,67 @@ export function ActivationGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>{t("activation.title")}</CardTitle>
-          <CardDescription>{t("activation.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="flex flex-col gap-3"
-            onSubmit={(e) => {
-              e.preventDefault()
-              void submit()
-            }}
-          >
-            <Input
-              type="password"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={t("activation.placeholder")}
-              autoFocus
-              autoComplete="off"
-            />
-            {error && (
-              <p className="text-sm text-destructive">
-                {error === "invalid" ? t("activation.invalid") : t("activation.networkError")}
-              </p>
-            )}
-            <Button type="submit" disabled={submitting || !input.trim()}>
-              {submitting ? t("activation.verifying") : t("activation.submit")}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+    <div className="relative flex min-h-dvh items-center justify-center p-6">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(-45deg, var(--edge) 0 2px, transparent 2px 14px)",
+        }}
+      />
+      <div className="w-full max-w-sm">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div className="flex flex-col">
+            <span className="hud-label">ACCESS // GATE</span>
+            <span className="font-heading text-2xl leading-none font-bold tracking-tight">
+              YSU TERMINAL
+            </span>
+          </div>
+          <span className="mb-1 flex items-center gap-1.5 border border-edge/40 px-1.5 py-0.5 font-mono text-[0.6rem] tracking-wider text-muted-foreground">
+            <span className="size-1.5 bg-hazard" />
+            LOCKED
+          </span>
+        </div>
+        <Card className="w-full">
+          <CardHeader className="border-b-2 border-edge/20 pb-4">
+            <CardTitle>{t("activation.title")}</CardTitle>
+            <CardDescription>{t("activation.description")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void submit()
+              }}
+            >
+              <Input
+                type="password"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={t("activation.placeholder")}
+                className="font-mono"
+                autoFocus
+                autoComplete="off"
+              />
+              {error && (
+                <p className="flex items-start gap-2 border-l-[3px] border-destructive bg-destructive/10 px-2 py-1.5 text-sm text-destructive">
+                  <span aria-hidden="true" className="font-mono text-xs leading-5">
+                    ERR
+                  </span>
+                  <span>
+                    {error === "invalid" ? t("activation.invalid") : t("activation.networkError")}
+                  </span>
+                </p>
+              )}
+              <Button type="submit" disabled={submitting || !input.trim()}>
+                {submitting ? t("activation.verifying") : t("activation.submit")}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
