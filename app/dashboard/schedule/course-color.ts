@@ -55,6 +55,17 @@ export function buildCourseColorMap(
   return map
 }
 
+export const COURSE_INK_CLASSES = [
+  "border-l-schedule-ink-1",
+  "border-l-schedule-ink-2",
+  "border-l-schedule-ink-3",
+  "border-l-schedule-ink-4",
+  "border-l-schedule-ink-5",
+  "border-l-schedule-ink-6",
+  "border-l-schedule-ink-7",
+  "border-l-schedule-ink-8",
+] as const
+
 export function courseBgClass(
   colorMap: CourseColorMap,
   course: Pick<Course, "code" | "name">
@@ -62,4 +73,14 @@ export function courseBgClass(
   const key = course.code || course.name || ""
   const index = colorMap.get(key) ?? hashIndex(key)
   return COURSE_BG_CLASSES[index]
+}
+
+/** Saturated rail color for the same slot as {@link courseBgClass}. */
+export function courseInkClass(
+  colorMap: CourseColorMap,
+  course: Pick<Course, "code" | "name">
+): string {
+  const key = course.code || course.name || ""
+  const index = colorMap.get(key) ?? hashIndex(key)
+  return COURSE_INK_CLASSES[index]
 }

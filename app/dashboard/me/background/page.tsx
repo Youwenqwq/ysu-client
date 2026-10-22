@@ -117,8 +117,6 @@ export default function BackgroundSettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold">{t("app.backgroundSettings")}</h1>
-
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t("app.backgroundUpload")}</CardTitle>
@@ -135,7 +133,7 @@ export default function BackgroundSettingsPage() {
             {backgroundUrl ? (
               <div className="flex items-center gap-4">
                 <div
-                  className="size-20 rounded-lg border bg-cover bg-center"
+                  className="size-20 rounded-none border bg-cover bg-center"
                   style={{ backgroundImage: `url(${backgroundUrl})` }}
                 />
                 <div className="flex flex-col gap-2">
@@ -153,7 +151,7 @@ export default function BackgroundSettingsPage() {
               <button
                 type="button"
                 onClick={handleSelectImage}
-                className="flex h-32 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/50 transition-colors hover:bg-muted"
+                className="flex h-32 w-full flex-col items-center justify-center gap-2 rounded-none border-2 border-dashed border-edge/30 bg-muted/30 transition-colors hover:bg-muted"
               >
                 <ImagePlus className="size-8 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
@@ -175,6 +173,7 @@ export default function BackgroundSettingsPage() {
               <FieldLabel>{t("app.backgroundStyle")}</FieldLabel>
               <ToggleGroup
                 type="single"
+                className="w-fit!"
                 value={localBackgroundStyle}
                 onValueChange={handleBackgroundStyleChange}
                 variant="outline"
@@ -221,6 +220,7 @@ export default function BackgroundSettingsPage() {
               <FieldLabel>{t("app.cardStyle")}</FieldLabel>
               <ToggleGroup
                 type="single"
+                className="w-fit!"
                 value={localCardStyle}
                 onValueChange={handleCardStyleChange}
                 variant="outline"

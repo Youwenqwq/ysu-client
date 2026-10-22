@@ -27,7 +27,7 @@ import {
   periodStartTime,
   type ScheduleBlock,
 } from "./schedule-utils"
-import { courseBgClass, type CourseColorMap } from "./course-color"
+import { courseBgClass, courseInkClass, type CourseColorMap } from "./course-color"
 import { ActivityModal } from "./activity-modal"
 import { SigninModal } from "./signin-modal"
 import { scheduleDate } from "@/lib/academic/schedule-patches"
@@ -193,22 +193,22 @@ export function ScheduleTablet({
             gridTemplateRows,
           }}
         >
-          <div className="border-r border-b border-border" />
+          <div className="border-r-2 border-b border-edge/40" />
 
           {DAYS.map((d, idx) => (
             <div
               key={d}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 border-b border-border py-1.5 text-[10px] font-medium",
-                idx < 6 && "border-r",
+                "flex flex-col items-center justify-center gap-0.5 border-b border-edge/30 py-1.5 font-mono text-[0.65rem] font-medium tracking-wider uppercase",
+                idx < 6 && "border-r border-edge/20",
                 isCurrentWeek && d === currentWeekday
-                  ? "bg-primary/5 text-primary"
+                  ? "bg-brand/10 text-brand [box-shadow:inset_0_-2px_0_0_var(--brand)]"
                   : "text-muted-foreground"
               )}
             >
               <ScheduleDayLabel week={selectedWeek} day={d} />
               {weekDates[d - 1] && (
-                <span className="text-[9px] opacity-70">{weekDates[d - 1]}</span>
+                <span className="hud-data text-[0.6rem] opacity-70">{weekDates[d - 1]}</span>
               )}
               <ScheduleDayHandle week={selectedWeek} day={d} />
             </div>
@@ -220,10 +220,12 @@ export function ScheduleTablet({
             return (
               <div
                 key={p.section}
-                className="flex flex-col items-center justify-center gap-0.5 border-r border-b border-border py-1 text-[9px] leading-tight text-muted-foreground"
+                className="flex flex-col items-center justify-center gap-0.5 border-r-2 border-b border-edge/20 border-r-edge/40 py-1 font-mono text-[0.6rem] leading-tight text-muted-foreground"
                 style={{ gridRow: row, gridColumn: 1 }}
               >
-                <span className="text-xs font-semibold text-foreground">{p.section}</span>
+                <span className="hud-data text-xs font-semibold text-foreground">
+                  {String(p.section).padStart(2, "0")}
+                </span>
                 {periodStartTime(p) && <span>{periodStartTime(p)}</span>}
                 {periodEndTime(p) && <span>{periodEndTime(p)}</span>}
               </div>
@@ -232,7 +234,7 @@ export function ScheduleTablet({
 
           {lunchRow !== null && (
             <div
-              className="flex items-center justify-center border-b border-border bg-muted/40 text-[9px] font-medium text-muted-foreground"
+              className="flex items-center justify-center gap-2 border-b border-edge/20 bg-muted/40 font-mono text-[0.6rem] tracking-[0.2em] text-muted-foreground uppercase"
               style={{ gridRow: lunchRow, gridColumn: "1 / -1" }}
             >
               {t("schedule.lunchBreak")}
@@ -241,7 +243,7 @@ export function ScheduleTablet({
 
           {dinnerRow !== null && (
             <div
-              className="flex items-center justify-center border-b border-border bg-muted/40 text-[9px] font-medium text-muted-foreground"
+              className="flex items-center justify-center gap-2 border-b border-edge/20 bg-muted/40 font-mono text-[0.6rem] tracking-[0.2em] text-muted-foreground uppercase"
               style={{ gridRow: dinnerRow, gridColumn: "1 / -1" }}
             >
               {t("schedule.dinnerBreak")}
@@ -258,9 +260,9 @@ export function ScheduleTablet({
                   data-schedule-date={dateForDay(d)}
                   data-schedule-section={p.section}
                   className={cn(
-                    "border-b border-border",
-                    d < 7 && "border-r",
-                    isCurrentWeek && d === currentWeekday && "bg-primary/5"
+                    "border-b border-edge/15",
+                    d < 7 && "border-r border-edge/15",
+                    isCurrentWeek && d === currentWeekday && "bg-brand/[0.06]"
                   )}
                   style={{ gridRow: row, gridColumn: d + 1 }}
                 />
@@ -279,20 +281,20 @@ export function ScheduleTablet({
                     editor.enabled ? scheduleOccurrence(c)?.occurrenceId : undefined
                   }
                   className={cn(
-                    "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1.5 text-left transition-opacity active:opacity-60",
-                    courseBgClass(colorMap, c),
+                    "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-none border-y border-r border-l-[3px] border-y-edge/30 border-r-edge/30 p-1.5 text-left transition-opacity active:opacity-60",
+                    cn(courseBgClass(colorMap, c), courseInkClass(colorMap, c)),
                     courseHasScheduleTrace(c, editor.traces) && "pb-7",
-                    isBlockCurrent(block) && "ring-1 ring-primary"
+                    isBlockCurrent(block) && "outline-2 outline-offset-[-2px] outline-edge"
                   )}
                   style={blockStyle(block)}
                   onClick={() => openCourse(c)}
                 >
-                  <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">
+                  <span className="line-clamp-3 text-[0.72rem] leading-tight font-medium text-foreground">
                     <SchedulePatchedLabel course={c} />
                     {c.name}
                   </span>
                   {c.classroom && (
-                    <span className="line-clamp-1 text-[9px] leading-tight text-foreground/70">
+                    <span className="line-clamp-1 font-mono text-[0.58rem] leading-tight text-foreground/70">
                       {c.classroom}
                     </span>
                   )}
@@ -308,7 +310,7 @@ export function ScheduleTablet({
               <button
                 key={`block-${idx}`}
                 className={cn(
-                  "relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60",
+                  "relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-none border-2 border-dashed border-edge/40 bg-accent p-1 text-center transition-opacity active:opacity-60",
                   block.courses.some((course) => courseHasScheduleTrace(course, editor.traces)) &&
                     "pb-7"
                 )}
@@ -334,14 +336,14 @@ export function ScheduleTablet({
             <button
               key={`exam-${idx}`}
               type="button"
-              className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md border border-amber-500/50 bg-amber-500/15 p-1.5 text-left transition-opacity active:opacity-60"
+              className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-none border-y border-r border-l-[3px] border-hazard/50 border-l-hazard bg-hazard/10 p-1.5 text-left transition-opacity active:opacity-60"
               style={blockStyle(block)}
               onClick={(e) => {
                 e.currentTarget.blur()
                 setExamDialog(block)
               }}
             >
-              <span className="line-clamp-1 text-[9px] font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
+              <span className="line-clamp-1 text-[9px] font-semibold tracking-[0.12em] text-hazard uppercase">
                 {t("schedule.examTag")}
               </span>
               <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">

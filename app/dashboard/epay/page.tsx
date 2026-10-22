@@ -4,6 +4,7 @@ import { useCallback, useMemo } from "react"
 import useSWR from "swr"
 import { RefreshCw, Wallet } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { ErrorState } from "@/components/academic/list-state"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -74,8 +75,8 @@ export default function EpayPage() {
     (hasHydrated && !!username && !credential)
   const error = queryError
     ? noAuth
-      ? t("epay.ssoUnavailable")
-      : t("epay.loadFailed", { message: t("epay.errorGeneric") })
+      ? { title: t("epay.ssoUnavailable") }
+      : { title: t("epay.loadFailedTitle"), detail: queryError.message || undefined }
     : null
   const load = useCallback(() => {
     if (canQuery) void mutate().catch(() => undefined)
@@ -148,17 +149,15 @@ export default function EpayPage() {
   if (!records) {
     return (
       <div className="p-4">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Wallet />
-            </EmptyMedia>
-            <EmptyTitle>{error || t("epay.retry")}</EmptyTitle>
-          </EmptyHeader>
+        <ErrorState
+          title={error?.title || t("epay.retry")}
+          detail={error?.detail}
+          icon={<Wallet />}
+        >
           <Button variant="outline" onClick={() => void load()} disabled={loading}>
             {t("epay.retry")}
           </Button>
-        </Empty>
+        </ErrorState>
       </div>
     )
   }
@@ -167,7 +166,7 @@ export default function EpayPage() {
     <div className="flex flex-col gap-4 p-4">
       <div className="hidden items-center justify-end gap-3 sm:flex">
         {updatedAt ? (
-          <span className="text-xs text-muted-foreground">
+          <span className="font-mono text-[0.65rem] tracking-wide text-muted-foreground">
             {t("epay.updatedAt", {
               time: updatedAt.toLocaleTimeString([], {
                 hour: "2-digit",
@@ -189,15 +188,22 @@ export default function EpayPage() {
       </div>
       {error && (
         <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>
+            <span className="font-semibold">{error.title}</span>
+            {error.detail && (
+              <span className="mt-1 block font-mono text-xs break-words opacity-80">
+                {error.detail}
+              </span>
+            )}
+          </AlertDescription>
         </Alert>
       )}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
             {t("epay.unpaidTitle")}
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {t("epay.unpaidCount", { count: unpaidCount })}
+            <span className="ml-2 font-mono text-sm font-normal text-muted-foreground">
+              [{t("epay.unpaidCount", { count: unpaidCount })}]
             </span>
           </CardTitle>
         </CardHeader>
@@ -207,21 +213,26 @@ export default function EpayPage() {
           ) : unpaidCount > 0 ? (
             <div className="flex flex-col gap-3">
               {unpaid.map((b, i) => (
-                <div key={`${b.id}-${i}`} className="flex items-start justify-between gap-3">
+                <div
+                  key={`${b.id}-${i}`}
+                  className="flex items-start justify-between gap-3 border-l-[3px] border-l-destructive bg-destructive/5 px-3 py-2"
+                >
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium break-words">{b.payName}</p>
-                    <p className="text-xs text-muted-foreground">{b.chargeYear}</p>
+                    <p className="hud-data text-[0.65rem] text-muted-foreground">{b.chargeYear}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 pt-0.5">
                     <Badge variant="destructive">{t("epay.statusUnpaid")}</Badge>
-                    <span className="text-sm font-semibold text-destructive">¥{b.amountN}</span>
+                    <span className="hud-data text-sm font-semibold text-destructive">
+                      ¥{b.amountN}
+                    </span>
                   </div>
                 </div>
               ))}
               <Separator />
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{t("epay.unpaidTotal")}</span>
-                <span className="text-base font-bold text-destructive">
+              <div className="flex items-center justify-between border-t-2 border-edge pt-2">
+                <span className="hud-label">{t("epay.unpaidTotal")}</span>
+                <span className="hud-data text-base font-bold text-destructive">
                   ¥{unpaidTotal.toFixed(2)}
                 </span>
               </div>
@@ -238,9 +249,12 @@ export default function EpayPage() {
           <CardContent>
             <div className="flex flex-col gap-2">
               {paid.map((b, i) => (
-                <div key={`${b.id}-${i}`} className="flex items-start justify-between gap-3">
+                <div
+                  key={`${b.id}-${i}`}
+                  className="flex items-start justify-between gap-3 border-b border-edge/20 pb-2 last:border-b-0 last:pb-0"
+                >
                   <p className="text-sm break-words">{b.payName}</p>
-                  <span className="shrink-0 text-sm text-muted-foreground">
+                  <span className="hud-data shrink-0 text-[0.7rem] text-muted-foreground">
                     {t("epay.statusPaid")} · ¥{b.amountN}
                   </span>
                 </div>

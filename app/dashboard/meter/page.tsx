@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { AirVent, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { ErrorState } from "@/components/academic/list-state"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -21,7 +22,7 @@ export default function MeterPage() {
   const username = useAuthStore((s) => s.username)
 
   const [data, setData] = useState<MeterData | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ title: string; detail?: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
 
@@ -34,15 +35,16 @@ export default function MeterPage() {
       setError(null)
       setUpdatedAt(new Date())
     } catch (e) {
-      const message =
+      const failure =
         e instanceof MeterError && e.message === "NOT_BOUND"
-          ? t("meter.notBound")
-          : t("meter.loadFailed", {
-              message: e instanceof Error ? e.message : String(e),
-            })
+          ? { title: t("meter.notBound") }
+          : {
+              title: t("meter.loadFailedTitle"),
+              detail: e instanceof Error ? e.message : String(e),
+            }
       // 已有数据时刷新失败不顶掉旧数据
-      if (data) toast.error(message)
-      else setError(message)
+      if (data) toast.error(failure.detail ? `${failure.title} · ${failure.detail}` : failure.title)
+      else setError(failure)
     } finally {
       setLoading(false)
     }
@@ -95,17 +97,15 @@ export default function MeterPage() {
   if (!data) {
     return (
       <div className="p-4">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <AirVent />
-            </EmptyMedia>
-            <EmptyTitle>{error}</EmptyTitle>
-          </EmptyHeader>
+        <ErrorState
+          title={error?.title ?? t("meter.loadFailedTitle")}
+          detail={error?.detail}
+          icon={<AirVent />}
+        >
           <Button variant="outline" onClick={() => void load()}>
             {t("meter.retry")}
           </Button>
-        </Empty>
+        </ErrorState>
       </div>
     )
   }
@@ -238,8 +238,8 @@ export default function MeterPage() {
                       use: String(d.use),
                     })}
                     className={cn(
-                      "min-w-1 flex-1 rounded-sm transition-colors",
-                      d.date === today ? "bg-primary" : "bg-primary/25 hover:bg-primary/50"
+                      "min-w-1 flex-1 rounded-none transition-colors",
+                      d.date === today ? "bg-brand" : "bg-brand/25 hover:bg-brand/50"
                     )}
                     style={{
                       height: `${maxDaily > 0 ? Math.max(3, (d.use / maxDaily) * 100) : 3}%`,
@@ -276,7 +276,7 @@ export default function MeterPage() {
                       <span className="text-xs text-muted-foreground tabular-nums">{r.time}</span>
                     </div>
                     <div className="ml-auto flex shrink-0 items-baseline gap-2">
-                      <span className="font-semibold text-primary tabular-nums">
+                      <span className="hud-data font-semibold text-brand">
                         +{r.amount} {t("meter.unit")}
                       </span>
                       {r.fare > 0 ? (

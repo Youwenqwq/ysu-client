@@ -1023,7 +1023,7 @@ export async function authorize(
       timeoutMs,
     })
   } catch (e) {
-    throw new CASProtocolError(`authorize redirect chain failed: ${(e as Error).message}`)
+    throw new CASProtocolError(`CAS authorize failed: ${(e as Error).message}`)
   }
 
   if (source !== casJar) {
@@ -1164,7 +1164,7 @@ async function classifyStep1Response(resp: HttpResponse, username: string): Prom
         timeoutMs,
       })
     } catch (e) {
-      throw new CASProtocolError(`failed to follow redirect: ${(e as Error).message}`)
+      throw new CASProtocolError(`CAS redirect failed: ${(e as Error).message}`)
     }
 
     if (follow.url.includes(casUrls.defaultLoginService) || follow.url.includes("ticket=")) {

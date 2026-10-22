@@ -171,7 +171,7 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
             <div className="flex flex-col gap-4">
               {alreadySigned && status && (
                 <div className="flex flex-col items-center gap-3 py-4">
-                  <CheckCircle2 className="size-12 text-green-500" />
+                  <CheckCircle2 className="size-12 text-brand" />
                   <div className="text-center">
                     <p className="text-lg font-semibold">{t("activity.alreadySigned")}</p>
                     {status.signOrder > 0 && status.signOrder !== 999999 && (
@@ -226,9 +226,9 @@ export function SigninModal({ activityId, signinType, open, onOpenChange }: Prop
                           <div
                             key={i}
                             className={cn(
-                              "flex size-12 items-center justify-center rounded-lg border-2 text-xl font-bold transition-colors",
+                              "flex size-12 items-center justify-center rounded-none border-2 text-xl font-bold transition-colors",
                               code.length > i
-                                ? "border-primary bg-primary/5 text-primary"
+                                ? "border-brand bg-brand/10 text-brand"
                                 : "border-muted bg-muted/30 text-muted-foreground"
                             )}
                           >
@@ -303,7 +303,7 @@ function SigninResult({
     <div className="flex flex-col items-center gap-4 py-4">
       {result.success ? (
         <>
-          <CheckCircle2 className="size-14 text-green-500" />
+          <CheckCircle2 className="size-14 text-brand" />
           <div className="text-center">
             <p className="text-lg font-semibold">{t("activity.signinSuccess")}</p>
             {result.rank && result.rank !== 999999 && (

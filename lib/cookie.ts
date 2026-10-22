@@ -399,6 +399,33 @@ function stripUrlFragment(url: string): string {
   }
 }
 
+/**
+ * 把代理失败的响应体压成一行可读文案。
+ *
+ * EdgeOne / 上游网关出错时返回的是整页 HTML 错误页（501、404 等），
+ * 原文直接进 toast 或空状态会把整张页面糊满标签。这里去标签、折叠空白、
+ * 截断到 160 字符，保留状态码便于排查。
+ */
+export function describeProxyFailure(status: number, detail: string): string {
+  const text = detail
+    .replace(/<!doctype[^>]*>/gi, " ")
+    .replace(/<head[\s\S]*?<\/head>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim()
+  if (!text) return `HTTP ${status}`
+  const clipped = text.length > 160 ? `${text.slice(0, 160)}…` : text
+  return `HTTP ${status} · ${clipped}`
+}
+
 async function proxyHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
   const headers = new Headers()
   for (const [k, v] of Object.entries(req.headers ?? {})) {
@@ -463,7 +490,7 @@ async function proxyHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<Ht
     if (response.status === 403 && detail.includes("ACTIVATION_REQUIRED")) {
       useActivationStore.getState().clearToken()
     }
-    throw new Error(`proxy request failed: HTTP ${response.status} ${detail}`)
+    throw new Error(describeProxyFailure(response.status, detail))
   }
 
   // 上游 Set-Cookie（base64(JSON) 分片）回装 jar；域名归属按上游 URL 解析

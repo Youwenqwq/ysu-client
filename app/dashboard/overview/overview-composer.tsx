@@ -216,7 +216,7 @@ function EditableRegion({
 
   return (
     <section className="flex flex-col gap-3" aria-labelledby={`${contextId}-title`}>
-      <h2 id={`${contextId}-title`} className="text-sm font-medium">
+      <h2 id={`${contextId}-title`} className="hud-label px-1">
         {t(`overviewLayout.${region}`)}
       </h2>
       <DndContext
@@ -296,7 +296,7 @@ function AddLibrary({
             className="flex flex-col gap-3"
             aria-label={t(`overviewLayout.${region}`)}
           >
-            <h3 className="text-sm font-medium">{t(`overviewLayout.${region}`)}</h3>
+            <h3 className="hud-label">{t(`overviewLayout.${region}`)}</h3>
             {items.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("overviewLayout.allAdded")}</p>
             ) : (

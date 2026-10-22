@@ -286,7 +286,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!hasHydrated) {
     return (
       <div className="flex min-h-svh items-center justify-center">
-        <div className="text-muted-foreground" suppressHydrationWarning>
+        <div
+          className="hud-label flex items-center gap-2 border-2 border-edge bg-card px-4 py-2 shadow-xs"
+          suppressHydrationWarning
+        >
+          <span className="size-1.5 animate-pulse bg-brand" />
           {t("app.updating")}
         </div>
       </div>
@@ -314,26 +318,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         <SidebarResizeHandle />
         <SidebarHeader>
-          <div className="flex items-center gap-2 px-2 py-3 transition-all duration-200 ease-linear group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-            <GraduationCap className="size-6 shrink-0 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]" />
-            <span className="font-semibold group-data-[collapsible=icon]:hidden">
-              {t("app.name")}
+          <div className="flex items-center gap-2.5 border-b-2 border-edge/25 px-2 py-3 transition-all duration-200 ease-linear group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+            <span className="flex size-8 shrink-0 items-center justify-center border-2 border-edge bg-brand text-brand-foreground">
+              <GraduationCap className="size-4.5" strokeWidth={2.4} />
+            </span>
+            <span className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
+              <span className="truncate font-heading text-sm leading-tight font-bold tracking-tight">
+                {t("app.name")}
+              </span>
+              <span className="hud-label leading-tight">RHODES TERMINAL</span>
             </span>
           </div>
         </SidebarHeader>
         <SidebarContent className="gap-0">
           {navGroups.map((group) => (
-            <SidebarGroup key={group.label}>
+            <SidebarGroup key={group.label} className="py-1.5">
               <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarMenu className="gap-1.5">
+                <SidebarMenu className="gap-0.5">
                   {group.items.map((item) => (
                     <SidebarMenuItem key={item.url}>
                       <SidebarMenuButton
                         asChild
                         isActive={pathname === item.url}
                         tooltip={item.title}
-                        className="py-3 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:translate-x-1 active:scale-[0.98] data-[active=true]:shadow-sm [&_svg]:transition-transform [&_svg]:duration-300 hover:[&_svg]:scale-110 data-[active=true]:[&_svg]:scale-110"
+                        className="py-2 [&_svg]:transition-transform [&_svg]:duration-150 hover:[&_svg]:scale-105 data-[active=true]:[&_svg]:scale-105"
                       >
                         <Link href={item.url}>
                           <item.icon />
@@ -346,16 +355,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </SidebarGroupContent>
             </SidebarGroup>
           ))}
-          <SidebarGroup className="mt-auto">
+          <SidebarGroup className="mt-auto py-1.5">
             <SidebarSeparator />
             <SidebarGroupContent>
-              <SidebarMenu className="gap-1.5">
+              <SidebarMenu className="gap-0.5">
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
                     isActive={pathname === "/dashboard/me" || pathname.startsWith("/dashboard/me/")}
                     tooltip={t("app.me")}
-                    className="py-3 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:translate-x-1 active:scale-[0.98] data-[active=true]:shadow-sm [&_svg]:transition-transform [&_svg]:duration-300 hover:[&_svg]:scale-110 data-[active=true]:[&_svg]:scale-110"
+                    className="py-2 [&_svg]:transition-transform [&_svg]:duration-150 hover:[&_svg]:scale-105 data-[active=true]:[&_svg]:scale-105"
                   >
                     <Link href="/dashboard/me">
                       <User />
@@ -370,7 +379,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <SidebarFooter>
           <button
             onClick={() => router.push("/dashboard/me/about")}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="flex items-center gap-2 rounded-none px-2 py-1.5 font-mono text-[0.65rem] tracking-wide text-muted-foreground transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             <Info className="size-3.5 shrink-0" />
             <span className="group-data-[collapsible=icon]:hidden">
@@ -405,12 +414,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </AlertTitle>
           </Alert>
         )}
-        <header className="hidden items-center justify-between gap-4 border-b px-6 py-4 md:flex">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-20 hidden items-center justify-between gap-4 border-b-2 border-edge bg-background/95 px-6 py-3 backdrop-blur md:flex">
+          <div className="flex min-w-0 items-center gap-3">
             <SidebarTrigger aria-label={t("app.toggleSidebar")} title={t("app.toggleSidebar")} />
-            <h1 className="animate-in text-lg font-semibold duration-300 fade-in slide-in-from-left-2">
-              {pageTitle}
-            </h1>
+            <span aria-hidden="true" className="h-5 w-px bg-edge/30" />
+            <div className="flex min-w-0 flex-col">
+              <span className="hud-label leading-none">YSU // TERMINAL</span>
+              <h1 className="animate-in truncate font-heading text-lg leading-tight font-semibold tracking-tight duration-300 fade-in slide-in-from-left-2">
+                {pageTitle}
+              </h1>
+            </div>
             <RefreshIndicator />
             <StaleIndicator />
           </div>
@@ -425,7 +438,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative size-8 rounded-full">
+                <Button variant="ghost" size="icon" className="relative">
                   <Avatar className="size-8">
                     {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
                     <AvatarFallback className="text-xs">
@@ -453,7 +466,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div
           key={pathname}
           className={cn(
-            "flex flex-1 flex-col md:p-8",
+            "flex flex-1 flex-col md:p-6 lg:p-8",
             mobileFullscreen
               ? "min-h-0 overflow-hidden"
               : "animate-in p-4 duration-500 fade-in slide-in-from-bottom-2"

@@ -31,30 +31,30 @@ function letterOf(item: PendingGrade): GradeLetter {
 
 const TIER_STYLE: Record<GachaTier, { ring: string; text: string; aura: string }> = {
   aplus: {
-    ring: "",
-    text: "",
-    aura: "bg-fuchsia-500/50",
+    ring: "border-2 border-rarity-5",
+    text: "text-rarity-5",
+    aura: "bg-rarity-4/50",
   },
   a: {
-    ring: "border-amber-400/80",
-    text: "text-amber-400",
-    aura: "bg-amber-400/50",
+    ring: "border-2 border-rarity-5/80",
+    text: "text-rarity-5",
+    aura: "bg-rarity-5/45",
   },
   b: {
-    ring: "border-violet-400/80",
-    text: "text-violet-400",
-    aura: "bg-violet-400/45",
+    ring: "border-2 border-rarity-4/80",
+    text: "text-rarity-4",
+    aura: "bg-rarity-4/40",
   },
   c: {
-    ring: "border-sky-400/70",
-    text: "text-sky-400",
-    aura: "bg-sky-400/40",
+    ring: "border-2 border-rarity-3/80",
+    text: "text-rarity-3",
+    aura: "bg-rarity-3/35",
   },
-  d: { ring: "border-zinc-500/40", text: "text-zinc-400", aura: "" },
+  d: { ring: "border-2 border-rarity-1/50", text: "text-rarity-1", aura: "" },
   f: {
-    ring: "border-red-500/70",
-    text: "text-red-400",
-    aura: "bg-red-500/40",
+    ring: "border-2 border-destructive/70",
+    text: "text-destructive",
+    aura: "bg-destructive/35",
   },
 }
 
@@ -127,7 +127,7 @@ function GachaCard({
         <div
           aria-hidden
           className={cn(
-            "absolute inset-0 rounded-xl blur-2xl transition-opacity duration-700",
+            "absolute inset-0 rounded-none blur-2xl transition-opacity duration-700",
             style.aura,
             flipped ? "opacity-100" : "opacity-0"
           )}
@@ -139,22 +139,22 @@ function GachaCard({
         transition={FLIP_SPRING}
       >
         {/* 卡背 */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl border border-white/15 bg-[radial-gradient(circle_at_50%_30%,oklch(0.32_0.02_260),oklch(0.18_0.02_260))] [backface-visibility:hidden]">
-          <Sparkles className="size-6 text-white/40" />
-          <span className="text-4xl font-bold text-white/70">?</span>
-          <span className="text-xs text-white/50">{t("gacha.tapToReveal")}</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-none border-2 border-edge/40 bg-[radial-gradient(circle_at_50%_30%,var(--card),var(--background))] [backface-visibility:hidden]">
+          <Sparkles className="size-6 text-muted-foreground" />
+          <span className="hud-data text-4xl font-bold text-muted-foreground">?</span>
+          <span className="hud-label">{t("gacha.tapToReveal")}</span>
         </div>
         {/* 卡面:A+ 用旋转色相的彩虹描边,其余用静态色环 */}
         <div
           className={cn(
-            "absolute inset-0 [transform:rotateY(180deg)] overflow-hidden rounded-xl bg-card [backface-visibility:hidden]",
+            "absolute inset-0 [transform:rotateY(180deg)] overflow-hidden rounded-none bg-card [backface-visibility:hidden]",
             tier === "aplus" ? "p-[2px]" : cn("border-2", style.ring)
           )}
         >
           {tier === "aplus" && (
             <motion.div
               aria-hidden
-              className="absolute inset-0 rounded-xl bg-[conic-gradient(from_0deg,#f87171,#fbbf24,#34d399,#60a5fa,#a78bfa,#f472b6,#f87171)]"
+              className="absolute inset-0 rounded-none bg-[conic-gradient(from_0deg,var(--rarity-5),var(--hazard),var(--brand),var(--rarity-2),var(--rarity-4),var(--rarity-5))]"
               animate={{ filter: ["hue-rotate(0deg)", "hue-rotate(360deg)"] }}
               transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
             />
@@ -162,18 +162,18 @@ function GachaCard({
           <div
             className={cn(
               "relative flex h-full w-full flex-col items-center justify-center gap-1.5 bg-card px-3 text-center",
-              tier === "aplus" && "rounded-[12px]"
+              tier === "aplus" && "rounded-none"
             )}
           >
             <span
               className={cn(
                 "flex items-center gap-0.5 text-sm font-bold tracking-[0.2em]",
                 tier === "aplus"
-                  ? "bg-gradient-to-r from-amber-300 via-fuchsia-400 to-sky-400 bg-clip-text text-transparent"
+                  ? "bg-gradient-to-r from-rarity-5 via-rarity-4 to-brand bg-clip-text text-transparent"
                   : style.text
               )}
             >
-              {tier === "aplus" && <Sparkles className="size-3.5 text-fuchsia-400" />}
+              {tier === "aplus" && <Sparkles className="size-3.5 text-rarity-5" />}
               {letter}
             </span>
             <span className="line-clamp-2 text-sm leading-snug font-medium">{item.courseName}</span>

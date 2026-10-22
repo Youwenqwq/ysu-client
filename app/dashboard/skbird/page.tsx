@@ -318,7 +318,7 @@ export default function SkbirdPage() {
         <Link href="/dashboard/skbird/messages">
           <Bell className="size-4" />
           {unread > 0 ? (
-            <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-destructive" />
+            <span className="absolute -top-0.5 -right-0.5 size-2 border border-background bg-destructive" />
           ) : null}
         </Link>
       </Button>
@@ -468,7 +468,7 @@ export default function SkbirdPage() {
             <Link href="/dashboard/skbird/messages">
               <Bell className="size-4" />
               {unread > 0 ? (
-                <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-destructive" />
+                <span className="absolute -top-0.5 -right-0.5 size-2 border border-background bg-destructive" />
               ) : null}
             </Link>
           </Button>

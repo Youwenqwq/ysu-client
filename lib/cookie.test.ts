@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { SimpleCookieJar, fetchWithJar } from "@/lib/cookie"
+import { SimpleCookieJar, describeProxyFailure, fetchWithJar } from "@/lib/cookie"
 
 describe("SimpleCookieJar cookie matching", () => {
   it("发送 Path 以 / 结尾的 cookie 到嵌套路径（RFC 6265 前缀匹配）", async () => {
@@ -89,5 +89,33 @@ describe("Web 代理传输", () => {
     const proxyUrl = new URL(String(fetchMock.mock.calls[0]![0]), "https://ysu.welain.com")
     expect(proxyUrl.pathname).toBe("/api/proxy")
     expect(proxyUrl.searchParams.get("url")).toBe("https://jwxt.ysu.edu.cn/jwmobile/index")
+  })
+})
+
+describe("代理失败文案", () => {
+  it("把上游 HTML 错误页压成单行，不透出标签", () => {
+    const html =
+      '<!DOCTYPE HTML><html lang="en"><head><meta charset="utf-8"><style type="text/css">.root{color:red}</style><title>Error response</title></head><body><h1>Error response</h1><p>Error code: 501</p><p>Message: Unsupported method (POST).</p><p>Error code explanation: 501 - Server does not support this operation.</p></body></html>'
+    const text = describeProxyFailure(501, html)
+    expect(text).toBe(
+      "HTTP 501 · Error response Error code: 501 Message: Unsupported method (POST). Error code explanation: 501 - Server does not support this operation."
+    )
+    expect(text).not.toContain("<")
+    expect(text).not.toContain("color:red")
+    expect(text).not.toContain("Error response Error response")
+  })
+
+  it("空响应体只保留状态码", () => {
+    expect(describeProxyFailure(502, "")).toBe("HTTP 502")
+    expect(describeProxyFailure(502, "   \n  ")).toBe("HTTP 502")
+  })
+
+  it("超长正文截断到 160 字符并加省略号", () => {
+    const text = describeProxyFailure(500, "x".repeat(400))
+    expect(text).toBe(`HTTP 500 · ${"x".repeat(160)}…`)
+  })
+
+  it("反转义 HTML 实体", () => {
+    expect(describeProxyFailure(404, "<p>a &amp; b &lt;c&gt;</p>")).toBe("HTTP 404 · a & b <c>")
   })
 })

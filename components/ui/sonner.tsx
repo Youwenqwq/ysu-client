@@ -37,14 +37,16 @@ const Toaster = ({ ...props }: ToasterProps) => {
         {
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
+          "--normal-border": "var(--edge)",
+          "--border-radius": "0px",
           ...(isMobile ? { "--width": "min(20rem, calc(100vw - 2rem))" } : {}),
         } as React.CSSProperties
       }
       toastOptions={{
         classNames: {
-          toast: isMobile ? "cn-toast cn-toast-mobile" : "cn-toast",
+          toast: isMobile
+            ? "cn-toast cn-toast-mobile rounded-none! border-2! border-edge! shadow-md!"
+            : "cn-toast rounded-none! border-2! border-edge! shadow-md!",
         },
       }}
       {...props}

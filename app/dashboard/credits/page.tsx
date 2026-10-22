@@ -10,7 +10,9 @@ import { Spinner } from "@/components/ui/spinner"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   EmptyState as SharedEmptyState,
+  InlineError,
   LoadingCards,
+  QueryError,
   useErrorToast,
   ValidatingList,
 } from "@/components/academic/list-state"
@@ -40,9 +42,10 @@ function DeclarationsPanel() {
   const { t } = useTranslation()
   const query = useCreditDeclarations()
   const declarations = query.data ?? []
-  useErrorToast(query.error)
+  useErrorToast(query.error, declarations.length > 0)
 
   if (query.isLoading && declarations.length === 0) return <LoadingCards />
+  if (query.error && declarations.length === 0) return <QueryError error={query.error} />
   if (declarations.length === 0) return <SharedEmptyState title={t("credits.noDeclarations")} />
 
   return (
@@ -139,7 +142,7 @@ function RecordGroup({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground transition-colors active:bg-muted/60"
+        className="flex items-center gap-2 rounded-none px-1 py-1 text-sm font-medium text-muted-foreground transition-colors active:bg-muted/60"
       >
         {open ? (
           <ChevronDown className="size-4 shrink-0" />
@@ -174,8 +177,8 @@ function RecordsPanel() {
   )
   const records = recordsQuery.data ?? []
 
-  useErrorToast(batchesQuery.error)
-  useErrorToast(recordsQuery.error)
+  useErrorToast(batchesQuery.error, batches.length > 0)
+  useErrorToast(recordsQuery.error, records.length > 0)
 
   const CURRENT = "__current"
   const chips = [
@@ -220,7 +223,9 @@ function RecordsPanel() {
         />
       </FilterDrawer>
 
-      {(recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0 ? (
+      {recordsQuery.error && records.length === 0 ? (
+        <QueryError error={recordsQuery.error} />
+      ) : (recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0 ? (
         <LoadingCards />
       ) : records.length === 0 ? (
         <SharedEmptyState title={t("credits.noRecords")} />
@@ -275,9 +280,8 @@ function CatalogPanel<T>({
   const [pageIndex, setPageIndex] = useState(1)
 
   const query = useCatalogQuery({ keyword: search, pageIndex })
-  useErrorToast(query.error)
-
   const items = query.data ? mapItems(query.data.items) : []
+  useErrorToast(query.error, items.length > 0)
   const totalPages = query.data?.totalPages ?? 1
   const current = query.data?.pageIndex ?? pageIndex
   const loading = query.isLoading || query.isValidating
@@ -305,7 +309,9 @@ function CatalogPanel<T>({
         </Button>
       </div>
 
-      {loading && items.length === 0 ? (
+      {query.error && items.length === 0 ? (
+        <QueryError error={query.error} />
+      ) : loading && items.length === 0 ? (
         <LoadingCards />
       ) : items.length === 0 ? (
         <SharedEmptyState title={t(noDataKey)} />
@@ -361,7 +367,7 @@ export default function CreditsPage() {
 
   const summaryQuery = useCreditSummary()
   const summary = summaryQuery.data
-  useErrorToast(summaryQuery.error)
+  useErrorToast(summaryQuery.error, !!summary)
 
   return (
     <div className="flex flex-col gap-6">
@@ -372,6 +378,8 @@ export default function CreditsPage() {
               <Skeleton className="h-12 w-24" />
               <Skeleton className="h-12 w-24" />
             </div>
+          ) : summaryQuery.error && !summary ? (
+            <InlineError error={summaryQuery.error} />
           ) : summary ? (
             <div className="flex gap-8">
               <div className="flex flex-col">

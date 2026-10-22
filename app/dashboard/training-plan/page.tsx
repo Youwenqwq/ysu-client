@@ -64,9 +64,9 @@ function CompletionHero({ data }: { data: AcademicCompletion }) {
       </div>
 
       {pct !== null && (
-        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div className="h-2 w-full overflow-hidden border border-edge/30 bg-muted">
           <div
-            className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+            className="hud-meter h-full bg-brand transition-[width] duration-700 ease-out"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -340,7 +340,7 @@ export default function TrainingPlanPage() {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-x-auto rounded-none border">
             <Table>
               <TableHeader>
                 <TableRow>

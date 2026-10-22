@@ -105,11 +105,11 @@ export default function MakeupExamsPage() {
             onChange={setSelectedBatchId}
           />
           {selectedBatch && (
-            <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+            <div className="flex flex-col gap-1.5 border-l-[3px] border-l-brand/60 bg-brand/5 px-3 py-2 text-sm text-muted-foreground">
               {(selectedBatch.signupStart || selectedBatch.signupEnd) && (
                 <div className="flex items-center gap-2">
                   <Clock className="size-4 shrink-0" />
-                  <span>
+                  <span className="hud-data text-[0.7rem]">
                     {t("makeupExams.signupWindow")}:{" "}
                     {formatTimeRange(selectedBatch.signupStart, selectedBatch.signupEnd)}
                   </span>

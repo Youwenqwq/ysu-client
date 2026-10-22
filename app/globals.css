@@ -4,152 +4,317 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * YSU Terminal × Rhodes Island
+ * A neubrutalist HUD: flat fills, 2px edges, zero-blur offset shadows,
+ * monospaced micro-labels. Light = blueprint paper, dark = terminal.
+ */
+
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: var(--font-sans);
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
-    --color-ring: var(--ring);
-    --color-input: var(--input);
-    --color-border: var(--border);
-    --color-destructive: var(--destructive);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-accent: var(--accent);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-muted: var(--muted);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-secondary: var(--secondary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-primary: var(--primary);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-popover: var(--popover);
-    --color-card-foreground: var(--card-foreground);
-    --color-card: var(--card);
-    --color-foreground: var(--foreground);
-    --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
-    --color-schedule-1: var(--schedule-1);
-    --color-schedule-2: var(--schedule-2);
-    --color-schedule-3: var(--schedule-3);
-    --color-schedule-4: var(--schedule-4);
-    --color-schedule-5: var(--schedule-5);
-    --color-schedule-6: var(--schedule-6);
-    --color-schedule-7: var(--schedule-7);
-    --color-schedule-8: var(--schedule-8);
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans), "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, "SFMono-Regular", monospace;
+  --color-edge: var(--edge);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-hazard: var(--hazard);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --color-schedule-1: var(--schedule-1);
+  --color-schedule-2: var(--schedule-2);
+  --color-schedule-3: var(--schedule-3);
+  --color-schedule-4: var(--schedule-4);
+  --color-schedule-5: var(--schedule-5);
+  --color-schedule-6: var(--schedule-6);
+  --color-schedule-7: var(--schedule-7);
+  --color-schedule-8: var(--schedule-8);
+  --color-schedule-ink-1: var(--schedule-ink-1);
+  --color-schedule-ink-2: var(--schedule-ink-2);
+  --color-schedule-ink-3: var(--schedule-ink-3);
+  --color-schedule-ink-4: var(--schedule-ink-4);
+  --color-schedule-ink-5: var(--schedule-ink-5);
+  --color-schedule-ink-6: var(--schedule-ink-6);
+  --color-schedule-ink-7: var(--schedule-ink-7);
+  --color-schedule-ink-8: var(--schedule-ink-8);
+  /* Rarity ramp, measured from the game's item frames (grey → lime → blue → pink → gold). */
+  --color-rarity-1: var(--rarity-1);
+  --color-rarity-2: var(--rarity-2);
+  --color-rarity-3: var(--rarity-3);
+  --color-rarity-4: var(--rarity-4);
+  --color-rarity-5: var(--rarity-5);
+  /* Hard, zero-blur depth. Overriding the shadow scale makes every
+       existing `shadow-sm|md|lg` usage inherit the HUD behavior. */
+  --shadow-2xs: 1px 1px 0 0 var(--shadow-color);
+  --shadow-xs: 2px 2px 0 0 var(--shadow-color);
+  --shadow-sm: 2px 2px 0 0 var(--shadow-color);
+  --shadow-md: 3px 3px 0 0 var(--shadow-color);
+  --shadow-lg: 5px 5px 0 0 var(--shadow-color);
+  --shadow-xl: 7px 7px 0 0 var(--shadow-color);
+  --shadow-2xl: 10px 10px 0 0 var(--shadow-color);
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-    --schedule-1: oklch(0.88 0.06 148);
-    --schedule-2: oklch(0.94 0.03 153);
-    --schedule-3: oklch(0.95 0.06 99);
-    --schedule-4: oklch(0.93 0.04 60);
-    --schedule-5: oklch(0.88 0.06 11);
-    --schedule-6: oklch(0.88 0.05 308);
-    --schedule-7: oklch(0.88 0.05 254);
-    --schedule-8: oklch(0.88 0.06 241);
+  color-scheme: light;
+  /* Paper, not cream: #f4f4f1 measured from in-game card bodies. */
+  --background: oklch(0.962 0.004 95);
+  --foreground: oklch(0.2221 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2221 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2221 0 0);
+  /* Primary plate = graphite #313131, the game's most load-bearing surface. */
+  --primary: oklch(0.3132 0 0);
+  --primary-foreground: oklch(0.985 0.002 95);
+  --secondary: oklch(0.935 0.003 95);
+  --secondary-foreground: oklch(0.28 0 0);
+  --muted: oklch(0.935 0.003 95);
+  --muted-foreground: oklch(0.4604 0 0);
+  --accent: oklch(0.92 0.012 230);
+  --accent-foreground: oklch(0.24 0.01 240);
+  --destructive: oklch(0.4513 0.1852 29.23);
+  --border: oklch(0.78 0 0);
+  --input: oklch(0.78 0 0);
+  --ring: oklch(0.5334 0.1174 237.54);
+  /* Signal: deep-blue action #0075a8 (active chips, toggles, OK). */
+  --brand: oklch(0.5334 0.1174 237.54);
+  --brand-foreground: oklch(0.99 0 0);
+  --hazard: oklch(0.6867 0.2083 39.46);
+  --edge: oklch(0.2221 0 0);
+  --shadow-color: oklch(0.2221 0 0);
+  --chart-1: oklch(0.5334 0.1174 237.54);
+  --chart-2: oklch(0.7105 0.1291 240.6);
+  --chart-3: oklch(0.8689 0.1526 111.23);
+  --chart-4: oklch(0.8421 0.1496 90);
+  --chart-5: oklch(0.4513 0.1852 29.23);
+  --radius: 0rem;
+  --sidebar: oklch(0.935 0.003 95);
+  --sidebar-foreground: oklch(0.28 0 0);
+  --sidebar-primary: oklch(0.3132 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0.002 95);
+  --sidebar-accent: oklch(0.89 0.014 235);
+  --sidebar-accent-foreground: oklch(0.2221 0 0);
+  --sidebar-border: oklch(0.2221 0 0 / 20%);
+  --sidebar-ring: oklch(0.5334 0.1174 237.54);
+  /* Course fills stay near-paper; the hue lives in the 3px rail (--schedule-ink-N). */
+  --schedule-1: oklch(0.945 0.035 155);
+  --schedule-2: oklch(0.945 0.03 210);
+  --schedule-3: oklch(0.95 0.05 95);
+  --schedule-4: oklch(0.95 0.04 65);
+  --schedule-5: oklch(0.948 0.035 20);
+  --schedule-6: oklch(0.948 0.035 320);
+  --schedule-7: oklch(0.945 0.035 275);
+  --schedule-8: oklch(0.945 0.035 245);
+  --schedule-ink-1: oklch(0.5 0.12 155);
+  --schedule-ink-2: oklch(0.5 0.11 210);
+  --schedule-ink-3: oklch(0.55 0.13 85);
+  --schedule-ink-4: oklch(0.55 0.14 55);
+  --schedule-ink-5: oklch(0.52 0.17 25);
+  --schedule-ink-6: oklch(0.5 0.16 330);
+  --schedule-ink-7: oklch(0.46 0.14 275);
+  --schedule-ink-8: oklch(0.48 0.13 245);
+  --rarity-1: oklch(0.65 0 0);
+  --rarity-2: oklch(0.82 0.16 118);
+  --rarity-3: oklch(0.66 0.13 240);
+  --rarity-4: oklch(0.75 0.09 330);
+  --rarity-5: oklch(0.82 0.15 85);
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
-    --schedule-1: oklch(0.26 0.08 148);
-    --schedule-2: oklch(0.35 0.04 153);
-    --schedule-3: oklch(0.36 0.07 99);
-    --schedule-4: oklch(0.34 0.04 60);
-    --schedule-5: oklch(0.26 0.08 11);
-    --schedule-6: oklch(0.31 0.06 308);
-    --schedule-7: oklch(0.31 0.06 254);
-    --schedule-8: oklch(0.25 0.09 241);
+  color-scheme: dark;
+  /* Canvas #111315, wells #1b1b1b, graphite #313131 — measured. */
+  --background: oklch(0.155 0.006 240);
+  --foreground: oklch(0.925 0.002 220);
+  --card: oklch(0.2221 0 0);
+  --card-foreground: oklch(0.925 0.002 220);
+  --popover: oklch(0.2554 0 0);
+  --popover-foreground: oklch(0.925 0.002 220);
+  --primary: oklch(0.925 0.002 220);
+  --primary-foreground: oklch(0.185 0 0);
+  --secondary: oklch(0.3132 0 0);
+  --secondary-foreground: oklch(0.925 0.002 220);
+  --muted: oklch(0.285 0 0);
+  --muted-foreground: oklch(0.7515 0 0);
+  --accent: oklch(0.33 0.008 235);
+  --accent-foreground: oklch(0.955 0.002 220);
+  --destructive: oklch(0.62 0.19 27);
+  --border: oklch(0.55 0 0);
+  --input: oklch(0.5 0 0);
+  --ring: oklch(0.7985 0.1444 221.77);
+  /* Signal: info cyan #18d1ff, unchanged across themes. */
+  --brand: oklch(0.7985 0.1444 221.77);
+  --brand-foreground: oklch(0.19 0.02 230);
+  --hazard: oklch(0.78 0.17 55);
+  --edge: oklch(0.86 0 0 / 30%);
+  --shadow-color: oklch(0.05 0 0);
+  --chart-1: oklch(0.7985 0.1444 221.77);
+  --chart-2: oklch(0.7105 0.1291 240.6);
+  --chart-3: oklch(0.8689 0.1526 111.23);
+  --chart-4: oklch(0.8421 0.1496 90);
+  --chart-5: oklch(0.62 0.19 27);
+  --radius: 0rem;
+  --sidebar: oklch(0.185 0.002 240);
+  --sidebar-foreground: oklch(0.9 0.002 220);
+  --sidebar-primary: oklch(0.7985 0.1444 221.77);
+  --sidebar-primary-foreground: oklch(0.19 0.02 230);
+  --sidebar-accent: oklch(0.285 0.006 235);
+  --sidebar-accent-foreground: oklch(0.955 0.002 220);
+  --sidebar-border: oklch(0.86 0 0 / 18%);
+  --sidebar-ring: oklch(0.7985 0.1444 221.77);
+  --schedule-1: oklch(0.28 0.04 155);
+  --schedule-2: oklch(0.28 0.035 210);
+  --schedule-3: oklch(0.29 0.045 95);
+  --schedule-4: oklch(0.29 0.04 65);
+  --schedule-5: oklch(0.29 0.04 20);
+  --schedule-6: oklch(0.29 0.04 320);
+  --schedule-7: oklch(0.28 0.04 275);
+  --schedule-8: oklch(0.28 0.04 245);
+  --schedule-ink-1: oklch(0.78 0.15 155);
+  --schedule-ink-2: oklch(0.79 0.12 210);
+  --schedule-ink-3: oklch(0.85 0.15 90);
+  --schedule-ink-4: oklch(0.8 0.15 60);
+  --schedule-ink-5: oklch(0.72 0.17 25);
+  --schedule-ink-6: oklch(0.78 0.15 330);
+  --schedule-ink-7: oklch(0.74 0.14 275);
+  --schedule-ink-8: oklch(0.78 0.13 245);
+  --rarity-1: oklch(0.72 0 0);
+  --rarity-2: oklch(0.86 0.16 118);
+  --rarity-3: oklch(0.74 0.14 240);
+  --rarity-4: oklch(0.82 0.1 330);
+  --rarity-5: oklch(0.86 0.16 85);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
-    }
+    @apply border-border;
+  }
   body {
     @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.015em;
+  }
+  ::selection {
+    background: var(--brand);
+    color: var(--brand-foreground);
+  }
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  /* A faint engineering grid behind everything. Never over content. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -20;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--edge) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--edge) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.035;
+  }
+}
+
+@layer components {
+  /* Mono micro-label: the Rhodes Island way to name a field. */
+  .hud-label {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    line-height: 1.1;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  /* Corner brackets. Drawn with borders so they never clip a shadow. */
+  .hud-corners {
+    position: relative;
+  }
+  .hud-corners::before,
+  .hud-corners::after {
+    content: "";
+    position: absolute;
+    z-index: 10;
+    width: 0.45rem;
+    height: 0.45rem;
+    pointer-events: none;
+    border: 2px solid color-mix(in oklab, var(--brand) 70%, transparent);
+  }
+  .hud-corners::before {
+    top: 2px;
+    left: 2px;
+    border-right: 0;
+    border-bottom: 0;
+  }
+  .hud-corners::after {
+    right: 2px;
+    bottom: 2px;
+    border-top: 0;
+    border-left: 0;
+  }
+  /* Hazard stripe, for alert rails only. */
+  .hud-hatch {
+    background-image: repeating-linear-gradient(-45deg, var(--hazard) 0 4px, transparent 4px 8px);
+  }
+  .hud-scan {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--foreground) 6%, transparent) 0 1px,
+      transparent 1px 3px
+    );
+  }
+  /* Data numerals: tabular, slightly tracked, always the mono face. */
+  .hud-data {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: 0.02em;
+  }
+  /* Segmented meter used by progress + stat bars. */
+  .hud-meter {
+    background-image: repeating-linear-gradient(to right, transparent 0 7px, var(--card) 7px 9px);
+  }
 }
 
 @custom-media --mobile (max-width: 767px);
@@ -178,4 +343,14 @@
 }
 [data-sonner-toaster] .cn-toast-mobile [data-icon] {
   margin-right: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

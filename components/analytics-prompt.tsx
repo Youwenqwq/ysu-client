@@ -42,7 +42,7 @@ export function AnalyticsPrompt({ open, onClose }: AnalyticsPromptProps) {
       <DialogContent>
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <BarChart3 className="size-5 text-primary" />
+            <BarChart3 className="size-5 text-brand" />
             <DialogTitle>{t("analyticsPrompt.title")}</DialogTitle>
           </div>
           <DialogDescription className="pt-2 leading-relaxed">

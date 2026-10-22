@@ -46,7 +46,7 @@ export function SkbirdCommentItem({
           <SkbirdImage
             url={skbirdImageUrl(comment.avatarUrl, { w: 64, h: 64 })}
             alt={comment.nickname}
-            className="mt-0.5 size-7 shrink-0 rounded-full object-cover"
+            className="mt-0.5 size-7 shrink-0 rounded-none object-cover"
           />
         ) : null}
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -64,7 +64,7 @@ export function SkbirdCommentItem({
             onClick={handleLike}
             disabled={pending}
             className={`inline-flex w-fit items-center gap-1 py-0.5 text-xs ${
-              likeHas ? "text-primary" : "text-muted-foreground"
+              likeHas ? "text-brand" : "text-muted-foreground"
             }`}
           >
             <ThumbsUp className="size-3" />

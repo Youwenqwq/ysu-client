@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   EmptyState,
+  InlineError,
   LoadingCards,
+  QueryError,
   useErrorToast,
   ValidatingList,
 } from "@/components/academic/list-state"
@@ -21,10 +23,13 @@ function RecordsPanel() {
   const { t } = useTranslation()
   const recordsQuery = useLaborRecords()
   const records = recordsQuery.data ?? []
-  useErrorToast(recordsQuery.error)
+  useErrorToast(recordsQuery.error, records.length > 0)
 
   if ((recordsQuery.isLoading || recordsQuery.isValidating) && records.length === 0) {
     return <LoadingCards className="h-28" />
+  }
+  if (recordsQuery.error && records.length === 0) {
+    return <QueryError error={recordsQuery.error} />
   }
   if (records.length === 0) {
     return <EmptyState title={t("labor.noRecords")} />
@@ -44,13 +49,13 @@ function RecordsPanel() {
                     </Badge>
                   )}
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="hud-data text-[0.7rem] tracking-wide">
                   {[record.term, record.category].filter(Boolean).join(" · ")}
                 </CardDescription>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
                 {record.hours !== undefined && (
-                  <span className="text-lg font-semibold tabular-nums">
+                  <span className="hud-data text-lg font-semibold">
                     {record.hours}
                     <span className="ml-0.5 text-xs font-normal text-muted-foreground">
                       {t("labor.hoursUnit")}
@@ -73,7 +78,9 @@ function RecordsPanel() {
             {formatTimeRange(record.timeStart, record.timeEnd) && (
               <div className="flex items-center gap-2">
                 <Clock className="size-4 shrink-0 text-muted-foreground" />
-                <span>{formatTimeRange(record.timeStart, record.timeEnd)}</span>
+                <span className="hud-data">
+                  {formatTimeRange(record.timeStart, record.timeEnd)}
+                </span>
               </div>
             )}
           </CardContent>
@@ -87,10 +94,13 @@ function ActivitiesPanel() {
   const { t } = useTranslation()
   const activitiesQuery = useLaborActivities()
   const activities = activitiesQuery.data ?? []
-  useErrorToast(activitiesQuery.error)
+  useErrorToast(activitiesQuery.error, activities.length > 0)
 
   if ((activitiesQuery.isLoading || activitiesQuery.isValidating) && activities.length === 0) {
     return <LoadingCards className="h-28" />
+  }
+  if (activitiesQuery.error && activities.length === 0) {
+    return <QueryError error={activitiesQuery.error} />
   }
   if (activities.length === 0) {
     return <EmptyState title={t("labor.noActivities")} />
@@ -103,13 +113,13 @@ function ActivitiesPanel() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <CardTitle className="text-base">{activity.name}</CardTitle>
-                <CardDescription>
+                <CardDescription className="hud-data text-[0.7rem] tracking-wide">
                   {[activity.category, activity.department].filter(Boolean).join(" · ")}
                 </CardDescription>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
                 {activity.hours !== undefined && (
-                  <span className="text-lg font-semibold tabular-nums">
+                  <span className="hud-data text-lg font-semibold">
                     {activity.hours}
                     <span className="ml-0.5 text-xs font-normal text-muted-foreground">
                       {t("labor.hoursUnit")}
@@ -132,7 +142,7 @@ function ActivitiesPanel() {
             {formatTimeRange(activity.timeStart, activity.timeEnd) && (
               <div className="flex items-center gap-2">
                 <Clock className="size-4 shrink-0 text-muted-foreground" />
-                <span>
+                <span className="hud-data">
                   {t("labor.activityTime")}: {formatTimeRange(activity.timeStart, activity.timeEnd)}
                 </span>
               </div>
@@ -162,7 +172,7 @@ export default function LaborPage() {
 
   const summaryQuery = useLaborSummary()
   const summary = summaryQuery.data
-  useErrorToast(summaryQuery.error)
+  useErrorToast(summaryQuery.error, !!summary)
 
   return (
     <div className="flex flex-col gap-6">
@@ -173,6 +183,8 @@ export default function LaborPage() {
               <Skeleton className="h-12 w-24" />
               <Skeleton className="h-12 w-24" />
             </div>
+          ) : summaryQuery.error && !summary ? (
+            <InlineError error={summaryQuery.error} />
           ) : summary ? (
             <div
               className={cn(
@@ -181,8 +193,8 @@ export default function LaborPage() {
               )}
             >
               <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground">{t("labor.totalHours")}</span>
-                <span className="text-2xl font-semibold tabular-nums">
+                <span className="hud-label">{t("labor.totalHours")}</span>
+                <span className="hud-data text-2xl font-semibold">
                   {summary.totalHours ?? "-"}
                   <span className="ml-1 text-sm font-normal text-muted-foreground">
                     {t("labor.hoursUnit")}
@@ -190,8 +202,8 @@ export default function LaborPage() {
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground">{t("labor.totalCredits")}</span>
-                <span className="text-2xl font-semibold tabular-nums">
+                <span className="hud-label">{t("labor.totalCredits")}</span>
+                <span className="hud-data text-2xl font-semibold">
                   {summary.totalCredits ?? "-"}
                 </span>
               </div>

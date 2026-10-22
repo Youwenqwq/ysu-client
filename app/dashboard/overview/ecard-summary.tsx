@@ -43,7 +43,7 @@ export function EcardSummary({ compact }: { compact: boolean }) {
       <Link
         href="/dashboard/ecard"
         title={balance ? undefined : message}
-        className="flex min-w-0 flex-col gap-1 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-w-0 flex-col gap-1 rounded-none outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
         aria-busy={loading || initializing}
       >
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -76,11 +76,11 @@ export function EcardSummary({ compact }: { compact: boolean }) {
   return (
     <>
       <CardHeader className="flex flex-row items-center gap-1">
-        <CreditCard className="size-4 shrink-0 text-primary" aria-hidden="true" />
+        <CreditCard className="size-4 shrink-0 text-brand" aria-hidden="true" />
         <CardTitle className="min-w-0 flex-1">
           <Link
             href="/dashboard/ecard"
-            className="rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="rounded-none hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             {t("ecard.title")}
           </Link>

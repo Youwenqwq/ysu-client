@@ -208,7 +208,7 @@ export default function MePage() {
             <button
               type="button"
               onClick={handleRelogin}
-              className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
+              className="flex items-center gap-3 border-l-[3px] border-l-transparent py-3 pl-2 transition-colors hover:border-l-brand hover:bg-muted/40 active:bg-muted/60"
             >
               <LogIn className="size-5 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-left text-sm">{t("app.relogin")}</span>
@@ -221,7 +221,7 @@ export default function MePage() {
       <div className="flex items-center justify-between px-1 pt-2 text-sm">
         <Link
           href="/dashboard/me/about"
-          className="relative text-primary underline underline-offset-2"
+          className="relative text-brand underline underline-offset-2"
         >
           {t("about.title")}
         </Link>
@@ -238,9 +238,7 @@ export default function MePage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {title}
-      </h2>
+      <h2 className="hud-label px-1">{title}</h2>
       {children}
     </section>
   )
@@ -262,8 +260,8 @@ function LinkCard({ items }: { items: ReadonlyArray<NavItem> }) {
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center gap-3 py-3 transition-colors active:bg-muted/60",
-              idx > 0 && "border-t border-border"
+              "flex items-center gap-3 border-l-[3px] border-l-transparent py-3 pl-2 transition-colors hover:border-l-brand hover:bg-muted/40 active:bg-muted/60",
+              idx > 0 && "border-t border-t-edge/20"
             )}
           >
             <item.icon className="size-5 shrink-0 text-muted-foreground" />

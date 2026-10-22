@@ -33,7 +33,7 @@ export function SkbirdThreadCard({
               <SkbirdImage
                 url={skbirdImageUrl(thread.avatarUrl, { w: 64, h: 64 })}
                 alt={thread.nickname}
-                className="size-5 shrink-0 rounded-full object-cover"
+                className="size-5 shrink-0 rounded-none object-cover"
               />
             ) : null}
             <span className="truncate">{thread.nickname}</span>
@@ -67,11 +67,11 @@ export function SkbirdThreadCard({
                   key={p}
                   url={skbirdImageUrl(p, { w: 200, h: 200 })}
                   alt=""
-                  className="size-20 rounded-md object-cover"
+                  className="size-20 rounded-none object-cover"
                 />
               ))}
               {thread.imgPaths.length > 3 ? (
-                <div className="flex size-20 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
+                <div className="flex size-20 items-center justify-center rounded-none bg-muted text-xs text-muted-foreground">
                   +{thread.imgPaths.length - 3}
                 </div>
               ) : null}

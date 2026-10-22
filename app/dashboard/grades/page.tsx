@@ -230,7 +230,7 @@ export default function GradesPage() {
         size="icon-sm"
         onClick={cycleSort}
         aria-label={t("grades.sortLabel")}
-        className={sortMode !== "default" ? "text-primary" : ""}
+        className={sortMode !== "default" ? "text-brand" : ""}
       >
         <SortIcon className="size-4" />
       </Button>
@@ -323,6 +323,7 @@ export default function GradesPage() {
         <FieldLabel>{t("grades.sortLabel")}</FieldLabel>
         <ToggleGroup
           type="single"
+          className="w-fit!"
           value={sortMode}
           onValueChange={(v) => v && setSortMode(v as "default" | "asc" | "desc")}
           variant="outline"
@@ -366,7 +367,7 @@ export default function GradesPage() {
 
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         {sorted.length === 0 ? (
-          <p className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+          <p className="rounded-none border p-6 text-center text-sm text-muted-foreground">
             {t("grades.table.noData")}
           </p>
         ) : (
@@ -375,12 +376,12 @@ export default function GradesPage() {
               key={idx}
               type="button"
               onClick={() => handleOpenStats(g)}
-              className="rounded-lg border bg-card p-3 text-left transition-colors hover:bg-muted/50 active:bg-muted/70"
+              className="rounded-none border border-l-[3px] border-edge/30 border-l-edge/40 bg-card p-3 text-left transition-colors hover:border-l-brand hover:bg-muted/40 active:bg-muted/60"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{g.courseName}</span>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 font-mono text-[0.65rem] tracking-wide text-muted-foreground">
                     {g.semester && <span>{g.semester}</span>}
                     {g.courseType && (
                       <>
@@ -400,17 +401,19 @@ export default function GradesPage() {
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-lg leading-none font-semibold tabular-nums">
+                    <span className="hud-data text-lg leading-none font-semibold">
                       {g.score || "-"}
                     </span>
                     {g.gradeLevel && (
-                      <span className="text-xs font-medium text-muted-foreground">
+                      <span className="font-mono text-[0.65rem] font-medium tracking-[0.14em] text-muted-foreground uppercase">
                         {g.gradeLevel}
                       </span>
                     )}
                   </div>
                   {g.gradePoint && (
-                    <span className="text-[10px] text-muted-foreground">GP {g.gradePoint}</span>
+                    <span className="hud-data text-[10px] text-muted-foreground">
+                      GP {g.gradePoint}
+                    </span>
                   )}
                   <div className="flex items-center gap-1">
                     {g.isDegreeCourse && (
@@ -491,7 +494,7 @@ export default function GradesPage() {
               </div>
             )}
             {statsError ? (
-              <p className="rounded-md border p-4 text-center text-sm text-muted-foreground">
+              <p className="rounded-none border p-4 text-center text-sm text-muted-foreground">
                 {statsError}
               </p>
             ) : statsLoading ? (
@@ -506,7 +509,7 @@ export default function GradesPage() {
                   <h3 className="text-sm font-semibold">{t("grades.stats.sectionStatistics")}</h3>
                   {statsResult ? (
                     <div className="grid grid-cols-3 gap-2">
-                      <div className="flex flex-col gap-1 rounded-md border p-2.5">
+                      <div className="flex flex-col gap-1 rounded-none border p-2.5">
                         <span className="text-[10px] text-muted-foreground">
                           {t("grades.stats.highest")}
                         </span>
@@ -514,7 +517,7 @@ export default function GradesPage() {
                           {statsResult.highestScore?.toFixed(1) ?? "-"}
                         </span>
                       </div>
-                      <div className="flex flex-col gap-1 rounded-md border p-2.5">
+                      <div className="flex flex-col gap-1 rounded-none border p-2.5">
                         <span className="text-[10px] text-muted-foreground">
                           {t("grades.stats.lowest")}
                         </span>
@@ -522,7 +525,7 @@ export default function GradesPage() {
                           {statsResult.lowestScore?.toFixed(1) ?? "-"}
                         </span>
                       </div>
-                      <div className="flex flex-col gap-1 rounded-md border p-2.5">
+                      <div className="flex flex-col gap-1 rounded-none border p-2.5">
                         <span className="text-[10px] text-muted-foreground">
                           {t("grades.stats.average")}
                         </span>
@@ -552,9 +555,9 @@ export default function GradesPage() {
                                 {d.levelName || d.levelCode || "-"}
                               </span>
                               <div className="relative flex-1">
-                                <div className="h-5 w-full rounded-sm bg-muted">
+                                <div className="h-5 w-full rounded-none bg-muted">
                                   <div
-                                    className="h-full rounded-sm bg-primary/70"
+                                    className="h-full rounded-none bg-brand/80"
                                     style={{ width: `${pct}%` }}
                                   />
                                 </div>
@@ -578,7 +581,7 @@ export default function GradesPage() {
                   <h3 className="text-sm font-semibold">{t("grades.stats.sectionRanking")}</h3>
                   {rankingResult ? (
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="flex flex-col gap-1 rounded-md border p-2.5">
+                      <div className="flex flex-col gap-1 rounded-none border p-2.5">
                         <span className="text-[10px] text-muted-foreground">
                           {t("grades.stats.myScore")}
                         </span>
@@ -586,7 +589,7 @@ export default function GradesPage() {
                           {rankingResult.score?.toFixed(1) ?? "-"}
                         </span>
                       </div>
-                      <div className="flex flex-col gap-1 rounded-md border p-2.5">
+                      <div className="flex flex-col gap-1 rounded-none border p-2.5">
                         <span className="text-[10px] text-muted-foreground">
                           {t("grades.stats.rank")}
                         </span>

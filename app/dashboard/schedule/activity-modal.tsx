@@ -204,13 +204,13 @@ function ActivityItem({
       disabled={!canJoin}
       onClick={() => canJoin && onSignin?.(activity.activityId, Number(activity.signType) || 1)}
       className={cn(
-        "flex w-full items-center gap-3 rounded-lg border p-3 text-left",
+        "flex w-full items-center gap-3 rounded-none border p-3 text-left",
         canJoin
           ? "cursor-pointer bg-card transition-colors hover:bg-accent/50 active:bg-accent"
           : "cursor-default bg-muted/30 opacity-70"
       )}
     >
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+      <div className="flex size-8 shrink-0 items-center justify-center border border-brand/40 bg-brand/10 text-brand">
         <Signpost className="size-4" />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">

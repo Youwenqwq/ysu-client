@@ -62,10 +62,10 @@ export function MobileBottomNav() {
     <nav
       ref={navRef}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-40 grid border-t border-border pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))] backdrop-blur md:hidden",
+        "fixed inset-x-0 bottom-0 z-40 grid border-t-2 border-edge pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))] backdrop-blur md:hidden",
         hasBackground
-          ? "bg-background/60 supports-[backdrop-filter]:bg-background/40"
-          : "bg-background/95 supports-[backdrop-filter]:bg-background/80"
+          ? "bg-background/70 supports-[backdrop-filter]:bg-background/50"
+          : "bg-background/95 supports-[backdrop-filter]:bg-background/85"
       )}
       style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
       aria-label="Primary"
@@ -81,12 +81,14 @@ export function MobileBottomNav() {
             key={tab.href}
             href={tab.href}
             className={cn(
-              "flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
-              isActive ? "text-primary" : "text-muted-foreground"
+              "relative flex flex-col items-center justify-center gap-1 py-2 font-mono text-[0.6rem] tracking-wider uppercase transition-colors",
+              isActive
+                ? "text-brand before:absolute before:inset-x-3 before:top-0 before:h-0.5 before:bg-brand"
+                : "text-muted-foreground"
             )}
             aria-current={isActive ? "page" : undefined}
           >
-            <Icon className="size-5" />
+            <Icon className="size-[18px]" strokeWidth={isActive ? 2.4 : 1.8} />
             <span>{tab.label}</span>
           </Link>
         )
