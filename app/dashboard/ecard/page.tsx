@@ -2,6 +2,7 @@
 
 import { CreditCard, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ErrorState } from "@/components/academic/list-state"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Card, CardContent } from "@/components/ui/card"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -27,8 +28,8 @@ export default function EcardPage() {
   } = useEcardBalance()
   const error = queryError
     ? noAuth
-      ? t("ecard.noAuth")
-      : t("ecard.loadFailed", { message: t("ecard.errorGeneric") })
+      ? { title: t("ecard.noAuth") }
+      : { title: t("ecard.loadFailedTitle"), detail: queryError.message || undefined }
     : null
 
   useMobileHeaderRight(
@@ -100,17 +101,15 @@ export default function EcardPage() {
   if (!balance) {
     return (
       <div className="p-4">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <CreditCard />
-            </EmptyMedia>
-            <EmptyTitle>{error || t("ecard.notAvailable")}</EmptyTitle>
-          </EmptyHeader>
+        <ErrorState
+          title={error?.title || t("ecard.notAvailable")}
+          detail={error?.detail}
+          icon={<CreditCard />}
+        >
           <Button variant="outline" onClick={() => void load()} disabled={!enabled || loading}>
             {t("ecard.retry")}
           </Button>
-        </Empty>
+        </ErrorState>
       </div>
     )
   }
@@ -125,7 +124,14 @@ export default function EcardPage() {
       </div>
       {error && (
         <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>
+            <span className="font-semibold">{error.title}</span>
+            {error.detail && (
+              <span className="mt-1 block font-mono text-xs break-words opacity-80">
+                {error.detail}
+              </span>
+            )}
+          </AlertDescription>
         </Alert>
       )}
       <Card className="overflow-hidden">

@@ -4,6 +4,7 @@ import { useCallback, useMemo } from "react"
 import useSWR from "swr"
 import { RefreshCw, Wallet } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { ErrorState } from "@/components/academic/list-state"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -74,8 +75,8 @@ export default function EpayPage() {
     (hasHydrated && !!username && !credential)
   const error = queryError
     ? noAuth
-      ? t("epay.ssoUnavailable")
-      : t("epay.loadFailed", { message: t("epay.errorGeneric") })
+      ? { title: t("epay.ssoUnavailable") }
+      : { title: t("epay.loadFailedTitle"), detail: queryError.message || undefined }
     : null
   const load = useCallback(() => {
     if (canQuery) void mutate().catch(() => undefined)
@@ -148,17 +149,15 @@ export default function EpayPage() {
   if (!records) {
     return (
       <div className="p-4">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Wallet />
-            </EmptyMedia>
-            <EmptyTitle>{error || t("epay.retry")}</EmptyTitle>
-          </EmptyHeader>
+        <ErrorState
+          title={error?.title || t("epay.retry")}
+          detail={error?.detail}
+          icon={<Wallet />}
+        >
           <Button variant="outline" onClick={() => void load()} disabled={loading}>
             {t("epay.retry")}
           </Button>
-        </Empty>
+        </ErrorState>
       </div>
     )
   }
@@ -189,7 +188,14 @@ export default function EpayPage() {
       </div>
       {error && (
         <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>
+            <span className="font-semibold">{error.title}</span>
+            {error.detail && (
+              <span className="mt-1 block font-mono text-xs break-words opacity-80">
+                {error.detail}
+              </span>
+            )}
+          </AlertDescription>
         </Alert>
       )}
       <Card>

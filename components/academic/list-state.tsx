@@ -50,6 +50,37 @@ export function EmptyState({ title, description }: { title: string; description?
 }
 
 /**
+ * 查询错误状态：标题位只放短标签，技术细节（上游状态码、原始报错）降到描述位。
+ * 代理网关会回整页 HTML 错误页，细节必须能换行且不能撑破标题栏。
+ */
+export function ErrorState({
+  title,
+  detail,
+  icon,
+  children,
+}: {
+  title: string
+  detail?: string
+  icon?: React.ReactNode
+  children?: React.ReactNode
+}) {
+  return (
+    <Empty>
+      <EmptyHeader>
+        {icon ? <EmptyMedia variant="icon">{icon}</EmptyMedia> : null}
+        <EmptyTitle>{title}</EmptyTitle>
+        {detail && (
+          <EmptyDescription className="max-w-full font-mono text-xs break-words">
+            {detail}
+          </EmptyDescription>
+        )}
+      </EmptyHeader>
+      {children}
+    </Empty>
+  )
+}
+
+/**
  * 重新校验（isValidating）期间旧数据列表的区域级 pending 反馈：
  * 整体降透明度。包在列表容器外，避免弱网下“点了没反应”的错觉。
  */

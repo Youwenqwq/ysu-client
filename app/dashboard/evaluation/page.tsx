@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { Progress } from "@/components/ui/progress"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { ErrorState } from "@/components/academic/list-state"
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -214,11 +215,14 @@ export default function EvaluationPage() {
   const loadingTypes = typesQuery.isLoading && types.length === 0
   const loadingTasks = (tasksQuery.isLoading || tasksQuery.isValidating) && tasks.length === 0
 
+  const typesFailed = !!typesQuery.error && types.length === 0
   useEffect(() => {
     const errors = [typesQuery.error, tasksQuery.error].filter(Boolean)
     if (errors.length === 0) return
+    // 类型列表失败已由页面级错误态承载，不重复弹 toast
+    if (typesFailed) return
     toast.error(errors[0]?.message || t("app.updating"))
-  }, [typesQuery.error, tasksQuery.error, t])
+  }, [typesQuery.error, tasksQuery.error, typesFailed, t])
 
   useEffect(() => {
     if (selectedType || types.length === 0 || !types[0].code) return
@@ -688,6 +692,23 @@ export default function EvaluationPage() {
       <div className="flex flex-col gap-4">
         <Skeleton className="h-12" />
         <Skeleton className="h-48" />
+      </div>
+    )
+  }
+
+  // 类型列表拉取失败时不能落成空卡片：空列表会读成「没有待评任务」。
+  if (typesFailed) {
+    return (
+      <div className="p-4">
+        <ErrorState
+          title={t("evaluation.loadFailed")}
+          detail={typesQuery.error?.message || undefined}
+          icon={<ClipboardCheck />}
+        >
+          <Button variant="outline" onClick={() => void refreshTypes()}>
+            {t("app.retry")}
+          </Button>
+        </ErrorState>
       </div>
     )
   }
