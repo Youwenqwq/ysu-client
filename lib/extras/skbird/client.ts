@@ -287,7 +287,8 @@ export class SkbirdClient {
 
   /**
    * 解锁认证帖。热榜与悬赏帖流对认证帖不裁剪（含图片），优先从中取全文；
-   * 都不在则走 mark→mark/list→unmark 链——mark/list 不含 img_paths
+   * 都不在则先读已有收藏；未收藏时走 mark→mark/list→unmark 链，保留原收藏状态。
+   * mark/list 不含 img_paths
    * （抓包实测），此时只能解锁文字。
    */
   async unlockThread(id: string): Promise<SkbirdThread | null> {
@@ -301,6 +302,8 @@ export class SkbirdClient {
       .then(findFull)
       .catch(() => undefined)
     if (inReward) return inReward
+    const marked = (await this.markList()).find((t) => t.threadId === id)
+    if (marked) return marked
     await this.mark(id, 1)
     try {
       const list = await this.markList()

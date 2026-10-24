@@ -296,6 +296,7 @@ describe("SkbirdClient 请求契约", () => {
     sendMock
       .mockResolvedValueOnce(okResponse({ list: [] })) // hot 未命中
       .mockResolvedValueOnce(okResponse({ list: [] })) // rewardlist 未命中
+      .mockResolvedValueOnce(okResponse({ list: [] })) // 原先未收藏
       .mockResolvedValueOnce(okResponse({})) // mark 1
       .mockResolvedValueOnce(
         okResponse({
@@ -307,11 +308,49 @@ describe("SkbirdClient 请求契约", () => {
     expect(t).toMatchObject({ threadId: "9", title: "全文标题", imgPaths: [] })
     const paths = sendMock.mock.calls.map((c) => c[0].url)
     expect(paths[1]).toContain("/thread/rewardlist")
-    expect(paths[2]).toContain("/thread/mark/post")
-    expect(paths[3]).toContain("/thread/mark/list")
-    expect(paths[4]).toContain("/thread/mark/post")
+    expect(paths[2]).toContain("/thread/mark/list")
+    expect(paths[3]).toContain("/thread/mark/post")
+    expect(paths[4]).toContain("/thread/mark/list")
+    expect(paths[5]).toContain("/thread/mark/post")
     // unmark: 最后一个请求 body action=2
-    expect(sendMock.mock.calls[4]![0].body).toBe("action=2&id=9")
+    expect(sendMock.mock.calls[5]![0].body).toBe("action=2&id=9")
+  })
+
+  it("unlockThread()：已有收藏直接读取全文，不修改收藏状态", async () => {
+    sendMock
+      .mockResolvedValueOnce(okResponse({ list: [] }))
+      .mockResolvedValueOnce(okResponse({ list: [] }))
+      .mockResolvedValueOnce(
+        okResponse({ list: [{ thread_id: "9", title: "已收藏的全文", mark_has: true }] })
+      )
+    await expect(new SkbirdClient(CONFIG).unlockThread("9")).resolves.toMatchObject({
+      threadId: "9",
+      title: "已收藏的全文",
+      markHas: true,
+    })
+    expect(sendMock).toHaveBeenCalledTimes(3)
+    expect(sendMock.mock.calls.every(([req]) => !req.url.includes("/mark/post"))).toBe(true)
+  })
+
+  it("unlockThread()：无法确认原收藏状态时不修改收藏", async () => {
+    sendMock
+      .mockResolvedValueOnce(okResponse({ list: [] }))
+      .mockResolvedValueOnce(okResponse({ list: [] }))
+      .mockRejectedValueOnce(new Error("收藏读取失败"))
+    await expect(new SkbirdClient(CONFIG).unlockThread("9")).rejects.toThrow("收藏读取失败")
+    expect(sendMock.mock.calls.every(([req]) => !req.url.includes("/mark/post"))).toBe(true)
+  })
+
+  it("unlockThread()：临时收藏后读取失败也取消本次新增的收藏", async () => {
+    sendMock
+      .mockResolvedValueOnce(okResponse({ list: [] }))
+      .mockResolvedValueOnce(okResponse({ list: [] }))
+      .mockResolvedValueOnce(okResponse({ list: [] }))
+      .mockResolvedValueOnce(okResponse({}))
+      .mockRejectedValueOnce(new Error("全文读取失败"))
+      .mockResolvedValueOnce(okResponse({}))
+    await expect(new SkbirdClient(CONFIG).unlockThread("9")).rejects.toThrow("全文读取失败")
+    expect(sendMock.mock.calls[5]![0].body).toBe("action=2&id=9")
   })
 
   it("unlockThread()：帖在悬赏流时取全文+图片，不走 mark 链", async () => {

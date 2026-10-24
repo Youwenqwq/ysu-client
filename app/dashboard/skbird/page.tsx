@@ -22,6 +22,7 @@ import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
 import { useBackHandler } from "@/hooks/use-back-handler"
 import { SkbirdError, SKBIRD_ERRNO_TOKEN_INVALID } from "@/lib/extras/skbird/client"
 import { getSkbirdClient, useSkbirdStore } from "@/lib/extras/skbird/store"
+import { SkbirdFeedRequests } from "@/lib/extras/skbird/feed-requests"
 import type { SkbirdCategory, SkbirdThread } from "@/lib/extras/skbird/types"
 import {
   readSkbirdFeedSnapshot,
@@ -78,7 +79,7 @@ export default function SkbirdPage() {
   useBackHandler(() => setSearchOpen(false), mobileSearch && searchOpen)
   const cursorRef = useRef("0")
   const searchPageRef = useRef(1)
-  const busyRef = useRef(false)
+  const requestsRef = useRef(new SkbirdFeedRequests())
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [feedStateReady, setFeedStateReady] = useState(false)
   const initializedRef = useRef(false)
@@ -234,40 +235,52 @@ export default function SkbirdPage() {
   const fetchPage = useCallback(
     async (append: boolean): Promise<void> => {
       const client = getSkbirdClient()
-      if (!client || busyRef.current) return
-      busyRef.current = true
+      if (!client) return
+      const requests = requestsRef.current
+      const request = requests.begin(append)
+      if (request === null) return
       if (append) setLoadingMore(true)
-      else setLoading(true)
+      else {
+        setLoading(true)
+        setLoadingMore(false)
+      }
       setError(null)
       try {
         let list: SkbirdThread[]
+        let nextSearchPage = 1
+        let nextCursor = "0"
+        let nextHasMore = false
         if (submittedWd) {
           const page = append ? searchPageRef.current + 1 : 1
           list = await client.search(submittedWd, page, range === "all" ? "" : range)
-          searchPageRef.current = page
-          setHasMore(list.length > 0)
+          nextSearchPage = page
+          nextHasMore = list.length > 0
         } else if (tab === "hot") {
           list = await client.hot()
-          setHasMore(false)
         } else if (tab === "top") {
           list = await client.toplist()
-          setHasMore(false)
         } else {
           const fromTime = append ? cursorRef.current : "0"
           list =
             tab === "reward"
               ? await client.rewardList(fromTime)
               : await client.latest(fromTime, cateId)
-          cursorRef.current = list.length > 0 ? String(list[list.length - 1]!.postTime) : "0"
-          setHasMore(list.length > 0)
+          nextCursor = list.length > 0 ? String(list[list.length - 1]!.postTime) : "0"
+          nextHasMore = list.length > 0
         }
+        if (!requests.isCurrent(request)) return
+        searchPageRef.current = nextSearchPage
+        cursorRef.current = nextCursor
+        setHasMore(nextHasMore)
         setThreads((prev) => (append ? [...prev, ...list] : list))
       } catch (e) {
-        setError(mapError(e))
+        if (requests.isCurrent(request)) setError(mapError(e))
       } finally {
-        setLoading(false)
-        setLoadingMore(false)
-        busyRef.current = false
+        if (requests.isCurrent(request)) {
+          setLoading(false)
+          setLoadingMore(false)
+          requests.finish(request)
+        }
       }
     },
     [tab, cateId, submittedWd, range, mapError]
@@ -276,13 +289,15 @@ export default function SkbirdPage() {
   // 首屏加载；若存在详情页返回快照，则直接使用快照，条件变化仍按原逻辑重新加载。
   useEffect(() => {
     if (!hasHydrated || !token || !feedStateReady) return
+    const requests = requestsRef.current
     if (restoredRef.current) {
       restoredRef.current = false
-      return
+    } else {
+      cursorRef.current = "0"
+      searchPageRef.current = 1
+      void fetchPage(false)
     }
-    cursorRef.current = "0"
-    searchPageRef.current = 1
-    void fetchPage(false)
+    return () => requests.invalidate()
   }, [hasHydrated, token, feedStateReady, fetchPage])
 
   // 分类列表与未读数：进入页面后各拉一次，失败静默
