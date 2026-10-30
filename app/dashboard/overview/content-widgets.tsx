@@ -101,11 +101,9 @@ export function TodayCoursesWidget({ data }: { data: OverviewSchedule }) {
   const [signinType, setSigninType] = useState(1)
   const [signinOpen, setSigninOpen] = useState(false)
 
-  const openCourse = (course: Course) => {
-    const occurrence =
-      "occurrenceId" in course && "source" in course ? (course as ScheduleOccurrence) : null
-    setActivityCourse(occurrence?.source.course ?? course)
-    setActivityWeek(occurrence?.source.week ?? data.currentWeek.data?.week ?? 1)
+  const openCourse = (course: ScheduleOccurrence) => {
+    setActivityCourse(course.source.course)
+    setActivityWeek(course.source.week)
     setActivityOpen(true)
   }
 
@@ -143,23 +141,23 @@ export function TodayCoursesWidget({ data }: { data: OverviewSchedule }) {
                       type="button"
                       onClick={() => openCourse(course)}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring",
+                        "flex w-full cursor-pointer items-center gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring",
                         isCurrent && "border-primary bg-primary/5",
                         isPast && "opacity-50"
                       )}
                     >
                       {range && (
-                        <div className="flex w-11 shrink-0 flex-col text-xs leading-tight text-muted-foreground">
+                        <span className="flex w-11 shrink-0 flex-col text-xs leading-tight text-muted-foreground">
                           <span>{clockText(range[0])}</span>
                           <span>{clockText(range[1])}</span>
-                        </div>
+                        </span>
                       )}
-                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="truncate text-sm font-medium">{course.name}</span>
                         <span className="text-xs text-muted-foreground">
                           {[course.teacher, course.classroom].filter(Boolean).join(" · ")}
                         </span>
-                      </div>
+                      </span>
                       <Badge variant={isCurrent ? "default" : "outline"} className="shrink-0">
                         {isCurrent
                           ? t("dashboard.ongoingNow")
