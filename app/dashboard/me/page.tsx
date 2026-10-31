@@ -128,7 +128,7 @@ export default function MePage() {
   return (
     <div className="flex flex-col gap-4">
       <Link href="/dashboard/me/student" className="block">
-        <Card className="transition-colors hover:bg-muted/40 active:bg-muted/60">
+        <Card className="py-0 transition-colors hover:bg-muted/40 active:bg-muted/60">
           <CardContent className="flex items-center gap-4 py-5">
             <Avatar className="size-14">
               {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
@@ -203,7 +203,7 @@ export default function MePage() {
       </Section>
 
       <Section title={t("me.sectionAccount")}>
-        <Card>
+        <Card className="py-0">
           <CardContent className="flex flex-col py-1">
             <button
               type="button"
@@ -255,7 +255,7 @@ interface NavItem {
 /** 分隔线列表行卡片：muted 图标 + 标签 + ChevronRight。 */
 function LinkCard({ items }: { items: ReadonlyArray<NavItem> }) {
   return (
-    <Card>
+    <Card className="py-0">
       <CardContent className="flex flex-col py-1">
         {items.map((item, idx) => (
           <Link

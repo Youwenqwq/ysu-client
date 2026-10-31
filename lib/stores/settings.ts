@@ -47,6 +47,8 @@ interface SettingsState {
   notifyNetworkError: boolean
   classReminderEnabled: boolean
   classReminderMinutes: number
+  classLiveUpdateEnabled: boolean
+  classVibrationEnabled: boolean
   classReminderDays: number
   analyticsConsent: boolean
   lastAnalyticsDate: string
@@ -84,6 +86,8 @@ interface SettingsState {
   setNotifyNetworkError: (v: boolean) => void
   setClassReminderEnabled: (v: boolean) => void
   setClassReminderMinutes: (v: number) => void
+  setClassLiveUpdateEnabled: (v: boolean) => void
+  setClassVibrationEnabled: (v: boolean) => void
   setClassReminderDays: (v: number) => void
   setAnalyticsConsent: (v: boolean) => void
   setLastAnalyticsDate: (v: string) => void
@@ -124,6 +128,8 @@ export const useSettingsStore = create<SettingsState>()(
       notifyNetworkError: false,
       classReminderEnabled: false,
       classReminderMinutes: 15,
+      classLiveUpdateEnabled: false,
+      classVibrationEnabled: false,
       classReminderDays: 7,
       analyticsConsent: false,
       lastAnalyticsDate: "",
@@ -161,6 +167,8 @@ export const useSettingsStore = create<SettingsState>()(
       setNotifyNetworkError: (notifyNetworkError) => set({ notifyNetworkError }),
       setClassReminderEnabled: (classReminderEnabled) => set({ classReminderEnabled }),
       setClassReminderMinutes: (classReminderMinutes) => set({ classReminderMinutes }),
+      setClassLiveUpdateEnabled: (classLiveUpdateEnabled) => set({ classLiveUpdateEnabled }),
+      setClassVibrationEnabled: (classVibrationEnabled) => set({ classVibrationEnabled }),
       setClassReminderDays: (classReminderDays) => set({ classReminderDays }),
       setAnalyticsConsent: (analyticsConsent) => set({ analyticsConsent }),
       setLastAnalyticsDate: (lastAnalyticsDate) => set({ lastAnalyticsDate }),

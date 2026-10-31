@@ -39,10 +39,20 @@ export interface YsuNotifyPlugin {
   // ─── Battery optimization ──────────────────────────────────────────────
   checkBatteryOptimization(): Promise<{ ignored: boolean }>
   requestIgnoreBatteryOptimization(): Promise<void>
+  openAutoStartSettings(): Promise<{ opened: boolean }>
 
   // ─── Class alarm ────────────────────────────────────────────────────────
   scheduleClassAlarms(options: { alarmsJson: string }): Promise<void>
   cancelClassAlarms(): Promise<void>
+
+  // ─── Debug (debug builds only) ──────────────────────────────────────────
+  debugLiveUpdate(options?: {
+    courseName?: string
+    classroom?: string
+    startInMinutes?: number
+    liveUpdateEnabled?: boolean
+    vibrationEnabled?: boolean
+  }): Promise<{ posted: boolean }>
 }
 
 export const NotifyPlugin = registerPlugin<YsuNotifyPlugin>("YsuNotify")

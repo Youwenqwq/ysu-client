@@ -1,102 +1,91 @@
 package com.youwenqwq.ysuclient.notify
 
-import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
-import com.youwenqwq.ysuclient.R
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import com.youwenqwq.ysuclient.cache.UnifiedCache
 import org.json.JSONArray
-import org.json.JSONObject
 
 class ClassAlarmReceiver : BroadcastReceiver() {
-
     companion object {
         const val TAG = "YsuClassAlarm"
         const val EXTRA_ALARM_ID = "alarm_id"
         const val EXTRA_ALARM_TIME = "alarm_time"
+        const val ACTION_START = "com.youwenqwq.ysuclient.action.CLASS_LIVE_START"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         val alarmId = intent.getStringExtra(EXTRA_ALARM_ID) ?: return
-        val expectedTime = intent.getLongExtra(EXTRA_ALARM_TIME, 0L)
         try {
-            // Scheduling, cancellation and delivery share the same snapshot lock.
             synchronized(ClassAlarmManager) {
-                val alarms = JSONArray(
-                    UnifiedCache.getString(context, UnifiedCache.KEY_CLASS_ALARMS, "[]")
-                )
-                var alarmConfig: JSONObject? = null
-                for (i in 0 until alarms.length()) {
-                    val alarm = alarms.getJSONObject(i)
-                    if (alarm.optString("alarmId") == alarmId) {
-                        alarmConfig = alarm
-                        break
+                val alarms = JSONArray(UnifiedCache.getString(context, UnifiedCache.KEY_CLASS_ALARMS, "[]"))
+                val alarm = (0 until alarms.length()).asSequence()
+                    .map { alarms.getJSONObject(it) }
+                    .firstOrNull { it.optString("alarmId") == alarmId } ?: return
+                val alarmTime = alarm.getLong("alarmTime")
+                if (intent.hasExtra(EXTRA_ALARM_TIME) &&
+                    intent.getLongExtra(EXTRA_ALARM_TIME, 0L) != alarmTime) return
+                val live = alarm.optBoolean("liveUpdateEnabled", false) &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA
+                val startAt = ClassReminderService.startAt(alarm)
+                val endAt = alarm.optLong("endAt")
+                val now = System.currentTimeMillis()
+                when (intent.action) {
+                    ACTION_START -> {
+                        if (now >= ClassReminderService.expiryAt(alarm)) return
+                        if (now < startAt) {
+                            val pending = PendingIntent.getBroadcast(
+                                context, alarmId.hashCode(),
+                                ClassAlarmManager.alarmIntent(context, alarmId, alarmTime, atStart = true),
+                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                            )
+                            ClassAlarmScheduling.schedule(context, startAt, pending, asAlarmClock = true)
+                        } else ClassReminderService.start(context, alarm)
+                    }
+                    ClassLiveUpdate.ACTION_CLASS_STARTED,
+                    ClassLiveUpdate.ACTION_CLASS_TICK,
+                    ClassLiveUpdate.ACTION_CLASS_ENDED -> {
+                        if (!live || endAt <= startAt ||
+                            intent.getLongExtra(ClassLiveUpdate.EXTRA_START_AT, 0L) != startAt ||
+                            intent.getLongExtra(ClassLiveUpdate.EXTRA_END_AT, 0L) != endAt) return
+                        // The foreground timer owns boundaries while alive; fallback broadcasts
+                        // must not race it into two end transitions.
+                        if (ClassReminderService.isMonitoring(alarmId)) return
+                        if (now >= endAt) {
+                            ClassLiveUpdate.markEnded(context, alarmId, intent.extras ?: android.os.Bundle())
+                            ClassReminderService.nextClass(context, alarmId, endAt)?.let {
+                                ClassReminderService.start(context, it)
+                            }
+                        } else {
+                            ClassReminderService.start(context, alarm)
+                        }
+                    }
+                    else -> {
+                        if (now >= startAt) return
+                        if (now < alarmTime) {
+                            val pending = PendingIntent.getBroadcast(
+                                context, alarmId.hashCode(),
+                                ClassAlarmManager.alarmIntent(context, alarmId, alarmTime),
+                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                            )
+                            ClassAlarmScheduling.schedule(context, alarmTime, pending, asAlarmClock = true)
+                            return
+                        }
+                        // Keep the receiver process eligible to run until the one-shot
+                        // waveform ends; no foreground disclosure is needed before class.
+                        if (ClassReminderService.sendReminder(context, alarm)) {
+                            val pending = goAsync()
+                            Handler(Looper.getMainLooper()).postDelayed({ pending.finish() }, 2_200L)
+                        }
                     }
                 }
-                if (alarmConfig == null) return
-                val alarmTime = alarmConfig.getLong("alarmTime")
-                val now = System.currentTimeMillis()
-                // Pre-upgrade alarms have no timestamp extra; validate their saved due/expiry times.
-                // New broadcasts additionally identify the exact configuration they were scheduled for.
-                if (intent.hasExtra(EXTRA_ALARM_TIME) && expectedTime != alarmTime) return
-                if (now < alarmTime) return
-
-                val updatedAlarms = JSONArray()
-                for (i in 0 until alarms.length()) {
-                    val alarm = alarms.getJSONObject(i)
-                    if (alarm.optString("alarmId") != alarmId) updatedAlarms.put(alarm)
-                }
-                UnifiedCache.putString(context, UnifiedCache.KEY_CLASS_ALARMS, updatedAlarms.toString())
-
-                val remindMinutes = alarmConfig.optInt("remindMinutes", 15)
-                if (now >= alarmTime + remindMinutes * 60_000L) {
-                    Log.d(TAG, "Class has already started; skipping delayed alarm $alarmId")
-                    return
-                }
-                // This snapshot is rebuilt from the complete schedule, including future weeks.
-                // Widget data is filtered to one week and cannot validate these reminders.
-                sendClassNotification(
-                    context,
-                    alarmId,
-                    alarmConfig.optString("courseName", context.getString(R.string.notify_fallback_alarm_course)),
-                    alarmConfig.optString("classroom", ""),
-                    alarmConfig.optString("startTime", ""),
-                    remindMinutes
-                )
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error handling class alarm", e)
+            ClassReminderService.reportFailure(context, e)
         }
     }
-
-    private fun sendClassNotification(
-        ctx: Context,
-        alarmId: String,
-        courseName: String,
-        classroom: String,
-        startTime: String,
-        remindMinutes: Int
-    ) {
-        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        val parts = buildList {
-            if (startTime.isNotEmpty()) add(startTime)
-            if (classroom.isNotEmpty()) add(classroom)
-        }
-        val content = if (parts.isNotEmpty()) {
-            parts.joinToString(" · ")
-        } else {
-            ctx.getString(R.string.class_alarm_text, remindMinutes)
-        }
-
-        val notification = NativeNotifications.builder(ctx, NotificationKind.CLASSES)
-            .setContentTitle(courseName)
-            .setContentText(content)
-            .build()
-
-        nm.notify("class:$alarmId", 0, notification)
-    }
-
 }

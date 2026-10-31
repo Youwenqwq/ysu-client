@@ -133,6 +133,8 @@ export function observeNativeNotifications(
       state.hasHydrated !== previous.hasHydrated ||
       state.classReminderEnabled !== previous.classReminderEnabled ||
       state.classReminderMinutes !== previous.classReminderMinutes ||
+      state.classLiveUpdateEnabled !== previous.classLiveUpdateEnabled ||
+      state.classVibrationEnabled !== previous.classVibrationEnabled ||
       state.classReminderDays !== previous.classReminderDays
     ) {
       void refreshClassAlarms().catch(() => {})
@@ -329,21 +331,39 @@ export interface ClassAlarmConfig {
   classroom: string
   startTime: string
   remindMinutes: number
+  liveUpdateEnabled?: boolean
+  vibrationEnabled?: boolean
+  /** 同一时段合并的课程数量，>1 表示时间冲突。 */
+  conflictCount?: number
+  /** 下课时间（HH:mm）与时间戳，用于课后倒计时和连堂提示。 */
+  endTime?: string
+  endAt?: number
 }
 
-function parseTimeToMinutes(timeStr: string): number {
-  const parts = timeStr.split(":")
-  if (parts.length < 2) return 0
-  return parseInt(parts[0]!, 10) * 60 + parseInt(parts[1]!, 10)
+function parseTimeToMinutes(timeStr: string): number | undefined {
+  const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(timeStr.trim())
+  if (!match) return undefined
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  return hours < 24 && minutes < 60 ? hours * 60 + minutes : undefined
+}
+
+/** 用 " / " 合并去重，冲突课程共用一条提醒时展示全部名称/教室。 */
+function mergeUnique(current: string, extra: string): string {
+  const part = extra.trim()
+  if (!part) return current
+  const parts = current ? current.split(" / ") : []
+  if (parts.includes(part)) return current
+  return current ? `${current} / ${part}` : part
 }
 
 export function computeClassAlarms(
   courses: Course[],
   currentWeek: CurrentWeek | null,
   periods: ClassPeriod[],
-  remindMinutes: number = 15,
   days: number = 7,
-  calendar?: TermCalendar
+  calendar?: TermCalendar,
+  remindMinutes: number = 15
 ): ClassAlarmConfig[] {
   const alarms: ClassAlarmConfig[] = []
   const now = new Date()
@@ -367,11 +387,33 @@ export function computeClassAlarms(
       if (!startTime) continue
 
       const startMinutes = parseTimeToMinutes(startTime)
-      // Subtract the reminder from school midnight, not device-local wall time.
+      if (startMinutes === undefined) continue
+      const endPeriod = periodMap.get(course.endSection)
+      const endMinutes = endPeriod?.endTime ? parseTimeToMinutes(endPeriod.endTime) : undefined
+      const endAt =
+        endMinutes !== undefined && endMinutes > startMinutes
+          ? dayStart + endMinutes * 60_000
+          : undefined
       const alarmTime = dayStart + (startMinutes - remindMinutes) * 60_000
-      if (!Number.isFinite(alarmTime) || alarmTime <= now.getTime()) continue
+      const expiresAt = endAt ?? dayStart + startMinutes * 60_000
+      if (!Number.isFinite(alarmTime) || expiresAt <= now.getTime()) continue
 
-      const alarmId = `${course.name}|${date}|${startSection}`
+      // 按「日期 + 起始节次」排钟：同一时段的多门课（课程冲突）合并成一条提醒。
+      const alarmId = `${date}|${startSection}`
+      const existing = alarms.find((alarm) => alarm.alarmId === alarmId)
+      if (existing) {
+        const before = existing.courseName
+        existing.courseName = mergeUnique(existing.courseName, course.name)
+        existing.classroom = mergeUnique(existing.classroom, course.classroom || "")
+        if (existing.courseName !== before) {
+          existing.conflictCount = (existing.conflictCount ?? 1) + 1
+        }
+        if (endAt !== undefined && (existing.endAt === undefined || endAt > existing.endAt)) {
+          existing.endAt = endAt
+          existing.endTime = endPeriod?.endTime
+        }
+        continue
+      }
       alarms.push({
         alarmId,
         alarmTime,
@@ -379,6 +421,7 @@ export function computeClassAlarms(
         classroom: course.classroom || "",
         startTime,
         remindMinutes,
+        ...(endAt !== undefined ? { endAt, endTime: endPeriod?.endTime } : {}),
       })
     }
   }
@@ -432,14 +475,22 @@ function refreshClassAlarms(): Promise<void> {
       schedule.courses,
       schedule.currentWeek,
       schedule.periods,
-      settings.classReminderMinutes,
       settings.classReminderDays,
-      schedule.calendar
+      schedule.calendar,
+      settings.classReminderMinutes
     )
+    for (const alarm of alarms) {
+      alarm.liveUpdateEnabled = settings.classLiveUpdateEnabled
+      alarm.vibrationEnabled = settings.classVibrationEnabled
+    }
     alarms.sort((a, b) => a.alarmId.localeCompare(b.alarmId) || a.alarmTime - b.alarmTime)
     const hash = JSON.stringify(alarms)
     if (hash === lastAlarmHash) return
-    await NotifyPlugin.cancelClassAlarms()
+    if (alarms.length === 0) {
+      await NotifyPlugin.cancelClassAlarms()
+      lastAlarmHash = hash
+      return
+    }
     lastAlarmHash = ""
     if (!valid()) return
     if (alarms.length > 0) {
