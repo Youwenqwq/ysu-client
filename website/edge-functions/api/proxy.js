@@ -36,7 +36,7 @@
 
 // 上游目标白名单：YSU 教务相关域名 + 实践教学平台 IP + 微信扫码登录 + NBU
 // + zanao（森空鸟，私有玩具箱功能；API/CDN 仅明文 HTTP）
-const ALLOWED_HOSTS = new Set([
+export const ALLOWED_HOSTS = new Set([
   'cer.ysu.edu.cn',
   'jwxt.ysu.edu.cn',
   'ldxt.ysu.edu.cn',

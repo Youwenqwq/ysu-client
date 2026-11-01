@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "build:macos": "node scripts/build-macos.mjs",
     "build": "next build",
     "postbuild": "node scripts/generate-pwa-shell.mjs",
     "start": "next start",

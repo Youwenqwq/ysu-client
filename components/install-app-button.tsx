@@ -15,6 +15,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { isCapacitor } from "@/lib/native/platform"
+import { isMacOSApp } from "@/lib/native/macos"
 import { getState, prompt, subscribe } from "@/lib/pwa-install"
 
 export function InstallAppButton() {
@@ -25,7 +26,7 @@ export function InstallAppButton() {
   const [prompting, setPrompting] = useState(false)
 
   useEffect(() => {
-    setNativePlatform(isCapacitor())
+    setNativePlatform(isCapacitor() || isMacOSApp)
   }, [])
 
   if (

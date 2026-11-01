@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useActivationStore } from "@/lib/stores/activation"
 import { isCapacitor } from "@/lib/native/platform"
+import { isMacOSApp, isMacOSNative } from "@/lib/native/macos"
 import { getActivateUrl } from "@/lib/cookie"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { Button } from "@/components/ui/button"
@@ -23,8 +24,16 @@ export function ActivationGate({ children }: { children: React.ReactNode }) {
   const [input, setInput] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<"invalid" | "network" | null>(null)
+  const [macNative, setMacNative] = useState<boolean | null>(null)
+  useEffect(() => {
+    setMacNative(isMacOSNative())
+  }, [])
 
-  if (isCapacitor() || process.env.NODE_ENV !== "production") {
+  // The server cannot inspect WK. Match its first render before allowing the
+  // privileged local bundle through; a Web build never gains this exemption.
+  if (isMacOSApp && macNative === null) return null
+
+  if (macNative || isCapacitor() || process.env.NODE_ENV !== "production") {
     return <>{children}</>
   }
   // 水合完成前不渲染，避免已激活用户看到激活页闪烁

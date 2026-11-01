@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { applyWebUpdate, dismissWebUpdate } from "@/lib/pwa-updater"
 import { usePwaUpdateStore } from "@/lib/stores/pwa-update"
+import { isMacOSApp } from "@/lib/native/macos"
 
 export function PwaUpdatePrompt() {
   const { t } = useTranslation()
   const updateAvailable = usePwaUpdateStore((s) => s.updateAvailable)
   const [applying, setApplying] = useState(false)
 
-  if (!updateAvailable) return null
+  if (isMacOSApp || !updateAvailable) return null
 
   const handleApply = async () => {
     setApplying(true)

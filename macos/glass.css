@@ -1,0 +1,71 @@
+/*
+ * macOS-only glass treatment, injected by the native shell.
+ * Web builds never load this file.
+ */
+
+html.macos-glass {
+  --mac-glass-card: color-mix(in srgb, var(--card) 62%, transparent);
+  --mac-glass-card-hover: color-mix(in srgb, var(--card) 74%, transparent);
+  --mac-glass-sidebar: color-mix(in srgb, var(--sidebar) 48%, transparent);
+  --mac-glass-popover: color-mix(in srgb, var(--popover) 76%, transparent);
+}
+
+html.macos-glass body {
+  background-color: var(--background) !important;
+  background-image:
+    radial-gradient(55% 45% at 12% 8%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 72%),
+    radial-gradient(50% 42% at 88% 14%, color-mix(in srgb, var(--accent-foreground) 12%, transparent), transparent 74%),
+    radial-gradient(48% 46% at 62% 96%, color-mix(in srgb, var(--chart-2) 14%, transparent), transparent 76%);
+  background-attachment: fixed;
+}
+
+html.macos-glass:not(.has-custom-background) [data-slot="card"] {
+  background-color: var(--mac-glass-card) !important;
+  border-radius: 1rem !important;
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(22px) saturate(1.4);
+  box-shadow: 0 10px 30px oklch(0 0 0 / 8%);
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    box-shadow 220ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    background-color 220ms ease;
+}
+
+html.macos-glass:not(.has-custom-background) [data-slot="card"]:hover {
+  background-color: var(--mac-glass-card-hover) !important;
+  box-shadow: 0 14px 40px oklch(0 0 0 / 12%);
+}
+
+html.macos-glass [data-slot="sidebar-inner"] {
+  background-color: var(--mac-glass-sidebar) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(1.4);
+  backdrop-filter: blur(26px) saturate(1.4);
+}
+
+html.macos-glass [data-slot="dialog-content"],
+html.macos-glass [data-slot="popover-content"],
+html.macos-glass [data-slot="dropdown-menu-content"],
+html.macos-glass [data-slot="select-content"],
+html.macos-glass [data-slot="sheet-content"] {
+  background-color: var(--mac-glass-popover) !important;
+  border-radius: 0.9rem !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.4);
+}
+
+html.macos-glass [data-slot="button"] {
+  transition:
+    transform 140ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.macos-glass:not(.has-custom-background) [data-slot="card"],
+  html.macos-glass [data-slot="button"] {
+    transition: none;
+  }
+  html.macos-glass:not(.has-custom-background) [data-slot="card"]:hover {
+    transform: none;
+  }
+}

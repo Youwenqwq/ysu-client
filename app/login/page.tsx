@@ -29,6 +29,7 @@ import {
 } from "@/lib/storage/secure"
 import { checkRateLimit, rateLimitMessage } from "@/lib/rate-limit"
 import { isCapacitor } from "@/lib/native/platform"
+import { isMacOSNative } from "@/lib/native/macos"
 import { useMFAModalStore } from "@/lib/stores/mfa-modal"
 import { getActiveProvider, setActiveProviderSchool } from "@/providers/provider-service"
 
@@ -51,10 +52,12 @@ export default function LoginPage() {
 
   // Web 端 secure-storage 退化为明文 localStorage，刻意不提供"记住密码"，
   // 避免账号密码明文落盘；会话 cookie 的持久化与教务系统本身的安全模型一致。
-  const canRemember = isCapacitor()
+  const [canRemember, setCanRemember] = useState(false)
 
   useEffect(() => {
-    if (!isCapacitor()) return
+    const native = isCapacitor() || isMacOSNative()
+    setCanRemember(native)
+    if (!native) return
     loadRememberedCredentials().then((r) => {
       if (r) {
         setUsername(r.username)
@@ -85,14 +88,17 @@ export default function LoginPage() {
     setActiveProviderSchool(schoolId)
   }
 
-  function showCaptcha() {
+  async function showCaptcha() {
     setNeedsCaptcha(true)
-    const captchaUrl = getActiveProvider().getCaptchaUrl()
-    setCaptchaUrl(captchaUrl ? `${captchaUrl}?${Date.now()}` : null)
+    try {
+      setCaptchaUrl(await getActiveProvider().getCaptchaImage())
+    } catch {
+      // Keep the current image; the next attempt surfaces the transport error.
+    }
   }
 
   async function syncRememberedLoginPreference() {
-    if (!isCapacitor()) return
+    if (!isCapacitor() && !isMacOSNative()) return
     if (remember) {
       await saveRememberedCredentials(username, password)
     } else {
@@ -112,7 +118,7 @@ export default function LoginPage() {
       await prepareFreshLoginSession()
       const captchaNeeded = await getActiveProvider().checkCaptchaNeeded(username)
       if (captchaNeeded) {
-        showCaptcha()
+        await showCaptcha()
       } else {
         setNeedsCaptcha(false)
         setCaptcha("")
@@ -126,6 +132,9 @@ export default function LoginPage() {
   async function doLogin(skipRateLimitCheck: boolean) {
     setLoading(true)
     try {
+      // Remember the typed credentials even if the network/login attempt fails;
+      // otherwise the checkbox only works after a successful login.
+      await syncRememberedLoginPreference()
       if (!needsCaptcha) {
         await prepareFreshLoginSession()
       }
@@ -139,7 +148,6 @@ export default function LoginPage() {
 
       if (res.authenticated && res.credential) {
         setCredential(res.credential, username)
-        await syncRememberedLoginPreference()
         toast.success(t("login.loginSuccess"))
         const landing = useSettingsStore.getState().defaultLandingPage
         router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard")
@@ -152,7 +160,6 @@ export default function LoginPage() {
         try {
           const result = await store.showMFA({ username })
           if (result.type === "wechat") {
-            await syncRememberedLoginPreference()
             toast.success(t("login.loginSuccess"))
             const landing = useSettingsStore.getState().defaultLandingPage
             router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard")
@@ -167,7 +174,6 @@ export default function LoginPage() {
             },
             code: result.code,
           })
-          await syncRememberedLoginPreference()
           toast.success(t("login.loginSuccess"))
           const landing = useSettingsStore.getState().defaultLandingPage
           router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard")
@@ -186,7 +192,7 @@ export default function LoginPage() {
       if (e.code === "NEED_CAPTCHA" || e.status === 403) {
         toast.error(t("login.errorCaptchaRequired"))
         if (!needsCaptcha) {
-          showCaptcha()
+          await showCaptcha()
         }
       } else {
         toast.error(e.message || t("login.errorLoginFailed"))

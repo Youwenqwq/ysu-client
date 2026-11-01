@@ -1,3 +1,6 @@
+import { isMacOSApp } from "./native/macos"
+import { isCapacitor } from "./native/platform"
+
 export interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
   userChoice: Promise<{
@@ -49,7 +52,7 @@ function updateState(next: Partial<PwaInstallState>) {
 }
 
 export function initializePwaInstallCapture(): void {
-  if (initialized || typeof window === "undefined") return
+  if (initialized || typeof window === "undefined" || isMacOSApp || isCapacitor()) return
   initialized = true
 
   standaloneQuery = window.matchMedia("(display-mode: standalone)")

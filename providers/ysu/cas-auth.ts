@@ -7,6 +7,7 @@
 import {
   prepareLogin as _prepareLogin,
   checkCaptchaNeeded as _checkCaptchaNeeded,
+  getCaptchaImage as _getCaptchaImage,
   loginStep1 as _loginStep1,
   requestMFACode as _requestMFACode,
   submitMFACode as _submitMFACode,
@@ -28,9 +29,8 @@ import {
   CASProtocolError,
   NotAuthenticatedError,
 } from "./protocol/cas"
-import { checkRateLimit, recordLoginAttempt } from "@/lib/rate-limit"
+import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
 import { useAuthStore } from "@/lib/stores/auth"
-import { casUrls } from "@/lib/server-config"
 import { getText } from "@/lib/i18n/get-text"
 import { withAuthTransition } from "./auth-transition"
 import { ProviderError, ProviderErrorCode, wrapError } from "../errors"
@@ -86,22 +86,12 @@ function mapCASError(e: unknown): ProviderError {
   return wrapError(e)
 }
 
-export function getCaptchaUrl(): string {
-  return casUrls.captcha
-}
-
 export async function prepareLogin(): Promise<void> {
   try {
     await _prepareLogin()
   } catch (e) {
     throw mapCASError(e)
   }
-}
-
-export async function resetLoginSession(): Promise<void> {
-  await withAuthTransition(async () => {
-    resetCAS()
-  })
 }
 
 export async function checkCaptchaNeeded(username: string): Promise<boolean> {
@@ -112,24 +102,54 @@ export async function checkCaptchaNeeded(username: string): Promise<boolean> {
   }
 }
 
+export async function getCaptchaImage(): Promise<string | null> {
+  try {
+    return await _getCaptchaImage()
+  } catch (e) {
+    throw mapCASError(e)
+  }
+}
+
+function assertPasswordLoginAllowed(): void {
+  const limit = checkRateLimit()
+  if (!limit.allowed) {
+    throw new ProviderError(
+      ProviderErrorCode.RATE_LIMITED,
+      rateLimitMessage(limit, getText, "login.errorRateLimitWindow", "login.errorRateLimitInterval"),
+      undefined,
+      429
+    )
+  }
+}
+
+export async function resetLoginSession(): Promise<void> {
+  await withAuthTransition(async () => {
+    resetCAS()
+  })
+}
+
 export async function loginStep1(
   credential: { username: string; password: string; captcha?: string },
   skipRateLimit = false
 ): Promise<LoginStep1Result> {
-  if (!skipRateLimit) {
-    const limit = checkRateLimit()
-    if (!limit.allowed) {
+  if (!skipRateLimit) assertPasswordLoginAllowed()
+  try {
+    await _prepareLogin()
+    const needsCaptcha = !credential.captcha?.trim() && await _checkCaptchaNeeded(credential.username)
+    if (needsCaptcha) {
       throw new ProviderError(
-        ProviderErrorCode.RATE_LIMITED,
-        `Rate limited: retry after ${Math.ceil(limit.retryAfterMs / 1000)}s`,
+        ProviderErrorCode.AUTH_CAPTCHA_REQUIRED,
+        getText("login.errorCaptchaRequired"),
         undefined,
-        429
+        403
       )
     }
-    recordLoginAttempt()
-  }
+    if (!skipRateLimit) {
+      // Preflight awaits may overlap; recheck immediately before recording and sending.
+      assertPasswordLoginAllowed()
+      recordLoginAttempt()
+    }
 
-  try {
     const result = await _loginStep1(credential.username, credential.password, {
       captcha: credential.captcha,
     })

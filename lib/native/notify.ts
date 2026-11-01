@@ -1,14 +1,18 @@
 /**
  * 成绩/考试发布通知模块
  *
- * 通知由原生 Android WorkManager 后台轮询驱动（NotifyWorker），
- * 使用 CASTGC 建立 JWXT 会话，拉取成绩/考试后 diff 并发送系统通知。
- *
+ * Android：通知由原生 WorkManager 后台轮询驱动（NotifyWorker），
+ * 使用 CASTGC 建立 JWXT 会话，拉取成绩/考试后 diff 并发送系统通知；
  * 上课提醒由 AlarmManager 在指定时间触发 ClassAlarmReceiver。
+ *
+ * macOS：仅支持上课提醒，由 UNUserNotificationCenter 直接排程，
+ * 关闭窗口或退出 App 后仍会触发；成绩/考试后台轮询需要常驻进程，不在此实现。
  */
 import { useSettingsStore } from "../stores/settings"
 import { useAuthStore } from "../stores/auth"
 import { isCapacitor } from "./platform"
+import { isMacOSNative } from "./macos"
+import { MacNotify } from "./macos-notify"
 import { NotifyPlugin } from "./notify-plugin"
 import { isCourseActiveInWeek } from "@/app/dashboard/schedule/schedule-utils"
 import { getAcademicClock, resolveAcademicWeek } from "@/lib/academic/academic-time"
@@ -38,6 +42,20 @@ let lastCastgc = ""
 let pendingTokenRefresh = false
 let pendingCheck = false
 const permissionRevisions = { polling: 0, classes: 0 }
+
+interface ClassAlarmBackend {
+  checkPermissions(): Promise<{ granted: boolean }>
+  requestPermissions(): Promise<{ granted: boolean }>
+  scheduleClassAlarms(options: { alarmsJson: string }): Promise<void>
+  cancelClassAlarms(): Promise<void>
+}
+
+/** Android keeps the Capacitor worker; macOS has local reminders only. */
+function classAlarmBackend(): ClassAlarmBackend | undefined {
+  if (isCapacitor()) return NotifyPlugin
+  if (isMacOSNative()) return MacNotify
+  return undefined
+}
 
 function enqueueNative(operation: () => Promise<void>): Promise<void> {
   const result = nativeQueue.then(operation)
@@ -108,7 +126,7 @@ export function observeNativeNotifications(
   nativeNotification: ProviderNativeNotification | undefined,
   providerId: string
 ): () => void {
-  if (!isCapacitor()) return () => {}
+  if (!classAlarmBackend()) return () => {}
   if (notificationProviderId && notificationProviderId !== providerId) stopNotify()
   notificationProvider = nativeNotification
   notificationProviderId = providerId
@@ -263,9 +281,11 @@ export async function setNotificationEnabled(
     await (kind === "polling" ? pollingSync : alarmSync)
     return true
   }
-  if (!isCapacitor() || stopped || !auth.isAuthenticated) return false
-  let permission = await NotifyPlugin.checkPermissions()
-  if (!permission.granted) permission = await NotifyPlugin.requestPermissions()
+  if (kind === "polling" && !isCapacitor()) return false
+  const backend = classAlarmBackend()
+  if (!backend || stopped || !auth.isAuthenticated) return false
+  let permission = await backend.checkPermissions()
+  if (!permission.granted) permission = await backend.requestPermissions()
   if (
     !permission.granted ||
     revision !== permissionRevisions[kind] ||
@@ -307,12 +327,13 @@ export function stopNotify(): void {
   lastAlarmHash = ""
   latestAlarmSchedule = null
   void enqueueNative(async () => {
-    if (!isCapacitor()) return
-    const results = await Promise.allSettled([
-      NotifyPlugin.stopPolling(),
-      NotifyPlugin.clearCastgc(),
-      NotifyPlugin.cancelClassAlarms(),
-    ])
+    const backend = classAlarmBackend()
+    if (!backend) return
+    const tasks: Promise<void>[] = [backend.cancelClassAlarms()]
+    if (isCapacitor()) {
+      tasks.push(NotifyPlugin.stopPolling(), NotifyPlugin.clearCastgc())
+    }
+    const results = await Promise.allSettled(tasks)
     for (const result of results) {
       if (result.status === "rejected")
         console.warn("Failed to stop native notifications", result.reason)
@@ -400,7 +421,7 @@ export function syncClassAlarmsToNative(
   periods: ClassPeriod[],
   calendar?: TermCalendar
 ): Promise<void> {
-  if (!isCapacitor() || stopped || !useAuthStore.getState().isAuthenticated)
+  if (!classAlarmBackend() || stopped || !useAuthStore.getState().isAuthenticated)
     return Promise.resolve()
   latestAlarmSchedule = { courses, currentWeek, periods, calendar }
   return refreshClassAlarms()
@@ -409,20 +430,21 @@ export function syncClassAlarmsToNative(
 function refreshClassAlarms(): Promise<void> {
   const revision = ++alarmRevision
   return (alarmSync = enqueueNative(async () => {
-    if (!isCapacitor() || revision !== alarmRevision) return
+    const backend = classAlarmBackend()
+    if (!backend || revision !== alarmRevision) return
     const auth = useAuthStore.getState()
     const settings = useSettingsStore.getState()
     if (!auth.hasHydrated || !settings.hasHydrated) return
     const valid = () =>
       revision === alarmRevision && !stopped && useAuthStore.getState().isAuthenticated
     if (!valid() || !settings.classReminderEnabled) {
-      await NotifyPlugin.cancelClassAlarms()
+      await backend.cancelClassAlarms()
       lastAlarmHash = ""
       return
     }
     const schedule = latestAlarmSchedule
     if (!schedule) return
-    const { granted } = await NotifyPlugin.checkPermissions()
+    const { granted } = await backend.checkPermissions()
     if (!valid()) return
     if (!granted) {
       settings.setClassReminderEnabled(false)
@@ -439,11 +461,11 @@ function refreshClassAlarms(): Promise<void> {
     alarms.sort((a, b) => a.alarmId.localeCompare(b.alarmId) || a.alarmTime - b.alarmTime)
     const hash = JSON.stringify(alarms)
     if (hash === lastAlarmHash) return
-    await NotifyPlugin.cancelClassAlarms()
+    await backend.cancelClassAlarms()
     lastAlarmHash = ""
     if (!valid()) return
     if (alarms.length > 0) {
-      await NotifyPlugin.scheduleClassAlarms({ alarmsJson: hash })
+      await backend.scheduleClassAlarms({ alarmsJson: hash })
       if (!valid()) return
     }
     lastAlarmHash = hash

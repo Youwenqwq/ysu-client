@@ -224,27 +224,61 @@ async function captureMobileToken(): Promise<string | null> {
   return null
 }
 
-async function verifyMobileToken(): Promise<boolean> {
+async function mobileAuthorizationToken(url: string): Promise<string | null> {
+  const cookie = (await mobileJar.getCookieString(url))
+    .split("; ")
+    .find((entry) => entry.startsWith("Authorization="))
+  return cookie ? cookie.slice("Authorization=".length) : null
+}
+
+async function mobileHeaders(url: string): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  }
+  const token = await mobileAuthorizationToken(url)
+  if (token) headers.Authorization = token
+  return headers
+}
+
+async function verifyMobileToken(): Promise<void> {
+  const url = mobileUrls.userInfo
+  const resp = await fetchWithJar(mobileJar, {
+    method: "GET",
+    url,
+    headers: await mobileHeaders(url),
+    redirect: "follow",
+    timeoutMs,
+  })
+  if (resp.status === 401 || resp.status === 403) {
+    throw new MobileNotLoggedInError(`HTTP ${resp.status} from ${url}`)
+  }
+  if (resp.status < 200 || resp.status >= 300) {
+    throw new MobileProtocolError(`HTTP ${resp.status} from ${url}`)
+  }
+
+  let result: unknown
   try {
-    const resp = await fetchWithJar(mobileJar, {
-      method: "GET",
-      url: `${mobileUrls.apiBase}/`,
-      redirect: "follow",
-      timeoutMs,
-    })
-    // 已认证时返回 404；未认证时返回 200 但 body 中 code: 401
-    if (resp.status === 404) return true
-    const text = await resp.text()
-    try {
-      const data = JSON.parse(text) as Record<string, unknown>
-      const code = data["code"]
-      if (code === 401 || code === "401") return false
-    } catch {
-      // non-JSON 响应，保守视为有效
-    }
-    return true
+    result = JSON.parse(await resp.text())
   } catch {
-    return false
+    throw new MobileProtocolError(`Invalid JSON response from ${url}`)
+  }
+  if (result === null || typeof result !== "object" || Array.isArray(result)) {
+    throw new MobileProtocolError(`Expected a JSON object from ${url}`)
+  }
+  const data = result as Record<string, unknown>
+  const code = data["code"]
+  const msg = typeof data["msg"] === "string" ? data["msg"] : null
+  if (code === 401 || code === "401" || code === 403 || code === "403") {
+    throw new MobileNotLoggedInError(msg || `Mobile API authentication failed: ${url}`)
+  }
+  if (
+    (code !== undefined && code !== 200 && code !== "200" && code !== 0 && code !== "0") ||
+    data["success"] === false ||
+    Boolean(data["error"])
+  ) {
+    const codeVal = typeof code === "string" || typeof code === "number" ? code : null
+    throw new MobileBusinessError(codeVal, msg, url)
   }
 }
 
@@ -260,23 +294,11 @@ export async function ensureMobileAuthorized(verify = false): Promise<void> {
     if (mobileAuthorized) return
     await hydrationDone
 
-    const cookies = await mobileJar.getAllCookies()
-    const hasAuthCookie = cookies.some(
-      (c) => c.name === "Authorization" && c.value && c.domain.includes(getJwxtCookieDomain())
-    )
-    if (hasAuthCookie) {
-      if (verify) {
-        const valid = await verifyMobileToken()
-        if (valid) {
-          mobileAuthorized = true
-          return
-        }
-        // Token 已过期，清除过期的 cookie 继续重新获取
-        await mobileJar.removeCookie(getJwxtCookieDomain(), "/jwmobile", "Authorization")
-      } else {
-        mobileAuthorized = true
-        return
-      }
+    const persistedToken = await mobileAuthorizationToken(mobileUrls.userInfo)
+    if (persistedToken) {
+      if (verify) await verifyMobileToken()
+      mobileAuthorized = true
+      return
     }
 
     // Step 1: Complete CAS SSO to obtain JSESSIONID.
@@ -325,10 +347,7 @@ async function mobileRequest(
   await ensureMobileAuthorized()
 
   const url = `${mobileUrls.apiBase}/${path}`
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  }
+  const headers = await mobileHeaders(url)
 
   const resp = await fetchWithJar(mobileJar, {
     method,
@@ -389,23 +408,6 @@ async function mobilePost(
   return mobileRequest("POST", path, body)
 }
 
-// ─── Auth wrapper ─────────────────────────────────────────────────────── //
-
-async function withMobileReauth<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn()
-  } catch (e) {
-    if (e instanceof MobileNotLoggedInError) {
-      await withAuthTransition(async () => {
-        resetMobileAuth()
-      })
-      await waitForAuthTransition()
-      return await fn()
-    }
-    throw e
-  }
-}
-
 // ─── Public API ───────────────────────────────────────────────────────── //
 
 export async function queryCurrentLesson(params: {
@@ -417,44 +419,38 @@ export async function queryCurrentLesson(params: {
   startNode: number
   endNode: number
 }): Promise<CurrentLesson> {
-  return withMobileReauth(async () => {
-    const data = await mobilePost("lesson/queryCurrentLesson", {
-      teachClassId: params.teachClassId,
-      teachClassType: params.teachClassType,
-      scheduleId: params.scheduleId,
-      week: params.week,
-      weekDay: params.weekDay,
-      startNode: params.startNode,
-      endNode: params.endNode,
-    })
-    return parseCurrentLesson(data)
+  const data = await mobilePost("lesson/queryCurrentLesson", {
+    teachClassId: params.teachClassId,
+    teachClassType: params.teachClassType,
+    scheduleId: params.scheduleId,
+    week: params.week,
+    weekDay: params.weekDay,
+    startNode: params.startNode,
+    endNode: params.endNode,
   })
+  return parseCurrentLesson(data)
 }
 
 export async function querySigninDetail(params: {
   activityId: string
   title?: string
 }): Promise<SigninActivityDetail> {
-  return withMobileReauth(async () => {
-    const data = await mobilePost("signin/detail", {
-      activityId: params.activityId,
-      title: params.title ?? "签到",
-    })
-    return parseSigninActivityDetail(data)
+  const data = await mobilePost("signin/detail", {
+    activityId: params.activityId,
+    title: params.title ?? "签到",
   })
+  return parseSigninActivityDetail(data)
 }
 
 export async function queryStudentSigninStatus(params: {
   activityId: string
   title?: string
 }): Promise<StudentSigninStatus> {
-  return withMobileReauth(async () => {
-    const data = await mobilePost("signin/querySigninDetail", {
-      activityId: params.activityId,
-      title: params.title ?? "签到",
-    })
-    return parseStudentSigninStatus(data)
+  const data = await mobilePost("signin/querySigninDetail", {
+    activityId: params.activityId,
+    title: params.title ?? "签到",
   })
+  return parseStudentSigninStatus(data)
 }
 
 export async function studentSign(params: {
@@ -464,19 +460,17 @@ export async function studentSign(params: {
   longitude?: number
   code?: string
 }): Promise<StudentSignResult> {
-  return withMobileReauth(async () => {
-    const body: Record<string, unknown> = {
-      activityId: params.activityId,
-      accuracy: params.accuracy ?? 0,
-      latitude: params.latitude ?? 0,
-      longitude: params.longitude ?? 0,
-    }
-    if (params.code) {
-      body.code = params.code
-    }
-    const data = await mobilePost("signin/sign", body)
-    return parseStudentSignResult(data)
-  })
+  const body: Record<string, unknown> = {
+    activityId: params.activityId,
+    accuracy: params.accuracy ?? 0,
+    latitude: params.latitude ?? 0,
+    longitude: params.longitude ?? 0,
+  }
+  if (params.code) {
+    body.code = params.code
+  }
+  const data = await mobilePost("signin/sign", body)
+  return parseStudentSignResult(data)
 }
 
 // ─── Parsers ──────────────────────────────────────────────────────────── //

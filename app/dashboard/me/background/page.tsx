@@ -184,6 +184,7 @@ export default function BackgroundSettingsPage() {
                 <ToggleGroupItem value="blur-overlay">
                   {t("app.backgroundStyleBlurOverlay")}
                 </ToggleGroupItem>
+                <ToggleGroupItem value="apple">{t("app.backgroundStyleApple")}</ToggleGroupItem>
               </ToggleGroup>
             </Field>
 
@@ -231,6 +232,7 @@ export default function BackgroundSettingsPage() {
                   {t("app.cardStyleTranslucent")}
                 </ToggleGroupItem>
                 <ToggleGroupItem value="glass">{t("app.cardStyleGlass")}</ToggleGroupItem>
+                <ToggleGroupItem value="apple">{t("app.cardStyleApple")}</ToggleGroupItem>
               </ToggleGroup>
             </Field>
 

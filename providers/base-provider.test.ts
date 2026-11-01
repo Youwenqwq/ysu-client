@@ -34,7 +34,7 @@ function makeProvider(capabilities: AcademicCapabilities) {
 
 /** One representative defaulted method per gated capability. */
 const REPRESENTATIVE_CALLS = {
-  captcha: (p: BaseProvider) => p.getCaptchaUrl(),
+  captcha: (p: BaseProvider) => p.getCaptchaImage(),
   mfa: (p: BaseProvider) => p.requestMfaCode({ username: "u", method: "sms" }),
   wechatMfa: (p: BaseProvider) => p.initiateWechatMfa(),
   studentInfo: (p: BaseProvider) => p.getStudentInfo(),

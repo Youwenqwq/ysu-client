@@ -17,7 +17,9 @@ import {
   authorize,
   CASProtocolError,
   getJar,
+  getCaptchaImage,
   isAuthenticated,
+  prepareLogin,
   NotAuthenticatedError,
   resetCAS,
 } from "./cas"
@@ -81,5 +83,48 @@ describe("CAS service authorization boundaries", () => {
       response("https://cer.ysu.edu.cn/authserver/index.do", 503)
     )
     await expect(isAuthenticated()).rejects.toBeInstanceOf(CASProtocolError)
+  })
+})
+
+describe("CAS login preparation", () => {
+  it("drops rejected TGC cookies without retrying the returned login page", async () => {
+    await getJar().setCookie(
+      "CASTGC=synthetic-stale-session; Path=/authserver",
+      "https://cer.ysu.edu.cn/authserver/login"
+    )
+    mocks.fetchWithJar.mockResolvedValueOnce(
+      response(
+        "https://cer.ysu.edu.cn/authserver/login",
+        200,
+        '<form><input name="execution" value="synthetic-execution"></form>'
+      )
+    )
+
+    await prepareLogin()
+
+    expect(mocks.fetchWithJar).toHaveBeenCalledTimes(1)
+    expect(await getJar().getCookieString("https://cer.ysu.edu.cn/authserver/login"))
+      .not.toContain("CASTGC=")
+  })
+})
+
+describe("CAS captcha images", () => {
+  it("preserves captcha image MIME and binary bytes in a data URL", async () => {
+    const bytes = new Uint8Array([0xff, 0xd8, 0x00, 0x80, 0xff])
+    mocks.fetchWithJar.mockResolvedValue({
+      ...response("https://cer.ysu.edu.cn/authserver/getCaptcha.htl"),
+      headers: { "content-type": "image/jpeg; charset=binary" },
+      arrayBuffer: async () => bytes.buffer,
+    })
+
+    expect(await getCaptchaImage()).toBe("data:image/jpeg;base64,/9gAgP8=")
+  })
+
+  it("rejects login/error HTML instead of presenting it as a captcha image", async () => {
+    mocks.fetchWithJar.mockResolvedValue({
+      ...response("https://cer.ysu.edu.cn/authserver/login"),
+      headers: { "content-type": "text/html" },
+    })
+    await expect(getCaptchaImage()).rejects.toBeInstanceOf(CASProtocolError)
   })
 })

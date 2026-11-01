@@ -304,9 +304,8 @@ export interface HttpRequest {
   readonly redirect: "manual" | "follow"
   readonly timeoutMs?: number
   /**
-   * 可选中止信号。Web 传输层（proxyHttpSend）真实取消请求；
-   * CapacitorHttp 不支持中止 in-flight 请求，仅在发送前检查
-   * （已中止则直接抛错），已发出的请求结果由调用方丢弃。
+   * Web 传输层真实取消请求；原生传输不取消底层 in-flight 请求，
+   * 但在发送前及响应后检查信号，已中止的响应不写入 jar。
    */
   readonly signal?: AbortSignal
   /** Passed to CapacitorHttp as responseType (e.g. 'arraybuffer' for binary data). */
@@ -332,7 +331,7 @@ export async function fetchWithJar(jar: SimpleCookieJar, req: HttpRequest): Prom
 }
 
 /**
- * 无会话请求：走平台传输层（原生 CapacitorHttp / Web 边缘代理），
+ * 无会话请求：走平台传输层（WK / Capacitor 原生 HTTP / Web 边缘代理），
  * 但使用一次性 jar，不读写任何持久 cookie。
  * 用于微信扫码登录等与教务会话无关的第三方端点。
  */
@@ -341,6 +340,7 @@ export async function fetchStateless(req: HttpRequest): Promise<HttpResponse> {
 }
 
 import { isCapacitor } from "./native/platform"
+import { isMacOSApp, macHttpRequest, bytesToBase64, base64ToBytes } from "./native/macos"
 import { getCustomUserAgent } from "./custom-user-agent"
 import { useActivationStore } from "./stores/activation"
 
@@ -354,6 +354,9 @@ async function getCapacitorCore(): Promise<any> {
 }
 
 async function send(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
+  if (isMacOSApp) {
+    return macHttpSend(jar, req)
+  }
   if (isCapacitor()) {
     return capacitorHttpSend(jar, req)
   }
@@ -509,6 +512,53 @@ async function proxyHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<Ht
   }
 }
 
+/** WK URLSession always returns manual redirects and untouched base64 bytes. */
+async function macHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
+  req.signal?.throwIfAborted()
+  const headers: Record<string, string> = {}
+  for (const [key, value] of Object.entries(req.headers ?? {})) {
+    // The JS jar is authoritative, never accept caller or WK cookie stores.
+    if (key.toLowerCase() !== "cookie") headers[key] = value
+  }
+  if (!hasHeader(headers, "User-Agent")) headers["User-Agent"] = getCustomUserAgent()
+  if (!hasHeader(headers, "Accept")) {
+    headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+  }
+  if (!hasHeader(headers, "Accept-Language")) headers["Accept-Language"] = "zh-CN,zh;q=0.9,en;q=0.8"
+  const cookies = await jar.getCookieString(req.url)
+  if (cookies) headers["Cookie"] = cookies
+  const body = req.body instanceof URLSearchParams ? req.body.toString() : req.body
+  req.signal?.throwIfAborted()
+  const response = await macHttpRequest({
+    url: req.url,
+    method: req.method,
+    headers,
+    ...(body === undefined ? {} : { bodyBase64: bytesToBase64(new TextEncoder().encode(body)) }),
+    timeoutMs: req.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  })
+  // WK's reply API has no cancellation handle. Discard aborted replies before
+  // applying cookies or decoding bytes; do not pretend to cancel URLSession.
+  req.signal?.throwIfAborted()
+  const normalizedHeaders: Record<string, string | string[]> = {}
+  for (const [key, value] of Object.entries(response.headers)) {
+    normalizedHeaders[key.toLowerCase()] = value
+  }
+  const rawCookies = normalizedHeaders["set-cookie"]
+  if (rawCookies) {
+    for (const cookie of Array.isArray(rawCookies) ? rawCookies : splitSetCookie(rawCookies)) {
+      await jar.setCookie(cookie, req.url, { ignoreError: true })
+    }
+  }
+  const bytes = base64ToBytes(response.bodyBase64)
+  return {
+    status: response.status,
+    headers: normalizedHeaders,
+    url: response.url,
+    text: async () => new TextDecoder().decode(bytes),
+    arrayBuffer: async () => bytes.buffer,
+  }
+}
+
 async function capacitorHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
   const capCore = await getCapacitorCore()
   const CapacitorHttp = capCore?.CapacitorHttp
@@ -569,6 +619,7 @@ async function capacitorHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promis
   }
 
   const response = await CapacitorHttp.request(options)
+  req.signal?.throwIfAborted()
 
   // CapacitorHttp preserves original header casing from the server.
   // Normalize all keys to lowercase so consumers can access uniformly.
@@ -646,6 +697,7 @@ async function capacitorHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promis
 
 async function followRedirects(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
   let currentUrl = req.url
+  let currentOrigin = new URL(currentUrl).origin
   let currentMethod = req.method
   let currentBody = req.body
   let currentHeaders = req.headers
@@ -658,6 +710,8 @@ async function followRedirects(jar: SimpleCookieJar, req: HttpRequest): Promise<
       body: currentBody,
       redirect: "manual",
       timeoutMs: req.timeoutMs,
+      signal: req.signal,
+      responseType: req.responseType,
     })
 
     if (resp.status < 300 || resp.status >= 400) {
@@ -669,7 +723,12 @@ async function followRedirects(jar: SimpleCookieJar, req: HttpRequest): Promise<
       return resp
     }
 
-    currentUrl = new URL(location, currentUrl).toString()
+    const nextUrl = new URL(location, currentUrl)
+    if (nextUrl.origin !== currentOrigin) {
+      currentHeaders = stripCredentials(currentHeaders)
+    }
+    currentUrl = nextUrl.toString()
+    currentOrigin = nextUrl.origin
 
     if (
       resp.status === 303 ||
@@ -721,6 +780,21 @@ function stripBodyHeaders(
     out[k] = v
   }
   return out
+}
+
+function stripCredentials(
+  headers: Readonly<Record<string, string>> | undefined
+): Readonly<Record<string, string>> | undefined {
+  if (!headers) return undefined
+  let stripped: Record<string, string> | undefined
+  for (const name in headers) {
+    if (!Object.hasOwn(headers, name)) continue
+    const lower = name.toLowerCase()
+    if (lower !== "authorization" && lower !== "cookie") continue
+    stripped ??= { ...headers }
+    delete stripped[name]
+  }
+  return stripped ?? headers
 }
 
 function hasHeader(headers: Readonly<Record<string, string>>, name: string): boolean {
