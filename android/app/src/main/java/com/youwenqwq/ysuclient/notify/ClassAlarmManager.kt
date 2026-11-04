@@ -5,12 +5,19 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import com.youwenqwq.ysuclient.cache.UnifiedCache
 import org.json.JSONArray
+import org.json.JSONObject
 
 object ClassAlarmManager {
     private const val TAG = "YsuClassAlarmManager"
+
+    internal fun supportsLiveUpdate(alarm: JSONObject): Boolean =
+        alarm.optBoolean("liveUpdateEnabled", false) &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
+            alarm.optLong("endAt") > ClassReminderService.startAt(alarm)
 
     @Synchronized
     fun scheduleAlarms(context: Context, alarmsJson: String) {
@@ -32,9 +39,11 @@ object ClassAlarmManager {
                 Log.w(TAG, "Skipping duplicate class alarm: $alarmId")
                 continue
             }
-            // Keep active classes until the end so service restoration and a live
-            // handoff can still resolve their saved configuration.
-            if (expiresAt > now) futureAlarms.put(alarm)
+            // Only live classes need restoration after their reminder/start time.
+            // Ordinary reminders keep the upstream future-only snapshot contract.
+            if (if (supportsLiveUpdate(alarm)) expiresAt > now else alarmTime > now) {
+                futureAlarms.put(alarm)
+            }
         }
 
         cancelAllAlarms(context)
@@ -46,12 +55,13 @@ object ClassAlarmManager {
                 val alarmId = alarm.getString("alarmId")
                 val alarmTime = alarm.getLong("alarmTime")
                 val startAt = ClassReminderService.startAt(alarm)
+                val live = supportsLiveUpdate(alarm)
                 // The reminder broadcast posts directly; only the separate start
                 // broadcast may create a live-countdown foreground service.
                 for (phase in 0..1) {
                     val atStart = phase == 1
                     if (!atStart && now >= startAt) continue
-                    if (atStart && !alarm.optBoolean("liveUpdateEnabled", false)) continue
+                    if (atStart && !live) continue
                     val pendingIntent = PendingIntent.getBroadcast(
                         context, alarmId.hashCode(),
                         alarmIntent(context, alarmId, alarmTime, atStart),
@@ -59,7 +69,8 @@ object ClassAlarmManager {
                     )
                     val triggerAt = if (atStart) startAt else alarmTime
                     val exact = ClassAlarmScheduling.schedule(
-                        context, maxOf(now + 1_000L, triggerAt), pendingIntent, asAlarmClock = true
+                        context, if (live) maxOf(now + 1_000L, triggerAt) else triggerAt,
+                        pendingIntent, asAlarmClock = live
                     )
                     Log.d(TAG, "Scheduled alarm $alarmId at $triggerAt (start=$atStart, exact=$exact)")
                 }
@@ -90,8 +101,6 @@ object ClassAlarmManager {
             // Cancel alarms created before intents acquired a collision-safe data URI.
             cancelAlarm(context, alarmManager, alarmId, Intent(context, ClassAlarmReceiver::class.java))
             ClassLiveUpdate.cancelPhaseAlarms(context, alarmId)
-            (context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
-                .cancel("class:$alarmId", 0)
         }
         UnifiedCache.putString(context, UnifiedCache.KEY_CLASS_ALARMS, "[]")
         Log.d(TAG, "All alarms cancelled")

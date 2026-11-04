@@ -9,6 +9,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.youwenqwq.ysuclient.MainActivity
@@ -38,9 +40,13 @@ object ClassLiveUpdate {
 
     /** 文案未变化时不重复 notify，避免每秒刷新通知。 */
     private val lastSignature = HashMap<String, String>()
+    private val cleanupHandler = Handler(Looper.getMainLooper())
+    private val endedCleanups = HashMap<String, Runnable>()
 
     /** 「已下课」保留时间。 */
     private const val ENDED_TIMEOUT_MS = 60_000L
+    private const val EXTRA_ENDED = "class_live_update_ended"
+    private const val ENDED_SIGNATURE = "ended"
 
 
     const val ACTION_CLASS_STARTED = "com.youwenqwq.ysuclient.action.CLASS_STARTED"
@@ -55,6 +61,7 @@ object ClassLiveUpdate {
     const val EXTRA_CLASSROOM = "classroom"
     const val EXTRA_REMIND = "remind_minutes"
     const val EXTRA_CONFLICT = "conflict_count"
+    const val EXTRA_ENDED_DEADLINE = "class_live_update_ended_deadline"
 
     fun notificationId(alarmId: String): Int = ("class:$alarmId").hashCode()
 
@@ -88,6 +95,7 @@ object ClassLiveUpdate {
         endAt: Long = 0L
     ): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) return false
+        if (isEnded(context, alarmId)) return true
         val extras = buildExtras(courseName, classroom, startAt, endAt, remindMinutes, conflictCount)
         updatePhase(context, alarmId, extras)
         if (startAt > System.currentTimeMillis()) {
@@ -102,9 +110,28 @@ object ClassLiveUpdate {
     /** 定时刷新：只负责重算文案与进度，不再重复安排开课/下课提醒。 */
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     fun onTick(context: Context, alarmId: String, extras: Bundle) {
+        val deadline = extras.getLong(EXTRA_ENDED_DEADLINE, 0L)
+        if (deadline > 0L) {
+            val nm = context.getSystemService(NotificationManager::class.java)
+            val active = nm.activeNotifications.firstOrNull {
+                it.id == notificationId(alarmId) &&
+                    it.notification.extras.getString(EXTRA_ALARM_ID) == alarmId &&
+                    it.notification.extras.getBoolean(EXTRA_ENDED, false) &&
+                    it.notification.extras.getLong(EXTRA_ENDED_DEADLINE, 0L) == deadline
+            } ?: return
+            if (System.currentTimeMillis() < deadline) {
+                scheduleEndedCleanup(context, alarmId, extras)
+                return
+            }
+            cancelPhaseAlarms(context, alarmId)
+            nm.cancel(active.id)
+            return
+        }
+        if (lastSignature[alarmId] == ENDED_SIGNATURE) return
         // 通知已被用户或后续课程替换时不再复活。
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (nm.activeNotifications.none { it.id == notificationId(alarmId) }) return
+        val active = nm.activeNotifications.firstOrNull { it.id == notificationId(alarmId) } ?: return
+        if (active.notification.extras.getBoolean(EXTRA_ENDED, false)) return
         val endAt = extras.getLong(EXTRA_END_AT, 0L)
         if (endAt > 0 && System.currentTimeMillis() >= endAt) {
             markEnded(context, alarmId, extras)
@@ -115,11 +142,16 @@ object ClassLiveUpdate {
 
     /** 下课：30 分钟内有下一节课就切过去，否则显示「已下课」并 1 分钟后收起。 */
     fun markEnded(context: Context, alarmId: String, extras: Bundle) {
+        if (lastSignature[alarmId] == ENDED_SIGNATURE) return
         val nm = context.getSystemService(NotificationManager::class.java)
         // 旧课程被替换或用户已移除通知时，迟到的下课广播不能重新发布。
-        if (nm.activeNotifications.none { it.id == notificationId(alarmId) && it.isOngoing }) return
+        val active = nm.activeNotifications.firstOrNull {
+            it.id == notificationId(alarmId) && it.isOngoing
+        } ?: return
+        if (active.notification.extras.getBoolean(EXTRA_ENDED, false)) return
         cancelPhaseAlarms(context, alarmId)
-        lastSignature.remove(alarmId)
+        // 入队通知是异步的，先锁定终态，重复边界不能刷新 60 秒期限。
+        lastSignature[alarmId] = ENDED_SIGNATURE
         val next = findNextClass(context, alarmId, extras.getLong(EXTRA_END_AT, System.currentTimeMillis()))
         if (next != null && next.optBoolean("liveUpdateEnabled", false) &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
@@ -141,34 +173,46 @@ object ClassLiveUpdate {
     }
 
     private fun showEnded(context: Context, alarmId: String, extras: Bundle) {
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        // 先收掉推广通知，再发一条 1 分钟后自动消失的普通通知。
+        // 结束胶囊仍走同一推广模板；解除前台绑定后另设显式撤下边界。
         ClassReminderService.detachLiveNotification(alarmId)
-        nm.cancel("class:$alarmId", 0)
-        nm.cancel(notificationId(alarmId))
+        val ended = context.getString(R.string.class_live_update_ended)
+        val deadline = System.currentTimeMillis() + ENDED_TIMEOUT_MS
+        // 你真的在Review啊
+        publish(
+            context, alarmId, extras.getString(EXTRA_COURSE).orEmpty(),
+            ended, ended, 100, ENDED_TIMEOUT_MS, deadline
+        )
+        scheduleEndedCleanup(context, alarmId, Bundle().apply {
+            putLong(EXTRA_ENDED_DEADLINE, deadline)
+        })
+    }
 
-        val classroom = extras.getString(EXTRA_CLASSROOM).orEmpty()
-        val text = classroom.ifBlank {
-            extras.getString(EXTRA_COURSE).orEmpty()
+    private fun scheduleEndedCleanup(context: Context, alarmId: String, extras: Bundle) {
+        val deadline = extras.getLong(EXTRA_ENDED_DEADLINE)
+        schedule(context, ACTION_CLASS_TICK, alarmId, deadline, extras)
+        endedCleanups.remove(alarmId)?.let { cleanupHandler.removeCallbacks(it) }
+        val cleanup = Runnable {
+            synchronized(ClassAlarmManager) {
+                endedCleanups.remove(alarmId)
+                onTick(context, alarmId, extras)
+            }
         }
-        ensureLiveChannel(context)
-        val notification = Notification.Builder(context, LIVE_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_class)
-            .setColor(ACCENT_COLOR)
-            .setCategory(Notification.CATEGORY_EVENT)
-            .setContentTitle(context.getString(R.string.class_live_update_ended))
-            .setContentText(text)
-            .setContentIntent(openScheduleIntent(context))
-            .setOngoing(false)
-            // 你真的在Review啊
-            .setAutoCancel(true)
-            .setTimeoutAfter(ENDED_TIMEOUT_MS)
-            .build()
-        nm.notify(notificationId(alarmId), notification)
+        endedCleanups[alarmId] = cleanup
+        cleanupHandler.postDelayed(cleanup, (deadline - System.currentTimeMillis()).coerceAtLeast(0L))
+    }
+
+    private fun isEnded(context: Context, alarmId: String): Boolean {
+        if (lastSignature[alarmId] == ENDED_SIGNATURE) return true
+        val nm = context.getSystemService(NotificationManager::class.java)
+        return nm.activeNotifications.any {
+            it.id == notificationId(alarmId) &&
+                it.notification.extras.getBoolean(EXTRA_ENDED, false)
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     private fun updatePhase(context: Context, alarmId: String, extras: Bundle) {
+        if (lastSignature[alarmId] == ENDED_SIGNATURE) return
         val now = System.currentTimeMillis()
         val startAt = extras.getLong(EXTRA_START_AT, 0L)
         val endAt = extras.getLong(EXTRA_END_AT, 0L)
@@ -240,7 +284,9 @@ object ClassLiveUpdate {
         courseName: String,
         text: String,
         capsule: String,
-        progress: Int
+        progress: Int,
+        timeoutAfter: Long = 0L,
+        endedDeadline: Long = 0L
     ) {
         ensureLiveChannel(context)
         val notification = Notification.Builder(context, LIVE_CHANNEL_ID)
@@ -253,6 +299,7 @@ object ClassLiveUpdate {
             .setOngoing(true)
             .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
             .setOnlyAlertOnce(true)
+            .setTimeoutAfter(timeoutAfter)
             .setShortCriticalText(capsule)
             .setStyle(progressStyle(context, progress))
             .setFlag(Notification.FLAG_PROMOTED_ONGOING, true)
@@ -260,9 +307,11 @@ object ClassLiveUpdate {
             .build()
         notification.extras.putBoolean("android.requestPromotedOngoing", true)
         notification.extras.putString(EXTRA_ALARM_ID, alarmId)
+        notification.extras.putBoolean(EXTRA_ENDED, timeoutAfter > 0L)
+        notification.extras.putLong(EXTRA_ENDED_DEADLINE, endedDeadline)
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (!ClassReminderService.attachLiveNotification(alarmId, notification)) {
+        if (timeoutAfter > 0L || !ClassReminderService.attachLiveNotification(alarmId, notification)) {
             nm.notify(notificationId(alarmId), notification)
         }
         nm.cancel("class:$alarmId", 0)
@@ -275,7 +324,12 @@ object ClassLiveUpdate {
         nm.activeNotifications
             .filter { it.packageName == context.packageName && it.id != keepId }
             .filter { it.notification.channelId == LIVE_CHANNEL_ID }
-            .forEach { nm.cancel(it.id) }
+            .forEach {
+                it.notification.extras.getString(EXTRA_ALARM_ID)?.let { alarmId ->
+                    cancelPhaseAlarms(context, alarmId)
+                }
+                nm.cancel(it.id)
+            }
     }
 
     /** 关闭提醒或退出账户时，同时清理已投递课程的通知与阶段闹钟。 */
@@ -288,6 +342,9 @@ object ClassLiveUpdate {
                 cancelPhaseAlarms(context, it)
             }
             nm.cancel(active.id)
+        }
+        while (endedCleanups.isNotEmpty()) {
+            cancelPhaseAlarms(context, endedCleanups.keys.first())
         }
         lastSignature.clear()
     }
@@ -362,6 +419,7 @@ object ClassLiveUpdate {
 
     /** 取消某个课次的阶段闹钟（开课/下课/刷新）。 */
     fun cancelPhaseAlarms(context: Context, alarmId: String) {
+        endedCleanups.remove(alarmId)?.let { cleanupHandler.removeCallbacks(it) }
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         for (action in listOf(ACTION_CLASS_STARTED, ACTION_CLASS_ENDED, ACTION_CLASS_TICK)) {
             val intent = Intent(context, ClassAlarmReceiver::class.java).apply {
@@ -399,12 +457,12 @@ object ClassLiveUpdate {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        // 上课/下课是关键节点，按系统闹钟投递；tick 只是刷新进度，允许宽松窗口。
+        // 开课/下课及结束胶囊撤下是关键边界；普通 tick 允许宽松窗口。
         ClassAlarmScheduling.schedule(
             context = context,
             triggerAt = triggerAt,
             operation = pending,
-            asAlarmClock = action != ACTION_CLASS_TICK,
+            asAlarmClock = action != ACTION_CLASS_TICK || extras.getLong(EXTRA_ENDED_DEADLINE, 0L) > 0L,
         )
     }
 }

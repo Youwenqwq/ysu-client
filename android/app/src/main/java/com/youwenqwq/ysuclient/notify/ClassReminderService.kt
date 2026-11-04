@@ -1,15 +1,12 @@
 package com.youwenqwq.ysuclient.notify
 
 import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
-import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -17,7 +14,6 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.youwenqwq.ysuclient.MainActivity
 import com.youwenqwq.ysuclient.R
 import com.youwenqwq.ysuclient.cache.UnifiedCache
 import kotlinx.coroutines.CancellationException
@@ -37,7 +33,6 @@ import java.util.concurrent.ConcurrentHashMap
 class ClassReminderService : Service() {
     companion object {
         private const val TAG = "YsuClassReminder"
-        private const val REMINDER_CHANNEL = "ysu_class_reminder_v1"
         private const val DELIVERY_PREFS = "ysu_class_start_delivery"
         private const val TICK_MS = 30_000L
         @Volatile private var running: ClassReminderService? = null
@@ -126,13 +121,13 @@ class ClassReminderService : Service() {
         }
 
         internal fun claimDelivery(
-            context: Context, id: String, start: Long, end: Long, vibration: Boolean = false
+            context: Context, id: String, start: Long, end: Long
         ): Boolean {
             val prefs = context.getSharedPreferences(DELIVERY_PREFS, Context.MODE_PRIVATE)
             val legacyKey = "$id:$start"
-            val key = "${if (vibration) "vibration" else "notification"}:$legacyKey"
-            // An old undifferentiated claim may already have vibrated. Preserve its
-            // at-most-once guarantee across upgrades, rather than replaying it.
+            val key = "vibration:$legacyKey"
+            // Old unified claims may already have vibrated; only the waveform is
+            // deduplicated. Ordinary reminders retain their upstream delivery rules.
             if (prefs.contains(legacyKey) || prefs.contains(key)) return false
             val editor = prefs.edit()
             val now = System.currentTimeMillis()
@@ -148,43 +143,34 @@ class ClassReminderService : Service() {
             val id = alarm.getString("alarmId")
             val start = startAt(alarm)
             val expiry = expiryAt(alarm)
-            val firstDelivery = claimDelivery(context, id, start, expiry)
-            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val alreadyLive = manager.activeNotifications.any {
-                it.isOngoing && it.notification.extras.containsKey(ClassLiveUpdate.EXTRA_ALARM_ID)
-            }
-            if (firstDelivery && !alreadyLive) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    manager.createNotificationChannel(NotificationChannel(
-                        REMINDER_CHANNEL, context.getString(R.string.class_alarm_channel_name),
-                        NotificationManager.IMPORTANCE_HIGH
-                    ).apply {
-                        description = context.getString(R.string.class_alarm_channel_desc)
-                        setSound(null, null)
-                        // Strong vibration is explicit, never a duplicate channel vibration.
-                        enableVibration(false)
-                    })
+            val end = alarm.optLong("endAt")
+            if (ClassAlarmManager.supportsLiveUpdate(alarm)) {
+                ClassLiveUpdate.post(
+                    context, id,
+                    text(alarm, "courseName", context.getString(R.string.notify_fallback_alarm_course)),
+                    text(alarm, "classroom"), text(alarm, "startTime"), start,
+                    alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end
+                )
+            } else {
+                val parts = buildList {
+                    val startTime = text(alarm, "startTime")
+                    val classroom = text(alarm, "classroom")
+                    if (startTime.isNotEmpty()) add(startTime)
+                    if (classroom.isNotEmpty()) add(classroom)
                 }
-                val notification = NotificationCompat.Builder(context, REMINDER_CHANNEL)
-                    .setSmallIcon(R.drawable.ic_stat_class)
+                val content = if (parts.isNotEmpty()) parts.joinToString(" · ")
+                    else context.getString(R.string.class_alarm_text, alarm.optInt("remindMinutes", 15))
+                val notification = NativeNotifications.builder(context, NotificationKind.CLASSES)
                     .setContentTitle(text(alarm, "courseName", context.getString(R.string.notify_fallback_alarm_course)))
-                    .setContentText(listOf(text(alarm, "startTime"), text(alarm, "classroom"))
-                        .filter { it.isNotBlank() }.joinToString(" · "))
-                    .setContentIntent(openSchedule(context))
-                    .setCategory(NotificationCompat.CATEGORY_REMINDER)
-                    .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .setSilent(true)
-                    .setVibrate(longArrayOf(0L))
-                    .setAutoCancel(true)
-                    .setOnlyAlertOnce(true)
-                    .setTimeoutAfter((start - System.currentTimeMillis()).coerceAtLeast(1L))
+                    .setContentText(content)
                     .build()
-                manager.notify("class:$id", 0, notification)
+                (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                    .notify("class:$id", 0, notification)
             }
             if (!alarm.optBoolean("vibrationEnabled", false)) return false
             val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             if (!vibrator.hasVibrator() ||
-                !claimDelivery(context, id, start, expiry, vibration = true)) return false
+                !claimDelivery(context, id, start, expiry)) return false
             vibrateReminder(vibrator)
             return true
         }
@@ -199,14 +185,6 @@ class ClassReminderService : Service() {
                 ), attributes)
             } else vibrator.vibrate(pattern, -1, attributes)
         }
-
-        private fun openSchedule(context: Context): PendingIntent = PendingIntent.getActivity(
-            context, 0,
-            Intent(context, MainActivity::class.java).setAction(Intent.ACTION_VIEW)
-                .setData(Uri.parse("ysuclient://schedule"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
