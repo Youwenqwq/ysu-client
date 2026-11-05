@@ -29,7 +29,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
-/** Starts at class time; absolute-time delays own live boundaries and silent handoffs. */
+/** Refreshes Live Updates from reminder time; absolute-time delays own boundaries and silent handoffs. */
 class ClassReminderService : Service() {
     companion object {
         private const val TAG = "YsuClassReminder"
@@ -57,6 +57,8 @@ class ClassReminderService : Service() {
 
         internal fun isMonitoring(alarmId: String): Boolean = running?.jobs?.containsKey(alarmId) == true
 
+        internal fun needsForegroundNotification(): Boolean = running?.foregroundReady == false
+
         internal fun attachLiveNotification(alarmId: String, notification: Notification): Boolean {
             val service = running ?: return false
             service.promoteLiveNotification(ClassLiveUpdate.notificationId(alarmId), notification)
@@ -76,10 +78,9 @@ class ClassReminderService : Service() {
             if (!alarm.optBoolean("liveUpdateEnabled", false) ||
                 Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA ||
                 alarm.optLong("endAt") <= startAt(alarm)) return false
-            // A previous class may already have handed off to this upcoming live.
-            // Otherwise never create an FGS (and its disclosure) before class starts,
-            // including when a cached alarm from an older version fires early.
-            if (System.currentTimeMillis() < startAt(alarm)) {
+            // Only a live handoff may resume before its configured reminder time.
+            // At the first reminder, notify() may not have reached the system yet.
+            if (System.currentTimeMillis() < minOf(startAt(alarm), alarm.optLong("alarmTime"))) {
                 val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 if (manager.activeNotifications.none {
                         it.id == ClassLiveUpdate.notificationId(alarm.optString("alarmId")) && it.isOngoing
@@ -138,7 +139,7 @@ class ClassReminderService : Service() {
             return true
         }
 
-        /** The pre-class reminder never starts a foreground service. */
+        /** ALU reminders start the same foreground timer used by class and handoff updates. */
         internal fun sendReminder(context: Context, alarm: JSONObject): Boolean {
             val id = alarm.getString("alarmId")
             val start = startAt(alarm)
@@ -151,6 +152,7 @@ class ClassReminderService : Service() {
                     text(alarm, "classroom"), text(alarm, "startTime"), start,
                     alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end
                 )
+                ClassReminderService.start(context, alarm)
             } else {
                 val parts = buildList {
                     val startTime = text(alarm, "startTime")
@@ -265,15 +267,19 @@ class ClassReminderService : Service() {
                     text(alarm, "classroom"), start, end,
                     alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1)
                 )
-                // Handoff live updates may already be showing an upcoming class. Refresh
-                // them on absolute display boundaries without posting an early first live.
-                val showingUpcoming = live &&
-                    (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-                        .activeNotifications.any { it.id == ClassLiveUpdate.notificationId(id) && it.isOngoing }
-                if (!showingUpcoming) delayUntil(start)
+                // Start refreshing the first upcoming class as well as live handoffs.
+                if (live && System.currentTimeMillis() < start) {
+                    ClassLiveUpdate.post(
+                        this@ClassReminderService, id,
+                        text(alarm, "courseName", getString(R.string.notify_fallback_alarm_course)),
+                        text(alarm, "classroom"), text(alarm, "startTime"), start,
+                        alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end
+                    )
+                }
                 while (System.currentTimeMillis() < start) {
                     val now = System.currentTimeMillis()
-                    delayUntil(minOf(start, now - now % TICK_MS + TICK_MS))
+                    val nextMinute = start - ((start - now - 1L) / 60_000L) * 60_000L
+                    delayUntil(minOf(nextMinute, now - now % TICK_MS + TICK_MS))
                     synchronized(ClassAlarmManager) {
                         if (!isCurrent(alarm)) return@launch
                         if (live && System.currentTimeMillis() < start) ClassLiveUpdate.onTick(this@ClassReminderService, id, extras)

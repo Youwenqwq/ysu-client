@@ -21,8 +21,9 @@ import org.json.JSONObject
 
 /**
  * 上课提醒的 Live Update：
- * 1. 到上课时刻发布「还有 N 分钟下课」；
- * 2. 下课后 30 分钟内有课则提前展示下一节课，否则显示「已下课」一分钟。
+ * 1. 从课前提醒时刻开始刷新上课倒计时；
+ * 2. 上课时切换为「还有 N 分钟下课」；
+ * 3. 下课后 30 分钟内有课则提前展示下一节课，否则显示「已下课」一分钟。
  *
  * 前台 ClassReminderService 负责按绝对时间刷新和阶段切换，边界闹钟仅作补偿。
  *
@@ -271,7 +272,7 @@ object ClassLiveUpdate {
             )
         }
         val signature = "$text|$capsule|$progress"
-        if (lastSignature[alarmId] != signature) {
+        if (lastSignature[alarmId] != signature || ClassReminderService.needsForegroundNotification()) {
             lastSignature[alarmId] = signature
             publish(context, alarmId, courseName, text, capsule, progress)
         }

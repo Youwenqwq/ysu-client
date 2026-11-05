@@ -112,7 +112,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="User-enabled class start reminders: start at the actual class time and maintain live class-end/handoff countdowns while holding a wake lock bounded by the monitored class end." />
+                android:value="User-enabled Live Updates: refresh pre-class, in-class and consecutive-class countdowns from the configured reminder time, using the same visible notification and a wake lock bounded by class end." />
         </service>
 
         <receiver
