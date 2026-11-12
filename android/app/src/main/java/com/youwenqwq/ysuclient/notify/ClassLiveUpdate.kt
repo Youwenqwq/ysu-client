@@ -19,6 +19,13 @@ import com.youwenqwq.ysuclient.cache.UnifiedCache
 import org.json.JSONArray
 import org.json.JSONObject
 
+internal fun shouldDeferLiveUpdate(
+    now: Long,
+    incomingStartAt: Long,
+    activeStartAt: Long,
+    activeEndAt: Long,
+): Boolean = incomingStartAt > now && activeStartAt in 1..now && activeEndAt > now
+
 /**
  * 上课提醒的 Live Update：
  * 1. 从课前提醒时刻开始刷新上课倒计时；
@@ -97,6 +104,10 @@ object ClassLiveUpdate {
     ): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) return false
         if (isEnded(context, alarmId)) return true
+        if (shouldDeferToActiveClass(context, alarmId, startAt)) {
+            Log.d(TAG, "Deferring $alarmId until the active class ends")
+            return false
+        }
         val extras = buildExtras(courseName, classroom, startAt, endAt, remindMinutes, conflictCount)
         updatePhase(context, alarmId, extras)
         if (startAt > System.currentTimeMillis()) {
@@ -202,6 +213,29 @@ object ClassLiveUpdate {
         cleanupHandler.postDelayed(cleanup, (deadline - System.currentTimeMillis()).coerceAtLeast(0L))
     }
 
+    private fun shouldDeferToActiveClass(
+        context: Context,
+        incomingAlarmId: String,
+        incomingStartAt: Long,
+    ): Boolean {
+        val now = System.currentTimeMillis()
+        val nm = context.getSystemService(NotificationManager::class.java)
+        return nm.activeNotifications.any { active ->
+            if (active.id == notificationId(incomingAlarmId) ||
+                active.notification.channelId != LIVE_CHANNEL_ID ||
+                active.notification.extras.getBoolean(EXTRA_ENDED, false)) {
+                false
+            } else {
+                shouldDeferLiveUpdate(
+                    now,
+                    incomingStartAt,
+                    active.notification.extras.getLong(EXTRA_START_AT, 0L),
+                    active.notification.extras.getLong(EXTRA_END_AT, 0L),
+                )
+            }
+        }
+    }
+
     private fun isEnded(context: Context, alarmId: String): Boolean {
         if (lastSignature[alarmId] == ENDED_SIGNATURE) return true
         val nm = context.getSystemService(NotificationManager::class.java)
@@ -274,7 +308,10 @@ object ClassLiveUpdate {
         val signature = "$text|$capsule|$progress"
         if (lastSignature[alarmId] != signature || ClassReminderService.needsForegroundNotification()) {
             lastSignature[alarmId] = signature
-            publish(context, alarmId, courseName, text, capsule, progress)
+            publish(
+                context, alarmId, courseName, text, capsule, progress,
+                startAt = startAt, endAt = endAt
+            )
         }
     }
 
@@ -287,7 +324,9 @@ object ClassLiveUpdate {
         capsule: String,
         progress: Int,
         timeoutAfter: Long = 0L,
-        endedDeadline: Long = 0L
+        endedDeadline: Long = 0L,
+        startAt: Long = 0L,
+        endAt: Long = 0L,
     ) {
         ensureLiveChannel(context)
         val notification = Notification.Builder(context, LIVE_CHANNEL_ID)
@@ -310,6 +349,8 @@ object ClassLiveUpdate {
         notification.extras.putString(EXTRA_ALARM_ID, alarmId)
         notification.extras.putBoolean(EXTRA_ENDED, timeoutAfter > 0L)
         notification.extras.putLong(EXTRA_ENDED_DEADLINE, endedDeadline)
+        notification.extras.putLong(EXTRA_START_AT, startAt)
+        notification.extras.putLong(EXTRA_END_AT, endAt)
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (timeoutAfter > 0L || !ClassReminderService.attachLiveNotification(alarmId, notification)) {

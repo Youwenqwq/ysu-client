@@ -75,9 +75,7 @@ class ClassReminderService : Service() {
         }
 
         internal fun start(context: Context, alarm: JSONObject): Boolean {
-            if (!alarm.optBoolean("liveUpdateEnabled", false) ||
-                Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA ||
-                alarm.optLong("endAt") <= startAt(alarm)) return false
+            if (!ClassAlarmManager.supportsLiveUpdate(context, alarm)) return false
             // Only a live handoff may resume before its configured reminder time.
             // At the first reminder, notify() may not have reached the system yet.
             if (System.currentTimeMillis() < minOf(startAt(alarm), alarm.optLong("alarmTime"))) {
@@ -145,13 +143,14 @@ class ClassReminderService : Service() {
             val start = startAt(alarm)
             val expiry = expiryAt(alarm)
             val end = alarm.optLong("endAt")
-            if (ClassAlarmManager.supportsLiveUpdate(alarm)) {
+            val livePosted = ClassAlarmManager.supportsLiveUpdate(context, alarm) &&
                 ClassLiveUpdate.post(
                     context, id,
                     text(alarm, "courseName", context.getString(R.string.notify_fallback_alarm_course)),
                     text(alarm, "classroom"), text(alarm, "startTime"), start,
                     alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end
                 )
+            if (livePosted) {
                 ClassReminderService.start(context, alarm)
             } else {
                 val parts = buildList {

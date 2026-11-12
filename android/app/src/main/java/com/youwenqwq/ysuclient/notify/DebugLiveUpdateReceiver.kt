@@ -37,19 +37,30 @@ class DebugLiveUpdateReceiver : BroadcastReceiver() {
             val realEnd = first.optLong("endAt", 0L)
             val duration = if (realEnd > realStart) realEnd - realStart else 45 * 60_000L
             val startAt = System.currentTimeMillis() + 5 * 60_000L
-            val ok = Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
-                ClassLiveUpdate.post(
+            val remindMinutes = first.optInt("remindMinutes", 15)
+            val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
+                ClassAlarmScheduling.canScheduleExact(context)
+            if (supported) {
+                scheduleAlarm(
                     context,
-                    "preview-${System.currentTimeMillis()}",
-                    first.optString("courseName"),
-                    first.optString("classroom"),
-                    first.optString("startTime"),
-                    startAt,
-                    first.optInt("remindMinutes", 15),
-                    first.optInt("conflictCount", 1),
-                    startAt + duration
+                    org.json.JSONObject()
+                        .put("alarmId", "preview-$startAt")
+                        .put("alarmTime", startAt - remindMinutes * 60_000L)
+                        .put("startAt", startAt)
+                        .put("remindMinutes", remindMinutes)
+                        .put("courseName", first.optString("courseName"))
+                        .put("classroom", first.optString("classroom"))
+                        .put("startTime", first.optString("startTime"))
+                        .put("conflictCount", first.optInt("conflictCount", 1))
+                        .put("endAt", startAt + duration)
+                        .put("liveUpdateEnabled", true)
+                        .put("vibrationEnabled", false)
                 )
-            Log.d("YsuDebugLiveUpdate", "preview posted=$ok for ${first.optString("courseName")}")
+            }
+            Log.d(
+                "YsuDebugLiveUpdate",
+                "preview scheduled=$supported for ${first.optString("courseName")}"
+            )
             return
         }
 
@@ -112,18 +123,39 @@ class DebugLiveUpdateReceiver : BroadcastReceiver() {
         val startAt = System.currentTimeMillis() + startInMinutes * 60_000L
         val startTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
             .format(java.util.Date(startAt))
-        val posted = Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
-            ClassLiveUpdate.post(
+        val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
+            ClassAlarmScheduling.canScheduleExact(context)
+        if (supported) {
+            scheduleAlarm(
                 context,
-                "debug-${System.currentTimeMillis()}",
-                courseName,
-                classroom,
-                startTime,
-                startAt,
-                15,
-                intent.getIntExtra("conflict", 1),
-                startAt + durationMinutes * 60_000L
+                org.json.JSONObject()
+                    .put("alarmId", "debug-$startAt")
+                    .put("alarmTime", startAt - 15 * 60_000L)
+                    .put("startAt", startAt)
+                    .put("remindMinutes", 15)
+                    .put("courseName", courseName)
+                    .put("classroom", classroom)
+                    .put("startTime", startTime)
+                    .put("conflictCount", intent.getIntExtra("conflict", 1))
+                    .put("endAt", startAt + durationMinutes * 60_000L)
+                    .put("liveUpdateEnabled", true)
+                    .put("vibrationEnabled", intent.getBooleanExtra("vibrate", false))
             )
-        Log.d("YsuDebugLiveUpdate", "posted=$posted startInMinutes=$startInMinutes")
+        }
+        Log.d("YsuDebugLiveUpdate", "scheduled=$supported startInMinutes=$startInMinutes")
+    }
+
+    private fun scheduleAlarm(context: Context, alarm: org.json.JSONObject) {
+        synchronized(ClassAlarmManager) {
+            val alarms = org.json.JSONArray(
+                com.youwenqwq.ysuclient.cache.UnifiedCache.getString(
+                    context,
+                    com.youwenqwq.ysuclient.cache.UnifiedCache.KEY_CLASS_ALARMS,
+                    "[]"
+                )
+            )
+            alarms.put(alarm)
+            ClassAlarmManager.scheduleAlarms(context, alarms.toString())
+        }
     }
 }

@@ -96,6 +96,7 @@ export default function SettingsPage() {
   const [batteryIgnored, setBatteryIgnored] = useState<boolean | null>(null)
   const [autoStartDialogOpen, setAutoStartDialogOpen] = useState(false)
   const [notificationPermissionPending, setNotificationPermissionPending] = useState(false)
+  const [liveUpdatePermissionPending, setLiveUpdatePermissionPending] = useState(false)
   const [liveUpdateSupported, setLiveUpdateSupported] = useState(false)
 
   useEffect(() => {
@@ -123,6 +124,23 @@ export default function SettingsPage() {
       toast.error(t("settings.notificationSyncFailed"))
     } finally {
       setNotificationPermissionPending(false)
+    }
+  }
+
+  async function handleLiveUpdateToggle(enabled: boolean) {
+    if (!enabled) {
+      setClassLiveUpdateEnabled(false)
+      return
+    }
+    setLiveUpdatePermissionPending(true)
+    try {
+      const { granted } = await NotifyPlugin.requestExactAlarmPermission()
+      if (granted) setClassLiveUpdateEnabled(true)
+      else toast.info(t("settings.classLiveUpdateExactAlarmRequired"))
+    } catch {
+      toast.error(t("settings.notificationSyncFailed"))
+    } finally {
+      setLiveUpdatePermissionPending(false)
     }
   }
 
@@ -521,15 +539,20 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3 border-t border-border py-3">
                 <label
                   htmlFor="class-live-update"
-                  className={cn("min-w-0 flex-1 text-sm", !liveUpdateSupported && "text-muted-foreground")}
+                  className={cn(
+                    "min-w-0 flex-1 text-sm",
+                    !liveUpdateSupported && "text-muted-foreground"
+                  )}
                 >
                   {t("settings.classLiveUpdateEnabled")}
                 </label>
                 <Switch
                   id="class-live-update"
                   checked={liveUpdateSupported && classLiveUpdateEnabled}
-                  disabled={!classReminderEnabled || !liveUpdateSupported}
-                  onCheckedChange={setClassLiveUpdateEnabled}
+                  disabled={
+                    !classReminderEnabled || !liveUpdateSupported || liveUpdatePermissionPending
+                  }
+                  onCheckedChange={(enabled) => void handleLiveUpdateToggle(enabled)}
                 />
               </div>
               <div className="flex items-center gap-3 border-t border-border py-3">

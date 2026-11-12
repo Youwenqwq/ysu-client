@@ -340,6 +340,24 @@ class YsuNotifyPlugin : Plugin() {
     // ─── Permission management ──────────────────────────────────────────────
 
     @PluginMethod
+    fun requestExactAlarmPermission(call: PluginCall) {
+        if (ClassAlarmScheduling.canScheduleExact(context)) {
+            call.resolve(JSObject().put("granted", true))
+            return
+        }
+        try {
+            val intent = Intent(
+                android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                android.net.Uri.parse("package:${context.packageName}")
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            call.resolve(JSObject().put("granted", false))
+        } catch (e: Exception) {
+            call.reject("Unable to open exact alarm settings", e)
+        }
+    }
+
+    @PluginMethod
     override fun checkPermissions(call: PluginCall) {
         call.resolve(JSObject().put("granted", notificationsGranted()))
     }

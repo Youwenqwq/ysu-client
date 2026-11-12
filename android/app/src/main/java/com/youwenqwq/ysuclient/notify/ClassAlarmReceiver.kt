@@ -41,7 +41,7 @@ class ClassAlarmReceiver : BroadcastReceiver() {
                 val alarmTime = alarm.getLong("alarmTime")
                 if (intent.hasExtra(EXTRA_ALARM_TIME) &&
                     intent.getLongExtra(EXTRA_ALARM_TIME, 0L) != alarmTime) return
-                live = ClassAlarmManager.supportsLiveUpdate(alarm)
+                live = ClassAlarmManager.supportsLiveUpdate(context, alarm)
                 val startAt = ClassReminderService.startAt(alarm)
                 val endAt = alarm.optLong("endAt")
                 val now = System.currentTimeMillis()

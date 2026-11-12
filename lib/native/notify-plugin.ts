@@ -35,6 +35,7 @@ export interface YsuNotifyPlugin {
   // ─── Permission management ──────────────────────────────────────────────
   checkPermissions(): Promise<{ granted: boolean }>
   requestPermissions(): Promise<{ granted: boolean }>
+  requestExactAlarmPermission(): Promise<{ granted: boolean }>
 
   // ─── Battery optimization ──────────────────────────────────────────────
   checkBatteryOptimization(): Promise<{ ignored: boolean }>

@@ -11,13 +11,25 @@ import com.youwenqwq.ysuclient.cache.UnifiedCache
 import org.json.JSONArray
 import org.json.JSONObject
 
+internal fun liveUpdateEligible(
+    enabled: Boolean,
+    sdkInt: Int,
+    exactAlarmGranted: Boolean,
+    startAt: Long,
+    endAt: Long,
+): Boolean = enabled && sdkInt >= Build.VERSION_CODES.BAKLAVA && exactAlarmGranted && endAt > startAt
+
 object ClassAlarmManager {
     private const val TAG = "YsuClassAlarmManager"
 
-    internal fun supportsLiveUpdate(alarm: JSONObject): Boolean =
-        alarm.optBoolean("liveUpdateEnabled", false) &&
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
-            alarm.optLong("endAt") > ClassReminderService.startAt(alarm)
+    internal fun supportsLiveUpdate(context: Context, alarm: JSONObject): Boolean =
+        liveUpdateEligible(
+            alarm.optBoolean("liveUpdateEnabled", false),
+            Build.VERSION.SDK_INT,
+            ClassAlarmScheduling.canScheduleExact(context),
+            ClassReminderService.startAt(alarm),
+            alarm.optLong("endAt"),
+        )
 
     @Synchronized
     fun scheduleAlarms(context: Context, alarmsJson: String) {
@@ -41,7 +53,7 @@ object ClassAlarmManager {
             }
             // Only live classes need restoration after their reminder/start time.
             // Ordinary reminders keep the upstream future-only snapshot contract.
-            if (if (supportsLiveUpdate(alarm)) expiresAt > now else alarmTime > now) {
+            if (if (supportsLiveUpdate(context, alarm)) expiresAt > now else alarmTime > now) {
                 futureAlarms.put(alarm)
             }
         }
@@ -55,7 +67,7 @@ object ClassAlarmManager {
                 val alarmId = alarm.getString("alarmId")
                 val alarmTime = alarm.getLong("alarmTime")
                 val startAt = ClassReminderService.startAt(alarm)
-                val live = supportsLiveUpdate(alarm)
+                val live = supportsLiveUpdate(context, alarm)
                 // The reminder broadcast posts directly; only the separate start
                 // broadcast may create a live-countdown foreground service.
                 for (phase in 0..1) {

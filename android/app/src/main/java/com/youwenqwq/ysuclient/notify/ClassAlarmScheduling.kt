@@ -16,6 +16,12 @@ import com.youwenqwq.ysuclient.MainActivity
  */
 internal object ClassAlarmScheduling {
 
+    fun canScheduleExact(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return false
+        return runCatching { alarmManager.canScheduleExactAlarms() }.getOrDefault(false)
+    }
+
     /**
      * @param asAlarmClock 关键节点是否尝试系统闹钟（同样受精确闹钟权限限制）。
      * @return 是否以精确或闹钟方式排程。
@@ -47,9 +53,7 @@ internal object ClassAlarmScheduling {
                 // 精确闹钟权限未授予或刚被撤销，继续使用非精确提醒。
             }
         }
-        val canScheduleExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            runCatching { alarmManager.canScheduleExactAlarms() }.getOrDefault(false)
-        if (canScheduleExact) {
+        if (canScheduleExact(context)) {
             val scheduled = runCatching {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, operation)
                 true
