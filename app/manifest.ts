@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next"
+import { pluginPageHref } from "@ysu/plugin-sdk"
 
 export const dynamic = "force-static"
 
@@ -33,7 +34,7 @@ export default function manifest(): LocalizedManifest {
         name: "课程表",
         short_name: "课表",
         description: "查看课程表",
-        url: "dashboard/schedule/",
+        url: pluginPageHref("ysu.schedule", "index").replace(/^\//, ""),
         icons: [
           {
             src: "icons/icon-192.png",
@@ -46,7 +47,7 @@ export default function manifest(): LocalizedManifest {
         name: "成绩查询",
         short_name: "成绩",
         description: "查询课程成绩",
-        url: "dashboard/grades/",
+        url: pluginPageHref("ysu.grades", "index").replace(/^\//, ""),
         icons: [
           {
             src: "icons/icon-192.png",
@@ -59,7 +60,7 @@ export default function manifest(): LocalizedManifest {
         name: "考试安排",
         short_name: "考试",
         description: "查看考试安排",
-        url: "dashboard/exams/",
+        url: pluginPageHref("ysu.exams", "index").replace(/^\//, ""),
         icons: [
           {
             src: "icons/icon-192.png",
@@ -75,7 +76,7 @@ export default function manifest(): LocalizedManifest {
           name: "Class Schedule",
           short_name: "Schedule",
           description: "View your class schedule",
-          url: "dashboard/schedule/",
+          url: pluginPageHref("ysu.schedule", "index").replace(/^\//, ""),
           icons: [
             {
               src: "icons/icon-192.png",
@@ -88,7 +89,7 @@ export default function manifest(): LocalizedManifest {
           name: "Grades",
           short_name: "Grades",
           description: "View your course grades",
-          url: "dashboard/grades/",
+          url: pluginPageHref("ysu.grades", "index").replace(/^\//, ""),
           icons: [
             {
               src: "icons/icon-192.png",
@@ -101,7 +102,7 @@ export default function manifest(): LocalizedManifest {
           name: "Exams",
           short_name: "Exams",
           description: "View your exam schedule",
-          url: "dashboard/exams/",
+          url: pluginPageHref("ysu.exams", "index").replace(/^\//, ""),
           icons: [
             {
               src: "icons/icon-192.png",

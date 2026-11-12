@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ChevronRight, LogIn, Settings, Sun, Moon } from "lucide-react"
+import { ChevronRight, LogIn, Puzzle, Settings, Sun, Moon } from "lucide-react"
 import { useAuthStore } from "@/lib/stores/auth"
 import { useSettingsStore } from "@/lib/stores/settings"
 import { cn } from "@/lib/utils"
@@ -21,16 +21,18 @@ import { useStudentInfo } from "@/providers/hooks"
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
 import { useTheme } from "next-themes"
 import { APP_VERSION, APP_BUILD } from "@/lib/version"
-import { EXTRA_FEATURES } from "@/lib/extras/registry"
-import { FEE_FEATURES } from "@/lib/fees/registry"
-import { ACADEMIC_NAV_GROUPS } from "@/lib/dashboard-nav"
-import { isDashboardFeatureAvailable } from "@/lib/dashboard-features"
 import { useProviderCapabilities } from "@/providers/use-provider"
+import { usePluginHost } from "@/components/plugin-provider"
+import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
+import { pluginPageHref, type PluginNavigationGroup } from "@ysu/plugin-sdk"
+import { hasPluginCapability } from "@/lib/plugins/navigation"
 
 export default function MePage() {
   const router = useRouter()
   const username = useAuthStore((s) => s.username)
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
+  const { host } = usePluginHost()
+  const { navigation: pluginNavigation, settings: pluginSettings } = usePluginUI(host.ui)
   const { theme, setTheme, systemTheme } = useTheme()
 
   const [mounted, setMounted] = useState(false)
@@ -99,35 +101,26 @@ export default function MePage() {
   const initials = (student.data?.name || username || "U").slice(-2)
 
   const capabilities = useProviderCapabilities()
-  const academicItems = (
-    ACADEMIC_NAV_GROUPS.find((g) => g.labelKey === "me.sectionAcademic")?.features ?? []
-  )
-    .filter((f) => isDashboardFeatureAvailable(f, capabilities))
-    .map((f) => ({ href: f.nav.url, label: t(f.nav.titleKey), icon: f.nav.icon }))
-
-  const platformItems = (
-    ACADEMIC_NAV_GROUPS.find((g) => g.labelKey === "me.sectionPlatforms")?.features ?? []
-  )
-    .filter((f) => isDashboardFeatureAvailable(f, capabilities))
-    .map((f) => ({ href: f.nav.url, label: t(f.nav.titleKey), icon: f.nav.icon }))
-
-  const feeItems = FEE_FEATURES.filter((f) => isDashboardFeatureAvailable(f, capabilities)).map(
-    (f) => ({
-      href: f.nav.url,
-      label: t(f.nav.titleKey),
-      icon: f.nav.icon,
-    })
-  )
+  const pluginItems = (group: PluginNavigationGroup) =>
+    pluginNavigation
+      .filter((item) => item.group === group)
+      .filter((item) => hasPluginCapability(capabilities, item.capability))
+      .map((item) => ({
+        href: pluginPageHref(item.pluginId, item.page),
+        label: item.titleKey
+          ? host.i18n.translate(item.pluginId, item.titleKey, locale)
+          : item.title,
+        icon: item.icon,
+      }))
+  const academicItems = pluginItems("academic")
+  const platformItems = pluginItems("platform")
+  const feeItems = pluginItems("fees")
   // 玩具箱入口（移动端经"我的"页进入；桌面端走侧边栏）
-  const extraItems = EXTRA_FEATURES.map((f) => ({
-    href: f.nav.url,
-    label: t(f.nav.titleKey),
-    icon: f.nav.icon,
-  }))
+  const extraItems = [...pluginItems("extras"), ...pluginItems("plugins")]
 
   return (
     <div className="flex flex-col gap-4">
-      <Link href="/dashboard/me/student" className="block">
+      <Link href={pluginPageHref("ysu.student-info", "index")} className="block">
         <Card className="py-0 transition-colors hover:bg-muted/40 active:bg-muted/60">
           <CardContent className="flex items-center gap-4 py-5">
             <Avatar className="size-14">
@@ -198,6 +191,18 @@ export default function MePage() {
               label: t("me.settings"),
               icon: Settings,
             },
+            {
+              href: "/dashboard/me/plugins",
+              label: t("plugins.title"),
+              icon: Puzzle,
+            },
+            ...pluginSettings.map((setting) => ({
+              href: pluginPageHref(setting.pluginId, setting.page),
+              label: setting.titleKey
+                ? host.i18n.translate(setting.pluginId, setting.titleKey, locale)
+                : setting.title,
+              icon: setting.icon,
+            })),
           ]}
         />
       </Section>

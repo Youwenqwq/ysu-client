@@ -1,3 +1,6 @@
+import { pluginPageHref } from "@ysu/plugin-sdk"
+import { usePluginRouteStore } from "@/lib/stores/plugin-route"
+
 const DEPTH_KEY = "__academicBackDepth"
 
 type AppHistory = Pick<History, "state" | "pushState" | "replaceState">
@@ -46,8 +49,14 @@ export function installBackHistory(history: AppHistory): () => void {
 export function backFallback(pathname: string): string | null {
   const path = pathname.replace(/\/+$/, "") || "/"
   if (path === "/dashboard" || path === "/login") return null
+  if (path === "/dashboard/plugin") {
+    const current = usePluginRouteStore.getState().current
+    if (current?.pluginId === "ysu.overview" && current.pageId === "index") return null
+    return current?.parent
+      ? pluginPageHref(current.pluginId, current.parent)
+      : pluginPageHref("ysu.overview", "index")
+  }
   if (path.startsWith("/dashboard/me/settings/")) return "/dashboard/me/settings"
   if (path.startsWith("/dashboard/me/")) return "/dashboard/me"
-  if (path.startsWith("/dashboard/skbird/")) return "/dashboard/skbird"
-  return "/dashboard"
+  return pluginPageHref("ysu.overview", "index")
 }

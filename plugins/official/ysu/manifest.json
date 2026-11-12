@@ -1,0 +1,11 @@
+{
+  "id": "ysu.provider",
+  "name": "燕山大学教务",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "kind": "provider",
+  "required": true,
+  "entry": "dist/index.js",
+  "minAppVersion": "0.15.0",
+  "description": "燕山大学 CAS / 教务 / 移动端 / 缴费平台 Provider"
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@ysu/plugin-sdk",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./host": "./host.ts",
+    "./manifest": "./manifest.ts",
+    "./academic": "./academic.ts",
+    "./providers": "./providers.ts",
+    "./provider-base": "./provider-base.ts",
+    "./provider-capabilities": "./provider-capabilities.ts",
+    "./provider-errors": "./provider-errors.ts",
+    "./provider-school": "./provider-school.ts",
+    "./ui": "./ui.ts",
+    "./i18n": "./i18n.ts",
+    "./services": "./services.ts",
+    "./market": "./market.ts",
+    "./host-modules": "./host-modules.ts"
+  },
+  "dependencies": {
+    "@cordisjs/core": "3.18.1",
+    "semver": "^7.8.2"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0"
+  }
+}

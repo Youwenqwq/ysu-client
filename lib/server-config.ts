@@ -11,25 +11,23 @@ import {
   getSchoolConfigById,
   getVisibleSchoolConfigs,
   registerSchoolConfig as registerBundledSchoolConfig,
+  unregisterSchoolConfig as unregisterBundledSchoolConfig,
 } from "./school-configs"
 import type { SchoolConfig } from "./school-configs/types"
 
-const defaultSchoolConfig = getSchoolConfigById(DEFAULT_SCHOOL_ID)
-if (!defaultSchoolConfig) {
-  throw new Error(`Missing default school config: ${DEFAULT_SCHOOL_ID}`)
-}
-
 let currentSchoolId = DEFAULT_SCHOOL_ID
-let currentSchoolConfig: SchoolConfig = defaultSchoolConfig
+// The default school config is contributed by its provider plugin. Core boot
+// must not fail when it has not registered yet.
+let currentSchoolConfig: SchoolConfig | undefined = getSchoolConfigById(DEFAULT_SCHOOL_ID)
 
 // ─── Mutable config ────────────────────────────────────────────────────── //
 
 export const serverConfig = {
   get cerBaseUrl() {
-    return serverConfig._customCerBaseUrl || currentSchoolConfig.cas.cerBaseUrl
+    return serverConfig._customCerBaseUrl || currentSchoolConfig?.cas.cerBaseUrl || ""
   },
   get jwxtBaseUrl() {
-    return serverConfig._customJwxtBaseUrl || currentSchoolConfig.jwxt.jwxtBaseUrl
+    return serverConfig._customJwxtBaseUrl || currentSchoolConfig?.jwxt.jwxtBaseUrl || ""
   },
   _customCerBaseUrl: "",
   _customJwxtBaseUrl: "",
@@ -84,10 +82,10 @@ export const jwxtUrls = {
     return `${serverConfig.jwxtBaseUrl}/jwapp/sys`
   },
   get portal() {
-    return `${serverConfig.jwxtBaseUrl}${currentSchoolConfig.jwxt.portalPath}`
+    return `${serverConfig.jwxtBaseUrl}${currentSchoolConfig?.jwxt.portalPath ?? ""}`
   },
   get appShow() {
-    return `${serverConfig.jwxtBaseUrl}${currentSchoolConfig.jwxt.appShowPath}`
+    return `${serverConfig.jwxtBaseUrl}${currentSchoolConfig?.jwxt.appShowPath ?? ""}`
   },
 }
 
@@ -106,8 +104,24 @@ export const mobileUrls = {
 
 // ─── School config accessors ───────────────────────────────────────────── //
 
+/**
+ * Returns the active school config.
+ *
+ * Throws only when code actually needs the config before its provider plugin
+ * has registered it; importing core modules is always safe.
+ */
 export function getSchoolConfig(): SchoolConfig {
+  if (!currentSchoolConfig) {
+    throw new Error(
+      `School config "${currentSchoolId}" is not registered. Start the provider plugin first.`
+    )
+  }
   return currentSchoolConfig
+}
+
+/** Returns the active school config if a provider plugin has registered it. */
+export function getSchoolConfigOrNull(): SchoolConfig | null {
+  return currentSchoolConfig ?? null
 }
 
 export function getSchoolId(): string {
@@ -130,8 +144,28 @@ export function registerSchoolConfig(config: SchoolConfig): void {
   }
 }
 
+/**
+ * Revokes a config contributed by a provider plugin.
+ *
+ * Passing the config object only removes that exact registration, so a newer
+ * registration for the same school is left untouched. Passing an id removes
+ * whatever is registered under it.
+ */
+export function unregisterSchoolConfig(config: SchoolConfig | string): void {
+  const schoolId = typeof config === "string" ? config : config.id
+  const registered = getSchoolConfigById(schoolId)
+  if (!registered) return
+  if (typeof config !== "string" && registered !== config) return
+  unregisterBundledSchoolConfig(schoolId)
+
+  if (currentSchoolId !== schoolId) return
+  if (typeof config !== "string" && currentSchoolConfig !== config) return
+  currentSchoolConfig = undefined
+  onSchoolConfigChanged()
+}
+
 export function isFeatureAvailable(feature: keyof SchoolConfig["features"]): boolean {
-  return currentSchoolConfig.features[feature]
+  return currentSchoolConfig?.features[feature] ?? false
 }
 
 export function getAvailableSchools(): Array<{

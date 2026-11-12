@@ -24,8 +24,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useMFAModalStore } from "@/lib/stores/mfa-modal"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { getActiveProvider } from "@/providers/provider-service"
-import type { WechatQrPollResult } from "@/providers/types"
-import type { YSUMfaMethod } from "@/providers/ysu"
+import type { MfaMethod, WechatQrPollResult } from "@/providers/types"
 import { useAuthStore } from "@/lib/stores/auth"
 import { isTablet } from "@/lib/native/platform"
 import { toast } from "sonner"
@@ -45,7 +44,7 @@ export function MFAModal() {
   } = useMFAModalStore()
   const showWechat = isTablet()
   const defaultMethod = showWechat ? "weixin" : "sms"
-  const [mfaMethod, setMfaMethod] = useState<YSUMfaMethod>(defaultMethod)
+  const [mfaMethod, setMfaMethod] = useState<MfaMethod>(defaultMethod)
   const [code, setCode] = useState("")
   const [loading, setLoading] = useState(false)
   const [localHint, setLocalHint] = useState("")
@@ -241,7 +240,7 @@ export function MFAModal() {
   function handleMethodChange(v: string) {
     if (!v) return
     stopWechatPolling()
-    setMfaMethod(v as YSUMfaMethod)
+    setMfaMethod(v as MfaMethod)
     setLocalMethodCode("")
     setLocalHint("")
     setCountdown(0)

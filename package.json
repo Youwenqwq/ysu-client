@@ -1,6 +1,6 @@
 {
   "name": "ysu-client",
-  "version": "0.14.2",
+  "version": "0.15.0",
   "type": "module",
   "private": true,
   "scripts": {
@@ -12,6 +12,7 @@
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
+    "plugin": "node --experimental-transform-types scripts/plugin.ts",
     "release": "bash scripts/release.sh"
   },
   "dependencies": {
@@ -22,12 +23,16 @@
     "@capacitor/device": "^8.0.2",
     "@capacitor/filesystem": "^8.1.2",
     "@capgo/capacitor-updater": "^8.47.4",
+    "@cordisjs/core": "3.18.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@ysu/plugin-sdk": "workspace:*",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "es-module-lexer": "^3.0.4",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.17.0",
     "motion": "^12.42.2",
     "next": "16.4.6",
@@ -55,6 +60,7 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@types/semver": "^7.7.1",
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.4",
     "eslint-config-next": "16.4.6",
     "postcss": "^8.5.15",

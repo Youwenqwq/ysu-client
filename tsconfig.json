@@ -14,6 +14,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
@@ -25,6 +26,18 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@ysu/plugin-sdk": [
+        "./packages/plugin-sdk/index.ts"
+      ],
+      "@ysu/plugin-sdk/*": [
+        "./packages/plugin-sdk/*"
+      ],
+      "@ysu/academic": [
+        "./packages/academic/index.ts"
+      ],
+      "@ysu/academic/*": [
+        "./packages/academic/*"
       ]
     }
   },
@@ -39,6 +52,7 @@
   ],
   "exclude": [
     "node_modules",
-    "website"
+    "website",
+    "android"
   ]
 }

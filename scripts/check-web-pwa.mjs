@@ -71,7 +71,7 @@ async function checkDeepLink(pathname) {
   check(`${pathname} final response`, final.status === 200, describeResponse(final));
 }
 
-for (const pathname of ['/app', '/app/dashboard', '/app/dashboard/me']) {
+for (const pathname of ['/app', '/app/dashboard/plugin/?plugin=ysu.overview&page=index', '/app/dashboard/me']) {
   await attempt(`${pathname} deep link`, () => checkDeepLink(pathname));
 }
 

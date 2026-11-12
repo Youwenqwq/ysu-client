@@ -30,6 +30,7 @@ import {
 import { checkRateLimit, rateLimitMessage } from "@/lib/rate-limit"
 import { isCapacitor } from "@/lib/native/platform"
 import { useMFAModalStore } from "@/lib/stores/mfa-modal"
+import { pluginPageHref } from "@ysu/plugin-sdk"
 import { getActiveProvider, setActiveProviderSchool } from "@/providers/provider-service"
 
 export default function LoginPage() {
@@ -142,7 +143,11 @@ export default function LoginPage() {
         await syncRememberedLoginPreference()
         toast.success(t("login.loginSuccess"))
         const landing = useSettingsStore.getState().defaultLandingPage
-        router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard")
+        router.replace(
+          landing === "schedule"
+            ? pluginPageHref("ysu.schedule", "index")
+            : pluginPageHref("ysu.overview", "index")
+        )
         return
       }
 
@@ -155,7 +160,11 @@ export default function LoginPage() {
             await syncRememberedLoginPreference()
             toast.success(t("login.loginSuccess"))
             const landing = useSettingsStore.getState().defaultLandingPage
-            router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard")
+            router.replace(
+              landing === "schedule"
+                ? pluginPageHref("ysu.schedule", "index")
+                : pluginPageHref("ysu.overview", "index")
+            )
             return
           }
           await getActiveProvider().submitMfaCode({
@@ -170,7 +179,11 @@ export default function LoginPage() {
           await syncRememberedLoginPreference()
           toast.success(t("login.loginSuccess"))
           const landing = useSettingsStore.getState().defaultLandingPage
-          router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard")
+          router.replace(
+            landing === "schedule"
+              ? pluginPageHref("ysu.schedule", "index")
+              : pluginPageHref("ysu.overview", "index")
+          )
         } catch (err) {
           if (err instanceof Error) {
             toast.error(err.message || t("login.errorMfaVerifyFailed"))

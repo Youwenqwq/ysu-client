@@ -15,6 +15,8 @@ import { DeepLinkHandler } from "@/components/deep-link-handler"
 import { NotifyProvider } from "@/components/notify-provider"
 import { PwaRegister } from "@/components/pwa-register"
 import { PwaUpdatePrompt } from "@/components/pwa-update-prompt"
+import { PluginProvider } from "@/components/plugin-provider"
+import { PluginThemeManager } from "@/components/plugin-theme-manager"
 import { ProviderProvider } from "@/providers/provider-context"
 import { cn } from "@/lib/utils"
 
@@ -71,21 +73,24 @@ export default function RootLayout({
           <PwaRegister />
           <PwaUpdatePrompt />
           <ThemeProvider>
-            <ProviderProvider>
-              <ActivationGate>
-                <SDKProvider>
-                  <TooltipProvider>
-                    <BackgroundImage />
-                    <BackButtonHandler />
-                    <DeepLinkHandler />
-                    <NotifyProvider />
-                    {children}
-                    <Toaster />
-                    <MFAModal />
-                  </TooltipProvider>
-                </SDKProvider>
-              </ActivationGate>
-            </ProviderProvider>
+            <PluginProvider>
+              <PluginThemeManager />
+              <ProviderProvider>
+                <ActivationGate>
+                  <SDKProvider>
+                    <TooltipProvider>
+                      <BackgroundImage />
+                      <BackButtonHandler />
+                      <DeepLinkHandler />
+                      <NotifyProvider />
+                      {children}
+                      <Toaster />
+                      <MFAModal />
+                    </TooltipProvider>
+                  </SDKProvider>
+                </ActivationGate>
+              </ProviderProvider>
+            </PluginProvider>
           </ThemeProvider>
         </I18nProvider>
       </body>

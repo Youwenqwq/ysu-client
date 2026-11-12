@@ -1,0 +1,220 @@
+/**
+ * CAS authentication wrapper for YSU Provider.
+ *
+ * Keeps CAS protocol details in lib/cas.ts while exposing a provider-native
+ * auth service shape and mapping CAS exceptions to ProviderError.
+ */
+import {
+  prepareLogin as _prepareLogin,
+  checkCaptchaNeeded as _checkCaptchaNeeded,
+  loginStep1 as _loginStep1,
+  requestMFACode as _requestMFACode,
+  submitMFACode as _submitMFACode,
+  isAuthenticated as _isAuthenticated,
+  initiateWechatMFA as _initiateWechatMFA,
+  pollWechatQR as _pollWechatQR,
+  completeWechatMFA as _completeWechatMFA,
+  resetCAS,
+  CASCredential,
+  getJar as getCasJar,
+  type MFAChallenge,
+  type WechatMFAContext,
+  CASError,
+  NeedCaptchaError,
+  IPBlockedError,
+  LoginFailedError,
+  MFARequiredError,
+  MFAFailedError,
+  CASProtocolError,
+  NotAuthenticatedError,
+} from "./protocol/cas"
+import {
+  casUrls,
+  checkRateLimit,
+  getText,
+  recordLoginAttempt,
+  useAuthStore,
+} from "@ysu/plugin-sdk/host"
+import { withAuthTransition } from "./auth-transition"
+import { ProviderError, ProviderErrorCode, wrapError } from "@ysu/plugin-sdk/provider-errors"
+import type { WechatQrPollResult } from "@ysu/plugin-sdk/academic"
+import { getYSUMfaMethods, isYSUMfaMethod } from "./types"
+
+export interface LoginStep1Result {
+  authenticated: boolean
+  needsMfa: boolean
+  username: string
+  credential?: string
+}
+
+export type { MFAChallenge, WechatMFAContext }
+
+export function mapCASSessionError(e: unknown): ProviderError | undefined {
+  if (!(e instanceof NotAuthenticatedError)) return undefined
+  return new ProviderError(
+    ProviderErrorCode.AUTH_SESSION_EXPIRED,
+    getText("app.sessionExpired"),
+    e,
+    401
+  )
+}
+
+function mapCASError(e: unknown): ProviderError {
+  const sessionError = mapCASSessionError(e)
+  if (sessionError) return sessionError
+
+  if (e instanceof NeedCaptchaError) {
+    return new ProviderError(ProviderErrorCode.AUTH_CAPTCHA_REQUIRED, e.message, e, 403)
+  }
+  if (e instanceof IPBlockedError) {
+    return new ProviderError(ProviderErrorCode.RATE_LIMITED, e.message, e, 429)
+  }
+  if (e instanceof LoginFailedError) {
+    return new ProviderError(ProviderErrorCode.AUTH_INVALID_CREDENTIAL, e.message, e, 401)
+  }
+  if (e instanceof MFARequiredError) {
+    return new ProviderError(ProviderErrorCode.AUTH_MFA_REQUIRED, e.message, e, 403, {
+      methods: [...getYSUMfaMethods()],
+    })
+  }
+  if (e instanceof MFAFailedError) {
+    return new ProviderError(ProviderErrorCode.AUTH_INVALID_CREDENTIAL, e.message, e, 401)
+  }
+  if (e instanceof CASProtocolError) {
+    return new ProviderError(ProviderErrorCode.BACKEND_PROTOCOL_ERROR, e.message, e, 500)
+  }
+  if (e instanceof CASError) {
+    return new ProviderError(ProviderErrorCode.BACKEND_BUSINESS_ERROR, e.message, e, 500)
+  }
+  return wrapError(e)
+}
+
+export function getCaptchaUrl(): string {
+  return casUrls.captcha
+}
+
+export async function prepareLogin(): Promise<void> {
+  try {
+    await _prepareLogin()
+  } catch (e) {
+    throw mapCASError(e)
+  }
+}
+
+export async function resetLoginSession(): Promise<void> {
+  await withAuthTransition(async () => {
+    resetCAS()
+  })
+}
+
+export async function checkCaptchaNeeded(username: string): Promise<boolean> {
+  try {
+    return await _checkCaptchaNeeded(username)
+  } catch (e) {
+    throw mapCASError(e)
+  }
+}
+
+export async function loginStep1(
+  credential: { username: string; password: string; captcha?: string },
+  skipRateLimit = false
+): Promise<LoginStep1Result> {
+  if (!skipRateLimit) {
+    const limit = checkRateLimit()
+    if (!limit.allowed) {
+      throw new ProviderError(
+        ProviderErrorCode.RATE_LIMITED,
+        `Rate limited: retry after ${Math.ceil(limit.retryAfterMs / 1000)}s`,
+        undefined,
+        429
+      )
+    }
+    recordLoginAttempt()
+  }
+
+  try {
+    const result = await _loginStep1(credential.username, credential.password, {
+      captcha: credential.captcha,
+    })
+    const credStr =
+      result.authenticated || result.needsMfa
+        ? (await CASCredential.fromJar(getCasJar())).toJSON()
+        : undefined
+    return {
+      authenticated: result.authenticated,
+      needsMfa: result.needsMfa,
+      username: result.username,
+      credential: credStr,
+    }
+  } catch (e) {
+    throw mapCASError(e)
+  }
+}
+
+export async function requestMFACode(username: string, method: string): Promise<MFAChallenge> {
+  if (!isYSUMfaMethod(method)) {
+    throw new ProviderError(
+      ProviderErrorCode.FEATURE_NOT_SUPPORTED,
+      `Unsupported YSU MFA method: ${method}`,
+      undefined,
+      501,
+      { methods: [...getYSUMfaMethods()] }
+    )
+  }
+
+  try {
+    return await _requestMFACode(username, method)
+  } catch (e) {
+    throw mapCASError(e)
+  }
+}
+
+export async function submitMFACode(challenge: MFAChallenge, code: string): Promise<string> {
+  try {
+    const credential = await _submitMFACode(challenge, code)
+    return credential.toJSON()
+  } catch (e) {
+    throw mapCASError(e)
+  }
+}
+
+export async function initiateWechatMFA(): Promise<WechatMFAContext> {
+  try {
+    return await _initiateWechatMFA()
+  } catch (e) {
+    throw mapCASError(e)
+  }
+}
+
+export async function pollWechatQR(
+  uuid: string,
+  lastErrcode?: number,
+  signal?: AbortSignal
+): Promise<WechatQrPollResult> {
+  try {
+    return await _pollWechatQR(uuid, lastErrcode, signal)
+  } catch (e) {
+    throw mapCASError(e)
+  }
+}
+
+export async function completeWechatMFA(code: string, state: string): Promise<string> {
+  try {
+    const credential = await _completeWechatMFA(code, state)
+    return credential.toJSON()
+  } catch (e) {
+    throw mapCASError(e)
+  }
+}
+
+export async function isAuthenticated(): Promise<boolean> {
+  try {
+    return await _isAuthenticated()
+  } catch (e) {
+    throw mapCASError(e)
+  }
+}
+
+export function saveCredential(credential: string, username?: string): void {
+  useAuthStore.getState().setCredential(credential, username)
+}

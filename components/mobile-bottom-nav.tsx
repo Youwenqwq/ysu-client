@@ -3,18 +3,24 @@
 import { useLayoutEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Calendar, GraduationCap, LayoutDashboard, User } from "lucide-react"
+import { User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { useSettingsStore } from "@/lib/stores/settings"
 import { useProviderCapabilities } from "@/providers/use-provider"
-import { hasCapability } from "@/providers/capabilities"
-import type { AcademicCapabilities } from "@/providers/types"
+import { usePluginHost } from "@/components/plugin-provider"
+import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
+import { pluginPageHref } from "@ysu/plugin-sdk"
+import { usePluginRouteStore } from "@/lib/stores/plugin-route"
+import { hasPluginCapability } from "@/lib/plugins/navigation"
 
 export function MobileBottomNav() {
   const rawPathname = usePathname()
   const pathname = rawPathname.replace(/\/$/, "")
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
+  const { host } = usePluginHost()
+  const { navigation } = usePluginUI(host.ui)
+  const pluginRoute = usePluginRouteStore((state) => state.current)
   const hasBackground = useSettingsStore((s) => !!s.backgroundImage)
   const navRef = useRef<HTMLElement>(null)
 
@@ -38,24 +44,20 @@ export function MobileBottomNav() {
 
   const capabilities = useProviderCapabilities()
   const tabs = [
-    { href: "/dashboard", label: t("app.overview"), icon: LayoutDashboard },
-    {
-      href: "/dashboard/schedule",
-      label: t("app.schedule"),
-      icon: Calendar,
-      capability: "schedule",
-    },
-    {
-      href: "/dashboard/grades",
-      label: t("app.grades"),
-      icon: GraduationCap,
-      capability: "grades",
-    },
+    ...navigation
+      .filter((item) => item.primary)
+      .map((item) => ({
+        href: pluginPageHref(item.pluginId, item.page),
+        label: item.titleKey
+          ? host.i18n.translate(item.pluginId, item.titleKey, locale)
+          : item.title,
+        icon: item.icon,
+        capability: item.capability,
+        pluginId: item.pluginId,
+      })),
     { href: "/dashboard/me", label: t("app.me"), icon: User },
-  ].filter(
-    (tab) =>
-      !("capability" in tab) ||
-      hasCapability(capabilities, tab.capability as keyof AcademicCapabilities)
+  ].filter((tab) =>
+    hasPluginCapability(capabilities, "capability" in tab ? tab.capability : undefined)
   )
 
   return (
@@ -72,8 +74,8 @@ export function MobileBottomNav() {
     >
       {tabs.map((tab) => {
         const isActive =
-          tab.href === "/dashboard"
-            ? pathname === "/dashboard"
+          "pluginId" in tab && tab.pluginId
+            ? pluginRoute?.pluginId === tab.pluginId
             : pathname === tab.href || pathname.startsWith(`${tab.href}/`)
         const Icon = tab.icon
         return (

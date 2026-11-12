@@ -7,7 +7,7 @@ import { useAuthStore } from "@/lib/stores/auth"
 import { ProviderError, ProviderErrorCode } from "../errors"
 import { hasCapability } from "../capabilities"
 import { useProvider, useProviderReady } from "../use-provider"
-import { fetchEcardBalance, type EcardSessionStatus } from "../ysu/ecard-access"
+import type { EcardSessionStatus } from "../types"
 import { providerQueryKey } from "./use-provider-query"
 
 interface EcardBalanceSnapshot {
@@ -23,7 +23,8 @@ export function useEcardBalance() {
   const credential = useAuthStore((s) => s.credential)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const schoolConfigScope = getSchoolConfigScope()
-  const available = hasCapability(provider.capabilities, "ecard")
+  const ecard = provider.ecard
+  const available = hasCapability(provider.capabilities, "ecard") && ecard !== undefined
   const enabled =
     available && isReady && hasHydrated && !!username && !!credential && isAuthenticated
   const {
@@ -37,6 +38,9 @@ export function useEcardBalance() {
       ? providerQueryKey(provider.id, schoolConfigScope, username, "ecard", { credential })
       : null,
     async () => {
+      if (!ecard) {
+        throw new ProviderError(ProviderErrorCode.FEATURE_NOT_SUPPORTED, "当前学校不支持一卡通查询")
+      }
       const account = useAuthStore.getState()
       if (
         account.username !== username ||
@@ -46,7 +50,7 @@ export function useEcardBalance() {
       ) {
         throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "一卡通查询账户已切换")
       }
-      const status = await fetchEcardBalance()
+      const status = await ecard.fetchBalance()
       const current = useAuthStore.getState()
       if (
         current.username !== username ||

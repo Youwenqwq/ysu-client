@@ -18,6 +18,7 @@ import { APP_VERSION } from "@/lib/version"
 import { useAnnouncementStore } from "@/lib/stores/announcement"
 import { checkAnnouncement } from "@/lib/announcement"
 import { AnnouncementDialog } from "@/components/announcement-dialog"
+import { runFeeStartupChecks } from "@/lib/fees/startup"
 
 export function SDKProvider({ children }: { children: React.ReactNode }) {
   const { t, locale } = useTranslation()
@@ -31,7 +32,8 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
   const updateMirror = useSettingsStore((s) => s.updateMirror)
   const updateChannel = useSettingsStore((s) => s.updateChannel)
   const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus)
-  const { markProviderInitializing, markProviderReady, markProviderError } = useProviderContext()
+  const { provider, markProviderInitializing, markProviderReady, markProviderError } =
+    useProviderContext()
   const didNotifyAppReady = useRef(false)
   const didRunStartupSideEffects = useRef(false)
   const [showAnalyticsPrompt, setShowAnalyticsPrompt] = useState(false)
@@ -118,20 +120,8 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
           trackAppLaunch().catch(() => {})
         }
 
-        // 学费未缴自动检查（仅读状态，不支付）
-        import("@/lib/fees/epay/auto-check")
-          .then(async ({ runEpayAutoCheck }) => {
-            const result = await runEpayAutoCheck()
-            if (result && result.hasUnpaid && !cancelled) {
-              toast.warning(
-                t("epay.unpaidNotify", {
-                  count: result.count,
-                  total: result.total.toFixed(2),
-                })
-              )
-            }
-          })
-          .catch(() => {})
+        // 费用类插件（如未缴提醒）的启动检查（仅读状态，不支付）
+        if (!cancelled) void runFeeStartupChecks()
 
         // Check WebView compatibility (Capacitor only)
         if (isCapacitor()) {
@@ -190,6 +180,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
     hasHydrated,
     settingsHydrated,
     schoolId,
+    provider,
     t,
     checkAnnouncementsThenUpdates,
     markProviderInitializing,

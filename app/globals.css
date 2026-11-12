@@ -179,3 +179,9 @@
 [data-sonner-toaster] .cn-toast-mobile [data-icon] {
   margin-right: 0.5rem;
 }
+
+/* Conditional widgets may render null; decide the overview fallback from actual DOM content. */
+[data-overview-root]:has([data-overview-content] [data-overview-widget]:not(:empty))
+  [data-overview-fallback] {
+  display: none;
+}

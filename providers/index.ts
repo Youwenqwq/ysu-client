@@ -58,10 +58,24 @@ export type {
   StudentSigninStatus,
   StudentSignInput,
   StudentSignResult,
+  EcardBalance,
+  EcardSessionStatus,
+  EpayRecord,
+  EpayRecordStatus,
+  EpaySessionStatus,
+  ProviderEcard,
+  ProviderEpay,
+  ProviderGradeScale,
+  GradeLetter,
 } from "./types"
 
 export { BaseProvider } from "./base-provider"
-export type { ProviderFactory, SchoolRegistration } from "./provider-registry"
+export type {
+  ProviderFactory,
+  SchoolRegistration,
+  PluginProviderService,
+} from "./provider-registry"
+export { ProviderPluginRegistry, providerRegistry } from "./provider-registry"
 export { ProviderError, ProviderErrorCode, isProviderError, wrapError } from "./errors"
 export {
   ALL_CAPABILITIES,
@@ -70,13 +84,6 @@ export {
   assertCapability,
   getEnabledCapabilities,
 } from "./capabilities"
-export {
-  registerProvider,
-  registerSchool,
-  hasProvider,
-  getRegisteredProviderIds,
-  createProvider,
-} from "./provider-registry"
 export { getSelectableSchools } from "./supported-schools"
 export { registerSchoolConfig } from "@/lib/server-config"
 export {
@@ -85,4 +92,3 @@ export {
   initializeActiveProvider,
   resetActiveProvider,
 } from "./provider-service"
-export { YSUProvider } from "./ysu"

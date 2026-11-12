@@ -1,10 +1,10 @@
 import { getAvailableSchools } from "@/lib/server-config"
-import { hasProvider } from "./provider-registry"
+import { providerRegistry } from "./provider-registry"
 
 export function getSelectableSchools(): Array<{
   id: string
   name: string
   nameEn: string
 }> {
-  return getAvailableSchools().filter((school) => hasProvider(school.id))
+  return getAvailableSchools().filter((school) => providerRegistry.hasProvider(school.id))
 }

@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Target**: Android APK (via Capacitor) + Web 静态部署（`scripts/deploy-website.sh` 构建并注入）
 - **Next.js config**: `output: 'export'`, `distDir: 'dist'`, `trailingSlash: true`, images unoptimized, `basePath` 由 `APP_BASE_PATH` 环境变量控制（Web 部署用 `/app`，Capacitor 留空）
 - **Web 传输层**: 浏览器禁改 `Cookie`/`Referer`/`User-Agent` 等头部且教务系统无 CORS 头，Web 端所有教务流量经 `lib/cookie.ts` 的 `proxyHttpSend()` 走同源 `/api/proxy`（EdgeOne 边缘函数 `website/edge-functions/api/proxy.js`，目标 host 硬白名单）。协议细节见函数文件头注释。
+- **Plugin architecture**: Cordis 3 主上下文完整信任插件；公开 SDK 在 `packages/plugin-sdk/`，官方功能在 `plugins/official/`，市场插件在 `plugins/market/`。页面统一由 `app/dashboard/plugin/page.tsx` 承载，插件管理与市场入口为 `/dashboard/me/plugins/`
 - **State**: Zustand + `persist` middleware backed by `@aparajita/capacitor-secure-storage`
 - **Styling**: Tailwind CSS v4 + shadcn/ui + `next-themes` (dark/light)
 - **Formatting**: TypeScript/TSX uses Prettier via `pnpm run format`; `.prettierrc` uses no semicolons, double quotes, 100-column width, and Tailwind class sorting. Keep formatting-only changes separate from functional commits.
@@ -76,34 +77,35 @@ Both use module-level `SimpleCookieJar` instances (`casJar`, `jwxtJar`). Cookie 
 - `app/dashboard/layout.tsx` owns the global expired-login banner and the dashboard auth gate.
 
 **YSU relogin paths**:
-- `providers/ysu/relogin.ts` handles remembered-credential relogin and must verify CAS before returning success.
-- `providers/ysu/protocol/cas.ts` contains CAS login/MFA/authorization primitives; avoid treating a non-login URL as successful auth without checking `isAuthenticated()` because CAS may land on reAuth/MFA pages.
-- `providers/ysu/emap-fetcher.ts` maps JWXT/CAS protocol errors into `ProviderError`; CAS `NotAuthenticatedError` from JWXT reauthorization should remain `AUTH_SESSION_EXPIRED`.
+- `plugins/official/ysu/relogin.ts` handles remembered-credential relogin and must verify CAS before returning success.
+- `plugins/official/ysu/protocol/cas.ts` contains CAS login/MFA/authorization primitives; avoid treating a non-login URL as successful auth without checking `isAuthenticated()` because CAS may land on reAuth/MFA pages.
+- `plugins/official/ysu/emap-fetcher.ts` maps JWXT/CAS protocol errors into `ProviderError`; CAS `NotAuthenticatedError` from JWXT reauthorization should remain `AUTH_SESSION_EXPIRED`.
 ### Layer Overview
 
 | Layer | File | Responsibility |
 |-------|------|----------------|
-| Provider contracts | `providers/types.ts` | `AcademicProvider` interface and app-facing domain models |
+| Provider contracts | `packages/plugin-sdk/academic.ts` | `AcademicProvider` interface and app-facing domain models |
+| Plugin runtime | `lib/plugins/`, `components/plugin-provider.tsx` | Cordis lifecycle, external packages, UI/theme/storage/host services |
 | Provider runtime | `providers/provider-context.tsx`, `providers/provider-service.ts` | Active provider context, initialization, relogin, logout |
 | Provider hooks | `providers/hooks/` | Cached UI data hooks; UI should consume these instead of legacy facades |
-| YSU provider | `providers/ysu/` | YSU-specific CAS/JWXT protocol, session lifecycle, EMAP fetchers, diagnostics |
+| YSU provider | `plugins/official/ysu/` | YSU-specific CAS/JWXT protocol, session lifecycle, EMAP fetchers, diagnostics |
 | Cookie / HTTP | `lib/cookie.ts` | `SimpleCookieJar`, `fetchWithJar`, `capacitorHttpSend` with native store sync |
 | Native helpers | `lib/native/` | Capacitor platform, notification, WebView compatibility, widget bridge helpers |
 | Storage helpers | `lib/storage/` | Secure storage, cache, avatar/background storage, persisted key naming |
 | State stores | `lib/stores/` | Zustand stores: auth, settings, refresh, update, MFA modal, mobile header |
 
-UI code consumes `providers/` (`AcademicProvider`, hooks, provider context/service); do not reintroduce `lib/api.ts`, `lib/types.ts`, or `lib/use-cached-data.ts`. Keep school-specific parsing/session logic under provider implementations such as `providers/ysu/`.
+UI code consumes `providers/` (`AcademicProvider`, hooks, provider context/service); do not reintroduce `lib/api.ts`, `lib/types.ts`, or `lib/use-cached-data.ts`. Keep school-specific parsing/session logic under provider implementations such as `plugins/official/ysu/`.
 
-When debugging provider data loading, start from `providers/hooks/use-provider-query.ts` for cache/error semantics, then `providers/ysu/emap-fetcher.ts` for JWXT error mapping, then `providers/ysu/protocol/jwxt.ts` / `providers/ysu/protocol/cas.ts` for wire protocol behavior. Avoid repeated broad searches for these paths.
+When debugging provider data loading, start from `providers/hooks/use-provider-query.ts` for cache/error semantics, then `plugins/official/ysu/emap-fetcher.ts` for JWXT error mapping, then `plugins/official/ysu/protocol/jwxt.ts` / `plugins/official/ysu/protocol/cas.ts` for wire protocol behavior. Avoid repeated broad searches for these paths.
 
 ### Testing Notes
 
-- Vitest is configured in `vitest.config.ts` with `environment: "node"` and includes `providers/**/*.test.ts`, `lib/**/*.test.ts`, and `app/**/*.test.ts`.
+- Vitest is configured in `vitest.config.ts` with `environment: "node"` and includes `providers/`、`lib/`、`app/`、`packages/`、`plugins/` 下的测试。
 - Existing regression tests cover cached auth-expiry fallback, YSU academic error mapping, CAS-verified relogin, and schedule week anchoring:
   - `providers/hooks/use-provider-query.test.ts`
-  - `providers/ysu/emap-fetcher.test.ts`
-  - `providers/ysu/relogin.test.ts`
-  - `app/dashboard/schedule/schedule-utils.test.ts`
+  - `plugins/official/ysu/emap-fetcher.test.ts`
+  - `plugins/official/ysu/relogin.test.ts`
+  - `packages/academic/schedule-utils.test.ts`
 - Tests use explicit imports from `vitest`, not globals.
 
 ### Storage / WebView Gotchas

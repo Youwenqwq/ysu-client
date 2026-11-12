@@ -1,0 +1,10 @@
+{
+  "id": "example.hello",
+  "name": "Hello Plugin",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "kind": "feature",
+  "entry": "dist/index.js",
+  "styles": ["dist/index.css"],
+  "description": "A complete feature plugin example."
+}

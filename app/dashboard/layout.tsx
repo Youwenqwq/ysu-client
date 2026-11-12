@@ -36,39 +36,38 @@ import {
 import { toast } from "sonner"
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service"
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
-import {
-  CircleOff,
-  GraduationCap,
-  Info,
-  LogIn,
-  LogOut,
-  Settings,
-  TriangleAlert,
-  User,
-} from "lucide-react"
+import { GraduationCap, Info, LogIn, LogOut, Settings, TriangleAlert, User } from "lucide-react"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 import { MobileTopBar } from "@/components/mobile-top-bar"
 import { RefreshIndicator } from "@/components/refresh-indicator"
 import { StaleIndicator } from "@/components/stale-indicator"
-import { EXTRA_FEATURES } from "@/lib/extras/registry"
-import { FEE_FEATURES } from "@/lib/fees/registry"
-import {
-  ACADEMIC_FEATURES,
-  ACADEMIC_NAV_GROUPS,
-  blockedCapabilityForPath,
-} from "@/lib/dashboard-nav"
-import { isDashboardFeatureAvailable } from "@/lib/dashboard-features"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { useProviderCapabilities } from "@/providers/use-provider"
 import { UpdateDialog } from "@/components/update-dialog"
 import { APP_VERSION, APP_BUILD } from "@/lib/version"
 import { useStoredMediaUrl } from "@/lib/storage/media"
 import { loadAvatarImage } from "@/lib/storage/avatar"
+import { usePluginHost } from "@/components/plugin-provider"
+import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
+import { pluginPageHref, type PluginIcon } from "@ysu/plugin-sdk"
+import { usePluginRouteStore } from "@/lib/stores/plugin-route"
+import { hasPluginCapability } from "@/lib/plugins/navigation"
 
 const SIDEBAR_WIDTH_KEY = "dashboard-sidebar-width"
 const DEFAULT_SIDEBAR_WIDTH = 288 // 18rem
 const MIN_SIDEBAR_WIDTH = 208 // 13rem
 const MAX_SIDEBAR_WIDTH = 384 // 24rem
+
+interface DashboardNavItem {
+  title: string
+  url: string
+  icon: PluginIcon
+  pluginId?: string
+}
+
+interface DashboardNavGroup {
+  label: string
+  items: DashboardNavItem[]
+}
 
 function SidebarResizeHandle() {
   const { state, setOpen, isMobile } = useSidebar()
@@ -146,9 +145,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const rawPathname = usePathname()
   const pathname = rawPathname.replace(/\/$/, "")
   const { isAuthenticated, hasHydrated, username, sessionExpired } = useAuthStore()
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const fullscreenRequested = useMobileHeaderStore((s) => s.fullscreen)
-  const mobileFullscreen = pathname === "/dashboard/schedule" && fullscreenRequested
+  const pluginRoute = usePluginRouteStore((state) => state.current)
+  const mobileFullscreen =
+    pluginRoute?.pluginId === "ysu.schedule" &&
+    pluginRoute.pageId === "index" &&
+    fullscreenRequested
 
   const backgroundImage = useSettingsStore((s) => s.backgroundImage)
   const avatarImage = useSettingsStore((s) => s.avatarImage)
@@ -187,57 +190,62 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [])
 
   const capabilities = useProviderCapabilities()
-  const navGroups = [
-    ...ACADEMIC_NAV_GROUPS.map((group) => ({
-      label: t(group.labelKey),
-      items: group.features
-        .filter((f) => isDashboardFeatureAvailable(f, capabilities))
-        .map((f) => ({ title: t(f.nav.titleKey), url: f.nav.url, icon: f.nav.icon })),
-    })),
-    {
-      label: t("fees.nav"),
-      items: FEE_FEATURES.filter((f) => isDashboardFeatureAvailable(f, capabilities)).map((f) => ({
-        title: t(f.nav.titleKey),
-        url: f.nav.url,
-        icon: f.nav.icon,
+  const { host } = usePluginHost()
+  const { navigation: pluginNavigation } = usePluginUI(host.ui)
+  const pluginNavGroups: DashboardNavGroup[] = (
+    ["main", "academic", "platform", "fees", "extras", "plugins"] as const
+  ).map((group) => ({
+    label:
+      group === "plugins"
+        ? t("plugins.title")
+        : t(
+            group === "main"
+              ? "app.nav"
+              : group === "fees"
+                ? "fees.nav"
+                : group === "extras"
+                  ? "extras.nav"
+                  : group === "academic"
+                    ? "me.sectionAcademic"
+                    : "me.sectionPlatforms"
+          ),
+    items: pluginNavigation
+      .filter((item) => item.group === group)
+      .filter((item) => hasPluginCapability(capabilities, item.capability))
+      .map((item) => ({
+        title: item.titleKey
+          ? host.i18n.translate(item.pluginId, item.titleKey, locale)
+          : item.title,
+        url: pluginPageHref(item.pluginId, item.page),
+        icon: item.icon,
+        pluginId: item.pluginId,
       })),
-    },
-    // 玩具箱：与教务无关的第三方功能（lib/extras/registry.ts）
-    {
-      label: t("extras.nav"),
-      items: EXTRA_FEATURES.map((f) => ({
-        title: t(f.nav.titleKey),
-        url: f.nav.url,
-        icon: f.nav.icon,
-      })),
-    },
-  ].filter((group) => group.items.length > 0)
+  }))
+  const navGroups: DashboardNavGroup[] = []
+  for (const pluginGroup of pluginNavGroups) {
+    const existing = navGroups.find((group) => group.label === pluginGroup.label)
+    if (existing) existing.items.push(...pluginGroup.items)
+    else navGroups.push(pluginGroup)
+  }
+  const visibleNavGroups = navGroups.filter((group) => group.items.length > 0)
 
   const titleByPath: Record<string, string> = {
-    ...Object.fromEntries(
-      [...ACADEMIC_FEATURES, ...FEE_FEATURES, ...EXTRA_FEATURES].flatMap((f) =>
-        Object.entries(f.titleKeys).map(([path, key]) => [path, t(key)])
-      )
-    ),
     "/dashboard/me": t("app.me"),
-    "/dashboard/me/student": t("app.studentInfo"),
     "/dashboard/me/background": t("app.backgroundSettings"),
     "/dashboard/me/settings": t("settings.title"),
+    "/dashboard/me/plugins": t("plugins.title"),
     "/dashboard/me/settings/overview": t("overviewLayout.customize"),
     "/dashboard/me/settings/widgets": t("desktopWidgets.title"),
     "/dashboard/me/avatar": t("app.avatarSettings"),
     "/dashboard/me/about": t("about.title"),
   }
-  const pageTitle = titleByPath[pathname] ?? t("app.name")
+  const pageTitle = pluginRoute
+    ? pluginRoute.titleKey
+      ? host.i18n.translate(pluginRoute.pluginId, pluginRoute.titleKey, locale)
+      : pluginRoute.title
+    : (titleByPath[pathname] ?? t("app.name"))
 
-  const primaryPaths = new Set([
-    "/dashboard",
-    "/dashboard/schedule",
-    "/dashboard/grades",
-    "/dashboard/me",
-  ])
-  const showBack = !primaryPaths.has(pathname)
-  const blockedCapability = blockedCapabilityForPath(pathname, capabilities)
+  const showBack = pluginRoute ? !pluginRoute.primary : pathname !== "/dashboard/me"
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated) {
@@ -323,7 +331,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </SidebarHeader>
         <SidebarContent className="gap-0">
-          {navGroups.map((group) => (
+          {visibleNavGroups.map((group) => (
             <SidebarGroup key={group.label}>
               <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
@@ -332,7 +340,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <SidebarMenuItem key={item.url}>
                       <SidebarMenuButton
                         asChild
-                        isActive={pathname === item.url}
+                        isActive={
+                          pluginRoute && "pluginId" in item
+                            ? pluginRoute.pluginId === item.pluginId
+                            : pathname === item.url
+                        }
                         tooltip={item.title}
                         className="py-3 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:translate-x-1 active:scale-[0.98] data-[active=true]:shadow-sm [&_svg]:transition-transform [&_svg]:duration-300 hover:[&_svg]:scale-110 data-[active=true]:[&_svg]:scale-110"
                       >
@@ -460,19 +472,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               : "animate-in p-4 duration-500 fade-in slide-in-from-bottom-2"
           )}
         >
-          {blockedCapability ? (
-            <Empty className="flex-1 justify-center">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <CircleOff />
-                </EmptyMedia>
-                <EmptyTitle>{t("app.featureUnavailable")}</EmptyTitle>
-                <EmptyDescription>{t("app.featureUnavailableDesc")}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            children
-          )}
+          {children}
         </div>
       </main>
       {!mobileFullscreen && <MobileBottomNav />}

@@ -5,37 +5,10 @@ import { usePathname, useRouter } from "next/navigation"
 import { isCapacitor } from "@/lib/native/platform"
 import { useAuthStore } from "@/lib/stores/auth"
 import { useSettingsStore } from "@/lib/stores/settings"
-
-function notificationDestination(url: string): string | null {
-  try {
-    const parsed = new URL(url)
-    if (
-      parsed.protocol !== "ysuclient:" ||
-      parsed.username ||
-      parsed.password ||
-      parsed.port ||
-      (parsed.pathname !== "" && parsed.pathname !== "/") ||
-      parsed.search ||
-      parsed.hash
-    ) {
-      return null
-    }
-    switch (parsed.host) {
-      case "grades":
-        return "/dashboard/grades"
-      case "exams":
-        return "/dashboard/exams"
-      case "schedule":
-        return "/dashboard/schedule"
-      case "settings":
-        return "/dashboard/me/settings"
-      default:
-        return null
-    }
-  } catch {
-    return null
-  }
-}
+import {
+  isCurrentNotificationDestination,
+  notificationDestination,
+} from "@/lib/navigation/deep-link"
 
 export function DeepLinkHandler() {
   const router = useRouter()
@@ -96,7 +69,7 @@ export function DeepLinkHandler() {
     // Navigate only after those pages finish their own default-dashboard replacement,
     // otherwise a later login callback can overwrite the notification destination.
     if (pathname !== "/dashboard" && !pathname.startsWith("/dashboard/")) return
-    if (pathname === pendingDestination) {
+    if (isCurrentNotificationDestination(pathname, window.location.search, pendingDestination)) {
       setPendingDestination(null)
     } else {
       router.replace(pendingDestination)

@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/lib/stores/auth"
 import { useSettingsStore } from "@/lib/stores/settings"
+import { pluginPageHref } from "@ysu/plugin-sdk"
 
 export default function HomePage() {
   const router = useRouter()
@@ -15,7 +16,11 @@ export default function HomePage() {
   useEffect(() => {
     if (!hasHydrated || !settingsHydrated) return
     if (isAuthenticated) {
-      router.replace(landing === "schedule" ? "/dashboard/schedule/" : "/dashboard")
+      router.replace(
+        landing === "schedule"
+          ? pluginPageHref("ysu.schedule", "index")
+          : pluginPageHref("ysu.overview", "index")
+      )
     } else {
       router.replace("/login")
     }

@@ -1,46 +1,108 @@
-import { registerSchoolConfig } from "@/lib/server-config"
-import type { SchoolConfig } from "@/lib/school-configs/types"
-import { ProviderError, ProviderErrorCode } from "./errors"
+import type { Context } from "@cordisjs/core"
+import type { PluginManifest } from "@ysu/plugin-sdk"
+import type {
+  PluginProviderService,
+  ProviderFactory,
+  SchoolRegistration,
+} from "@ysu/plugin-sdk/providers"
+import { registerSchoolConfig, unregisterSchoolConfig } from "@/lib/server-config"
 import type { AcademicProvider } from "./types"
-import { YSUProvider } from "./ysu"
+import { ProviderError, ProviderErrorCode } from "./errors"
 
-export type ProviderFactory = () => AcademicProvider
+export type { ProviderFactory, SchoolRegistration, PluginProviderService }
 
-const registry: Record<string, ProviderFactory> = {
-  ysu: () => new YSUProvider(),
+interface ProviderEntry {
+  factory: ProviderFactory
 }
 
-export interface SchoolRegistration {
-  config: SchoolConfig
-  providerFactory: ProviderFactory
-}
+/**
+ * Host-side registry for provider plugins.
+ *
+ * Plugins contribute schools through a Cordis-scoped service; disposing the
+ * plugin scope removes everything it registered. The host only ever reads from
+ * this registry, so no provider implementation is imported or constructed until
+ * a plugin registers it and the app asks for it.
+ */
+export class ProviderPluginRegistry {
+  private readonly providers = new Map<string, ProviderEntry>()
+  private readonly listeners = new Set<(schoolId: string) => void>()
 
-export function registerProvider(schoolId: string, factory: ProviderFactory): void {
-  registry[schoolId] = factory
-}
-
-export function registerSchool(registration: SchoolRegistration): void {
-  registerSchoolConfig(registration.config)
-  registerProvider(registration.config.id, registration.providerFactory)
-}
-
-export function hasProvider(schoolId: string): boolean {
-  return Object.prototype.hasOwnProperty.call(registry, schoolId)
-}
-
-export function getRegisteredProviderIds(): string[] {
-  return Object.keys(registry)
-}
-
-export function createProvider(schoolId: string): AcademicProvider {
-  const factory = registry[schoolId]
-  if (!factory) {
-    throw new ProviderError(
-      ProviderErrorCode.FEATURE_NOT_SUPPORTED,
-      `Unsupported school provider: ${schoolId}`,
-      undefined,
-      501
-    )
+  /** Cordis service factory: inject into PluginRuntime alongside the UI service. */
+  createService = (ctx: Context, _manifest: PluginManifest): void => {
+    const disposers = new Set<() => void>()
+    const track = (dispose: () => void): (() => void) => {
+      disposers.add(dispose)
+      const onDispose = () => {
+        disposers.delete(dispose)
+        dispose()
+      }
+      const unregister = ctx.on("dispose", onDispose)
+      return () => {
+        unregister()
+        if (!disposers.delete(dispose)) return
+        dispose()
+      }
+    }
+    const service: PluginProviderService = {
+      registerProvider: (schoolId, factory) => track(this.addProvider(schoolId, factory)),
+      registerSchool: (registration) => track(this.addSchool(registration)),
+      hasProvider: (schoolId) => this.hasProvider(schoolId),
+    }
+    ctx.set("providers", service)
   }
-  return factory()
+
+  hasProvider(schoolId: string): boolean {
+    return this.providers.has(schoolId)
+  }
+
+  getRegisteredProviderIds(): string[] {
+    return Array.from(this.providers.keys())
+  }
+
+  createProvider(schoolId: string): AcademicProvider {
+    const entry = this.providers.get(schoolId)
+    if (!entry) {
+      throw new ProviderError(
+        ProviderErrorCode.FEATURE_NOT_SUPPORTED,
+        `Unsupported school provider: ${schoolId}`,
+        undefined,
+        501
+      )
+    }
+    return entry.factory()
+  }
+
+  subscribe = (listener: (schoolId: string) => void): (() => void) => {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  private addProvider(schoolId: string, factory: ProviderFactory): () => void {
+    const entry: ProviderEntry = { factory }
+    this.providers.set(schoolId, entry)
+    this.publish(schoolId)
+    return () => {
+      if (this.providers.get(schoolId) !== entry) return
+      this.providers.delete(schoolId)
+      this.publish(schoolId)
+    }
+  }
+
+  private addSchool(registration: SchoolRegistration): () => void {
+    const { config } = registration
+    registerSchoolConfig(config)
+    this.publish(config.id)
+    const removeProvider = this.addProvider(config.id, registration.providerFactory)
+    return () => {
+      removeProvider()
+      unregisterSchoolConfig(config)
+      this.publish(config.id)
+    }
+  }
+
+  private publish(schoolId: string): void {
+    for (const listener of this.listeners) listener(schoolId)
+  }
 }
+
+export const providerRegistry = new ProviderPluginRegistry()

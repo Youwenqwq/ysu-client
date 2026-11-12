@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useSettingsStore } from "@/lib/stores/settings"
 import type { AcademicProvider } from "./types"
 import { getActiveProvider, setActiveProviderSchool } from "./provider-service"
+import { providerRegistry } from "./provider-registry"
 
 export interface ProviderContextValue {
   provider: AcademicProvider
@@ -46,6 +47,22 @@ export function ProviderProvider({ children, schoolId }: ProviderProviderProps) 
       setIsReady(false)
     }
   }, [effectiveSchoolId, hasHydrated, schoolId])
+
+  useEffect(
+    () =>
+      providerRegistry.subscribe((changedSchoolId) => {
+        if (changedSchoolId !== effectiveSchoolId) return
+        try {
+          setProvider(setActiveProviderSchool(effectiveSchoolId))
+          setIsReady(false)
+          setError(undefined)
+        } catch (error) {
+          setError(error instanceof Error ? error : new Error(String(error)))
+          setIsReady(false)
+        }
+      }),
+    [effectiveSchoolId]
+  )
 
   const markProviderInitializing = useCallback(() => {
     setIsReady(false)

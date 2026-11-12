@@ -3,21 +3,41 @@ import { useAuthStore } from "@/lib/stores/auth"
 import { getSchoolId, setSchoolConfig } from "@/lib/server-config"
 import { DEFAULT_SCHOOL_ID, hasSchoolConfig } from "@/lib/school-configs"
 import type { AcademicProvider } from "./types"
-import { createProvider, hasProvider } from "./provider-registry"
+import { providerRegistry } from "./provider-registry"
 import { stopNotify, syncNativeNotifications } from "@/lib/native/notify"
 
 function resolveSupportedSchoolId(schoolId: string): string {
-  if (hasSchoolConfig(schoolId) && hasProvider(schoolId)) {
+  if (hasSchoolConfig(schoolId) && providerRegistry.hasProvider(schoolId)) {
     return schoolId
   }
   return DEFAULT_SCHOOL_ID
 }
 
-let activeSchoolId = resolveSupportedSchoolId(getSchoolId())
-let activeProvider: AcademicProvider = createProvider(activeSchoolId)
+let activeSchoolId: string | null = null
+let activeProvider: AcademicProvider | null = null
 let activeInitializePromise: Promise<AcademicProvider> | null = null
 let authOperation = 0
-setSchoolConfig(activeSchoolId)
+
+/**
+ * Providers are constructed lazily from plugin registrations, never at module
+ * import time: the official provider plugin may start after this module loads.
+ */
+function ensureActiveProvider(schoolId: string): AcademicProvider {
+  if (activeProvider && activeSchoolId === schoolId) return activeProvider
+  activeProvider = providerRegistry.createProvider(schoolId)
+  activeSchoolId = schoolId
+  activeInitializePromise = null
+  return activeProvider
+}
+
+// Replacing or disposing a plugin factory must invalidate the active instance.
+providerRegistry.subscribe((changedSchoolId) => {
+  if (activeSchoolId === changedSchoolId) {
+    activeProvider = null
+    activeSchoolId = null
+    activeInitializePromise = null
+  }
+})
 
 export function getActiveProvider(): AcademicProvider {
   const currentSchoolId = getSchoolId()
@@ -25,12 +45,7 @@ export function getActiveProvider(): AcademicProvider {
   if (nextSchoolId !== currentSchoolId) {
     setSchoolConfig(nextSchoolId)
   }
-  if (nextSchoolId !== activeSchoolId) {
-    activeSchoolId = nextSchoolId
-    activeProvider = createProvider(activeSchoolId)
-    activeInitializePromise = null
-  }
-  return activeProvider
+  return ensureActiveProvider(nextSchoolId)
 }
 
 export function setActiveProviderSchool(schoolId: string): AcademicProvider {
@@ -38,12 +53,7 @@ export function setActiveProviderSchool(schoolId: string): AcademicProvider {
   if (nextSchoolId !== getSchoolId()) {
     setSchoolConfig(nextSchoolId)
   }
-  if (nextSchoolId !== activeSchoolId) {
-    activeSchoolId = nextSchoolId
-    activeProvider = createProvider(nextSchoolId)
-    activeInitializePromise = null
-  }
-  return activeProvider
+  return ensureActiveProvider(nextSchoolId)
 }
 
 export async function initializeActiveProvider(): Promise<AcademicProvider> {

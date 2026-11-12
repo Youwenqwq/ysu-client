@@ -1,0 +1,17 @@
+{
+  "name": "@ysu/academic",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./schedule-utils": "./schedule-utils.ts",
+    "./course-color": "./course-color.ts",
+    "./exam-blocks": "./exam-blocks.ts",
+    "./schedule-editor-context": "./schedule-editor-context.tsx",
+    "./schedule-mobile": "./schedule-mobile.tsx",
+    "./schedule-tablet": "./schedule-tablet.tsx",
+    "./activity-modal": "./activity-modal.tsx",
+    "./signin-modal": "./signin-modal.tsx"
+  }
+}

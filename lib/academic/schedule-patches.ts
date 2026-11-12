@@ -1,5 +1,5 @@
 import type { Course, CurrentWeek, TermCalendar } from "@/providers/types"
-import { isCourseActiveInWeek } from "@/app/dashboard/schedule/schedule-utils"
+import { isCourseActiveInWeek } from "@ysu/academic/schedule-utils"
 
 export interface ScheduleOccurrence extends Course {
   occurrenceId: string

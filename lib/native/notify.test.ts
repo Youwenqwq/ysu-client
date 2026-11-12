@@ -398,9 +398,7 @@ describe("school-time class alarms", () => {
       { ...course, weekDay: 1 },
     ]
     expect(
-      notify
-        .computeClassAlarms(courses, null, periods, 7, calendar)
-        .map((alarm) => alarm.alarmTime)
+      notify.computeClassAlarms(courses, null, periods, 7, calendar).map((alarm) => alarm.alarmTime)
     ).toEqual([Date.parse("2026-09-20T01:45:00Z")])
   })
 })

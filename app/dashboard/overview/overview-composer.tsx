@@ -1,6 +1,14 @@
 "use client"
 
-import { useId, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react"
+import {
+  useEffect,
+  useId,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+  type CSSProperties,
+  type ReactNode,
+} from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -21,22 +29,17 @@ import { CSS } from "@dnd-kit/utilities"
 import {
   ArrowDown,
   ArrowUp,
-  BookOpen,
-  CalendarDays,
-  CalendarRange,
   Check,
-  ClipboardCheck,
-  CreditCard,
   Eye,
   EyeOff,
-  GraduationCap,
   GripVertical,
   LayoutDashboard,
-  ListChecks,
   Plus,
   RotateCcw,
   UserRound,
 } from "lucide-react"
+import { usePluginHost } from "@/components/plugin-provider"
+import { pluginPageHref } from "@ysu/plugin-sdk"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -75,6 +78,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useTranslation } from "@/lib/i18n/use-translation"
+import type { RegisteredPluginOverviewWidget } from "@/lib/plugins/ui-registry"
+import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
 import { useSettingsStore } from "@/lib/stores/settings"
 import { cn } from "@/lib/utils"
 import {
@@ -82,33 +87,66 @@ import {
   isOverviewWidgetId,
   moveOverviewWidget,
   normalizeOverviewLayout,
-  OVERVIEW_WIDGETS,
-  type ContentWidgetId,
+  pluginOverviewWidgetId,
+  type DynamicOverviewWidget,
   type OverviewLayout,
   type OverviewRegion,
   type OverviewWidgetId,
-  type SummaryWidgetId,
 } from "./layout-config"
 
-const WIDGET_ICONS = {
-  week: CalendarDays,
-  ecard: CreditCard,
-  gpa: GraduationCap,
-  evaluation: ClipboardCheck,
-  "course-progress": BookOpen,
-  "today-courses": CalendarRange,
-  "upcoming-exams": GraduationCap,
-  "evaluation-tasks": ListChecks,
-} as const
+type WidgetIcon = ComponentType<{ className?: string }>
+
+interface OverviewWidgetMeta {
+  title: string
+  description: string
+  icon: WidgetIcon
+  region: OverviewRegion
+}
+
+function useOverviewWidgetMeta() {
+  const { locale } = useTranslation()
+  const { host } = usePluginHost()
+  const { overviewWidgets } = usePluginUI(host.ui)
+  const dynamicWidgets: DynamicOverviewWidget[] = overviewWidgets.map((widget) => ({
+    id: pluginOverviewWidgetId(widget.pluginId, widget.id),
+    region: widget.region,
+    defaultVisible: widget.defaultVisible,
+  }))
+  const contributions = new Map<string, RegisteredPluginOverviewWidget>()
+  for (const widget of overviewWidgets) {
+    contributions.set(pluginOverviewWidgetId(widget.pluginId, widget.id), widget)
+  }
+  const meta = (id: OverviewWidgetId): OverviewWidgetMeta | undefined => {
+    const widget = contributions.get(id)
+    if (!widget) return undefined
+    return {
+      title: widget.titleKey
+        ? host.i18n.translate(widget.pluginId, widget.titleKey, locale)
+        : widget.title,
+      description: widget.descriptionKey
+        ? host.i18n.translate(widget.pluginId, widget.descriptionKey, locale)
+        : widget.description,
+      icon: widget.icon,
+      region: widget.region,
+    }
+  }
+  return { meta, dynamicWidgets, contributions }
+}
 
 function SortablePreview({
   id,
+  title,
+  description,
+  icon: Icon,
   first,
   last,
   onMove,
   onHide,
 }: {
   id: OverviewWidgetId
+  title: string
+  description: string
+  icon: WidgetIcon
   first: boolean
   last: boolean
   onMove: (direction: -1 | 1) => void
@@ -124,9 +162,6 @@ function SortablePreview({
     transition,
     isDragging,
   } = useSortable({ id })
-  const widget = OVERVIEW_WIDGETS[id]
-  const Icon = WIDGET_ICONS[id]
-  const title = t(widget.titleKey)
 
   return (
     <div
@@ -140,7 +175,7 @@ function SortablePreview({
             <Icon className="size-4 shrink-0" aria-hidden="true" />
             {title}
           </CardTitle>
-          <CardDescription>{t(widget.descriptionKey)}</CardDescription>
+          <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent className="mt-auto">
           <p className="text-xs text-muted-foreground">{t("overviewLayout.preview")}</p>
@@ -203,16 +238,18 @@ function EditableRegion({
   onHide: (id: OverviewWidgetId) => void
 }) {
   const { t } = useTranslation()
+  const { meta } = useOverviewWidgetMeta()
   const contextId = useId()
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
-  const items = layout.items.filter(
-    (item) => item.visible && OVERVIEW_WIDGETS[item.id].region === region
-  )
-  const titleFor = (id: string | number) =>
-    isOverviewWidgetId(id) ? t(OVERVIEW_WIDGETS[id].titleKey) : ""
+  const items = layout.items.flatMap((item) => {
+    if (!item.visible) return []
+    const widget = meta(item.id)
+    return widget?.region === region ? [{ id: item.id, ...widget }] : []
+  })
+  const titleFor = (id: string | number) => (isOverviewWidgetId(id) ? (meta(id)?.title ?? "") : "")
 
   return (
     <section className="flex flex-col gap-3" aria-labelledby={`${contextId}-title`}>
@@ -251,6 +288,9 @@ function EditableRegion({
               <SortablePreview
                 key={item.id}
                 id={item.id}
+                title={item.title}
+                description={item.description}
+                icon={item.icon}
                 first={index === 0}
                 last={index === items.length - 1}
                 onMove={(direction) => {
@@ -283,13 +323,18 @@ function AddLibrary({
   onAdd: (id: OverviewWidgetId) => void
 }) {
   const { t } = useTranslation()
+  const { meta } = useOverviewWidgetMeta()
   const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
-  const hidden = layout.items.filter((item) => !item.visible)
+  const hidden = layout.items.flatMap((item) => {
+    if (item.visible) return []
+    const widget = meta(item.id)
+    return widget ? [{ id: item.id, ...widget }] : []
+  })
   const content = (
     <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-4 pb-4">
       {(["summary", "content"] as const).map((region) => {
-        const items = hidden.filter((item) => OVERVIEW_WIDGETS[item.id].region === region)
+        const items = hidden.filter((item) => item.region === region)
         return (
           <section
             key={region}
@@ -300,35 +345,30 @@ function AddLibrary({
             {items.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("overviewLayout.allAdded")}</p>
             ) : (
-              items.map(({ id }) => {
-                const widget = OVERVIEW_WIDGETS[id]
-                const Icon = WIDGET_ICONS[id]
-                const title = t(widget.titleKey)
-                return (
-                  <Card key={id} size="sm">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Icon className="size-4" aria-hidden="true" />
-                        {title}
-                      </CardTitle>
-                      <CardDescription>{t(widget.descriptionKey)}</CardDescription>
-                    </CardHeader>
-                    <CardFooter className="justify-between gap-3">
-                      <span className="text-xs text-muted-foreground">
-                        {t("overviewLayout.preview")}
-                      </span>
-                      <Button
-                        variant="outline"
-                        onClick={() => onAdd(id)}
-                        aria-label={t("overviewLayout.addWidget", { title })}
-                      >
-                        <Plus data-icon="inline-start" />
-                        {t("overviewLayout.add")}
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                )
-              })
+              items.map(({ id, title, description, icon: Icon }) => (
+                <Card key={id} size="sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Icon className="size-4" aria-hidden="true" />
+                      {title}
+                    </CardTitle>
+                    <CardDescription>{description}</CardDescription>
+                  </CardHeader>
+                  <CardFooter className="justify-between gap-3">
+                    <span className="text-xs text-muted-foreground">
+                      {t("overviewLayout.preview")}
+                    </span>
+                    <Button
+                      variant="outline"
+                      onClick={() => onAdd(id)}
+                      aria-label={t("overviewLayout.addWidget", { title })}
+                    >
+                      <Plus data-icon="inline-start" />
+                      {t("overviewLayout.add")}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))
             )}
           </section>
         )
@@ -402,7 +442,18 @@ function LayoutEditor({ initialLayout }: { initialLayout: OverviewLayout }) {
   const { t } = useTranslation()
   const router = useRouter()
   const setLayout = useSettingsStore((state) => state.setOverviewLayout)
-  const [draft, setDraft] = useState(() => normalizeOverviewLayout(initialLayout))
+  const { dynamicWidgets } = useOverviewWidgetMeta()
+  const [draft, setDraft] = useState(() => normalizeOverviewLayout(initialLayout, dynamicWidgets))
+  const dynamicSignature = dynamicWidgets
+    .map((widget) => `${widget.id}:${widget.region}:${widget.defaultVisible}`)
+    .join("|")
+
+  useEffect(() => {
+    // Plugins can be enabled or disabled while the editor is open; reconcile the draft
+    // without dropping saved slots for contributions that are currently absent.
+    setDraft((current) => normalizeOverviewLayout(current, dynamicWidgets))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by the contribution signature
+  }, [dynamicSignature])
 
   function setVisibility(id: OverviewWidgetId, visible: boolean) {
     setDraft((current) => ({
@@ -419,7 +470,7 @@ function LayoutEditor({ initialLayout }: { initialLayout: OverviewLayout }) {
           <Button
             onClick={() => {
               setLayout(draft)
-              router.push("/dashboard")
+              router.push(pluginPageHref("ysu.overview", "index"))
             }}
           >
             <Check data-icon="inline-start" />
@@ -428,7 +479,10 @@ function LayoutEditor({ initialLayout }: { initialLayout: OverviewLayout }) {
           <Button variant="outline" onClick={() => router.push("/dashboard/me/settings")}>
             {t("overviewLayout.cancel")}
           </Button>
-          <Button variant="ghost" onClick={() => setDraft(createDefaultOverviewLayout())}>
+          <Button
+            variant="ghost"
+            onClick={() => setDraft(createDefaultOverviewLayout(dynamicWidgets))}
+          >
             <RotateCcw data-icon="inline-start" />
             {t("overviewLayout.reset")}
           </Button>
@@ -466,7 +520,7 @@ function LayoutEditor({ initialLayout }: { initialLayout: OverviewLayout }) {
           region={region}
           layout={draft}
           onMove={(active, target) =>
-            setDraft((current) => moveOverviewWidget(current, active, target))
+            setDraft((current) => moveOverviewWidget(current, active, target, dynamicWidgets))
           }
           onHide={(id) => setVisibility(id, false)}
         />
@@ -477,35 +531,37 @@ function LayoutEditor({ initialLayout }: { initialLayout: OverviewLayout }) {
 
 export function OverviewComposer({
   renderProfile,
-  renderSummary,
-  renderContent,
 }: {
-  renderProfile: (compact: boolean, summaries?: ReactNode) => ReactNode
-  renderSummary: (id: SummaryWidgetId, compact: boolean) => ReactNode
-  renderContent: (id: ContentWidgetId) => ReactNode
+  renderProfile?: (compact: boolean, summaries?: ReactNode) => ReactNode
 }) {
   const { t } = useTranslation()
   const hydrated = useLayoutHydrated()
   const compact = useIsMobile()
   const layout = useSettingsStore((state) => state.overviewLayout)
   const setLayout = useSettingsStore((state) => state.setOverviewLayout)
+  const { meta, dynamicWidgets, contributions } = useOverviewWidgetMeta()
   if (!hydrated) return <LayoutSkeleton />
 
-  const summary: { id: SummaryWidgetId; node: ReactNode }[] = []
-  const content: { id: ContentWidgetId; node: ReactNode }[] = []
-  for (const item of layout.items) {
+  // Reconcile installed plugin contributions so a widget the user has never arranged
+  // still honours its declared default visibility.
+  const effective = normalizeOverviewLayout(layout, dynamicWidgets)
+  const summary: { id: OverviewWidgetId; node: ReactNode }[] = []
+  const content: { id: OverviewWidgetId; title: string; node: ReactNode }[] = []
+  for (const item of effective.items) {
     if (!item.visible) continue
-    if (OVERVIEW_WIDGETS[item.id].region === "summary") {
-      const id = item.id as SummaryWidgetId
-      const node = renderSummary(id, compact)
-      if (node != null && typeof node !== "boolean") summary.push({ id, node })
+    // An uninstalled plugin (or an unmigrated legacy ID) keeps its saved slot but has
+    // nothing to render right now.
+    const contribution = contributions.get(item.id)
+    if (!contribution) continue
+    const Component = contribution.component
+    const node = <Component />
+    if (contribution.region === "summary") {
+      summary.push({ id: item.id, node })
     } else {
-      const id = item.id as ContentWidgetId
-      const node = renderContent(id)
-      if (node != null && typeof node !== "boolean") content.push({ id, node })
+      content.push({ id: item.id, title: meta(item.id)?.title ?? contribution.title, node })
     }
   }
-  const empty = !layout.profileVisible && summary.length === 0 && content.length === 0
+  const showFallback = !layout.profileVisible && summary.length === 0
   const inlineSummaries =
     summary.length > 0 ? (
       <CardContent
@@ -522,21 +578,22 @@ export function OverviewComposer({
     ) : null
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    <div data-overview-root className="flex min-w-0 flex-col gap-4">
       {compact
-        ? layout.profileVisible
+        ? layout.profileVisible && renderProfile
           ? renderProfile(true, inlineSummaries)
           : inlineSummaries && <Card>{inlineSummaries}</Card>
-        : (layout.profileVisible || summary.length > 0) && (
+        : ((layout.profileVisible && renderProfile) || summary.length > 0) && (
             <div
               className={cn(
                 "grid gap-4",
                 layout.profileVisible &&
+                  renderProfile &&
                   summary.length > 0 &&
                   "lg:grid-cols-[minmax(14rem,1fr)_minmax(0,2fr)]"
               )}
             >
-              {layout.profileVisible && (
+              {layout.profileVisible && renderProfile && (
                 <div className="min-w-0 [&>*]:h-full">{renderProfile(false)}</div>
               )}
               {summary.length > 0 && (
@@ -548,61 +605,67 @@ export function OverviewComposer({
                     } as CSSProperties
                   }
                 >
-                  {summary.map(({ id, node }, index) => (
-                    <Card
-                      key={id}
-                      size="sm"
-                      data-overview-widget={id}
-                      className={cn(
-                        "min-w-0",
-                        summary.length % 2 === 1 &&
-                          index === summary.length - 1 &&
-                          "col-span-2 xl:col-span-1"
-                      )}
-                    >
-                      {node}
-                    </Card>
-                  ))}
+                  {summary.map(({ id, node }, index) => {
+                    const oddLast = summary.length % 2 === 1 && index === summary.length - 1
+                    return (
+                      <div
+                        key={id}
+                        data-overview-widget={id}
+                        className={cn(
+                          "min-w-0 [&>*]:h-full",
+                          oddLast && "col-span-2 xl:col-span-1"
+                        )}
+                      >
+                        {node}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
           )}
       {content.length > 0 && (
-        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-          {content.map(({ id, node }) => (
-            <section
-              key={id}
-              aria-label={t(OVERVIEW_WIDGETS[id].titleKey)}
-              data-overview-widget={id}
-              className={cn(
-                "min-w-0",
-                (id === "course-progress" || id === "evaluation-tasks") && "xl:col-span-2"
-              )}
-            >
-              {node}
-            </section>
-          ))}
+        <div data-overview-content className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+          {content.map(({ id, title, node }) => {
+            // A contribution renders its own Card; `[data-overview-wide]` opts into the
+            // full row, and a widget with nothing to show collapses instead of leaving a gap.
+            return (
+              <section
+                key={id}
+                aria-label={title}
+                data-overview-widget={id}
+                className="min-w-0 empty:hidden has-[>[data-overview-wide]]:xl:col-span-2"
+              >
+                {node}
+              </section>
+            )
+          })}
         </div>
       )}
-      {empty && (
-        <Empty className="border py-12">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <LayoutDashboard />
-            </EmptyMedia>
-            <EmptyTitle>{t("overviewLayout.empty")}</EmptyTitle>
-            <EmptyDescription>{t("overviewLayout.emptyDescription")}</EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button asChild>
-              <Link href="/dashboard/me/settings">{t("settings.title")}</Link>
-            </Button>
-            <Button variant="outline" onClick={() => setLayout(createDefaultOverviewLayout())}>
-              <RotateCcw data-icon="inline-start" />
-              {t("overviewLayout.reset")}
-            </Button>
-          </EmptyContent>
-        </Empty>
+      {showFallback && (
+        <div data-overview-fallback>
+          <Empty className="border py-12">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <LayoutDashboard />
+              </EmptyMedia>
+              <EmptyTitle>{t("overviewLayout.empty")}</EmptyTitle>
+              <EmptyDescription>{t("overviewLayout.emptyDescription")}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button asChild>
+                <Link href="/dashboard/me/settings">{t("settings.title")}</Link>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setLayout(createDefaultOverviewLayout(dynamicWidgets))}
+              >
+                <RotateCcw data-icon="inline-start" />
+                {t("overviewLayout.reset")}
+              </Button>
+            </EmptyContent>
+          </Empty>
+        </div>
       )}
     </div>
   )

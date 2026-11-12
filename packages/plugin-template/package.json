@@ -1,0 +1,12 @@
+{
+  "name": "@ysu/plugin-template",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cordisjs/core": "3.18.1",
+    "@ysu/plugin-sdk": "workspace:*",
+    "lucide-react": "^1.17.0",
+    "react": "^19.2.6"
+  }
+}

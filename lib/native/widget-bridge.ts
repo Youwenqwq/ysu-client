@@ -1,6 +1,6 @@
 import { registerPlugin } from "@capacitor/core"
 import type { Course, CurrentWeek, ClassPeriod, Exam, TermCalendar } from "@/providers/types"
-import { parseWeeks } from "@/app/dashboard/schedule/schedule-utils"
+import { parseWeeks } from "@ysu/academic/schedule-utils"
 import { getAcademicClock, resolveAcademicWeek } from "@/lib/academic/academic-time"
 
 export type NativeWidgetId = "schedule" | "tomorrow" | "exam" | "exam-compact"

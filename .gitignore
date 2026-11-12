@@ -18,6 +18,10 @@
 # production
 /build
 /dist
+/packages/*/dist/
+/packages/*/*.zip
+/plugins/**/dist/
+/plugins/**/*.zip
 
 /android/*
 !/android/build.gradle
@@ -94,6 +98,3 @@ website/.edgeone/
 /Could
 /Failed
 /Toolchain
-
-# Should be ignored test file
-lib/fees/meter/client.test.ts
