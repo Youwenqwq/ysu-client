@@ -8,10 +8,14 @@
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="true"
@@ -101,6 +105,19 @@
         <receiver
             android:name=".notify.ClassAlarmReceiver"
             android:exported="false" />
+
+        <service
+            android:name=".notify.ClassReminderService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-enabled Live Updates: refresh pre-class, in-class and consecutive-class countdowns from the configured reminder time, using the same visible notification and a wake lock bounded by class end." />
+        </service>
+
+        <receiver
+            android:name=".notify.DebugLiveUpdateReceiver"
+            android:exported="true" />
 
         <receiver
             android:name=".notify.BootReceiver"

@@ -35,14 +35,27 @@ export interface YsuNotifyPlugin {
   // ─── Permission management ──────────────────────────────────────────────
   checkPermissions(): Promise<{ granted: boolean }>
   requestPermissions(): Promise<{ granted: boolean }>
+  checkExactAlarmPermission(): Promise<{ granted: boolean }>
+  requestExactAlarmPermission(): Promise<{ granted: boolean }>
 
   // ─── Battery optimization ──────────────────────────────────────────────
   checkBatteryOptimization(): Promise<{ ignored: boolean }>
   requestIgnoreBatteryOptimization(): Promise<void>
+  // TODO: 接入设置页的厂商自启动引导。
+  openAutoStartSettings(): Promise<{ opened: boolean }>
 
   // ─── Class alarm ────────────────────────────────────────────────────────
   scheduleClassAlarms(options: { alarmsJson: string }): Promise<void>
   cancelClassAlarms(): Promise<void>
+
+  // ─── Debug (debug builds only) ──────────────────────────────────────────
+  debugLiveUpdate(options?: {
+    courseName?: string
+    classroom?: string
+    startInMinutes?: number
+    liveUpdateEnabled?: boolean
+    vibrationEnabled?: boolean
+  }): Promise<{ posted: boolean }>
 }
 
 export const NotifyPlugin = registerPlugin<YsuNotifyPlugin>("YsuNotify")

@@ -426,6 +426,25 @@ export default function DebugPage() {
     }
   }
 
+  async function handleDebugLiveUpdate() {
+    if (!isCapacitor()) {
+      logNative("非 Capacitor 平台，跳过")
+      return
+    }
+    try {
+      const { posted } = await NotifyPlugin.debugLiveUpdate({
+        startInMinutes: 2,
+      })
+      logNative(
+        posted
+          ? "测试计时已安排，2 分钟后发布上课 Live Update（不震动）"
+          : "当前设备不支持 Live Updates（需要 Android 16+）"
+      )
+    } catch (e) {
+      logNative(`触发 Live Update 失败: ${(e as Error).message}`)
+    }
+  }
+
   function handleNativeClearLog() {
     setNativeTestLog([])
   }
@@ -829,6 +848,10 @@ export default function DebugPage() {
                 <Button variant="outline" size="sm" onClick={handleNativeRunWorker}>
                   <Play className="mr-1 size-3.5" />
                   立即执行
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDebugLiveUpdate}>
+                  <Bell className="mr-1 size-3.5" />
+                  测试上课胶囊
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleNativeClearLog}>
                   <Trash2 className="mr-1 size-3.5" />

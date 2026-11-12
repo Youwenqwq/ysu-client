@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { Device } from "@capacitor/device"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -47,6 +48,8 @@ import {
   Bell,
   Timer,
   AlarmClock,
+  Radio,
+  Vibrate,
   Battery,
   Wallet2,
   ShieldCheck,
@@ -82,6 +85,10 @@ export default function SettingsPage() {
   const setEpayNotifyEnabled = useSettingsStore((s) => s.setEpayNotifyEnabled)
   const classReminderMinutes = useSettingsStore((s) => s.classReminderMinutes)
   const setClassReminderMinutes = useSettingsStore((s) => s.setClassReminderMinutes)
+  const classLiveUpdateEnabled = useSettingsStore((s) => s.classLiveUpdateEnabled)
+  const setClassLiveUpdateEnabled = useSettingsStore((s) => s.setClassLiveUpdateEnabled)
+  const classVibrationEnabled = useSettingsStore((s) => s.classVibrationEnabled)
+  const setClassVibrationEnabled = useSettingsStore((s) => s.setClassVibrationEnabled)
   const classReminderDays = useSettingsStore((s) => s.classReminderDays)
   const setClassReminderDays = useSettingsStore((s) => s.setClassReminderDays)
   const analyticsConsent = useSettingsStore((s) => s.analyticsConsent)
@@ -91,8 +98,27 @@ export default function SettingsPage() {
   const [batteryIgnored, setBatteryIgnored] = useState<boolean | null>(null)
   const [autoStartDialogOpen, setAutoStartDialogOpen] = useState(false)
   const [notificationPermissionPending, setNotificationPermissionPending] = useState(false)
+  const [liveUpdatePermissionPending, setLiveUpdatePermissionPending] = useState(false)
+  const awaitingExactAlarmPermission = useRef(false)
+  const [liveUpdateSupported, setLiveUpdateSupported] = useState(false)
+
+  useEffect(() => {
+    if (!isCapacitor()) return
+    let mounted = true
+    Device.getInfo()
+      .then((info) => {
+        if (mounted) {
+          setLiveUpdateSupported(info.platform === "android" && (info.androidSDKVersion ?? 0) >= 36)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   async function handleNotificationToggle(kind: "polling" | "classes", enabled: boolean) {
+    if (kind === "classes" && !enabled) awaitingExactAlarmPermission.current = false
     setNotificationPermissionPending(true)
     try {
       if (!(await setNotificationEnabled(kind, enabled))) {
@@ -102,6 +128,30 @@ export default function SettingsPage() {
       toast.error(t("settings.notificationSyncFailed"))
     } finally {
       setNotificationPermissionPending(false)
+    }
+  }
+
+  async function handleLiveUpdateToggle(enabled: boolean) {
+    if (!enabled) {
+      awaitingExactAlarmPermission.current = false
+      setClassLiveUpdateEnabled(false)
+      return
+    }
+    awaitingExactAlarmPermission.current = true
+    setLiveUpdatePermissionPending(true)
+    try {
+      const { granted } = await NotifyPlugin.requestExactAlarmPermission()
+      if (granted) {
+        awaitingExactAlarmPermission.current = false
+        setClassLiveUpdateEnabled(true)
+      } else {
+        toast.info(t("settings.classLiveUpdateExactAlarmRequired"))
+      }
+    } catch {
+      awaitingExactAlarmPermission.current = false
+      toast.error(t("settings.notificationSyncFailed"))
+    } finally {
+      setLiveUpdatePermissionPending(false)
     }
   }
 
@@ -124,6 +174,16 @@ export default function SettingsPage() {
               setBatteryIgnored(ignored)
             })
             .catch(() => {})
+          if (awaitingExactAlarmPermission.current) {
+            NotifyPlugin.checkExactAlarmPermission()
+              .then(({ granted }) => {
+                if (granted && awaitingExactAlarmPermission.current) {
+                  awaitingExactAlarmPermission.current = false
+                  setClassLiveUpdateEnabled(true)
+                }
+              })
+              .catch(() => {})
+          }
         }
       }).then((h) => {
         listener = h
@@ -133,7 +193,7 @@ export default function SettingsPage() {
     return () => {
       listener?.remove()
     }
-  }, [])
+  }, [setClassLiveUpdateEnabled])
 
   async function handleLogout() {
     setLogoutDialogOpen(false)
@@ -187,7 +247,7 @@ export default function SettingsPage() {
       <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
 
       <Section title={t("me.sectionPreferences")}>
-        <Card>
+        <Card className="py-0">
           <CardContent className="flex flex-col py-1">
             {/* 通用 */}
             <h3 className="flex items-center gap-2 px-0.5 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">
@@ -356,7 +416,7 @@ export default function SettingsPage() {
       {/* 通知设置 — 仅 Capacitor 平台 */}
       {isCapacitor() && (
         <Section title={t("settings.notifyTitle")}>
-          <Card>
+          <Card className="py-0">
             <CardContent className="flex flex-col py-1">
               {/* 系统权限 */}
               <h3 className="flex items-center gap-2 px-0.5 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">
@@ -369,7 +429,7 @@ export default function SettingsPage() {
                 onClick={() => NotifyPlugin.requestIgnoreBatteryOptimization()}
                 className="flex items-center gap-3 py-3 text-left transition-colors active:bg-muted/60"
               >
-                <Battery className="size-5 shrink-0 text-muted-foreground" />
+                <Battery className="size-5 shrink-0 translate-x-0.5 text-muted-foreground" />
                 <div className="flex flex-1 flex-col">
                   <span className="text-sm">{t("settings.batteryOptimization")}</span>
                   <span className="text-xs text-muted-foreground">
@@ -499,6 +559,35 @@ export default function SettingsPage() {
               </div>
               {classReminderEnabled && (
                 <>
+                  <div className="flex items-center gap-3 border-t border-border py-3">
+                    <Radio className="size-5 shrink-0 text-muted-foreground" />
+                    <label
+                      htmlFor="class-live-update"
+                      className={cn(
+                        "min-w-0 flex-1 text-sm",
+                        !liveUpdateSupported && "text-muted-foreground"
+                      )}
+                    >
+                      {t("settings.classLiveUpdateEnabled")}
+                    </label>
+                    <Switch
+                      id="class-live-update"
+                      checked={liveUpdateSupported && classLiveUpdateEnabled}
+                      disabled={!liveUpdateSupported || liveUpdatePermissionPending}
+                      onCheckedChange={(enabled) => void handleLiveUpdateToggle(enabled)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 border-t border-border py-3">
+                    <Vibrate className="size-5 shrink-0 text-muted-foreground" />
+                    <label htmlFor="class-vibration" className="min-w-0 flex-1 text-sm">
+                      {t("settings.classVibrationEnabled")}
+                    </label>
+                    <Switch
+                      id="class-vibration"
+                      checked={classVibrationEnabled}
+                      onCheckedChange={setClassVibrationEnabled}
+                    />
+                  </div>
                   <SettingNumberInput
                     icon={Timer}
                     label={t("settings.classReminderMinutes")}
@@ -527,7 +616,7 @@ export default function SettingsPage() {
       )}
 
       <Section title={t("settings.epayReminderTitle")}>
-        <Card>
+        <Card className="py-0">
           <CardContent className="flex flex-col py-1">
             <div className="flex items-center gap-3 py-3">
               <Wallet2 className="size-5 shrink-0 text-muted-foreground" />
@@ -546,7 +635,7 @@ export default function SettingsPage() {
       </Section>
 
       <Section title={t("me.sectionAccount")}>
-        <Card>
+        <Card className="py-0">
           <CardContent className="flex flex-col py-1">
             <button
               type="button"
@@ -570,7 +659,7 @@ export default function SettingsPage() {
       </Section>
 
       <div className="flex flex-col gap-2">
-        <Card>
+        <Card className="py-0">
           <CardContent className="flex flex-col py-1">
             <div className="flex items-center gap-3 py-3">
               <BarChart3 className="size-5 shrink-0 text-muted-foreground" />
@@ -585,7 +674,7 @@ export default function SettingsPage() {
       </div>
 
       <Section title={t("about.title")}>
-        <Card>
+        <Card className="py-0">
           <CardContent className="flex flex-col py-1">
             <Link
               href="/dashboard/me/about"

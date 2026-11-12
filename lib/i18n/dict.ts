@@ -119,7 +119,8 @@ export const zh = {
     autoStartDesc: "允许自启动以确保后台通知不被系统杀死",
     autoStartDialogTitle: "开启自启动",
     autoStartDialogContent:
-      '请前往系统设置，搜索"自启动"，找到本应用并开启。不同品牌手机的路径可能不同，通常在 设置 → 应用 → 自启动管理 中。',
+      "部分系统会限制后台应用的闹钟和网络，导致上课提醒不准时。请在系统设置里允许本应用自启动、后台运行，并关闭电池优化。不同品牌手机的路径可能不同，通常在 设置 → 应用 → 自启动管理 中。",
+    autoStartOpen: "去设置",
     notifyNetworkError: "网络错误提醒",
     notifyNetworkErrorDesc: "通知检查失败时推送网络错误提醒",
     notifyContentTitle: "成绩/考试通知",
@@ -128,6 +129,10 @@ export const zh = {
     classReminderEnabled: "开启上课提醒",
     classReminderHint: "注意：需至少每隔一个预约周期打开 App 刷新提醒数据",
     classReminderMinutes: "提前提醒时间",
+    classLiveUpdateEnabled: "使用Android Live Update显示上课通知",
+    classLiveUpdateExactAlarmRequired:
+      "请在系统设置中允许“闹钟和提醒”，返回后将自动开启 Live Update",
+    classVibrationEnabled: "课前提醒时强振动",
     classReminderDays: "预约天数",
     minutes: "分钟",
     days: "天",
@@ -1271,7 +1276,8 @@ export const en = {
     autoStartDesc: "Allow auto-start to prevent the system from killing background notifications",
     autoStartDialogTitle: "Enable Auto-start",
     autoStartDialogContent:
-      'Please go to system settings, search for "Auto-start", find this app and enable it. The path varies by brand, usually in Settings → Apps → Auto-start management.',
+      "Some systems restrict alarms and network access for background apps, which can delay class reminders. Allow auto-start and background running, and disable battery optimization for this app.The path varies by brand, usually in Settings → Apps → Auto-start management. ",
+    autoStartOpen: "Open settings",
     notifyNetworkError: "Network Error Alert",
     notifyNetworkErrorDesc: "Push notification when check fails due to network error",
     notifyContentTitle: "Grade/Exam Notifications",
@@ -1281,6 +1287,10 @@ export const en = {
     classReminderHint:
       "Note: Open the app at least once per reservation cycle to refresh reminder data",
     classReminderMinutes: "Reminder time",
+    classLiveUpdateEnabled: "Use Android Live Update for class notifications",
+    classLiveUpdateExactAlarmRequired:
+      'Allow "Alarms & reminders" in system settings; Live Update will turn on when you return.',
+    classVibrationEnabled: "Strong vibration with the pre-class reminder",
     classReminderDays: "Days ahead",
     minutes: "minutes",
     days: "days",
