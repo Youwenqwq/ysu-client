@@ -35,11 +35,13 @@ export interface YsuNotifyPlugin {
   // ─── Permission management ──────────────────────────────────────────────
   checkPermissions(): Promise<{ granted: boolean }>
   requestPermissions(): Promise<{ granted: boolean }>
+  checkExactAlarmPermission(): Promise<{ granted: boolean }>
   requestExactAlarmPermission(): Promise<{ granted: boolean }>
 
   // ─── Battery optimization ──────────────────────────────────────────────
   checkBatteryOptimization(): Promise<{ ignored: boolean }>
   requestIgnoreBatteryOptimization(): Promise<void>
+  // TODO: 接入设置页的厂商自启动引导。
   openAutoStartSettings(): Promise<{ opened: boolean }>
 
   // ─── Class alarm ────────────────────────────────────────────────────────

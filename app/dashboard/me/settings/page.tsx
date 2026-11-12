@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Device } from "@capacitor/device"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -48,6 +48,8 @@ import {
   Bell,
   Timer,
   AlarmClock,
+  Radio,
+  Vibrate,
   Battery,
   Wallet2,
   ShieldCheck,
@@ -97,6 +99,7 @@ export default function SettingsPage() {
   const [autoStartDialogOpen, setAutoStartDialogOpen] = useState(false)
   const [notificationPermissionPending, setNotificationPermissionPending] = useState(false)
   const [liveUpdatePermissionPending, setLiveUpdatePermissionPending] = useState(false)
+  const awaitingExactAlarmPermission = useRef(false)
   const [liveUpdateSupported, setLiveUpdateSupported] = useState(false)
 
   useEffect(() => {
@@ -115,6 +118,7 @@ export default function SettingsPage() {
   }, [])
 
   async function handleNotificationToggle(kind: "polling" | "classes", enabled: boolean) {
+    if (kind === "classes" && !enabled) awaitingExactAlarmPermission.current = false
     setNotificationPermissionPending(true)
     try {
       if (!(await setNotificationEnabled(kind, enabled))) {
@@ -129,15 +133,22 @@ export default function SettingsPage() {
 
   async function handleLiveUpdateToggle(enabled: boolean) {
     if (!enabled) {
+      awaitingExactAlarmPermission.current = false
       setClassLiveUpdateEnabled(false)
       return
     }
+    awaitingExactAlarmPermission.current = true
     setLiveUpdatePermissionPending(true)
     try {
       const { granted } = await NotifyPlugin.requestExactAlarmPermission()
-      if (granted) setClassLiveUpdateEnabled(true)
-      else toast.info(t("settings.classLiveUpdateExactAlarmRequired"))
+      if (granted) {
+        awaitingExactAlarmPermission.current = false
+        setClassLiveUpdateEnabled(true)
+      } else {
+        toast.info(t("settings.classLiveUpdateExactAlarmRequired"))
+      }
     } catch {
+      awaitingExactAlarmPermission.current = false
       toast.error(t("settings.notificationSyncFailed"))
     } finally {
       setLiveUpdatePermissionPending(false)
@@ -163,6 +174,16 @@ export default function SettingsPage() {
               setBatteryIgnored(ignored)
             })
             .catch(() => {})
+          if (awaitingExactAlarmPermission.current) {
+            NotifyPlugin.checkExactAlarmPermission()
+              .then(({ granted }) => {
+                if (granted && awaitingExactAlarmPermission.current) {
+                  awaitingExactAlarmPermission.current = false
+                  setClassLiveUpdateEnabled(true)
+                }
+              })
+              .catch(() => {})
+          }
         }
       }).then((h) => {
         listener = h
@@ -172,7 +193,7 @@ export default function SettingsPage() {
     return () => {
       listener?.remove()
     }
-  }, [])
+  }, [setClassLiveUpdateEnabled])
 
   async function handleLogout() {
     setLogoutDialogOpen(false)
@@ -536,38 +557,37 @@ export default function SettingsPage() {
                   onCheckedChange={(enabled) => void handleNotificationToggle("classes", enabled)}
                 />
               </div>
-              <div className="flex items-center gap-3 border-t border-border py-3">
-                <label
-                  htmlFor="class-live-update"
-                  className={cn(
-                    "min-w-0 flex-1 text-sm",
-                    !liveUpdateSupported && "text-muted-foreground"
-                  )}
-                >
-                  {t("settings.classLiveUpdateEnabled")}
-                </label>
-                <Switch
-                  id="class-live-update"
-                  checked={liveUpdateSupported && classLiveUpdateEnabled}
-                  disabled={
-                    !classReminderEnabled || !liveUpdateSupported || liveUpdatePermissionPending
-                  }
-                  onCheckedChange={(enabled) => void handleLiveUpdateToggle(enabled)}
-                />
-              </div>
-              <div className="flex items-center gap-3 border-t border-border py-3">
-                <label htmlFor="class-vibration" className="min-w-0 flex-1 text-sm">
-                  {t("settings.classVibrationEnabled")}
-                </label>
-                <Switch
-                  id="class-vibration"
-                  checked={classVibrationEnabled}
-                  disabled={!classReminderEnabled}
-                  onCheckedChange={setClassVibrationEnabled}
-                />
-              </div>
               {classReminderEnabled && (
                 <>
+                  <div className="flex items-center gap-3 border-t border-border py-3">
+                    <Radio className="size-5 shrink-0 text-muted-foreground" />
+                    <label
+                      htmlFor="class-live-update"
+                      className={cn(
+                        "min-w-0 flex-1 text-sm",
+                        !liveUpdateSupported && "text-muted-foreground"
+                      )}
+                    >
+                      {t("settings.classLiveUpdateEnabled")}
+                    </label>
+                    <Switch
+                      id="class-live-update"
+                      checked={liveUpdateSupported && classLiveUpdateEnabled}
+                      disabled={!liveUpdateSupported || liveUpdatePermissionPending}
+                      onCheckedChange={(enabled) => void handleLiveUpdateToggle(enabled)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 border-t border-border py-3">
+                    <Vibrate className="size-5 shrink-0 text-muted-foreground" />
+                    <label htmlFor="class-vibration" className="min-w-0 flex-1 text-sm">
+                      {t("settings.classVibrationEnabled")}
+                    </label>
+                    <Switch
+                      id="class-vibration"
+                      checked={classVibrationEnabled}
+                      onCheckedChange={setClassVibrationEnabled}
+                    />
+                  </div>
                   <SettingNumberInput
                     icon={Timer}
                     label={t("settings.classReminderMinutes")}

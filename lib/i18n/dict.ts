@@ -130,7 +130,8 @@ export const zh = {
     classReminderHint: "注意：需至少每隔一个预约周期打开 App 刷新提醒数据",
     classReminderMinutes: "提前提醒时间",
     classLiveUpdateEnabled: "使用Android Live Update显示上课通知",
-    classLiveUpdateExactAlarmRequired: "请在系统设置中允许“闹钟和提醒”，返回后再次开启 Live Update",
+    classLiveUpdateExactAlarmRequired:
+      "请在系统设置中允许“闹钟和提醒”，返回后将自动开启 Live Update",
     classVibrationEnabled: "课前提醒时强振动",
     classReminderDays: "预约天数",
     minutes: "分钟",
@@ -1288,7 +1289,7 @@ export const en = {
     classReminderMinutes: "Reminder time",
     classLiveUpdateEnabled: "Use Android Live Update for class notifications",
     classLiveUpdateExactAlarmRequired:
-      'Allow "Alarms & reminders" in system settings, then return and enable Live Update again.',
+      'Allow "Alarms & reminders" in system settings; Live Update will turn on when you return.',
     classVibrationEnabled: "Strong vibration with the pre-class reminder",
     classReminderDays: "Days ahead",
     minutes: "minutes",

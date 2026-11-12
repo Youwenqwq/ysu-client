@@ -340,6 +340,13 @@ class YsuNotifyPlugin : Plugin() {
     // ─── Permission management ──────────────────────────────────────────────
 
     @PluginMethod
+    fun checkExactAlarmPermission(call: PluginCall) {
+        call.resolve(
+            JSObject().put("granted", ClassAlarmScheduling.canScheduleExact(context))
+        )
+    }
+
+    @PluginMethod
     fun requestExactAlarmPermission(call: PluginCall) {
         if (ClassAlarmScheduling.canScheduleExact(context)) {
             call.resolve(JSObject().put("granted", true))
