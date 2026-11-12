@@ -3,7 +3,11 @@ import type { Course, CurrentWeek, ClassPeriod, Exam, TermCalendar } from "@/pro
 import { parseWeeks } from "@/app/dashboard/schedule/schedule-utils"
 import { getAcademicClock, resolveAcademicWeek } from "@/lib/academic/academic-time"
 
+export type NativeWidgetId = "schedule" | "tomorrow" | "exam" | "exam-compact"
+
 export interface WidgetBridgePlugin {
+  /** Resolves true only after the provider gains a new home-screen widget ID. */
+  pinWidget(options: { widget: NativeWidgetId }): Promise<{ added: boolean }>
   syncSchedule(options: {
     coursesJson: string
     currentWeekJson: string
@@ -21,6 +25,9 @@ export interface WidgetBridgePlugin {
 const WidgetBridge = registerPlugin<WidgetBridgePlugin>("WidgetBridge", {
   web: async () => {
     return {
+      async pinWidget() {
+        return { added: false }
+      },
       async syncSchedule() {
         // No-op on web
       },
@@ -36,6 +43,17 @@ const WidgetBridge = registerPlugin<WidgetBridgePlugin>("WidgetBridge", {
     }
   },
 })
+
+export async function requestWidgetPin(widget: NativeWidgetId): Promise<boolean> {
+  try {
+    const result = await WidgetBridge.pinWidget({ widget })
+    return result.added
+  } catch (error) {
+    console.warn("Failed to request widget pin", error)
+    // Older native shells and unsupported launchers fall back to manual instructions.
+    return false
+  }
+}
 
 export interface WidgetCourse {
   name: string

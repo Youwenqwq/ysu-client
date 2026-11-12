@@ -60,6 +60,7 @@ import { ScheduleTablet } from "./schedule-tablet"
 import { ScheduleMobile } from "./schedule-mobile"
 import { ScheduleDragProvider } from "./schedule-drag"
 import { ScheduleAdjustmentDialog, ScheduleAdjustmentsDialog } from "./schedule-editor-dialogs"
+import { WidgetDiscovery } from "./widget-discovery"
 import { syncExamsToWidget, syncScheduleToWidget } from "@/lib/native/widget-bridge"
 import { syncClassAlarmsToNative } from "@/lib/native/notify"
 import { useSettingsStore } from "@/lib/stores/settings"
@@ -722,6 +723,8 @@ export default function SchedulePage() {
       >
         {renderFilterControls("schedule-drawer")}
       </FilterDrawer>
+
+      <WidgetDiscovery suspended={mobileFullscreen || editing || showOriginal} />
     </div>
   )
 }

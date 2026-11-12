@@ -20,6 +20,7 @@ import { BACK_PRIORITY } from "@/lib/navigation/back"
 import { cn } from "@/lib/utils"
 import {
   scheduleDate,
+  scheduleOccurrence,
   scheduleWeek,
   type ScheduleDrop,
   type ScheduleOccurrence,
@@ -77,10 +78,6 @@ const ScheduleEditorContext = createContext<ScheduleEditorValue>({
 
 export function useScheduleEditor() {
   return useContext(ScheduleEditorContext)
-}
-
-export function scheduleOccurrence(course: Course): ScheduleOccurrence | null {
-  return "occurrenceId" in course && "source" in course ? (course as ScheduleOccurrence) : null
 }
 
 export function courseHasScheduleTrace(course: Course, traces: ScheduleTrace[]): boolean {

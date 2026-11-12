@@ -8,6 +8,10 @@ export interface ScheduleOccurrence extends Course {
   patchIds: string[]
 }
 
+export function scheduleOccurrence(course: Course): ScheduleOccurrence | null {
+  return "occurrenceId" in course && "source" in course ? (course as ScheduleOccurrence) : null
+}
+
 export interface SchedulePatch {
   id: string
   kind: "course" | "day"

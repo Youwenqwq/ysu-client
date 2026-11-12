@@ -30,14 +30,13 @@ import {
 import { courseBgClass, type CourseColorMap } from "./course-color"
 import { ActivityModal } from "./activity-modal"
 import { SigninModal } from "./signin-modal"
-import { scheduleDate } from "@/lib/academic/schedule-patches"
+import { scheduleDate, scheduleOccurrence } from "@/lib/academic/schedule-patches"
 import {
   ScheduleDayHandle,
   ScheduleDayLabel,
   ScheduleGridTraces,
   SchedulePatchedLabel,
   courseHasScheduleTrace,
-  scheduleOccurrence,
   useScheduleEditor,
 } from "./schedule-drag"
 

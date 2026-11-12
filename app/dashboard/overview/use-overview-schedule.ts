@@ -12,6 +12,7 @@ import { useSettingsStore } from "@/lib/stores/settings"
 import { syncScheduleToWidget, syncExamsToWidget } from "@/lib/native/widget-bridge"
 import { syncClassAlarmsToNative } from "@/lib/native/notify"
 import { compareExamStartTime, isExamCompleted } from "@/lib/academic/exam-utils"
+import type { ScheduleOccurrence } from "@/lib/academic/schedule-patches"
 import type { ClassPeriod, Course, CurrentWeek, Exam } from "@/providers/types"
 import type { ProviderQueryResult } from "@/providers/hooks"
 import { useEffectiveSchedule } from "@/providers/hooks/use-effective-schedule"
@@ -35,7 +36,7 @@ export interface OverviewSchedule {
   schedule: ProviderQueryResult<Course[]>
   exams: ProviderQueryResult<Exam[]>
   periodsRaw: ProviderQueryResult<ClassPeriod[]>
-  todayCourses: Course[]
+  todayCourses: ScheduleOccurrence[]
   upcomingExams: Exam[]
   timeMap: Record<number, [number, number]>
   now: Date
