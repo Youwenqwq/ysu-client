@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
 import type { Grade } from "../../providers/types"
 import { STORAGE_KEYS } from "../storage/keys"
+import { localStorageAdapter } from "../storage/local"
 
 /** 待抽取的新成绩(快照自 Grade,避免持久化整行原始数据) */
 export interface PendingGrade {
@@ -96,7 +97,7 @@ export const useGradeGachaStore = create<GradeGachaState>()(
     }),
     {
       name: STORAGE_KEYS.gradeGacha,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => localStorageAdapter),
       partialize: (s) => ({
         seenSignatures: s.seenSignatures,
         pending: s.pending,

@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
 import type { UpdateChannel } from "../updater"
 import { migrateLocalStorageKey, STORAGE_KEYS } from "../storage/keys"
+import { localStorageAdapter } from "../storage/local"
 import {
   createDefaultOverviewLayout,
   normalizeOverviewLayout,
@@ -203,7 +204,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: STORAGE_KEYS.settings,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => localStorageAdapter),
       merge: (persisted, current) => {
         const saved: Partial<SettingsState> = {}
         if (typeof persisted === "object" && persisted !== null && !Array.isArray(persisted)) {
