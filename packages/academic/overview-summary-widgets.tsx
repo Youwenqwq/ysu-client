@@ -1,18 +1,15 @@
 "use client"
 
-import Link from "next/link"
-import { BarChart3, Calendar, ClipboardCheck, Eye, EyeOff } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { useSettingsStore } from "@/lib/stores/settings"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useGPAStats, type ProviderQueryResult } from "@/providers/hooks"
-import type { EvaluationTask } from "@/providers/types"
-import { useIsMobile } from "@/hooks/use-mobile"
-import { QueryState } from "./query-state"
-import { useOverviewEvaluation, useOverviewScheduleData } from "./context"
-import type { OverviewSchedule } from "./use-overview-schedule"
-import { pluginPageHref } from "@ysu/plugin-sdk"
+import { BarChart3, Calendar, Eye, EyeOff } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@ysu/plugin-ui/components"
+import { Button } from "@ysu/plugin-ui/components"
+import { useSettingsStore } from "@ysu/plugin-ui/stores"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useGPAStats } from "@ysu/plugin-ui/hooks"
+import { useIsMobile } from "@ysu/plugin-ui/hooks"
+import { QueryState } from "@ysu/academic"
+import { useOverviewScheduleData } from "@ysu/academic"
+import type { OverviewSchedule } from "@ysu/academic"
 
 function WeekSummary({ data, compact }: { data: OverviewSchedule; compact: boolean }) {
   const { t } = useTranslation()
@@ -117,55 +114,6 @@ function GpaSummary({ compact }: { compact: boolean }) {
   )
 }
 
-function EvaluationSummary({
-  query,
-  compact,
-}: {
-  query: ProviderQueryResult<EvaluationTask[]>
-  compact: boolean
-}) {
-  const { t } = useTranslation()
-  const count = (query.data ?? []).filter((task) => task.status === "active").length
-  if (compact)
-    return (
-      <Link
-        href={pluginPageHref("ysu.evaluation", "index")}
-        className="flex min-w-0 flex-col gap-1 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <ClipboardCheck className="size-3.5 shrink-0" />
-          <span className="truncate">{t("app.evaluation")}</span>
-        </span>
-        <QueryState queries={[query]} compact>
-          <span className="text-base font-semibold tabular-nums">{count}</span>
-        </QueryState>
-      </Link>
-    )
-  return (
-    <>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ClipboardCheck className="size-4 shrink-0 text-primary" />
-          {t("app.evaluation")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <QueryState queries={[query]}>
-          <Link
-            href={pluginPageHref("ysu.evaluation", "index")}
-            className="flex flex-col gap-1 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <span className="text-2xl font-semibold tabular-nums">{count}</span>
-            <span className="text-xs text-muted-foreground">
-              {t(count ? "overviewData.pendingTasks" : "overviewData.noPendingTasks")}
-            </span>
-          </Link>
-        </QueryState>
-      </CardContent>
-    </>
-  )
-}
-
 export function WeekSummaryWidget() {
   const data = useOverviewScheduleData()
   const compact = useIsMobile()
@@ -185,18 +133,6 @@ export function GpaSummaryWidget() {
   ) : (
     <Card size="sm">
       <GpaSummary compact={false} />
-    </Card>
-  )
-}
-
-export function EvaluationSummaryWidget() {
-  const query = useOverviewEvaluation()
-  const compact = useIsMobile()
-  return compact ? (
-    <EvaluationSummary query={query} compact />
-  ) : (
-    <Card size="sm">
-      <EvaluationSummary query={query} compact={false} />
     </Card>
   )
 }

@@ -1,20 +1,21 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
-  EmptyState,
-  LoadingCards,
-  useErrorToast,
-  ValidatingList,
-} from "@/components/academic/list-state"
-import { formatTimeRange } from "@/lib/academic/time"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useLaborActivities, useLaborRecords, useLaborSummary } from "@/providers/hooks"
-import { cn } from "@/lib/utils"
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@ysu/plugin-ui/components"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@ysu/plugin-ui/components"
+import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@ysu/plugin-ui/components"
+import { formatTimeRange } from "@ysu/plugin-ui/academic"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useLaborActivities, useLaborRecords, useLaborSummary } from "@ysu/plugin-ui/hooks"
+import { cn } from "@ysu/plugin-ui/components"
 import { Clock, MapPin, ScrollText, User } from "lucide-react"
 
 function RecordsPanel() {

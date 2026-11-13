@@ -129,9 +129,9 @@ describe("overview layout plugin widgets", () => {
 
   it("migrates IDs saved before widgets moved into plugins", () => {
     const overviewWidgets: DynamicOverviewWidget[] = [
-      { id: "plugin:ysu.overview:week", region: "summary", defaultVisible: true },
-      { id: "plugin:ysu.overview:gpa", region: "summary", defaultVisible: false },
-      { id: "plugin:ysu.overview:today-courses", region: "content", defaultVisible: true },
+      { id: "plugin:org.hub:week", region: "summary", defaultVisible: true },
+      { id: "plugin:org.hub:gpa", region: "summary", defaultVisible: false },
+      { id: "plugin:org.hub:today-courses", region: "content", defaultVisible: true },
     ]
     const layout = normalizeOverviewLayout(
       {
@@ -147,9 +147,9 @@ describe("overview layout plugin widgets", () => {
       overviewWidgets
     )
     expect(layout.items).toEqual([
-      { id: "plugin:ysu.overview:week", visible: true },
-      { id: "plugin:ysu.overview:gpa", visible: true },
-      { id: "plugin:ysu.overview:today-courses", visible: false },
+      { id: "plugin:org.hub:week", visible: true },
+      { id: "plugin:org.hub:gpa", visible: true },
+      { id: "plugin:org.hub:today-courses", visible: false },
       { id: "ecard", visible: true },
     ])
     expect(normalizeOverviewLayout(layout, overviewWidgets)).toEqual(layout)

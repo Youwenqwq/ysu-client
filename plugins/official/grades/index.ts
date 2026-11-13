@@ -1,6 +1,7 @@
 import { GraduationCap } from "lucide-react"
 import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
 import { GradesPage } from "./page"
+import { GpaSummaryWidget } from "@ysu/academic"
 
 export const manifest: PluginManifest = {
   id: "ysu.grades",
@@ -12,6 +13,18 @@ export const manifest: PluginManifest = {
 }
 
 export const definition = definePlugin((ctx) => {
+  ctx.ui.registerOverviewWidget({
+    id: "gpa",
+    title: "平均绩点",
+    titleKey: "overviewLayout.widgets.gpa.title",
+    description: "查看绩点与平均成绩，可隐藏成绩数值。",
+    descriptionKey: "overviewLayout.widgets.gpa.description",
+    icon: GraduationCap,
+    component: GpaSummaryWidget,
+    region: "summary",
+    defaultVisible: false,
+    order: 20,
+  })
   ctx.ui.registerPage({
     id: "index",
     title: "成绩查询",

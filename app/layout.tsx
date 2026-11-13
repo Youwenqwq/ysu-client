@@ -3,21 +3,12 @@ import { Geist, Geist_Mono } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { TooltipProvider } from "@/components/ui/tooltip"
-import { Toaster } from "@/components/ui/sonner"
 import { I18nProvider } from "@/lib/i18n/context"
-import { SDKProvider } from "@/components/sdk-provider"
-import { ActivationGate } from "@/components/activation-gate"
-import { MFAModal } from "@/components/mfa-modal"
-import { BackgroundImage } from "@/components/background-image"
-import { BackButtonHandler } from "@/components/back-button-handler"
-import { DeepLinkHandler } from "@/components/deep-link-handler"
-import { NotifyProvider } from "@/components/notify-provider"
 import { PwaRegister } from "@/components/pwa-register"
 import { PwaUpdatePrompt } from "@/components/pwa-update-prompt"
 import { PluginProvider } from "@/components/plugin-provider"
 import { PluginThemeManager } from "@/components/plugin-theme-manager"
-import { ProviderProvider } from "@/providers/provider-context"
+import { PluginShell } from "@/components/plugin-shell"
 import { cn } from "@/lib/utils"
 
 const geist = Geist({
@@ -75,21 +66,7 @@ export default function RootLayout({
           <ThemeProvider>
             <PluginProvider>
               <PluginThemeManager />
-              <ProviderProvider>
-                <ActivationGate>
-                  <SDKProvider>
-                    <TooltipProvider>
-                      <BackgroundImage />
-                      <BackButtonHandler />
-                      <DeepLinkHandler />
-                      <NotifyProvider />
-                      {children}
-                      <Toaster />
-                      <MFAModal />
-                    </TooltipProvider>
-                  </SDKProvider>
-                </ActivationGate>
-              </ProviderProvider>
+              <PluginShell>{children}</PluginShell>
             </PluginProvider>
           </ThemeProvider>
         </I18nProvider>

@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react"
 import { X } from "lucide-react"
 import { toast } from "sonner"
-import { fetchStateless, headerSingle } from "@/lib/cookie"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Button } from "@/components/ui/button"
+import { fetchStateless, headerSingle } from "@ysu/plugin-sdk/host"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { Button } from "@ysu/plugin-ui/components"
 import {
   Drawer,
   DrawerClose,
@@ -14,12 +14,11 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-} from "@/components/ui/drawer"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useBackLayer } from "@/hooks/use-back-handler"
-import { isCapacitor } from "@/lib/native/platform"
-import { YsuFile } from "@/lib/native/ysu-file"
-
+} from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useBackLayer } from "@ysu/plugin-ui/hooks"
+import { isCapacitor } from "@ysu/plugin-ui/platform"
+import { YsuFile } from "@ysu/plugin-ui/platform"
 /** 关闭动画时长，与过渡类 duration 匹配 */
 const LIGHTBOX_TRANSITION_MS = 200
 

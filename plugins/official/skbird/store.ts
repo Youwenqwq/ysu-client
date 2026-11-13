@@ -1,9 +1,8 @@
 import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
 import { SkbirdClient, generateDeviceId } from "./client"
-import { secureStorage } from "@/lib/storage/secure"
-import { STORAGE_KEYS } from "@/lib/storage/keys"
-
+import { secureStorage } from "@ysu/plugin-ui/stores"
+import { STORAGE_KEYS } from "@ysu/plugin-ui/stores"
 /**
  * 森空鸟配置。token 来源于 App 抓包（微信登录无法脚本化），过期后需手动更新。
  * deviceId 首次启动随机生成并持久化（与 App 格式一致）。与教务 auth store 完全独立。

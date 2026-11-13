@@ -17,6 +17,11 @@ export interface PluginAssetService {
   url(path: string): string | undefined
 }
 
+export interface PluginLifecycleService {
+  /** Runs after every provider initialization; late subscribers are scheduled immediately. */
+  onProviderReady(listener: () => void | Promise<void>): () => void
+}
+
 export interface PluginNativeService {
   readonly isNative: boolean
   saveImage(image: Blob, fileName?: string): Promise<{ uri: string }>

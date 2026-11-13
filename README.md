@@ -46,9 +46,9 @@
 
 ## 插件
 
-应用内核、Provider、业务页面、总览挂件和主题通过同一套 Cordis 插件协议组合。用户可在「我的 → 插件」管理官方/外部插件、切换扩展主题、安装 ZIP 或访问插件市场。
+应用 Shell、Provider、业务页面、UI Slot、总览挂件和主题通过同一套 Cordis 插件协议组合。用户可在「我的 → 插件」管理官方/外部插件、切换应用 Shell 与主题、安装 ZIP 或访问插件市场。社区插件既能向默认 UI 添加内容，也能完全替换应用界面。
 
-插件是拥有完整应用能力的主上下文代码，侧载前请自行确认来源可信。开发入口、包格式与打包工具见 [插件 SDK 文档](packages/plugin-sdk/README.md)，可复制 [插件模板](packages/plugin-template) 开始开发。
+插件是拥有完整应用能力的主上下文代码，可访问凭据、会话和原生能力；只安装可信来源，更新同样需要信任。架构边界见 [插件组合架构](PLUGIN_ARCHITECTURE.md)，包格式与 API 见 [插件 SDK 文档](packages/plugin-sdk/README.md)。可复制 [功能插件模板](packages/plugin-template) 或 [完整 Shell 模板](packages/plugin-shell-template) 开始开发。
 
 ## 数据来源与安全性
 

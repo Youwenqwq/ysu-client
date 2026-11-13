@@ -18,9 +18,10 @@ import { APP_VERSION } from "@/lib/version"
 import { useAnnouncementStore } from "@/lib/stores/announcement"
 import { checkAnnouncement } from "@/lib/announcement"
 import { AnnouncementDialog } from "@/components/announcement-dialog"
-import { runFeeStartupChecks } from "@/lib/fees/startup"
+import { usePluginHost } from "@/components/plugin-context"
 
 export function SDKProvider({ children }: { children: React.ReactNode }) {
+  const { host } = usePluginHost()
   const { t, locale } = useTranslation()
   const localeRef = useRef(locale)
   useEffect(() => {
@@ -97,12 +98,14 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
 
     let cancelled = false
     markProviderInitializing()
+    host.lifecycle.setProviderReady(false)
     setActiveProviderSchool(schoolId)
 
     initializeActiveProvider()
       .then((provider) => {
         if (cancelled) return
         markProviderReady(provider)
+        host.lifecycle.setProviderReady(true)
         mutate((key) => Array.isArray(key) && key[0] === "provider")
 
         if (didRunStartupSideEffects.current) return
@@ -119,9 +122,6 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
           // Fire-and-forget: anonymous usage stats
           trackAppLaunch().catch(() => {})
         }
-
-        // 费用类插件（如未缴提醒）的启动检查（仅读状态，不支付）
-        if (!cancelled) void runFeeStartupChecks()
 
         // Check WebView compatibility (Capacitor only)
         if (isCapacitor()) {
@@ -179,6 +179,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
   }, [
     hasHydrated,
     settingsHydrated,
+    host,
     schoolId,
     provider,
     t,

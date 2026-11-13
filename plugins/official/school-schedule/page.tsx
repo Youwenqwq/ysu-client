@@ -1,37 +1,32 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Button } from "@ysu/plugin-ui/components"
+import { Input } from "@ysu/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@ysu/plugin-ui/components"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@ysu/plugin-ui/components"
 import {
   Drawer,
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
   DrawerTitle,
-} from "@/components/ui/drawer"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import {
-  EmptyState,
-  LoadingCards,
-  useErrorToast,
-  ValidatingList,
-} from "@/components/academic/list-state"
-import { FilterDrawer, FilterTrigger } from "@/components/academic/filter-drawer"
+} from "@ysu/plugin-ui/components"
+import { Field, FieldGroup, FieldLabel } from "@ysu/plugin-ui/components"
+import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@ysu/plugin-ui/components"
+import { FilterDrawer, FilterTrigger } from "@ysu/plugin-ui/components"
 import type { PluginPageProps } from "@ysu/plugin-sdk"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
-import { ResponsiveSelect } from "@/components/responsive-select"
-import { cn } from "@/lib/utils"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
+import { ResponsiveSelect } from "@ysu/plugin-ui/components"
+import { cn } from "@ysu/plugin-ui/components"
 import {
   useCurrentWeek,
   useClassPeriods,
@@ -45,15 +40,15 @@ import {
   useSchoolGradeYears,
   useSchoolMajors,
   useTermCalendar,
-} from "@/providers/hooks"
-import type { Course, SchoolClassInfo, ClassroomInfo } from "@/providers/types"
-import { useIsMobile } from "@/hooks/use-mobile"
-import { useBackHandler } from "@/hooks/use-back-handler"
-import { useAcademicTime } from "@/hooks/use-academic-time"
-import { buildCourseColorMap } from "@ysu/academic/course-color"
-import { ScheduleMobile } from "@ysu/academic/schedule-mobile"
-import { ScheduleTablet } from "@ysu/academic/schedule-tablet"
-import { isCourseActiveInWeek, periodIsInUse } from "@ysu/academic/schedule-utils"
+} from "@ysu/plugin-ui/hooks"
+import type { Course, SchoolClassInfo, ClassroomInfo } from "@ysu/plugin-sdk/academic"
+import { useIsMobile } from "@ysu/plugin-ui/hooks"
+import { useBackHandler } from "@ysu/plugin-ui/hooks"
+import { useAcademicTime } from "@ysu/plugin-ui/hooks"
+import { buildCourseColorMap } from "@ysu/academic"
+import { ScheduleMobile } from "@ysu/academic"
+import { ScheduleTablet } from "@ysu/academic"
+import { isCourseActiveInWeek, periodIsInUse } from "@ysu/academic"
 import { ArrowLeft, CalendarSearch, ChevronLeft, ChevronRight, Search } from "lucide-react"
 
 const ALL = "__all__"

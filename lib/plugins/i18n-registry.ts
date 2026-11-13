@@ -2,6 +2,7 @@ import type { PluginI18nService, PluginLocale, PluginTranslations } from "@ysu/p
 import { en, zh } from "@/lib/i18n/dict"
 import { translateDictionary } from "@/lib/i18n/translate"
 import type { PluginServiceFactory } from "./runtime"
+import { trackPluginRegistration } from "./track-registration"
 
 export class PluginI18nRegistry {
   private readonly translations = new Map<string, PluginTranslations>()
@@ -10,20 +11,16 @@ export class PluginI18nRegistry {
 
   createService: PluginServiceFactory = (ctx, manifest) => {
     const service: PluginI18nService = {
-      register: (translations) => {
-        this.translations.set(manifest.id, translations)
-        this.publish()
-        const dispose = () => {
-          if (this.translations.get(manifest.id) !== translations) return
-          this.translations.delete(manifest.id)
+      register: (translations) =>
+        trackPluginRegistration(ctx, () => {
+          this.translations.set(manifest.id, translations)
           this.publish()
-        }
-        const unregister = ctx.on("dispose", dispose)
-        return () => {
-          unregister()
-          dispose()
-        }
-      },
+          return () => {
+            if (this.translations.get(manifest.id) !== translations) return
+            this.translations.delete(manifest.id)
+            this.publish()
+          }
+        }),
       t: (key, params, locale) => this.translate(manifest.id, key, locale ?? "zh", params),
     }
     ctx.set("i18n", service)

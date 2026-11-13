@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { HttpRequest, HttpResponse } from "@/lib/cookie"
+import type { HttpRequest, HttpResponse } from "@ysu/plugin-sdk/host"
 import { makeSign, type SignEntry } from "./sign"
 
 const sendMock = vi.fn<(req: HttpRequest) => Promise<HttpResponse>>()
 
-vi.mock("@/lib/cookie", () => ({
+vi.mock("@ysu/plugin-sdk/host", () => ({
   fetchStateless: (req: HttpRequest) => sendMock(req),
 }))
 

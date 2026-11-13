@@ -1,0 +1,10 @@
+{
+  "id": "example.shell",
+  "name": "Community Shell",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "minAppVersion": "0.15.0",
+  "kind": "shell",
+  "entry": "dist/index.js",
+  "description": "A complete replacement application shell example."
+}

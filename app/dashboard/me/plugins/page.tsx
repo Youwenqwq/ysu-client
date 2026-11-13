@@ -31,9 +31,11 @@ import type { MarketplacePlugin } from "@ysu/plugin-sdk"
 export default function PluginsPage() {
   const { host, isReady } = usePluginHost()
   const states = usePluginStates()
-  const { themes } = usePluginUI(host.ui)
+  const { themes, shells } = usePluginUI(host.ui)
   const activeTheme = usePluginPreferences((state) => state.activeTheme)
   const setActiveTheme = usePluginPreferences((state) => state.setActiveTheme)
+  const activeShell = usePluginPreferences((state) => state.activeShell)
+  const setActiveShell = usePluginPreferences((state) => state.setActiveShell)
   const autoCheckUpdates = usePluginPreferences((state) => state.autoCheckUpdates)
   const setAutoCheckUpdates = usePluginPreferences((state) => state.setAutoCheckUpdates)
   const lastUpdateCheck = usePluginPreferences((state) => state.lastUpdateCheck)
@@ -260,8 +262,10 @@ export default function PluginsPage() {
                 <div className="flex items-center justify-between gap-2">
                   {!plugin.required ? (
                     <Switch
-                      checked={plugin.status === "active"}
-                      disabled={!!busy || plugin.status === "registered"}
+                      checked={plugin.status === "active" || plugin.status === "starting"}
+                      disabled={
+                        !!busy || plugin.status === "registered" || plugin.status === "starting"
+                      }
                       onCheckedChange={(enabled) =>
                         void run(plugin.id, async () => {
                           if (enabled) await host.enable(plugin.id)
@@ -295,6 +299,27 @@ export default function PluginsPage() {
           ))
         )}
       </section>
+
+      {shells.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold">{t("plugins.shell")}</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {shells.map((shell) => {
+              const id = `${shell.pluginId}:${shell.id}`
+              const selected = activeShell ? activeShell === id : id === "ysu.shell:default"
+              return (
+                <Button
+                  key={id}
+                  variant={selected ? "default" : "outline"}
+                  onClick={() => setActiveShell(id === "ysu.shell:default" ? undefined : id)}
+                >
+                  {shell.name}
+                </Button>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       {themes.length > 0 && (
         <section className="flex flex-col gap-3">

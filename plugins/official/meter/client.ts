@@ -5,7 +5,7 @@
  * 接口无会话鉴权，凭据即学工号；详见逆向笔记（docs 未入库）。
  */
 
-import { fetchStateless } from "@/lib/cookie"
+import { fetchStateless } from "@ysu/plugin-sdk/host"
 import { aes128EcbDecrypt, aes128EcbEncrypt, base64ToBytes, bytesToBase64 } from "./crypto"
 import {
   toDayUseList,

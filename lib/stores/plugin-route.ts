@@ -8,6 +8,7 @@ export interface ActivePluginRoute {
   parent?: string
   primary?: boolean
   capability?: string
+  fullscreen?: boolean
 }
 
 interface PluginRouteState {

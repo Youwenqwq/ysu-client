@@ -2,11 +2,16 @@
 
 import { useEffect } from "react"
 import { toast } from "sonner"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useStudentInfo } from "@/providers/use-student-info"
-
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@ysu/plugin-ui/components"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useStudentInfo } from "@ysu/plugin-ui/hooks"
 export function StudentInfoPage() {
   const { t } = useTranslation()
   const { data: student, isLoading, isError, error } = useStudentInfo()

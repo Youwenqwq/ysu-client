@@ -3,18 +3,17 @@
 import { useCallback, useEffect, useState } from "react"
 import { AirVent, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useAuthStore } from "@/lib/stores/auth"
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Button } from "@ysu/plugin-ui/components"
+import { Card, CardContent, CardHeader, CardTitle } from "@ysu/plugin-ui/components"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@ysu/plugin-ui/components"
+import { Separator } from "@ysu/plugin-ui/components"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useAuthStore } from "@ysu/plugin-ui/stores"
+import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
 import { fetchMeterData, MeterError, type MeterData } from "./client"
-import { cn } from "@/lib/utils"
-
+import { cn } from "@ysu/plugin-ui/components"
 export function MeterPage() {
   const { t } = useTranslation()
   const hasHydrated = useAuthStore((s) => s.hasHydrated)

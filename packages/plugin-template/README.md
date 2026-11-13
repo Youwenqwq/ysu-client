@@ -1,6 +1,6 @@
 # 插件模板
 
-复制本目录，修改 `manifest.json` 的 ID、名称和版本，再实现 `src/index.tsx` 与页面。
+复制本目录，修改 `manifest.json` 的 ID、名称和版本，再实现 `src/index.tsx` 与页面。模板同时注册一个页面和 `dashboard.header.actions` Slot，并通过 `requires` 声明默认 Shell 依赖。
 
 ```bash
 pnpm install

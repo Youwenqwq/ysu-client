@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { ThumbsUp } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { useTranslation } from "@/lib/i18n/use-translation"
+import { Badge } from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
 import { skbirdImageUrl } from "../client"
 import { getSkbirdClient } from "../store"
 import type { SkbirdComment } from "../types"

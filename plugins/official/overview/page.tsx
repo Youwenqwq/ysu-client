@@ -1,7 +1,7 @@
 "use client"
 
-import { OverviewComposer } from "@/app/dashboard/overview/overview-composer"
-import { OverviewDataProvider } from "./context"
+import { OverviewComposer } from "@ysu/plugin-ui/shell"
+import { OverviewDataProvider } from "@ysu/academic"
 import { ProfileWidget } from "./profile-widget"
 
 export function OverviewPage() {

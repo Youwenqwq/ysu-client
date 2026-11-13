@@ -1,7 +1,15 @@
 import type { MetadataRoute } from "next"
-import { pluginPageHref } from "@ysu/plugin-sdk"
 
 export const dynamic = "force-static"
+
+/**
+ * Semantic shortcut URLs: the manifest is static, so shortcuts point at stable
+ * semantic deep-link destinations that the runtime resolves to the live plugin
+ * page (see `lib/navigation/deep-link.ts`). No plugin ids are baked in here.
+ */
+function semanticShortcutHref(id: string): string {
+  return `dashboard/plugin?route=${encodeURIComponent(id)}`
+}
 
 type LocalizedManifest = MetadataRoute.Manifest & {
   name_localized?: Record<string, string>
@@ -34,7 +42,7 @@ export default function manifest(): LocalizedManifest {
         name: "课程表",
         short_name: "课表",
         description: "查看课程表",
-        url: pluginPageHref("ysu.schedule", "index").replace(/^\//, ""),
+        url: semanticShortcutHref("schedule"),
         icons: [
           {
             src: "icons/icon-192.png",
@@ -47,7 +55,7 @@ export default function manifest(): LocalizedManifest {
         name: "成绩查询",
         short_name: "成绩",
         description: "查询课程成绩",
-        url: pluginPageHref("ysu.grades", "index").replace(/^\//, ""),
+        url: semanticShortcutHref("grades"),
         icons: [
           {
             src: "icons/icon-192.png",
@@ -60,7 +68,7 @@ export default function manifest(): LocalizedManifest {
         name: "考试安排",
         short_name: "考试",
         description: "查看考试安排",
-        url: pluginPageHref("ysu.exams", "index").replace(/^\//, ""),
+        url: semanticShortcutHref("exams"),
         icons: [
           {
             src: "icons/icon-192.png",
@@ -76,7 +84,7 @@ export default function manifest(): LocalizedManifest {
           name: "Class Schedule",
           short_name: "Schedule",
           description: "View your class schedule",
-          url: pluginPageHref("ysu.schedule", "index").replace(/^\//, ""),
+          url: semanticShortcutHref("schedule"),
           icons: [
             {
               src: "icons/icon-192.png",
@@ -89,7 +97,7 @@ export default function manifest(): LocalizedManifest {
           name: "Grades",
           short_name: "Grades",
           description: "View your course grades",
-          url: pluginPageHref("ysu.grades", "index").replace(/^\//, ""),
+          url: semanticShortcutHref("grades"),
           icons: [
             {
               src: "icons/icon-192.png",
@@ -102,7 +110,7 @@ export default function manifest(): LocalizedManifest {
           name: "Exams",
           short_name: "Exams",
           description: "View your exam schedule",
-          url: pluginPageHref("ysu.exams", "index").replace(/^\//, ""),
+          url: semanticShortcutHref("exams"),
           icons: [
             {
               src: "icons/icon-192.png",
@@ -123,13 +131,11 @@ export default function manifest(): LocalizedManifest {
         src: "icons/icon-192.png",
         sizes: "192x192",
         type: "image/png",
-        purpose: "any",
       },
       {
         src: "icons/icon-512.png",
         sizes: "512x512",
         type: "image/png",
-        purpose: "any",
       },
       {
         src: "icons/icon-maskable-192.png",

@@ -24,6 +24,17 @@ describe("validatePluginManifest", () => {
     expect(() => validatePluginManifest({ ...valid, entry })).toThrow(message)
   })
 
+  it("accepts shells with valid plugin dependencies", () => {
+    const shell = { ...valid, kind: "shell", requires: ["ysu.provider"] }
+    expect(validatePluginManifest(shell)).toEqual(shell)
+    expect(() => validatePluginManifest({ ...valid, requires: ["../bad"] })).toThrow(
+      "requires must contain valid plugin IDs"
+    )
+    expect(() => validatePluginManifest({ ...valid, requires: [valid.id] })).toThrow(
+      "plugin must not depend on itself"
+    )
+  })
+
   it("rejects non-SemVer package and app versions", () => {
     expect(() => validatePluginManifest({ ...valid, version: "latest" })).toThrow(
       "version must be a valid SemVer"

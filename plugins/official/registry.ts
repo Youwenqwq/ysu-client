@@ -1,4 +1,5 @@
 import type { PluginDefinition, PluginManifest } from "@ysu/plugin-sdk"
+import { definition as officialShell, manifest as officialShellManifest } from "./shell"
 import { definition as ysuProvider, manifest as ysuProviderManifest } from "./ysu"
 import { definition as defaultTheme, manifest as defaultThemeManifest } from "./theme-default"
 import { definition as meter, manifest as meterManifest } from "./meter"
@@ -24,6 +25,7 @@ export interface OfficialPlugin {
 }
 
 export const OFFICIAL_PLUGINS: readonly OfficialPlugin[] = [
+  { manifest: officialShellManifest, definition: officialShell },
   { manifest: ysuProviderManifest, definition: ysuProvider },
   { manifest: defaultThemeManifest, definition: defaultTheme },
   { manifest: meterManifest, definition: meter },

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest"
-import { appHistoryDepth, installBackHistory } from "./back-history"
+import { beforeEach, describe, expect, it } from "vitest"
+import { appHistoryDepth, backFallback, installBackHistory } from "./back-history"
+import { usePluginRouteStore } from "../stores/plugin-route"
 
 function browserHistory() {
   const entries: unknown[] = [null]
@@ -50,5 +51,60 @@ describe("app-owned history", () => {
     history.pushState(outsideState)
     expect(history.state).toBe(outsideState)
     expect(appHistoryDepth(history)).toBe(0)
+  })
+})
+
+describe("back fallback destinations", () => {
+  beforeEach(() => {
+    usePluginRouteStore.setState({ current: undefined })
+  })
+
+  it("exits on the dashboard root and never falls back to login", () => {
+    expect(backFallback("/dashboard", "/home")).toBeNull()
+    expect(backFallback("/login", "/home")).toBeNull()
+  })
+
+  it("returns to the live plugin home or the deterministic primary page", () => {
+    expect(backFallback("/dashboard/plugin", "/primary/home")).toBe("/primary/home")
+    usePluginRouteStore.setState({
+      current: {
+        pluginId: "org.other.grades",
+        pageId: "detail",
+        title: "detail",
+        parent: "index",
+      },
+    })
+    expect(backFallback("/dashboard/plugin", "/primary/home")).toBe(
+      "/dashboard/plugin/?plugin=org.other.grades&page=index"
+    )
+  })
+
+  it("does not navigate away from a plugin home page", () => {
+    usePluginRouteStore.setState({
+      current: {
+        pluginId: "org.other.overview",
+        pageId: "index",
+        title: "overview",
+        primary: true,
+      },
+    })
+    expect(backFallback("/dashboard/plugin", "/primary/home")).toBeNull()
+  })
+
+  it("leaves a non-primary plugin root instead of replacing the current URL", () => {
+    usePluginRouteStore.setState({
+      current: {
+        pluginId: "org.other.grades",
+        pageId: "index",
+        title: "grades",
+      },
+    })
+    expect(backFallback("/dashboard/plugin", "/primary/home")).toBe("/primary/home")
+  })
+
+  it("keeps the settings breadcrumb hierarchy", () => {
+    expect(backFallback("/dashboard/me/settings/widgets", "/home")).toBe("/dashboard/me/settings")
+    expect(backFallback("/dashboard/me/avatar", "/home")).toBe("/dashboard/me")
+    expect(backFallback("/dashboard/ecard", "/home")).toBe("/home")
   })
 })

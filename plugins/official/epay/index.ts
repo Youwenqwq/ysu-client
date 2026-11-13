@@ -6,8 +6,7 @@ import {
   type PluginLocale,
   type PluginManifest,
 } from "@ysu/plugin-sdk"
-import { registerFeeStartupCheck } from "@/lib/fees/startup"
-import { getLocalStorageItemWithFallback, STORAGE_KEYS } from "@/lib/storage/keys"
+import { getLocalStorageItemWithFallback, STORAGE_KEYS } from "@ysu/plugin-ui/stores"
 import { runEpayAutoCheck } from "./auto-check"
 import { EpayPage } from "./page"
 
@@ -45,8 +44,7 @@ export const definition = definePlugin((ctx) => {
     order: 20,
   })
 
-  // 启动提醒：宿主在 Provider 初始化完成后运行已注册的检查。
-  const unregister = registerFeeStartupCheck(async () => {
+  ctx.hostLifecycle.onProviderReady(async () => {
     const result = await runEpayAutoCheck()
     if (!result?.hasUnpaid) return
     toast.warning(
@@ -57,5 +55,4 @@ export const definition = definePlugin((ctx) => {
       )
     )
   })
-  ctx.on("dispose", unregister)
 })

@@ -4,23 +4,29 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import Link from "next/link"
 import { Bird, Search, Settings, User, Bell, X } from "lucide-react"
 import { pluginPageHref, type PluginPageProps } from "@ysu/plugin-sdk"
-import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@ysu/plugin-ui/components"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Button } from "@ysu/plugin-ui/components"
+import { Input } from "@ysu/plugin-ui/components"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger } from "@ysu/plugin-ui/components"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
-import { useBackHandler } from "@/hooks/use-back-handler"
+} from "@ysu/plugin-ui/components"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
+import { useBackHandler } from "@ysu/plugin-ui/hooks"
 import { SkbirdError, SKBIRD_ERRNO_TOKEN_INVALID } from "../client"
 import { getSkbirdClient, useSkbirdStore } from "../store"
 import type { SkbirdCategory, SkbirdThread } from "../types"

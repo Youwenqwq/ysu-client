@@ -25,6 +25,7 @@ import { useProviderCapabilities } from "@/providers/use-provider"
 import { usePluginHost } from "@/components/plugin-provider"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
 import { pluginPageHref, type PluginNavigationGroup } from "@ysu/plugin-sdk"
+import { useSemanticNavigation } from "@/lib/navigation/use-semantic-navigation"
 import { hasPluginCapability } from "@/lib/plugins/navigation"
 
 export default function MePage() {
@@ -32,7 +33,11 @@ export default function MePage() {
   const username = useAuthStore((s) => s.username)
   const { t, locale } = useTranslation()
   const { host } = usePluginHost()
+  const nav = useSemanticNavigation()
+  // The profile card links to the student-info page via its stable semantic route;
+  // when the contributing plugin is missing or disabled the entry hides entirely.
   const { navigation: pluginNavigation, settings: pluginSettings } = usePluginUI(host.ui)
+  const studentInfoHref = nav.href("student-info")
   const { theme, setTheme, systemTheme } = useTheme()
 
   const [mounted, setMounted] = useState(false)
@@ -120,44 +125,46 @@ export default function MePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link href={pluginPageHref("ysu.student-info", "index")} className="block">
-        <Card className="py-0 transition-colors hover:bg-muted/40 active:bg-muted/60">
-          <CardContent className="flex items-center gap-4 py-5">
-            <Avatar className="size-14">
-              {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
-              <AvatarFallback className="text-lg">{initials}</AvatarFallback>
-            </Avatar>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              {student.isLoading && !student.data ? (
-                <>
-                  <Skeleton className="h-5 w-24" />
-                  <Skeleton className="h-4 w-32" />
-                </>
-              ) : (
-                <>
-                  <span className="truncate text-base font-semibold">{displayName}</span>
-                  {student.data?.studentId && (
-                    <span className="truncate text-sm text-muted-foreground">
-                      {student.data.studentId}
-                    </span>
-                  )}
-                  {student.data?.department && (
-                    <span className="truncate text-xs text-muted-foreground md:hidden">
-                      {student.data.department}
-                    </span>
-                  )}
-                  {(student.data?.department || student.data?.major) && (
-                    <span className="hidden truncate text-xs text-muted-foreground md:inline">
-                      {[student.data.department, student.data.major].filter(Boolean).join(" · ")}
-                    </span>
-                  )}
-                </>
-              )}
-            </div>
-            <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
-          </CardContent>
-        </Card>
-      </Link>
+      {studentInfoHref && (
+        <Link href={studentInfoHref} className="block">
+          <Card className="py-0 transition-colors hover:bg-muted/40 active:bg-muted/60">
+            <CardContent className="flex items-center gap-4 py-5">
+              <Avatar className="size-14">
+                {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
+                <AvatarFallback className="text-lg">{initials}</AvatarFallback>
+              </Avatar>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                {student.isLoading && !student.data ? (
+                  <>
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-4 w-32" />
+                  </>
+                ) : (
+                  <>
+                    <span className="truncate text-base font-semibold">{displayName}</span>
+                    {student.data?.studentId && (
+                      <span className="truncate text-sm text-muted-foreground">
+                        {student.data.studentId}
+                      </span>
+                    )}
+                    {student.data?.department && (
+                      <span className="truncate text-xs text-muted-foreground md:hidden">
+                        {student.data.department}
+                      </span>
+                    )}
+                    {(student.data?.department || student.data?.major) && (
+                      <span className="hidden truncate text-xs text-muted-foreground md:inline">
+                        {[student.data.department, student.data.major].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+              <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       {academicItems.length > 0 && (
         <Section title={t("me.sectionAcademic")}>

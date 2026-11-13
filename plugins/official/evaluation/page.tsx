@@ -9,13 +9,13 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
-import { Progress } from "@/components/ui/progress"
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+} from "@ysu/plugin-ui/components"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Button } from "@ysu/plugin-ui/components"
+import { Spinner } from "@ysu/plugin-ui/components"
+import { Progress } from "@ysu/plugin-ui/components"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@ysu/plugin-ui/components"
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -24,24 +24,24 @@ import {
   ResponsiveModalHeader,
   ResponsiveModalTitle,
   ResponsiveModalBody,
-} from "@/components/responsive-modal"
-import { Checkbox } from "@/components/ui/checkbox"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Field, FieldLabel } from "@/components/ui/field"
+} from "@ysu/plugin-ui/components"
+import { Checkbox } from "@ysu/plugin-ui/components"
+import { RadioGroup, RadioGroupItem } from "@ysu/plugin-ui/components"
+import { Label } from "@ysu/plugin-ui/components"
+import { Textarea } from "@ysu/plugin-ui/components"
+import { Input } from "@ysu/plugin-ui/components"
+import { Field, FieldLabel } from "@ysu/plugin-ui/components"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
-import { cn } from "@/lib/utils"
-import { useEvaluationTypes, usePendingEvaluations } from "@/providers/hooks"
-import { useProvider } from "@/providers/use-provider"
+} from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
+import { cn } from "@ysu/plugin-ui/components"
+import { useEvaluationTypes, usePendingEvaluations } from "@ysu/plugin-ui/hooks"
+import { useProvider } from "@ysu/plugin-ui/hooks"
 import type { EvaluationTask, EvaluationDetail, Question, EvaluationAnswer } from "@ysu/plugin-sdk"
 import { ChevronDown, ChevronRight, ClipboardCheck, Sparkles } from "lucide-react"
 

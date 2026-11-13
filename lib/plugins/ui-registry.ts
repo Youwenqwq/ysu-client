@@ -4,9 +4,11 @@ import type {
   PluginPageDefinition,
   PluginThemeDefinition,
   PluginSettingDefinition,
+  PluginShellDefinition,
   PluginUIService,
 } from "@ysu/plugin-sdk"
 import type { PluginServiceFactory } from "./runtime"
+import { trackPluginRegistration } from "./track-registration"
 
 export interface RegisteredPluginPage extends PluginPageDefinition {
   pluginId: string
@@ -28,12 +30,17 @@ export interface RegisteredPluginTheme extends PluginThemeDefinition {
   pluginId: string
 }
 
+export interface RegisteredPluginShell extends PluginShellDefinition {
+  pluginId: string
+}
+
 export interface PluginUISnapshot {
   pages: readonly RegisteredPluginPage[]
   navigation: readonly RegisteredPluginNavigation[]
   themes: readonly RegisteredPluginTheme[]
   settings: readonly RegisteredPluginSetting[]
   overviewWidgets: readonly RegisteredPluginOverviewWidget[]
+  shells: readonly RegisteredPluginShell[]
 }
 
 export class PluginUIRegistry {
@@ -42,6 +49,7 @@ export class PluginUIRegistry {
   private readonly themes = new Map<string, RegisteredPluginTheme>()
   private readonly settings = new Map<string, RegisteredPluginSetting>()
   private readonly overviewWidgets = new Map<string, RegisteredPluginOverviewWidget>()
+  private readonly shells = new Map<string, RegisteredPluginShell>()
   private readonly listeners = new Set<() => void>()
   private snapshot: PluginUISnapshot = {
     pages: [],
@@ -49,49 +57,57 @@ export class PluginUIRegistry {
     themes: [],
     settings: [],
     overviewWidgets: [],
+    shells: [],
   }
 
   createService: PluginServiceFactory = (ctx, manifest) => {
-    const track = (dispose: () => void) => {
-      const unregister = ctx.on("dispose", dispose)
-      return () => {
-        unregister()
-        dispose()
-      }
-    }
+    const track = (register: () => () => void) => trackPluginRegistration(ctx, register)
     const service: PluginUIService = {
-      registerPage: (page) =>
-        track(
+      getSnapshot: () => this.snapshot,
+      subscribe: this.subscribe,
+      registerPage: (page) => {
+        if (page.route && this.getSnapshot().pages.some((item) => item.route === page.route)) {
+          throw new Error(`Plugin page route already registered: ${page.route}`)
+        }
+        return track(() =>
           this.register(this.pages, `${manifest.id}:${page.id}`, {
             ...page,
             pluginId: manifest.id,
           })
-        ),
+        )
+      },
       registerNavigation: (item) =>
-        track(
+        track(() =>
           this.register(this.navigation, `${manifest.id}:${item.id}`, {
             ...item,
             pluginId: manifest.id,
           })
         ),
       registerOverviewWidget: (widget) =>
-        track(
+        track(() =>
           this.register(this.overviewWidgets, `${manifest.id}:${widget.id}`, {
             ...widget,
             pluginId: manifest.id,
           })
         ),
       registerSetting: (setting) =>
-        track(
+        track(() =>
           this.register(this.settings, `${manifest.id}:${setting.id}`, {
             ...setting,
             pluginId: manifest.id,
           })
         ),
       registerTheme: (theme) =>
-        track(
+        track(() =>
           this.register(this.themes, `${manifest.id}:${theme.id}`, {
             ...theme,
+            pluginId: manifest.id,
+          })
+        ),
+      registerShell: (shell) =>
+        track(() =>
+          this.register(this.shells, `${manifest.id}:${shell.id}`, {
+            ...shell,
             pluginId: manifest.id,
           })
         ),
@@ -129,7 +145,10 @@ export class PluginUIRegistry {
       ),
       themes: Array.from(this.themes.values()),
       settings: Array.from(this.settings.values()).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
-      overviewWidgets: Array.from(this.overviewWidgets.values()),
+      overviewWidgets: Array.from(this.overviewWidgets.values()).sort(
+        (a, b) => (a.order ?? 100) - (b.order ?? 100) || a.id.localeCompare(b.id)
+      ),
+      shells: Array.from(this.shells.values()),
     }
     for (const listener of this.listeners) listener()
   }

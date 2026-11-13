@@ -30,15 +30,19 @@ import {
 import { checkRateLimit, rateLimitMessage } from "@/lib/rate-limit"
 import { isCapacitor } from "@/lib/native/platform"
 import { useMFAModalStore } from "@/lib/stores/mfa-modal"
-import { pluginPageHref } from "@ysu/plugin-sdk"
+import { landingPreferenceHref } from "@/lib/plugins/navigation"
 import { getActiveProvider, setActiveProviderSchool } from "@/providers/provider-service"
+import { useSemanticNavigation } from "@/lib/navigation/use-semantic-navigation"
 
 export default function LoginPage() {
   const router = useRouter()
   const setCredential = useAuthStore((s) => s.setCredential)
   const setSchoolId = useSettingsStore((s) => s.setSchoolId)
+  const nav = useSemanticNavigation()
+  function redirectAfterLogin() {
+    return landingPreferenceHref(useSettingsStore.getState().defaultLandingPage, nav.sources)
+  }
   const { t } = useTranslation()
-
   const schools = getSelectableSchools()
   const [selectedSchool, setSelectedSchool] = useState(getSchoolId())
   const [username, setUsername] = useState("")
@@ -142,12 +146,7 @@ export default function LoginPage() {
         setCredential(res.credential, username)
         await syncRememberedLoginPreference()
         toast.success(t("login.loginSuccess"))
-        const landing = useSettingsStore.getState().defaultLandingPage
-        router.replace(
-          landing === "schedule"
-            ? pluginPageHref("ysu.schedule", "index")
-            : pluginPageHref("ysu.overview", "index")
-        )
+        router.replace(redirectAfterLogin())
         return
       }
 
@@ -159,12 +158,7 @@ export default function LoginPage() {
           if (result.type === "wechat") {
             await syncRememberedLoginPreference()
             toast.success(t("login.loginSuccess"))
-            const landing = useSettingsStore.getState().defaultLandingPage
-            router.replace(
-              landing === "schedule"
-                ? pluginPageHref("ysu.schedule", "index")
-                : pluginPageHref("ysu.overview", "index")
-            )
+            router.replace(redirectAfterLogin())
             return
           }
           await getActiveProvider().submitMfaCode({
@@ -178,12 +172,7 @@ export default function LoginPage() {
           })
           await syncRememberedLoginPreference()
           toast.success(t("login.loginSuccess"))
-          const landing = useSettingsStore.getState().defaultLandingPage
-          router.replace(
-            landing === "schedule"
-              ? pluginPageHref("ysu.schedule", "index")
-              : pluginPageHref("ysu.overview", "index")
-          )
+          router.replace(redirectAfterLogin())
         } catch (err) {
           if (err instanceof Error) {
             toast.error(err.message || t("login.errorMfaVerifyFailed"))

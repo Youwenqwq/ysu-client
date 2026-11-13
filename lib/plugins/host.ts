@@ -2,11 +2,25 @@ import * as React from "react"
 import * as ReactDOM from "react-dom"
 import * as ReactDOMClient from "react-dom/client"
 import * as JSXRuntime from "react/jsx-runtime"
+import * as NextLink from "next/link"
+import * as NextImage from "next/image"
+import * as NextNavigation from "next/navigation"
 import * as PluginSDK from "@ysu/plugin-sdk"
+import * as Academic from "@ysu/academic"
+import * as PluginComponents from "@ysu/plugin-ui/components"
+import * as PluginHooks from "@ysu/plugin-ui/hooks"
+import * as PluginStores from "@ysu/plugin-ui/stores"
+import * as PluginAcademic from "@ysu/plugin-ui/academic"
+import * as PluginPlatform from "@ysu/plugin-ui/platform"
+import * as PluginRuntimeUI from "@ysu/plugin-ui/plugin"
+import * as PluginShellRuntime from "@ysu/plugin-ui/shell"
+import * as PluginAssets from "@ysu/plugin-ui/assets"
 import type { PluginManifest } from "@ysu/plugin-sdk"
 import { OFFICIAL_PLUGINS } from "@/plugins/official/registry"
 import { PluginRuntime } from "./runtime"
 import { PluginUIRegistry } from "./ui-registry"
+import { PluginSlotRegistry } from "./slot-registry"
+import { PluginLifecycleRegistry } from "./lifecycle-service"
 import { PluginI18nRegistry } from "./i18n-registry"
 import { providerRegistry } from "@/providers/provider-registry"
 import { createPluginStorageService } from "./storage-service"
@@ -34,11 +48,15 @@ import { usePluginPreferences } from "@/lib/stores/plugin-preferences"
 
 export class PluginHost {
   readonly ui = new PluginUIRegistry()
+  readonly slots = new PluginSlotRegistry()
+  readonly lifecycle = new PluginLifecycleRegistry()
   readonly i18n = new PluginI18nRegistry()
   readonly providers = providerRegistry
   readonly packages = new PluginPackageStore()
   readonly runtime = new PluginRuntime((ctx, manifest) => {
     this.ui.createService(ctx, manifest)
+    this.slots.createService(ctx, manifest)
+    this.lifecycle.createService(ctx, manifest)
     this.i18n.createService(ctx, manifest)
     this.providers.createService(ctx, manifest)
     createPluginStorageService(ctx, manifest)
@@ -106,7 +124,9 @@ export class PluginHost {
     this.external.delete(id)
     this.removeStyles(id)
     this.loadErrors.delete(id)
-    usePluginPreferences.getState().setPluginDisabled(id, false)
+    const preferences = usePluginPreferences.getState()
+    preferences.setPluginDisabled(id, false)
+    if (preferences.activeShell?.startsWith(`${id}:`)) preferences.setActiveShell(undefined)
     await this.packages.remove(id)
   }
 
@@ -174,17 +194,47 @@ export class PluginHost {
 
   private async loadInstalled(): Promise<void> {
     const installed = await this.packages.list()
-    for (const summary of installed) {
-      if (usePluginPreferences.getState().disabledPluginIds.includes(summary.manifest.id)) continue
+    const enabled = installed.filter(
+      (summary) => !usePluginPreferences.getState().disabledPluginIds.includes(summary.manifest.id)
+    )
+    const pending = new Set<string>()
+    for (const summary of enabled) {
       try {
-        await this.load(summary.manifest.id, false)
+        await this.load(summary.manifest.id, false, false)
+        pending.add(summary.manifest.id)
       } catch (error) {
         this.loadErrors.set(summary.manifest.id, errorMessage(error))
       }
     }
+    while (pending.size > 0) {
+      let progressed = false
+      for (const id of Array.from(pending)) {
+        const state = this.runtime.get(id)
+        if (state?.manifest.requires?.some((dependency) => pending.has(dependency))) continue
+        pending.delete(id)
+        progressed = true
+        try {
+          markPluginStarted(id)
+          await this.runtime.startAndWait(id)
+          this.applyStyles(id)
+        } catch (error) {
+          this.loadErrors.set(id, errorMessage(error))
+        }
+      }
+      if (!progressed) {
+        for (const id of pending) {
+          try {
+            await this.runtime.startAndWait(id)
+          } catch (error) {
+            this.loadErrors.set(id, errorMessage(error))
+          }
+        }
+        pending.clear()
+      }
+    }
   }
 
-  private async load(id: string, replaceActive: boolean): Promise<void> {
+  private async load(id: string, replaceActive: boolean, start = true): Promise<void> {
     this.loadErrors.delete(id)
     const snapshot = await this.packages.read(id)
     if (!snapshot) throw new Error(`Installed plugin not found: ${id}`)
@@ -192,7 +242,7 @@ export class PluginHost {
       hostModules: this.getHostModules(),
     })
     const previous = this.external.get(id)
-    const shouldStart = replaceActive || !previous
+    const shouldStart = start && (replaceActive || !previous)
     this.external.set(id, loaded)
     this.removeStyles(id)
     try {
@@ -219,6 +269,18 @@ export class PluginHost {
         "react-dom": ReactDOM,
         "react-dom/client": ReactDOMClient,
         "react/jsx-runtime": JSXRuntime,
+        "next/link": typeof NextLink === "function" ? { default: NextLink } : NextLink,
+        "next/image": typeof NextImage === "function" ? { default: NextImage } : NextImage,
+        "next/navigation": NextNavigation,
+        "@ysu/academic": Academic,
+        "@ysu/plugin-ui/components": PluginComponents,
+        "@ysu/plugin-ui/hooks": PluginHooks,
+        "@ysu/plugin-ui/stores": PluginStores,
+        "@ysu/plugin-ui/academic": PluginAcademic,
+        "@ysu/plugin-ui/platform": PluginPlatform,
+        "@ysu/plugin-ui/plugin": PluginRuntimeUI,
+        "@ysu/plugin-ui/shell": PluginShellRuntime,
+        "@ysu/plugin-ui/assets": PluginAssets,
       }
       for (const specifier of SUPPORTED_HOST_MODULES) {
         if (specifier.startsWith("@ysu/plugin-sdk")) modules[specifier] = PluginSDK

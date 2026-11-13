@@ -2,21 +2,27 @@
 
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { FilterDrawer, FilterTrigger } from "@/components/academic/filter-drawer"
-import { useSettingsStore } from "@/lib/stores/settings"
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { compareExamStartTime, formatExamTime, isExamCompleted } from "@/lib/academic/exam-utils"
-import { syncExamsToWidget } from "@/lib/native/widget-bridge"
-import { useExams } from "@/providers/hooks"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@ysu/plugin-ui/components"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Button } from "@ysu/plugin-ui/components"
+import { Input } from "@ysu/plugin-ui/components"
+import { Spinner } from "@ysu/plugin-ui/components"
+import { Field, FieldGroup, FieldLabel } from "@ysu/plugin-ui/components"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@ysu/plugin-ui/components"
+import { FilterDrawer, FilterTrigger } from "@ysu/plugin-ui/components"
+import { useSettingsStore } from "@ysu/plugin-ui/stores"
+import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { compareExamStartTime, formatExamTime, isExamCompleted } from "@ysu/plugin-ui/academic"
+import { syncExamsToWidget } from "@ysu/plugin-ui/platform"
+import { useExams } from "@ysu/plugin-ui/hooks"
 import { CalendarOff, CheckCircle2, Clock, MapPin, Search } from "lucide-react"
 
 export function ExamsPage() {

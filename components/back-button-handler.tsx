@@ -6,10 +6,12 @@ import { App } from "@capacitor/app"
 import { isCapacitor } from "@/lib/native/platform"
 import { requestBack, setNavigationBackHandler } from "@/lib/navigation/back"
 import { appHistoryDepth, backFallback, installBackHistory } from "@/lib/navigation/back-history"
+import { useSemanticNavigation } from "@/lib/navigation/use-semantic-navigation"
 
 export function BackButtonHandler() {
   const pathname = usePathname()
   const router = useRouter()
+  const nav = useSemanticNavigation()
 
   useEffect(() => installBackHistory(window.history), [])
 
@@ -21,11 +23,11 @@ export function BackButtonHandler() {
         router.back()
         return
       }
-      const fallback = backFallback(path)
+      const fallback = backFallback(path, nav.primaryHref())
       if (fallback) router.replace(fallback)
       else if (isCapacitor()) void App.exitApp()
     })
-  }, [pathname, router])
+  }, [pathname, nav, router])
 
   useEffect(() => {
     if (!isCapacitor()) return

@@ -199,9 +199,15 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.6)
+      '@ysu/academic':
+        specifier: workspace:*
+        version: link:packages/academic
       '@ysu/plugin-sdk':
         specifier: workspace:*
         version: link:packages/plugin-sdk
+      '@ysu/plugin-ui':
+        specifier: workspace:*
+        version: link:packages/plugin-ui
       canvas-confetti:
         specifier: ^1.9.4
         version: 1.9.4
@@ -335,6 +341,21 @@ importers:
         specifier: ^7.8.2
         version: 7.8.6
 
+  packages/plugin-shell-template:
+    dependencies:
+      '@cordisjs/core':
+        specifier: 3.18.1
+        version: 3.18.1
+      '@ysu/plugin-sdk':
+        specifier: workspace:*
+        version: link:../plugin-sdk
+      '@ysu/plugin-ui':
+        specifier: workspace:*
+        version: link:../plugin-ui
+      react:
+        specifier: ^19.2.6
+        version: 19.2.6
+
   packages/plugin-template:
     dependencies:
       '@cordisjs/core':
@@ -348,6 +369,12 @@ importers:
         version: 1.17.0(react@19.2.6)
       react:
         specifier: ^19.2.6
+        version: 19.2.6
+
+  packages/plugin-ui:
+    dependencies:
+      react:
+        specifier: ^19.2.0
         version: 19.2.6
 
 packages:

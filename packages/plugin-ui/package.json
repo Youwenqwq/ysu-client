@@ -1,0 +1,20 @@
+{
+  "name": "@ysu/plugin-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./components": "./components.ts",
+    "./hooks": "./hooks.ts",
+    "./stores": "./stores.ts",
+    "./academic": "./academic.ts",
+    "./platform": "./platform.ts",
+    "./plugin": "./plugin.ts",
+    "./shell": "./shell.ts",
+    "./assets": "./assets.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0"
+  }
+}

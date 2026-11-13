@@ -1,21 +1,11 @@
 "use client"
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-} from "react"
-import { getPluginHost, type PluginHost } from "@/lib/plugins/host"
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
+import { getPluginHost } from "@/lib/plugins/host"
+import { PluginSlotRuntimeProvider } from "./plugin-slot-runtime"
+import { PluginReactContext, usePluginHost } from "./plugin-context"
 
-interface PluginProviderValue {
-  host: PluginHost
-  isReady: boolean
-}
-
-const PluginContext = createContext<PluginProviderValue | null>(null)
+export { usePluginHost }
 
 export function PluginProvider({ children }: { children: React.ReactNode }) {
   const host = getPluginHost()
@@ -23,9 +13,15 @@ export function PluginProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true
-    void host.bootstrap().then(() => {
-      if (active) setReady(true)
-    })
+    void host.bootstrap().then(
+      () => {
+        if (active) setReady(true)
+      },
+      (error) => {
+        host.bootstrapError = error instanceof Error ? error.message : String(error)
+        if (active) setReady(true)
+      }
+    )
     return () => {
       active = false
     }
@@ -33,16 +29,12 @@ export function PluginProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(() => ({ host, isReady }), [host, isReady])
   return (
-    <PluginContext.Provider value={value}>
-      {isReady ? children : <div className="min-h-svh bg-background" />}
-    </PluginContext.Provider>
+    <PluginReactContext.Provider value={value}>
+      <PluginSlotRuntimeProvider registry={host.slots}>
+        {isReady ? children : <div className="min-h-svh bg-background" />}
+      </PluginSlotRuntimeProvider>
+    </PluginReactContext.Provider>
   )
-}
-
-export function usePluginHost(): PluginProviderValue {
-  const context = useContext(PluginContext)
-  if (!context) throw new Error("usePluginHost must be used within PluginProvider")
-  return context
 }
 
 export function usePluginStates() {

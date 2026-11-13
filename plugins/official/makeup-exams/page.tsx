@@ -2,23 +2,24 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  EmptyState,
-  LoadingCards,
-  useErrorToast,
-  ValidatingList,
-} from "@/components/academic/list-state"
-import { FilterChips } from "@/components/academic/filter-chips"
-import { formatTimeRange } from "@/lib/academic/time"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useMakeupExamBatches, useMakeupExamCourses } from "@/providers/hooks"
-import { useProvider } from "@/providers/use-provider"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@ysu/plugin-ui/components"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger } from "@ysu/plugin-ui/components"
+import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@ysu/plugin-ui/components"
+import { FilterChips } from "@ysu/plugin-ui/components"
+import { formatTimeRange } from "@ysu/plugin-ui/academic"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useMakeupExamBatches, useMakeupExamCourses } from "@ysu/plugin-ui/hooks"
+import { useProvider } from "@ysu/plugin-ui/hooks"
+import { Button } from "@ysu/plugin-ui/components"
+import { Spinner } from "@ysu/plugin-ui/components"
 import {
   Dialog,
   DialogContent,
@@ -26,7 +27,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@ysu/plugin-ui/components"
 import type { MakeupExamCourse } from "@ysu/plugin-sdk"
 import { Clock, FilePenLine, School } from "lucide-react"
 

@@ -33,6 +33,12 @@
       "@ysu/plugin-sdk/*": [
         "./packages/plugin-sdk/*"
       ],
+      "@ysu/plugin-ui": [
+        "./packages/plugin-ui/index.ts"
+      ],
+      "@ysu/plugin-ui/*": [
+        "./packages/plugin-ui/*"
+      ],
       "@ysu/academic": [
         "./packages/academic/index.ts"
       ],

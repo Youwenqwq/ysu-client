@@ -1,23 +1,29 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@ysu/plugin-ui/components"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Button } from "@ysu/plugin-ui/components"
+import { Input } from "@ysu/plugin-ui/components"
+import { Spinner } from "@ysu/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@ysu/plugin-ui/components"
 import {
   EmptyState as SharedEmptyState,
   LoadingCards,
   useErrorToast,
   ValidatingList,
-} from "@/components/academic/list-state"
-import { FilterChips } from "@/components/academic/filter-chips"
-import { FilterDrawer, FilterOptionList, FilterTrigger } from "@/components/academic/filter-drawer"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
+} from "@ysu/plugin-ui/components"
+import { FilterChips } from "@ysu/plugin-ui/components"
+import { FilterDrawer, FilterOptionList, FilterTrigger } from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
 import {
   useCreditBatches,
   useCreditCompetitions,
@@ -25,15 +31,15 @@ import {
   useCreditLibraryActivities,
   useCreditRecords,
   useCreditSummary,
-} from "@/providers/hooks"
+} from "@ysu/plugin-ui/hooks"
 import type {
   CatalogPage,
   CatalogQueryOptions,
   Competition,
   CreditRecord,
   LibraryActivity,
-} from "@/providers/types"
-import type { ProviderQueryResult } from "@/providers/hooks"
+} from "@ysu/plugin-sdk/academic"
+import type { ProviderQueryResult } from "@ysu/plugin-ui/hooks"
 import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react"
 
 function DeclarationsPanel() {

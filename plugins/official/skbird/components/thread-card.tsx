@@ -2,9 +2,9 @@
 
 import Link from "next/link"
 import { BadgeCheck, Eye, MessageSquare, ThumbsUp } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-import { useTranslation } from "@/lib/i18n/use-translation"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Card, CardContent } from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
 import { skbirdImageUrl } from "../client"
 import { isCertThread, type SkbirdThread } from "../types"
 import { SkbirdImage } from "./skbird-image"

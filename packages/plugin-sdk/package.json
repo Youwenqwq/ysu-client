@@ -14,6 +14,7 @@
     "./provider-errors": "./provider-errors.ts",
     "./provider-school": "./provider-school.ts",
     "./ui": "./ui.ts",
+    "./slots": "./slots.ts",
     "./i18n": "./i18n.ts",
     "./services": "./services.ts",
     "./market": "./market.ts",

@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useSettingsStore } from "@/lib/stores/settings"
+import { Card, CardContent, CardHeader, CardTitle } from "@ysu/plugin-ui/components"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Button } from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useSettingsStore } from "@ysu/plugin-ui/stores"
 import type { GPAStats } from "@ysu/plugin-sdk"
 import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react"
 

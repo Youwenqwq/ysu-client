@@ -1,9 +1,9 @@
 "use client"
 
 import { createContext, useContext, type ReactNode } from "react"
-import { useEvaluationTasks, type ProviderQueryResult } from "@/providers/hooks"
-import type { EvaluationTask } from "@/providers/types"
-import { useOverviewSchedule, type OverviewSchedule } from "./use-overview-schedule"
+import { useEvaluationTasks, type ProviderQueryResult } from "@ysu/plugin-ui/hooks"
+import type { EvaluationTask } from "@ysu/plugin-sdk/academic"
+import { useOverviewSchedule, type OverviewSchedule } from "./overview-schedule"
 
 interface OverviewData {
   schedule: OverviewSchedule

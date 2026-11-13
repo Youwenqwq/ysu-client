@@ -27,7 +27,7 @@ my-plugin/
 }
 ```
 
-`kind` 为 `provider`、`feature` 或 `theme`。ID 使用小写点分格式；版本使用 SemVer。`entry` 和 `styles` 必须引用包内文件。
+`kind` 为 `provider`、`feature`、`theme` 或 `shell`。ID 使用小写点分格式；版本使用 SemVer。`entry` 和 `styles` 必须引用包内文件。`requires` 可声明必须先处于运行状态的插件 ID。
 
 ## 开发入口
 
@@ -63,6 +63,22 @@ export default definePlugin((ctx) => {
 
 注册函数返回清理函数；插件停用或卸载时 Cordis 也会自动清理页面、导航、主题、设置、挂件、翻译和 Provider 注册。
 
+## Shell 与 UI Slot
+
+完整应用界面通过 `ctx.ui.registerShell()` 注册，组件接收 `children` 和 `selectShell()`。Shell 可以包装或完全忽略默认 Next.js 内容；应提供恢复默认界面的入口。纯外部示例见 `packages/plugin-shell-template`。
+
+Shell 使用 `ctx.slots.declare()` 声明 `single`、`list` 或 `keyed` Slot，扩展插件使用 `ctx.slots.register()` 注册组件。`single`/`keyed` 以最低 `priority` 生效，`list` 按 `order` 排列。声明和贡献都随插件卸载自动清理；移除声明会级联移除贡献。
+
+```tsx
+ctx.slots.register({
+  id: "my-header-action",
+  slot: "dashboard.header.actions",
+  component: MyHeaderAction,
+})
+```
+
+`PluginSlot` 让 Shell 渲染 Slot，无需导入宿主私有模块。`ctx.ui.getSnapshot()` 与 `ctx.ui.subscribe()` 提供页面和导航快照，供替代 Shell 自行组合。
+
 ## 页面与 URL
 
 插件页面由固定宿主渲染：
@@ -81,7 +97,9 @@ export default definePlugin((ctx) => {
 
 ## 宿主服务
 
-- `ctx.ui`：页面、导航、设置入口、总览挂件和全局主题。
+- `ctx.ui`：Shell、页面、导航、设置入口、总览挂件、全局主题和可订阅快照。
+- `ctx.slots`：带类型、优先级和自动清理的 UI Slot。
+- `ctx.hostLifecycle`：Provider 初始化完成订阅；晚注册也会执行。
 - `ctx.providers`：学校配置与 `AcademicProvider` 工厂注册。
 - `ctx.storage.local` / `ctx.storage.secure`：按插件 ID 命名空间的字符串存储。
 - `ctx.http.fetch`：应用网络栈。
@@ -106,6 +124,9 @@ pnpm plugin pack packages/plugin-template
 - `react-dom`
 - `react-dom/client`
 - `react/jsx-runtime`
+- `next/link` / `next/image` / `next/navigation`
+- `@ysu/academic`
+- `@ysu/plugin-ui/components` / `hooks` / `stores` / `academic` / `platform` / `plugin` / `shell` / `assets`
 - `@ysu/plugin-sdk`
 
 其他依赖会正常打包。命令输出 ZIP 路径、大小和 SHA-256；市场索引必须记录同一个哈希。

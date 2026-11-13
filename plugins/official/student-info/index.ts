@@ -13,6 +13,7 @@ export const manifest: PluginManifest = {
 export const definition = definePlugin((ctx) => {
   ctx.ui.registerPage({
     id: "index",
+    route: "student-info",
     title: "学生信息",
     titleKey: "app.studentInfo",
     component: StudentInfoPage,

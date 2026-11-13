@@ -7,16 +7,16 @@ import {
   useExams,
   useSchedule,
   useTermCalendar,
-} from "@/providers/hooks"
-import { useSettingsStore } from "@/lib/stores/settings"
-import { syncScheduleToWidget, syncExamsToWidget } from "@/lib/native/widget-bridge"
-import { syncClassAlarmsToNative } from "@/lib/native/notify"
-import { compareExamStartTime, isExamCompleted } from "@/lib/academic/exam-utils"
-import type { ScheduleOccurrence } from "@/lib/academic/schedule-patches"
-import type { ClassPeriod, Course, CurrentWeek, Exam } from "@/providers/types"
-import type { ProviderQueryResult } from "@/providers/hooks"
-import { useEffectiveSchedule } from "@/providers/hooks/use-effective-schedule"
-import { useAcademicTime } from "@/hooks/use-academic-time"
+} from "@ysu/plugin-ui/hooks"
+import { useSettingsStore } from "@ysu/plugin-ui/stores"
+import { syncScheduleToWidget, syncExamsToWidget } from "@ysu/plugin-ui/platform"
+import { syncClassAlarmsToNative } from "@ysu/plugin-ui/platform"
+import { compareExamStartTime, isExamCompleted } from "@ysu/plugin-ui/academic"
+import type { ScheduleOccurrence } from "@ysu/plugin-ui/academic"
+import type { ClassPeriod, Course, CurrentWeek, Exam } from "@ysu/plugin-sdk/academic"
+import type { ProviderQueryResult } from "@ysu/plugin-ui/hooks"
+import { useEffectiveSchedule } from "@ysu/plugin-ui/hooks"
+import { useAcademicTime } from "@ysu/plugin-ui/hooks"
 import {
   buildSectionTimeMap,
   courseEndSection,
@@ -24,8 +24,7 @@ import {
   courseWeekDay,
   isCourseActiveInWeek,
   periodIsInUse,
-} from "@ysu/academic/schedule-utils"
-
+} from "@ysu/academic"
 export type OverviewWeekQuery = Omit<ProviderQueryResult<CurrentWeek>, "data" | "mutate"> & {
   data: CurrentWeek | null | undefined
   mutate: () => Promise<unknown>

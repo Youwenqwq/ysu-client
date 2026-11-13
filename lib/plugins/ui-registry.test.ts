@@ -46,6 +46,7 @@ describe("PluginUIRegistry", () => {
         })
         ctx.ui.registerSetting({ id: "settings", title: "Settings", page: "index", icon: Icon })
         ctx.ui.registerTheme({ id: "dark", name: "Dark", css: ":root { --background: black }" })
+        ctx.ui.registerShell({ id: "default", name: "Shell", component: Page })
       },
       "builtin"
     )
@@ -60,7 +61,27 @@ describe("PluginUIRegistry", () => {
       themes: [],
       settings: [],
       overviewWidgets: [],
+      shells: [],
     })
+  })
+
+  it("rejects duplicate semantic page routes", async () => {
+    const registry = new PluginUIRegistry()
+    const runtime = new PluginRuntime(registry.createService)
+    runtime.register(
+      manifest,
+      (ctx) => ctx.ui.registerPage({ id: "index", route: "home", title: "One", component: Page }),
+      "builtin"
+    )
+    runtime.register(
+      { ...manifest, id: "example.other" },
+      (ctx) => ctx.ui.registerPage({ id: "index", route: "home", title: "Two", component: Page }),
+      "external"
+    )
+    runtime.start(manifest.id)
+    runtime.start("example.other")
+    await vi.waitFor(() => expect(runtime.get("example.other")?.status).toBe("failed"))
+    expect(runtime.get("example.other")?.error).toContain("route already registered")
   })
 
   it("rejects duplicate contribution IDs", async () => {

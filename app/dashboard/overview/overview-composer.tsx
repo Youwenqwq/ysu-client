@@ -39,7 +39,6 @@ import {
   UserRound,
 } from "lucide-react"
 import { usePluginHost } from "@/components/plugin-provider"
-import { pluginPageHref } from "@ysu/plugin-sdk"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -470,7 +469,7 @@ function LayoutEditor({ initialLayout }: { initialLayout: OverviewLayout }) {
           <Button
             onClick={() => {
               setLayout(draft)
-              router.push(pluginPageHref("ysu.overview", "index"))
+              router.push("/dashboard/plugin?route=overview")
             }}
           >
             <Check data-icon="inline-start" />

@@ -1,14 +1,20 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useSettingsStore } from "@/lib/stores/settings"
-import { useStoredMediaUrl } from "@/lib/storage/media"
-import { loadAvatarImage } from "@/lib/storage/avatar"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useStudentInfo } from "@/providers/hooks"
-import { QueryState } from "./query-state"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@ysu/plugin-ui/components"
+import { Avatar, AvatarFallback, AvatarImage } from "@ysu/plugin-ui/components"
+import { useSettingsStore } from "@ysu/plugin-ui/stores"
+import { useStoredMediaUrl } from "@ysu/plugin-ui/hooks"
+import { loadAvatarImage } from "@ysu/plugin-ui/stores"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useStudentInfo } from "@ysu/plugin-ui/hooks"
+import { QueryState } from "@ysu/academic"
 
 export function ProfileWidget({ compact, children }: { compact: boolean; children?: ReactNode }) {
   const { t } = useTranslation()

@@ -2,21 +2,21 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { BookOpen, Calendar, ChevronRight, ClipboardCheck, Clock } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { cn } from "@/lib/utils"
-import { formatExamTime, getExamStartTime } from "@/lib/academic/exam-utils"
-import { getAcademicClock } from "@/lib/academic/academic-time"
-import type { ScheduleOccurrence } from "@/lib/academic/schedule-patches"
-import { courseEndSection, courseStartSection, isCoursePast } from "@ysu/academic/schedule-utils"
-import { ActivityModal } from "@ysu/academic/activity-modal"
-import { SigninModal } from "@ysu/academic/signin-modal"
-import type { Course } from "@/providers/types"
-import { useOverviewEvaluation, useOverviewScheduleData } from "./context"
-import { QueryState } from "./query-state"
+import { BookOpen, Calendar, ChevronRight, Clock } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@ysu/plugin-ui/components"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Progress } from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { cn } from "@ysu/plugin-ui/components"
+import { formatExamTime, getExamStartTime } from "@ysu/plugin-ui/academic"
+import { getAcademicClock } from "@ysu/plugin-ui/academic"
+import type { ScheduleOccurrence } from "@ysu/plugin-ui/academic"
+import { courseEndSection, courseStartSection, isCoursePast } from "@ysu/academic"
+import { ActivityModal } from "@ysu/academic"
+import { SigninModal } from "@ysu/academic"
+import type { Course } from "@ysu/plugin-sdk/academic"
+import { useOverviewScheduleData } from "@ysu/academic"
+import { QueryState } from "@ysu/academic"
 import { pluginPageHref } from "@ysu/plugin-sdk"
 
 function clockText(minutes: number): string {
@@ -260,36 +260,6 @@ export function UpcomingExamsWidget() {
               })}
             </div>
           )}
-        </QueryState>
-      </CardContent>
-    </Card>
-  )
-}
-
-export function EvaluationTasksWidget() {
-  const { t } = useTranslation()
-  const query = useOverviewEvaluation()
-  const tasks = (query.data ?? []).filter((task) => task.status === "active")
-  if (query.data && !query.error && tasks.length === 0) return null
-  return (
-    <Card data-overview-wide>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ClipboardCheck className="size-4 text-primary" />
-          {t("app.evaluation")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <QueryState queries={[query]}>
-          <Link
-            href={pluginPageHref("ysu.evaluation", "index")}
-            className="flex items-center gap-3 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <span className="flex-1 text-sm">
-              {t("dashboard.pendingEvaluation", { count: tasks.length })}
-            </span>
-            <ChevronRight className="size-4 shrink-0" />
-          </Link>
         </QueryState>
       </CardContent>
     </Card>

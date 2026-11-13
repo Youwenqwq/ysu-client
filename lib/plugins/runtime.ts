@@ -2,9 +2,19 @@ import { Context, type ForkScope, type Plugin } from "@cordisjs/core"
 import type { PluginContext, PluginDefinition, PluginManifest } from "@ysu/plugin-sdk"
 
 export type PluginSource = "builtin" | "external"
-export type PluginStatus = "registered" | "active" | "disabled" | "failed"
+export type PluginStatus = "registered" | "starting" | "active" | "disabled" | "failed"
 
-const PLUGIN_SERVICES = ["ui", "i18n", "providers", "storage", "http", "native", "assets"]
+const PLUGIN_SERVICES = [
+  "ui",
+  "slots",
+  "i18n",
+  "providers",
+  "storage",
+  "http",
+  "native",
+  "assets",
+  "hostLifecycle",
+]
 
 export interface PluginState {
   manifest: PluginManifest
@@ -21,6 +31,7 @@ interface RegisteredPlugin {
   serviceLabels: Record<string, symbol>
   generation: number
   scope?: ForkScope<Context>
+  pending?: Promise<void>
   status: PluginStatus
   error?: string
 }
@@ -44,7 +55,7 @@ export class PluginRuntime {
   private snapshot: readonly PluginState[] = []
 
   constructor(private readonly configureServices?: PluginServiceFactory) {
-    for (const service of PLUGIN_SERVICES) this.context.provide(service)
+    for (const service of PLUGIN_SERVICES) this.context.set(service, undefined)
     void this.context.start()
     const handleError = (source: Context, error: unknown) => {
       const binding = source === this.context ? undefined : this.contexts.get(source)
@@ -60,9 +71,9 @@ export class PluginRuntime {
 
   register(manifest: PluginManifest, definition: PluginDefinition, source: PluginSource): void {
     const previous = this.plugins.get(manifest.id)
-    const wasActive = previous?.status === "active"
+    const wasActive = previous?.status === "active" || previous?.status === "starting"
     if (previous) {
-      this.stop(manifest.id)
+      this.stop(manifest.id, false)
       this.context.registry.delete(previous.cordisPlugin)
       this.deleteServiceRecords(previous)
     }
@@ -82,8 +93,26 @@ export class PluginRuntime {
       this.contexts.set(isolated, { plugin: current, generation })
       this.configureServices?.(isolated, current.manifest)
       const pluginContext = isolated as PluginContext
-      if (typeof current.definition === "function") return current.definition(pluginContext)
-      return current.definition.apply(pluginContext)
+      const result =
+        typeof current.definition === "function"
+          ? current.definition(pluginContext)
+          : current.definition.apply(pluginContext)
+      if (result && typeof result.then === "function") {
+        const pending = Promise.resolve(result)
+        current.pending = pending
+        void pending.then(
+          () => {
+            if (current.generation !== generation || current.pending !== pending) return
+            current.pending = undefined
+            if (current.status === "starting") current.status = "active"
+            this.publish()
+          },
+          () => {
+            if (current.pending === pending) current.pending = undefined
+          }
+        )
+      }
+      return result
     }
     cordisPlugin.inject = Object.fromEntries(
       PLUGIN_SERVICES.map((service) => [service, { required: false }])
@@ -114,13 +143,25 @@ export class PluginRuntime {
   start(id: string): void {
     const plugin = this.plugins.get(id)
     if (!plugin) throw new Error(`Plugin not registered: ${id}`)
-    if (plugin.scope?.isActive && plugin.status === "active") return
+    if (plugin.scope?.isActive && (plugin.status === "active" || plugin.status === "starting"))
+      return
     try {
+      for (const dependency of plugin.manifest.requires ?? []) {
+        if (this.plugins.get(dependency)?.status !== "active") {
+          throw new Error(`Plugin dependency is not active: ${dependency}`)
+        }
+      }
+      plugin.pending = undefined
       plugin.generation += 1
       plugin.scope?.dispose()
       plugin.scope = this.context.plugin(plugin.cordisPlugin)
-      plugin.status = "active"
-      plugin.error = undefined
+      if (plugin.scope.error) {
+        plugin.status = "failed"
+        plugin.error = errorMessage(plugin.scope.error)
+      } else {
+        plugin.status = plugin.pending ? "starting" : "active"
+        plugin.error = undefined
+      }
     } catch (error) {
       plugin.status = "failed"
       plugin.error = errorMessage(error)
@@ -132,18 +173,25 @@ export class PluginRuntime {
 
   async startAndWait(id: string): Promise<void> {
     this.start(id)
-    await Promise.all(Array.from(this.context.lifecycle._tasks))
+    await this.plugins.get(id)?.pending
     const state = this.get(id)
     if (state?.status === "failed") throw new Error(state.error)
   }
 
-  stop(id: string): void {
+  stop(id: string, cascade = true): void {
     const plugin = this.plugins.get(id)
-    if (!plugin) return
+    if (!plugin || (plugin.status === "disabled" && !plugin.scope)) return
     plugin.generation += 1
-    plugin.scope?.dispose()
-    plugin.scope = undefined
     plugin.status = "disabled"
+    const scope = plugin.scope
+    plugin.scope = undefined
+    plugin.pending = undefined
+    if (cascade) {
+      for (const dependent of this.plugins.values()) {
+        if (dependent.manifest.requires?.includes(id)) this.stop(dependent.manifest.id)
+      }
+    }
+    scope?.dispose()
     this.publish()
   }
 

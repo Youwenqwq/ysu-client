@@ -4,7 +4,8 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/lib/stores/auth"
 import { useSettingsStore } from "@/lib/stores/settings"
-import { pluginPageHref } from "@ysu/plugin-sdk"
+import { landingPreferenceHref } from "@/lib/plugins/navigation"
+import { useSemanticNavigation } from "@/lib/navigation/use-semantic-navigation"
 
 export default function HomePage() {
   const router = useRouter()
@@ -12,19 +13,16 @@ export default function HomePage() {
   const hasHydrated = useAuthStore((s) => s.hasHydrated)
   const settingsHydrated = useSettingsStore((s) => s.hasHydrated)
   const landing = useSettingsStore((s) => s.defaultLandingPage)
+  const nav = useSemanticNavigation()
 
   useEffect(() => {
     if (!hasHydrated || !settingsHydrated) return
     if (isAuthenticated) {
-      router.replace(
-        landing === "schedule"
-          ? pluginPageHref("ysu.schedule", "index")
-          : pluginPageHref("ysu.overview", "index")
-      )
+      router.replace(landingPreferenceHref(landing, nav.sources))
     } else {
       router.replace("/login")
     }
-  }, [hasHydrated, settingsHydrated, isAuthenticated, landing, router])
+  }, [hasHydrated, settingsHydrated, isAuthenticated, landing, nav, router])
 
   return null
 }

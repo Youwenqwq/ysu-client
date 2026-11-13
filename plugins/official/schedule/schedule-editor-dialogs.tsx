@@ -11,15 +11,15 @@ import {
   ResponsiveModalFooter,
   ResponsiveModalHeader,
   ResponsiveModalTitle,
-} from "@/components/responsive-modal"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useBackLayer } from "@/hooks/use-back-handler"
-import { cn } from "@/lib/utils"
+} from "@ysu/plugin-ui/components"
+import { Alert, AlertDescription, AlertTitle } from "@ysu/plugin-ui/components"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Button } from "@ysu/plugin-ui/components"
+import { Field, FieldGroup, FieldLabel } from "@ysu/plugin-ui/components"
+import { Input } from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useBackLayer } from "@ysu/plugin-ui/hooks"
+import { cn } from "@ysu/plugin-ui/components"
 import {
   scheduleDate,
   schedulePatchDependents,
@@ -27,9 +27,8 @@ import {
   type ScheduleIssue,
   type ScheduleOccurrence,
   type SchedulePatch,
-} from "@/lib/academic/schedule-patches"
-import type { ClassPeriod } from "@/providers/types"
-
+} from "@ysu/plugin-ui/academic"
+import type { ClassPeriod } from "@ysu/plugin-sdk/academic"
 type PatchDraft = Omit<SchedulePatch, "id" | "createdAt" | "enabled">
 
 interface AdjustmentProps {

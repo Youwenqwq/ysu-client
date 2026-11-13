@@ -2,14 +2,14 @@
 
 import Link from "next/link"
 import { CreditCard, RefreshCw } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { cn } from "@/lib/utils"
-import { useIsMobile } from "@/hooks/use-mobile"
-import { useEcardBalance } from "@/providers/hooks/use-ecard-balance"
+import { Button } from "@ysu/plugin-ui/components"
+import { Card, CardContent, CardHeader, CardTitle } from "@ysu/plugin-ui/components"
+import { Empty, EmptyDescription, EmptyHeader } from "@ysu/plugin-ui/components"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { cn } from "@ysu/plugin-ui/components"
+import { useIsMobile } from "@ysu/plugin-ui/hooks"
+import { useEcardBalance } from "@ysu/plugin-ui/hooks"
 import { pluginPageHref } from "@ysu/plugin-sdk"
 
 function EcardSummary({ compact }: { compact: boolean }) {

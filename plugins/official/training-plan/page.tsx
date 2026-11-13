@@ -1,14 +1,20 @@
 "use client"
 
-import { ResponsiveSelect } from "@/components/responsive-select"
+import { ResponsiveSelect } from "@ysu/plugin-ui/components"
 import { useMemo, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@ysu/plugin-ui/components"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Button } from "@ysu/plugin-ui/components"
+import { Alert, AlertDescription, AlertTitle } from "@ysu/plugin-ui/components"
+import { Field, FieldGroup, FieldLabel } from "@ysu/plugin-ui/components"
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@ysu/plugin-ui/components"
 import {
   Table,
   TableBody,
@@ -16,13 +22,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { useTranslation } from "@/lib/i18n/use-translation"
+} from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
 import { toast } from "sonner"
-import { useProvider } from "@/providers/use-provider"
-import { Spinner } from "@/components/ui/spinner"
+import { useProvider } from "@ysu/plugin-ui/hooks"
+import { Spinner } from "@ysu/plugin-ui/components"
 import type { AcademicCompletion } from "@ysu/plugin-sdk"
-import { useAcademicCompletion, useAcademicWarnings, useTrainingPlan } from "@/providers/hooks"
+import { useAcademicCompletion, useAcademicWarnings, useTrainingPlan } from "@ysu/plugin-ui/hooks"
 import { AlertTriangle, CheckCircle2, RefreshCw, RotateCcw, Search } from "lucide-react"
 
 const ALL = "__all__"

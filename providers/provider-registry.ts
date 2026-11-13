@@ -6,6 +6,7 @@ import type {
   SchoolRegistration,
 } from "@ysu/plugin-sdk/providers"
 import { registerSchoolConfig, unregisterSchoolConfig } from "@/lib/server-config"
+import { trackPluginRegistration } from "@/lib/plugins/track-registration"
 import type { AcademicProvider } from "./types"
 import { ProviderError, ProviderErrorCode } from "./errors"
 
@@ -29,23 +30,11 @@ export class ProviderPluginRegistry {
 
   /** Cordis service factory: inject into PluginRuntime alongside the UI service. */
   createService = (ctx: Context, _manifest: PluginManifest): void => {
-    const disposers = new Set<() => void>()
-    const track = (dispose: () => void): (() => void) => {
-      disposers.add(dispose)
-      const onDispose = () => {
-        disposers.delete(dispose)
-        dispose()
-      }
-      const unregister = ctx.on("dispose", onDispose)
-      return () => {
-        unregister()
-        if (!disposers.delete(dispose)) return
-        dispose()
-      }
-    }
     const service: PluginProviderService = {
-      registerProvider: (schoolId, factory) => track(this.addProvider(schoolId, factory)),
-      registerSchool: (registration) => track(this.addSchool(registration)),
+      registerProvider: (schoolId, factory) =>
+        trackPluginRegistration(ctx, () => this.addProvider(schoolId, factory)),
+      registerSchool: (registration) =>
+        trackPluginRegistration(ctx, () => this.addSchool(registration)),
       hasProvider: (schoolId) => this.hasProvider(schoolId),
     }
     ctx.set("providers", service)

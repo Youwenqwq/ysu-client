@@ -1,5 +1,5 @@
-import { pluginPageHref } from "@ysu/plugin-sdk"
-import { usePluginRouteStore } from "@/lib/stores/plugin-route"
+import { pluginPageHref } from "@ysu/plugin-sdk/ui"
+import { usePluginRouteStore } from "../stores/plugin-route"
 
 const DEPTH_KEY = "__academicBackDepth"
 
@@ -46,17 +46,26 @@ export function installBackHistory(history: AppHistory): () => void {
   }
 }
 
-export function backFallback(pathname: string): string | null {
+/**
+ * Where the hardware back button lands when history is exhausted. `homeHref` is
+ * the deterministic dashboard home (resolved by the caller from the live plugin
+ * registry); `null` means exit the app.
+ */
+export function backFallback(pathname: string, homeHref: string | null): string | null {
   const path = pathname.replace(/\/+$/, "") || "/"
   if (path === "/dashboard" || path === "/login") return null
   if (path === "/dashboard/plugin") {
     const current = usePluginRouteStore.getState().current
-    if (current?.pluginId === "ysu.overview" && current.pageId === "index") return null
-    return current?.parent
-      ? pluginPageHref(current.pluginId, current.parent)
-      : pluginPageHref("ysu.overview", "index")
+    if (current) {
+      const homePageId = current.parent ?? "index"
+      const isHome = current.pageId === homePageId && current.primary === true
+      if (isHome) return null
+      if (current.pageId === homePageId) return homeHref
+      return pluginPageHref(current.pluginId, homePageId)
+    }
+    return homeHref
   }
   if (path.startsWith("/dashboard/me/settings/")) return "/dashboard/me/settings"
   if (path.startsWith("/dashboard/me/")) return "/dashboard/me"
-  return pluginPageHref("ysu.overview", "index")
+  return homeHref
 }

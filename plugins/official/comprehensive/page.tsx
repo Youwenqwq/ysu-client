@@ -1,20 +1,21 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
-  EmptyState,
-  LoadingCards,
-  useErrorToast,
-  ValidatingList,
-} from "@/components/academic/list-state"
-import { FilterChips } from "@/components/academic/filter-chips"
-import { FilterDrawer, FilterOptionList, FilterTrigger } from "@/components/academic/filter-drawer"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useMobileHeaderRight } from "@/lib/stores/mobile-header"
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@ysu/plugin-ui/components"
+import { Skeleton } from "@ysu/plugin-ui/components"
+import { Badge } from "@ysu/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@ysu/plugin-ui/components"
+import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@ysu/plugin-ui/components"
+import { FilterChips } from "@ysu/plugin-ui/components"
+import { FilterDrawer, FilterOptionList, FilterTrigger } from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
 import {
   useComprehensiveIndicators,
   useComprehensiveRadar,
@@ -23,8 +24,7 @@ import {
   useComprehensiveResult,
   useComprehensiveTerms,
   useComprehensiveYearScores,
-} from "@/providers/hooks"
-
+} from "@ysu/plugin-ui/hooks"
 function ResultPanel({ year, term }: { year: string; term: string }) {
   const { t } = useTranslation()
   const opts = useMemo(() => ({ year, term }), [year, term])

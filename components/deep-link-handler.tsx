@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { isCapacitor } from "@/lib/native/platform"
 import { useAuthStore } from "@/lib/stores/auth"
@@ -9,6 +9,7 @@ import {
   isCurrentNotificationDestination,
   notificationDestination,
 } from "@/lib/navigation/deep-link"
+import { useSemanticNavigation } from "@/lib/navigation/use-semantic-navigation"
 
 export function DeepLinkHandler() {
   const router = useRouter()
@@ -16,8 +17,15 @@ export function DeepLinkHandler() {
   const hasHydrated = useAuthStore((state) => state.hasHydrated)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const settingsHydrated = useSettingsStore((state) => state.hasHydrated)
+  const nav = useSemanticNavigation()
+  const sourcesRef = useRef(nav.sources)
+  useLayoutEffect(() => {
+    sourcesRef.current = nav.sources
+  }, [nav.sources])
   const [pendingDestination, setPendingDestination] = useState<string | null>(null)
 
+  // Native listeners and the cold-start intent are installed/read exactly once.
+  // Registry updates only refresh sourcesRef; they must not replay the launch URL.
   useEffect(() => {
     if (!isCapacitor()) return
 
@@ -27,7 +35,7 @@ export function DeepLinkHandler() {
 
     function handleUrl(url: string) {
       if (disposed) return false
-      const destination = notificationDestination(url)
+      const destination = notificationDestination(url, sourcesRef.current)
       if (!destination) return false
       setPendingDestination(destination)
       return true
@@ -57,7 +65,7 @@ export function DeepLinkHandler() {
       disposed = true
       if (removeListener) {
         void removeListener().catch((error: unknown) => {
-          console.warn("[deep-link] Native link cleanup failed:", error)
+          console.warn("[deep-link] Native link handling cleanup failed:", error)
         })
       }
     }

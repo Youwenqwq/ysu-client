@@ -2,12 +2,18 @@
 
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { useTranslation } from "@/lib/i18n/use-translation"
+import { Button } from "@ysu/plugin-ui/components"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@ysu/plugin-ui/components"
+import { Input } from "@ysu/plugin-ui/components"
+import { Textarea } from "@ysu/plugin-ui/components"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@ysu/plugin-ui/components"
+import { useTranslation } from "@ysu/plugin-ui/hooks"
 import { SkbirdClient, generateDeviceId } from "../client"
 import { useSkbirdStore } from "../store"
 

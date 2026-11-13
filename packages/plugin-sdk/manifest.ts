@@ -2,7 +2,7 @@ import semver from "semver"
 
 export const PLUGIN_API_VERSION = 1
 
-export type PluginKind = "provider" | "feature" | "theme"
+export type PluginKind = "provider" | "feature" | "theme" | "shell"
 
 export interface PluginManifest {
   id: string
@@ -17,6 +17,8 @@ export interface PluginManifest {
   homepage?: string
   icon?: string
   styles?: string[]
+  /** Plugin IDs that must be active before this plugin can start. */
+  requires?: string[]
   /** Core providers can be replaced but not disabled from the plugin manager. */
   required?: boolean
 }
@@ -64,8 +66,8 @@ export function validatePluginManifest(input: unknown): PluginManifest {
   if (value.apiVersion !== PLUGIN_API_VERSION) {
     issues.push(`apiVersion must be ${PLUGIN_API_VERSION}`)
   }
-  if (!["provider", "feature", "theme"].includes(String(value.kind))) {
-    issues.push("kind must be provider, feature, or theme")
+  if (!["provider", "feature", "theme", "shell"].includes(String(value.kind))) {
+    issues.push("kind must be provider, feature, theme, or shell")
   }
   if (typeof value.entry === "string" && !PACKAGE_FILE_PATTERN.test(value.entry)) {
     issues.push("entry must be a safe relative JavaScript file path")
@@ -86,6 +88,20 @@ export function validatePluginManifest(input: unknown): PluginManifest {
       value.styles.some((path) => typeof path !== "string" || !PACKAGE_FILE_PATTERN.test(path)))
   ) {
     issues.push("styles must contain safe relative CSS file paths")
+  }
+  if (
+    value.requires !== undefined &&
+    (!Array.isArray(value.requires) ||
+      value.requires.some((id) => typeof id !== "string" || !PLUGIN_ID_PATTERN.test(id)))
+  ) {
+    issues.push("requires must contain valid plugin IDs")
+  }
+  if (
+    typeof value.id === "string" &&
+    Array.isArray(value.requires) &&
+    value.requires.includes(value.id)
+  ) {
+    issues.push("plugin must not depend on itself")
   }
 
   if (issues.length > 0) throw new PluginManifestError(issues)
