@@ -63,7 +63,7 @@ export function CourseProgressWidget() {
           {course && range && (
             <div className="flex flex-col gap-2">
               <Link
-                href={pluginPageHref("ysu.schedule", "index")}
+                href={pluginPageHref("orahako.schedule", "index")}
                 className="rounded-sm text-lg font-semibold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {course.name}
@@ -117,7 +117,7 @@ export function TodayCoursesWidget() {
             {t("dashboard.todayCourses")}
           </CardTitle>
           <Link
-            href={pluginPageHref("ysu.schedule", "index")}
+            href={pluginPageHref("orahako.schedule", "index")}
             aria-label={t("app.schedule")}
             className="rounded-sm p-2 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
           >
@@ -208,7 +208,7 @@ export function UpcomingExamsWidget() {
           {t("dashboard.upcomingExams")}
         </CardTitle>
         <Link
-          href={pluginPageHref("ysu.exams", "index")}
+          href={pluginPageHref("orahako.exams", "index")}
           className="rounded-sm p-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Badge variant="secondary">

@@ -11,7 +11,7 @@ import { runEpayAutoCheck } from "./auto-check"
 import { EpayPage } from "./page"
 
 export const manifest: PluginManifest = {
-  id: "ysu.epay",
+  id: "orahako.epay",
   name: "缴费查询",
   version: "1.0.0",
   apiVersion: PLUGIN_API_VERSION,

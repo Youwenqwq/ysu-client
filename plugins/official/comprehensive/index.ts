@@ -3,7 +3,7 @@ import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { ComprehensivePage } from "./page"
 
 export const manifest: PluginManifest = {
-  id: "ysu.comprehensive",
+  id: "orahako.comprehensive",
   name: "综合测评",
   version: "1.0.0",
   apiVersion: 1,

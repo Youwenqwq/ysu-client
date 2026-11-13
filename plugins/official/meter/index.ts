@@ -3,7 +3,7 @@ import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { MeterPage } from "./page"
 
 export const manifest: PluginManifest = {
-  id: "ysu.meter",
+  id: "orahako.meter",
   name: "空调电费",
   version: "1.0.0",
   apiVersion: 1,

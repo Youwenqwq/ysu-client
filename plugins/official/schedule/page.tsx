@@ -351,7 +351,7 @@ export function SchedulePage() {
   }, [periods, nowMinutes, headerWeekday])
   const freeRoomHref = useMemo(
     () =>
-      pluginPageHref("ysu.school-schedule", "index", {
+      pluginPageHref("orahako.school-schedule", "index", {
         tab: "room",
         week: selectedWeek || currentWeek?.week || 1,
         day: headerWeekday >= 1 ? headerWeekday : undefined,
@@ -410,7 +410,7 @@ export function SchedulePage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <Link href={pluginPageHref("ysu.school-schedule")}>{t("app.schoolSchedule")}</Link>
+              <Link href={pluginPageHref("orahako.school-schedule")}>{t("app.schoolSchedule")}</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href={freeRoomHref}>{t("schoolSchedule.freeRoomEntry")}</Link>
@@ -573,7 +573,7 @@ export function SchedulePage() {
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href={pluginPageHref("ysu.school-schedule")}>
+              <Link href={pluginPageHref("orahako.school-schedule")}>
                 <CalendarDays data-icon="inline-start" />
                 {t("app.schoolSchedule")}
               </Link>

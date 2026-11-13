@@ -43,7 +43,7 @@ function EcardSummary({ compact }: { compact: boolean }) {
   if (compact)
     return (
       <Link
-        href={pluginPageHref("ysu.ecard", "index")}
+        href={pluginPageHref("orahako.ecard", "index")}
         title={balance ? undefined : message}
         className="flex min-w-0 flex-col gap-1 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
         aria-busy={loading || initializing}
@@ -81,7 +81,7 @@ function EcardSummary({ compact }: { compact: boolean }) {
         <CreditCard className="size-4 shrink-0 text-primary" aria-hidden="true" />
         <CardTitle className="min-w-0 flex-1">
           <Link
-            href={pluginPageHref("ysu.ecard", "index")}
+            href={pluginPageHref("orahako.ecard", "index")}
             className="rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             {t("ecard.title")}

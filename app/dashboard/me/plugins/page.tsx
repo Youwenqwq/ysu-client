@@ -306,12 +306,12 @@ export default function PluginsPage() {
           <div className="grid grid-cols-2 gap-2">
             {shells.map((shell) => {
               const id = `${shell.pluginId}:${shell.id}`
-              const selected = activeShell ? activeShell === id : id === "ysu.shell:default"
+              const selected = activeShell ? activeShell === id : id === "orahako.shell:default"
               return (
                 <Button
                   key={id}
                   variant={selected ? "default" : "outline"}
-                  onClick={() => setActiveShell(id === "ysu.shell:default" ? undefined : id)}
+                  onClick={() => setActiveShell(id === "orahako.shell:default" ? undefined : id)}
                 >
                   {shell.name}
                 </Button>

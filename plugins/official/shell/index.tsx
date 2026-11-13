@@ -16,7 +16,7 @@ import {
 } from "@orahako/plugin-ui/shell"
 
 export const manifest: PluginManifest = {
-  id: "ysu.shell",
+  id: "orahako.shell",
   name: "酸橙盒界面",
   version: "1.0.0",
   apiVersion: 1,

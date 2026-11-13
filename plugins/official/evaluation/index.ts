@@ -4,7 +4,7 @@ import { EvaluationPage } from "./page"
 import { EvaluationSummaryWidget, EvaluationTasksWidget } from "./widgets"
 
 export const manifest: PluginManifest = {
-  id: "ysu.evaluation",
+  id: "orahako.evaluation",
   name: "学生评教",
   version: "1.0.0",
   apiVersion: 1,

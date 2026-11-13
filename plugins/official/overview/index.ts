@@ -4,7 +4,7 @@ import { OverviewPage } from "./page"
 import { WeekSummaryWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
-  id: "ysu.overview",
+  id: "orahako.overview",
   name: "总览",
   version: "1.0.0",
   apiVersion: 1,

@@ -1,7 +1,7 @@
 import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 
 export const manifest: PluginManifest = {
-  id: "ysu.theme.default",
+  id: "orahako.theme.default",
   name: "默认主题",
   version: "1.0.0",
   apiVersion: 1,

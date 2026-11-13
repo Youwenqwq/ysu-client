@@ -4,7 +4,7 @@ import { GradesPage } from "./page"
 import { GpaSummaryWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
-  id: "ysu.grades",
+  id: "orahako.grades",
   name: "成绩",
   version: "1.0.0",
   apiVersion: 1,

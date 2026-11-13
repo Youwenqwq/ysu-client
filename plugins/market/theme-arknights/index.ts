@@ -2,7 +2,7 @@ import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { arknightsThemeCss } from "./styles"
 
 export const manifest: PluginManifest = {
-  id: "ysu.theme.arknights",
+  id: "community.theme.arknights",
   name: "明日方舟 × 新粗野主义",
   version: "1.0.1",
   apiVersion: 1,

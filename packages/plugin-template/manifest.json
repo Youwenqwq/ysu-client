@@ -7,6 +7,6 @@
   "kind": "feature",
   "entry": "dist/index.js",
   "styles": ["dist/index.css"],
-  "requires": ["ysu.shell"],
+  "requires": ["orahako.shell"],
   "description": "A complete feature plugin example."
 }

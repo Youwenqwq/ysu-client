@@ -26,18 +26,18 @@ describe("overview widget ownership", () => {
     expect(
       registry.getSnapshot().overviewWidgets.map((widget) => [widget.id, widget.pluginId])
     ).toEqual([
-      ["week", "ysu.overview"],
-      ["ecard", "ysu.ecard"],
-      ["gpa", "ysu.grades"],
-      ["evaluation", "ysu.evaluation"],
-      ["course-progress", "ysu.schedule"],
-      ["today-courses", "ysu.schedule"],
-      ["upcoming-exams", "ysu.exams"],
-      ["evaluation-tasks", "ysu.evaluation"],
+      ["week", "orahako.overview"],
+      ["ecard", "orahako.ecard"],
+      ["gpa", "orahako.grades"],
+      ["evaluation", "orahako.evaluation"],
+      ["course-progress", "orahako.schedule"],
+      ["today-courses", "orahako.schedule"],
+      ["upcoming-exams", "orahako.exams"],
+      ["evaluation-tasks", "orahako.evaluation"],
     ])
 
-    runtime.stop("ysu.evaluation")
-    runtime.stop("ysu.ecard")
+    runtime.stop("orahako.evaluation")
+    runtime.stop("orahako.ecard")
     expect(registry.getSnapshot().overviewWidgets.map((widget) => widget.id)).toEqual([
       "week",
       "gpa",

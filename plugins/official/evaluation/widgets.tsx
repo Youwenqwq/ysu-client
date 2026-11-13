@@ -21,7 +21,7 @@ function EvaluationSummary({
   if (compact)
     return (
       <Link
-        href={pluginPageHref("ysu.evaluation", "index")}
+        href={pluginPageHref("orahako.evaluation", "index")}
         className="flex min-w-0 flex-col gap-1 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -44,7 +44,7 @@ function EvaluationSummary({
       <CardContent>
         <QueryState queries={[query]}>
           <Link
-            href={pluginPageHref("ysu.evaluation", "index")}
+            href={pluginPageHref("orahako.evaluation", "index")}
             className="flex flex-col gap-1 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span className="text-2xl font-semibold tabular-nums">{count}</span>
@@ -86,7 +86,7 @@ export function EvaluationTasksWidget() {
       <CardContent>
         <QueryState queries={[query]}>
           <Link
-            href={pluginPageHref("ysu.evaluation", "index")}
+            href={pluginPageHref("orahako.evaluation", "index")}
             className="flex items-center gap-3 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span className="flex-1 text-sm">

@@ -4,7 +4,7 @@ import { EcardPage } from "./page"
 import { EcardSummaryWidget } from "./summary-widget"
 
 export const manifest: PluginManifest = {
-  id: "ysu.ecard",
+  id: "orahako.ecard",
   name: "一卡通余额",
   version: "1.0.0",
   apiVersion: 1,

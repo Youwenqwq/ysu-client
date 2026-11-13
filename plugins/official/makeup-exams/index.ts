@@ -3,7 +3,7 @@ import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@orahako/
 import { MakeupExamsPage } from "./page"
 
 export const manifest: PluginManifest = {
-  id: "ysu.makeup-exams",
+  id: "orahako.makeup-exams",
   name: "补考查询",
   version: "1.0.0",
   apiVersion: PLUGIN_API_VERSION,

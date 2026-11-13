@@ -3,7 +3,7 @@ import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { CreditsPage } from "./page"
 
 export const manifest: PluginManifest = {
-  id: "ysu.credits",
+  id: "orahako.credits",
   name: "双创学分",
   version: "1.0.0",
   apiVersion: 1,

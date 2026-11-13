@@ -3,7 +3,7 @@ import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { SchoolSchedulePage } from "./page"
 
 export const manifest: PluginManifest = {
-  id: "ysu.school-schedule",
+  id: "orahako.school-schedule",
   name: "全校课表",
   version: "1.0.0",
   apiVersion: 1,

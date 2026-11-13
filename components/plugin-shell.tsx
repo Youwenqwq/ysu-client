@@ -6,7 +6,7 @@ import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
 import { usePluginPreferences } from "@/lib/stores/plugin-preferences"
 import type { RegisteredPluginShell } from "@/lib/plugins/ui-registry"
 
-const DEFAULT_SHELL = "ysu.shell:default"
+const DEFAULT_SHELL = "orahako.shell:default"
 
 function shellKey(shell: RegisteredPluginShell): string {
   return `${shell.pluginId}:${shell.id}`

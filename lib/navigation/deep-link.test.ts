@@ -9,21 +9,21 @@ const registry = (pages: SemanticNavSources["pages"]): SemanticNavSources => ({
 })
 
 const liveRegistry = registry([
-  { pluginId: "ysu.grades", id: "index", route: "grades" },
-  { pluginId: "ysu.exams", id: "index", route: "exams" },
-  { pluginId: "ysu.schedule", id: "index", route: "schedule" },
+  { pluginId: "orahako.grades", id: "index", route: "grades" },
+  { pluginId: "orahako.exams", id: "index", route: "exams" },
+  { pluginId: "orahako.schedule", id: "index", route: "schedule" },
 ])
 
 describe("notification deep links", () => {
   it("resolves a semantic host to the live plugin page", () => {
     expect(notificationDestination("orahako://schedule", liveRegistry)).toBe(
-      "/dashboard/plugin/?plugin=ysu.schedule&page=index"
+      "/dashboard/plugin/?plugin=orahako.schedule&page=index"
     )
     expect(notificationDestination("orahako://grades", liveRegistry)).toBe(
-      "/dashboard/plugin/?plugin=ysu.grades&page=index"
+      "/dashboard/plugin/?plugin=orahako.grades&page=index"
     )
     expect(notificationDestination("orahako://exams", liveRegistry)).toBe(
-      "/dashboard/plugin/?plugin=ysu.exams&page=index"
+      "/dashboard/plugin/?plugin=orahako.exams&page=index"
     )
   })
   it("falls back to a core page when the target plugin is missing or lacks capability", () => {
@@ -40,18 +40,18 @@ describe("notification deep links", () => {
 
   it("matches the complete plugin destination including query", () => {
     const destination = notificationDestination("orahako://grades", liveRegistry)!
-    expect(destination).toBe("/dashboard/plugin/?plugin=ysu.grades&page=index")
+    expect(destination).toBe("/dashboard/plugin/?plugin=orahako.grades&page=index")
     expect(
       isCurrentNotificationDestination(
         "/dashboard/plugin",
-        "?plugin=ysu.grades&page=index",
+        "?plugin=orahako.grades&page=index",
         destination
       )
     ).toBe(true)
     expect(
       isCurrentNotificationDestination(
         "/dashboard/plugin",
-        "?plugin=ysu.exams&page=index",
+        "?plugin=orahako.exams&page=index",
         destination
       )
     ).toBe(false)

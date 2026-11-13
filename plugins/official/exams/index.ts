@@ -4,7 +4,7 @@ import { ExamsPage } from "./page"
 import { UpcomingExamsWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
-  id: "ysu.exams",
+  id: "orahako.exams",
   name: "考试安排",
   version: "1.0.0",
   apiVersion: PLUGIN_API_VERSION,

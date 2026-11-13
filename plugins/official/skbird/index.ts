@@ -7,7 +7,7 @@ import { SkbirdMePage } from "./pages/me"
 import { SkbirdSettingsPage } from "./pages/settings"
 
 export const manifest: PluginManifest = {
-  id: "ysu.skbird",
+  id: "orahako.skbird",
   name: "森空鸟",
   version: "1.0.0",
   apiVersion: 1,

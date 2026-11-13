@@ -4,7 +4,7 @@ import { SchedulePage } from "./page"
 import { CourseProgressWidget, TodayCoursesWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
-  id: "ysu.schedule",
+  id: "orahako.schedule",
   name: "日程",
   version: "1.0.0",
   apiVersion: 1,
