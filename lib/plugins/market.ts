@@ -118,5 +118,39 @@ export function validateMarketplaceIndex(input: unknown): MarketplaceIndex {
       }
     }
   }
+  if (index.bundles !== undefined) validateMarketplaceBundles(index.bundles)
   return index as MarketplaceIndex
+}
+
+function validateMarketplaceBundles(bundles: unknown): void {
+  if (!Array.isArray(bundles)) throw new Error("Invalid plugin market bundles")
+  const ids = new Set<string>()
+  for (const bundle of bundles) {
+    if (
+      !bundle ||
+      typeof bundle !== "object" ||
+      !isNonEmptyString(bundle.id) ||
+      !isNonEmptyString(bundle.name) ||
+      !isNonEmptyString(bundle.schoolId) ||
+      !Array.isArray(bundle.pluginIds)
+    ) {
+      throw new Error("Invalid plugin market bundle")
+    }
+    if (ids.has(bundle.id)) throw new Error(`Duplicate bundle id: ${bundle.id}`)
+    ids.add(bundle.id)
+    const pluginIds = new Set<string>()
+    for (const pluginId of bundle.pluginIds) {
+      if (!isNonEmptyString(pluginId)) {
+        throw new Error(`Invalid plugin id in bundle ${bundle.id}`)
+      }
+      if (pluginIds.has(pluginId)) {
+        throw new Error(`Duplicate plugin id in bundle ${bundle.id}: ${pluginId}`)
+      }
+      pluginIds.add(pluginId)
+    }
+  }
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0
 }

@@ -113,7 +113,7 @@ ctx.slots.register({
 
 ## 学校 Provider
 
-Provider 插件通过 `ctx.providers.registerSchool({ config, providerFactory })` 同时注册学校配置与实现工厂。实现应继承 `BaseProvider`，只覆盖已声明能力的对应方法；认证核心方法必须实现。学校停用后，注册会随插件作用域自动撤销。`supportedPlugins` 可进一步按插件 ID 限定该学校支持的页面、导航和总览挂件；缺省保持兼容，不限制插件。
+Provider 插件通过 `ctx.providers.registerSchool({ config, providerFactory })` 同时注册学校配置与实现工厂。实现应继承 `BaseProvider`，只覆盖已声明能力的对应方法；认证核心方法必须实现。学校停用后，注册会随插件作用域自动撤销。`supportedPlugins` 可进一步按插件 ID 限定该学校支持的功能运行状态、页面、导航和总览挂件；缺省保持兼容，不限制插件。
 
 `plugins/market/zmu-provider` 是非 EMAP 教务系统的最小参考：本地验证码密码登录、CookieJar 会话恢复、学籍、全学期课表、成绩/GPA 和考试均只使用公共 SDK。需要与 CookieJar 绑定的验证码图片时，Provider 应通过 `fetchWithJar` 读取图片并返回 data URL，不能把远端图片 URL 当作可携带会话的普通 `<img>` 地址。
 
@@ -142,4 +142,4 @@ pnpm plugin pack packages/plugin-template
 
 ## 市场索引
 
-客户端读取 `https://ysu.welain.com/updates/plugins.json`，协议类型见 `market.ts`。每个 release 必须声明 `apiVersion`、平台、ZIP URL、字节大小与 SHA-256，可选 `minAppVersion`。客户端只展示兼容当前 API、应用版本和平台的最高版本；网络失败时使用本地缓存并标记为过期。
+客户端读取 `https://ysu.welain.com/updates/plugins.json`，协议类型见 `market.ts`。每个 release 必须声明 `apiVersion`、平台、ZIP URL、字节大小与 SHA-256，可选 `minAppVersion`。索引可通过可选 `bundles` 声明学校推荐组合包；每项包含 `id`、`name`、`schoolId` 和 `pluginIds`。组合包执行前会预检所有插件的来源、平台兼容性和 Provider 支持范围，再安装缺失插件或启用已有插件。客户端只展示兼容当前 API、应用版本与平台的最高版本；网络失败时使用本地缓存并标记为过期。

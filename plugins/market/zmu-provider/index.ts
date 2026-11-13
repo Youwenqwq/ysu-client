@@ -9,6 +9,7 @@ export const manifest: PluginManifest = {
   version: "1.0.0",
   apiVersion: PLUGIN_API_VERSION,
   kind: "provider",
+  categories: ["provider", "school"],
   required: false,
   entry: "index.js",
   description: "遵义医科大学乘方教务 Provider（验证码登录、学籍、课表、成绩与考试）",

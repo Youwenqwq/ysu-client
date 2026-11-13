@@ -1,0 +1,13 @@
+{
+  "id": "orahako.skbird",
+  "name": "森空鸟",
+  "version": "1.0.1",
+  "apiVersion": 1,
+  "kind": "feature",
+  "entry": "dist/index.js",
+  "minAppVersion": "0.15.0",
+  "categories": ["toybox"],
+  "description": "森空鸟热榜、帖子、消息与个人账户。",
+  "author": "Orahako",
+  "homepage": "https://github.com/Youwenqwq/ysu-client"
+}

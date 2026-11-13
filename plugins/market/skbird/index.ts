@@ -1,5 +1,6 @@
 import { Bird } from "lucide-react"
 import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
+import { skbirdTranslations } from "./i18n"
 import { SkbirdIndexPage } from "./pages/index"
 import { SkbirdThreadPage } from "./pages/thread"
 import { SkbirdMessagesPage } from "./pages/messages"
@@ -9,13 +10,16 @@ import { SkbirdSettingsPage } from "./pages/settings"
 export const manifest: PluginManifest = {
   id: "orahako.skbird",
   name: "森空鸟",
-  version: "1.0.0",
+  version: "1.0.1",
   apiVersion: 1,
   kind: "feature",
+  categories: ["toybox"],
   entry: "index.js",
 }
 
 export const definition = definePlugin((ctx) => {
+  ctx.i18n.register(skbirdTranslations)
+
   ctx.ui.registerNavigation({
     id: "skbird",
     title: "森空鸟",
@@ -60,3 +64,5 @@ export const definition = definePlugin((ctx) => {
     parent: "index",
   })
 })
+
+export default definition

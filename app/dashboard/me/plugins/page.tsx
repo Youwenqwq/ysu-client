@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { usePluginHost, usePluginStates } from "@/components/plugin-provider"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
@@ -26,7 +27,9 @@ import type { InstalledPluginSummary } from "@/lib/plugins/package-store"
 import { isCapacitor } from "@/lib/native/platform"
 import { APP_VERSION } from "@/lib/version"
 import { useTranslation } from "@/lib/i18n/use-translation"
-import type { MarketplacePlugin } from "@orahako/plugin-sdk"
+import { supportsPlugin, type MarketplaceBundle, type MarketplacePlugin } from "@orahako/plugin-sdk"
+import { useProvider, useSupportedPlugins } from "@/providers/use-provider"
+import { groupByPluginCategory } from "@/lib/plugins/categories"
 
 export default function PluginsPage() {
   const { host, isReady } = usePluginHost()
@@ -41,6 +44,8 @@ export default function PluginsPage() {
   const lastUpdateCheck = usePluginPreferences((state) => state.lastUpdateCheck)
   const setLastUpdateCheck = usePluginPreferences((state) => state.setLastUpdateCheck)
   const { t, locale } = useTranslation()
+  const supportedPlugins = useSupportedPlugins()
+  const provider = useProvider()
   const [packages, setPackages] = useState<readonly InstalledPluginSummary[]>([])
   const [market, setMarket] = useState<PluginMarketResult>()
   const [marketError, setMarketError] = useState<string>()
@@ -119,6 +124,15 @@ export default function PluginsPage() {
     })
   }
 
+  async function enableBundle(bundle: MarketplaceBundle) {
+    await run(bundle.id, async () => {
+      const result = market ?? (await loadPluginMarket())
+      setMarket(result)
+      await host.applyPluginBundle(bundle.pluginIds, result.index)
+      toast.success(t("plugins.bundleEnabled", { name: bundle.name }))
+    })
+  }
+
   const externalOnly = packages.filter(
     (pkg) => !states.some((state) => state.manifest.id === pkg.manifest.id)
   )
@@ -128,8 +142,15 @@ export default function PluginsPage() {
       name: state.manifest.name,
       version: state.manifest.version,
       kind: state.manifest.kind,
+      categories:
+        state.manifest.categories ??
+        market?.index.plugins.find((plugin) => plugin.id === state.manifest.id)?.categories,
       source: state.source,
       required: state.manifest.required,
+      supported:
+        state.manifest.kind !== "feature" ||
+        state.manifest.required ||
+        supportsPlugin(supportedPlugins, state.manifest.id),
       status: state.status,
       error: state.error ?? host.loadErrors.get(state.manifest.id),
     })),
@@ -138,8 +159,15 @@ export default function PluginsPage() {
       name: pkg.manifest.name,
       version: pkg.manifest.version,
       kind: pkg.manifest.kind,
+      categories:
+        pkg.manifest.categories ??
+        market?.index.plugins.find((plugin) => plugin.id === pkg.manifest.id)?.categories,
       source: "external" as const,
       required: pkg.manifest.required,
+      supported:
+        pkg.manifest.kind !== "feature" ||
+        pkg.manifest.required ||
+        supportsPlugin(supportedPlugins, pkg.manifest.id),
       status: "disabled" as const,
       error: host.loadErrors.get(pkg.manifest.id),
     })),
@@ -147,6 +175,14 @@ export default function PluginsPage() {
   const availableUpdates = market
     ? findAvailableUpdates(market.index, rows, APP_VERSION, platform)
     : []
+  const installedGroups = groupByPluginCategory(rows)
+  const marketGroups = groupByPluginCategory(
+    market?.index.plugins.filter((plugin) =>
+      selectCompatibleRelease(plugin, APP_VERSION, platform)
+    ) ?? []
+  )
+  const recommendedBundles =
+    market?.index.bundles?.filter((bundle) => bundle.schoolId === provider.id) ?? []
   const lastCheckText = lastUpdateCheck
     ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
         month: "short",
@@ -203,6 +239,53 @@ export default function PluginsPage() {
         </CardContent>
       </Card>
 
+      {recommendedBundles.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <Package className="size-4" />
+            {t("plugins.recommendedBundles")}
+          </h2>
+          {recommendedBundles.map((bundle) => {
+            const complete = bundle.pluginIds.every((id) => {
+              const row = rows.find((item) => item.id === id)
+              return row?.status === "active" || row?.status === "starting"
+            })
+            const names = bundle.pluginIds
+              .map(
+                (id) =>
+                  rows.find((row) => row.id === id)?.name ??
+                  market?.index.plugins.find((plugin) => plugin.id === id)?.name ??
+                  id
+              )
+              .join(" · ")
+            return (
+              <Card key={bundle.id} className="py-0">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium">{bundle.name}</div>
+                    <p className="mt-1 text-xs break-words text-muted-foreground">{names}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={complete || !!busy}
+                    onClick={() => void enableBundle(bundle)}
+                  >
+                    {busy === bundle.id && <Spinner data-icon="inline-start" />}
+                    {t(
+                      busy === bundle.id
+                        ? "plugins.bundleWorking"
+                        : complete
+                          ? "plugins.bundleComplete"
+                          : "plugins.enableBundle"
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </section>
+      )}
+
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
@@ -241,61 +324,73 @@ export default function PluginsPage() {
             </EmptyHeader>
           </Empty>
         ) : (
-          rows.map((plugin) => (
-            <Card key={plugin.id} className="py-0">
-              <CardContent className="flex flex-col gap-3 p-4">
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{plugin.name}</div>
-                    <div className="truncate font-mono text-xs text-muted-foreground">
-                      {plugin.id} · v{plugin.version}
+          installedGroups.map((group) => (
+            <div key={group.id} className="flex flex-col gap-3">
+              <h3 className="text-xs font-medium text-muted-foreground">
+                {t(`plugins.category.${group.id}`)}
+              </h3>
+              {group.plugins.map((plugin) => (
+                <Card key={plugin.id} className="py-0">
+                  <CardContent className="flex flex-col gap-3 p-4">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">{plugin.name}</div>
+                        <div className="truncate font-mono text-xs text-muted-foreground">
+                          {plugin.id} · v{plugin.version}
+                        </div>
+                      </div>
+                      <Badge variant="outline">{t(`plugins.${plugin.source}`)}</Badge>
+                      <Badge variant={plugin.status === "failed" ? "destructive" : "secondary"}>
+                        {t(`plugins.${plugin.status}`)}
+                      </Badge>
                     </div>
-                  </div>
-                  <Badge variant="outline">{t(`plugins.${plugin.source}`)}</Badge>
-                  <Badge variant={plugin.status === "failed" ? "destructive" : "secondary"}>
-                    {t(`plugins.${plugin.status}`)}
-                  </Badge>
-                </div>
-                {plugin.error && (
-                  <p className="text-xs break-words text-destructive">{plugin.error}</p>
-                )}
-                <div className="flex items-center justify-between gap-2">
-                  {!plugin.required ? (
-                    <Switch
-                      checked={plugin.status === "active" || plugin.status === "starting"}
-                      disabled={
-                        !!busy || plugin.status === "registered" || plugin.status === "starting"
-                      }
-                      onCheckedChange={(enabled) =>
-                        void run(plugin.id, async () => {
-                          if (enabled) await host.enable(plugin.id)
-                          else host.disable(plugin.id)
-                        })
-                      }
-                      aria-label={t("plugins.toggle", { name: plugin.name })}
-                    />
-                  ) : (
-                    <span />
-                  )}
-                  {plugin.source === "external" && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive"
-                      disabled={!!busy}
-                      onClick={() => {
-                        if (window.confirm(t("plugins.uninstallConfirm", { name: plugin.name }))) {
-                          void run(plugin.id, () => host.uninstall(plugin.id))
-                        }
-                      }}
-                    >
-                      <Trash2 />
-                      {t("plugins.uninstall")}
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    {plugin.error && (
+                      <p className="text-xs break-words text-destructive">{plugin.error}</p>
+                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      {!plugin.required ? (
+                        <Switch
+                          checked={plugin.status === "active" || plugin.status === "starting"}
+                          disabled={
+                            !!busy ||
+                            !plugin.supported ||
+                            plugin.status === "registered" ||
+                            plugin.status === "starting"
+                          }
+                          onCheckedChange={(enabled) =>
+                            void run(plugin.id, async () => {
+                              if (enabled) await host.enable(plugin.id)
+                              else host.disable(plugin.id)
+                            })
+                          }
+                          aria-label={t("plugins.toggle", { name: plugin.name })}
+                        />
+                      ) : (
+                        <span />
+                      )}
+                      {plugin.source === "external" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          disabled={!!busy}
+                          onClick={() => {
+                            if (
+                              window.confirm(t("plugins.uninstallConfirm", { name: plugin.name }))
+                            ) {
+                              void run(plugin.id, () => host.uninstall(plugin.id))
+                            }
+                          }}
+                        >
+                          <Trash2 />
+                          {t("plugins.uninstall")}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           ))
         )}
       </section>
@@ -376,43 +471,50 @@ export default function PluginsPage() {
             </EmptyHeader>
           </Empty>
         )}
-        {market?.index.plugins.map((plugin) => {
-          const release = selectCompatibleRelease(plugin, APP_VERSION, platform)
-          if (!release) return null
-          const installed = rows.find((row) => row.id === plugin.id)
-          const update = installed && semver.gt(release.version, installed.version)
-          return (
-            <Card key={plugin.id} className="py-0">
-              <CardContent className="flex items-center gap-3 p-4">
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium">{plugin.name}</div>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {plugin.summary}
-                  </p>
-                  <div className="mt-2 font-mono text-xs text-muted-foreground">
-                    {plugin.author} ·{" "}
-                    {update && installed
-                      ? `v${installed.version} → v${release.version}`
-                      : `v${release.version}`}
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  disabled={!!busy || (!!installed && !update)}
-                  onClick={() => void installRelease(plugin)}
-                >
-                  {t(
-                    update
-                      ? "plugins.update"
-                      : installed
-                        ? "plugins.installedBadge"
-                        : "plugins.install"
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          )
-        })}
+        {marketGroups.map((group) => (
+          <div key={group.id} className="flex flex-col gap-3">
+            <h3 className="text-xs font-medium text-muted-foreground">
+              {t(`plugins.category.${group.id}`)}
+            </h3>
+            {group.plugins.map((plugin) => {
+              const release = selectCompatibleRelease(plugin, APP_VERSION, platform)
+              if (!release) return null
+              const installed = rows.find((row) => row.id === plugin.id)
+              const update = installed && semver.gt(release.version, installed.version)
+              return (
+                <Card key={plugin.id} className="py-0">
+                  <CardContent className="flex items-center gap-3 p-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium">{plugin.name}</div>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {plugin.summary}
+                      </p>
+                      <div className="mt-2 font-mono text-xs text-muted-foreground">
+                        {plugin.author} ·{" "}
+                        {update && installed
+                          ? `v${installed.version} → v${release.version}`
+                          : `v${release.version}`}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={!!busy || (!!installed && !update)}
+                      onClick={() => void installRelease(plugin)}
+                    >
+                      {t(
+                        update
+                          ? "plugins.update"
+                          : installed
+                            ? "plugins.installedBadge"
+                            : "plugins.install"
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        ))}
       </section>
     </div>
   )

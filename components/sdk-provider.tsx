@@ -103,7 +103,9 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
     setActiveProviderSchool(schoolId)
 
     initializeActiveProvider()
-      .then((provider) => {
+      .then(async (provider) => {
+        if (cancelled) return
+        await host.reconcileProviderSupport(provider.supportedPlugins)
         if (cancelled) return
         markProviderReady(provider)
         host.lifecycle.setProviderReady(true)

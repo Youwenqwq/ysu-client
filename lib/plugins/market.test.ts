@@ -63,4 +63,75 @@ describe("plugin market", () => {
       })
     ).toThrow("Invalid release")
   })
+
+  it("keeps indexes published before bundles existed valid", () => {
+    const index = validateMarketplaceIndex({
+      schemaVersion: 1,
+      updatedAt: "2026-11-12T00:00:00Z",
+      plugins: [plugin],
+    })
+    expect(index.bundles).toBeUndefined()
+  })
+
+  it("accepts school bundles", () => {
+    const bundles = [
+      { id: "ysu.recommended", name: "YSU Recommended", schoolId: "ysu", pluginIds: [plugin.id] },
+    ]
+    expect(
+      validateMarketplaceIndex({
+        schemaVersion: 1,
+        updatedAt: "2026-11-12T00:00:00Z",
+        plugins: [plugin],
+        bundles,
+      }).bundles
+    ).toEqual(bundles)
+  })
+
+  it.each([
+    ["a non-list bundles field", { bundles: {} }, "Invalid plugin market bundles"],
+    [
+      "a bundle without a name",
+      { bundles: [{ id: "b", name: "", schoolId: "ysu", pluginIds: [] }] },
+      "Invalid plugin market bundle",
+    ],
+    [
+      "a bundle without a school",
+      { bundles: [{ id: "b", name: "Bundle", schoolId: 1, pluginIds: [] }] },
+      "Invalid plugin market bundle",
+    ],
+    [
+      "non-string plugin ids",
+      { bundles: [{ id: "b", name: "Bundle", schoolId: "ysu", pluginIds: ["ok", ""] }] },
+      "Invalid plugin id in bundle b",
+    ],
+    [
+      "duplicate bundle ids",
+      {
+        bundles: [
+          { id: "b", name: "One", schoolId: "ysu", pluginIds: [] },
+          { id: "b", name: "Two", schoolId: "ysu", pluginIds: [] },
+        ],
+      },
+      "Duplicate bundle id: b",
+    ],
+    [
+      "duplicate plugin ids inside a bundle",
+      {
+        bundles: [{ id: "b", name: "Bundle", schoolId: "ysu", pluginIds: ["x", "x"] }],
+      },
+      "Duplicate plugin id in bundle b: x",
+    ],
+  ] satisfies [string, Record<string, unknown>, string][])(
+    "rejects %s",
+    (_name, extra, message) => {
+      expect(() =>
+        validateMarketplaceIndex({
+          schemaVersion: 1,
+          updatedAt: "2026-11-12T00:00:00Z",
+          plugins: [plugin],
+          ...extra,
+        })
+      ).toThrow(message)
+    }
+  )
 })

@@ -19,10 +19,12 @@ import * as PluginAssets from "@orahako/plugin-ui/assets"
 import type { Context } from "@cordisjs/core"
 import type {
   MarketplaceIndex,
+  MarketplaceRelease,
   PluginInstallerService,
   PluginManifest,
   PluginPlatform as PluginPlatformType,
 } from "@orahako/plugin-sdk"
+import { supportsPlugin, type AcademicProvider } from "@orahako/plugin-sdk"
 import { APP_VERSION } from "@/lib/version"
 import { isCapacitor } from "@/lib/native/platform"
 import { OFFICIAL_PLUGINS } from "@/plugins/official/registry"
@@ -71,6 +73,9 @@ export class PluginHost {
   private hostModules?: HostModuleRegistry
   private readonly external = new Map<string, LoadedExternalPlugin>()
   private readonly styleElements = new Map<string, HTMLStyleElement[]>()
+  private readonly providerDisabledIds = new Set<string>()
+  private activeSupportedPlugins: AcademicProvider["supportedPlugins"]
+  private supportRevision = 0
 
   private configureServices(ctx: Context, manifest: PluginManifest): void {
     this.ui.createService(ctx, manifest)
@@ -96,6 +101,38 @@ export class PluginHost {
     return this.bootstrapPromise
   }
 
+  async reconcileProviderSupport(
+    supportedPlugins: AcademicProvider["supportedPlugins"]
+  ): Promise<void> {
+    this.activeSupportedPlugins = supportedPlugins
+    const revision = ++this.supportRevision
+    for (const state of this.runtime.getSnapshot()) {
+      if (revision !== this.supportRevision) return
+      const { manifest } = state
+      if (manifest.kind !== "feature" || manifest.required) continue
+      const id = manifest.id
+      if (!supportsPlugin(supportedPlugins, id)) {
+        if (state.status !== "disabled") {
+          this.providerDisabledIds.add(id)
+          this.runtime.stop(id)
+        }
+        continue
+      }
+      if (
+        !this.providerDisabledIds.has(id) ||
+        usePluginPreferences.getState().disabledPluginIds.includes(id)
+      ) {
+        continue
+      }
+      try {
+        await this.runtime.startAndWait(id)
+        if (revision === this.supportRevision) this.providerDisabledIds.delete(id)
+      } catch {
+        // The runtime exposes the failed state; other school features stay usable.
+      }
+    }
+  }
+
   async install(
     input: PluginPackageInput,
     expectedSha256?: string,
@@ -113,6 +150,7 @@ export class PluginHost {
     usePluginPreferences.getState().setPluginDisabled(snapshot.manifest.id, false)
     try {
       await this.load(snapshot.manifest.id, true)
+      await this.reconcileProviderSupport(this.activeSupportedPlugins)
     } catch (error) {
       await this.rollback(snapshot.manifest.id, previousSnapshot, wasDisabled)
       this.loadErrors.set(snapshot.manifest.id, errorMessage(error))
@@ -131,6 +169,72 @@ export class PluginHost {
     return this.install(await response.arrayBuffer(), sha256, expected)
   }
 
+  /**
+   * Installs and enables every plugin in a recommended bundle.
+   *
+   * All ids are resolved against the runtime, the local package store, and the
+   * market index before anything changes, so an unsupported or unavailable
+   * plugin cannot leave a partially applied bundle behind.
+   */
+  async applyPluginBundle(pluginIds: readonly string[], index: MarketplaceIndex): Promise<void> {
+    const releases = await this.preflightPluginBundle(pluginIds, index)
+    for (const id of new Set(pluginIds)) {
+      const state = this.runtime.get(id)
+      if (state?.status === "active" || state?.status === "starting") continue
+      if (state) {
+        await this.enable(id)
+        continue
+      }
+      const release = releases.get(id)
+      if (!release) {
+        await this.load(id, true)
+        continue
+      }
+      await this.installFromUrl(
+        new URL(release.zipUrl, PLUGIN_MARKET_URL).toString(),
+        release.sha256,
+        { id, version: release.version }
+      )
+    }
+  }
+
+  private async preflightPluginBundle(
+    pluginIds: readonly string[],
+    index: MarketplaceIndex
+  ): Promise<Map<string, MarketplaceRelease>> {
+    const requests = Array.from(new Set(pluginIds))
+    const unregistered = requests.filter((id) => !this.runtime.get(id))
+    const installed = new Map<string, PluginManifest>()
+    if (unregistered.length > 0) {
+      for (const summary of await this.packages.list()) {
+        installed.set(summary.manifest.id, summary.manifest)
+      }
+    }
+    const platform = isCapacitor() ? "android" : "web"
+    const releases = new Map<string, MarketplaceRelease>()
+    for (const id of requests) {
+      const manifest = this.runtime.get(id)?.manifest ?? installed.get(id)
+      if (
+        manifest?.kind === "feature" &&
+        !manifest.required &&
+        !supportsPlugin(this.activeSupportedPlugins, id)
+      ) {
+        throw new Error(`Plugin not supported by the active school: ${id}`)
+      }
+      if (manifest) continue
+      const plugin = index.plugins.find((entry) => entry.id === id)
+      if (!plugin) throw new Error(`Plugin not found in market: ${id}`)
+      const release = selectCompatibleRelease(plugin, APP_VERSION, platform)
+      if (!release) {
+        throw new Error(
+          `No compatible release for plugin ${id} (app ${APP_VERSION}, platform ${platform})`
+        )
+      }
+      releases.set(id, release)
+    }
+    return releases
+  }
+
   async uninstall(id: string): Promise<void> {
     const snapshot = await this.packages.read(id)
     if (!snapshot) throw new Error(`External plugin not found: ${id}`)
@@ -140,6 +244,7 @@ export class PluginHost {
     }
     this.external.get(id)?.dispose()
     this.external.delete(id)
+    this.providerDisabledIds.delete(id)
     this.removeStyles(id)
     this.loadErrors.delete(id)
     const preferences = usePluginPreferences.getState()

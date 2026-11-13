@@ -10,5 +10,6 @@ describe("official plugin identities", () => {
     expect(ids).toContain("orahako.overview")
     expect(ids).toContain("orahako.onboarding")
     expect(ids).not.toContain("zmu.provider")
+    expect(ids).not.toContain("orahako.skbird")
   })
 })

@@ -17,6 +17,8 @@ export interface PluginManifest {
   homepage?: string
   icon?: string
   styles?: string[]
+  /** Optional UI categories such as academic, provider, or toybox. */
+  categories?: string[]
   /** Plugin IDs that must be active before this plugin can start. */
   requires?: string[]
   /** Core providers can be replaced but not disabled from the plugin manager. */
@@ -88,6 +90,13 @@ export function validatePluginManifest(input: unknown): PluginManifest {
       value.styles.some((path) => typeof path !== "string" || !PACKAGE_FILE_PATTERN.test(path)))
   ) {
     issues.push("styles must contain safe relative CSS file paths")
+  }
+  if (
+    value.categories !== undefined &&
+    (!Array.isArray(value.categories) ||
+      value.categories.some((category) => typeof category !== "string" || !category.trim()))
+  ) {
+    issues.push("categories must contain non-empty strings")
   }
   if (
     value.requires !== undefined &&

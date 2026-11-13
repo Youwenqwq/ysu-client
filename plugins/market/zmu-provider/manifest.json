@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "apiVersion": 1,
   "kind": "provider",
+  "categories": ["provider", "school"],
   "required": false,
   "entry": "dist/index.js",
   "minAppVersion": "0.15.0",

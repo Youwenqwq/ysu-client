@@ -1,6 +1,6 @@
 const DEFAULT_INDEX = {
   schemaVersion: 1,
-  updatedAt: '2026-11-13T12:53:43Z',
+  updatedAt: '2026-11-13T13:33:23Z',
   plugins: [{
     id: 'community.theme.arknights',
     name: '明日方舟 × 新粗野主义',
@@ -55,6 +55,49 @@ const DEFAULT_INDEX = {
       publishedAt: '2026-11-13T12:53:43Z',
       changelog: '首个乘方教务 Provider。',
     }],
+  }, {
+    id: 'orahako.skbird',
+    name: '森空鸟',
+    summary: '热榜、帖子、消息与个人账户。',
+    author: 'Orahako',
+    homepage: 'https://github.com/Youwenqwq/ysu-client',
+    categories: ['toybox'],
+    versions: [{
+      version: '1.0.1',
+      apiVersion: 1,
+      minAppVersion: '0.15.0',
+      platforms: ['web', 'android'],
+      zipUrl: '/plugins/orahako.skbird/1.0.1.zip',
+      sha256: 'a9e64700644213802de090bcb5ac99108636ab23c4aee6b500bd51bae57e9940',
+      size: 20121,
+      publishedAt: '2026-11-13T13:33:23Z',
+      changelog: '从内置功能迁移为官方市场插件。',
+    }],
+  }],
+  bundles: [{
+    id: 'ysu.essentials',
+    name: '燕大常用功能',
+    schoolId: 'ysu',
+    pluginIds: [
+      'orahako.overview',
+      'orahako.schedule',
+      'orahako.grades',
+      'orahako.exams',
+      'orahako.student-info',
+      'orahako.skbird',
+    ],
+  }, {
+    id: 'zmu.essentials',
+    name: '遵医常用功能',
+    schoolId: 'zmu',
+    pluginIds: [
+      'orahako.overview',
+      'orahako.schedule',
+      'orahako.grades',
+      'orahako.exams',
+      'orahako.student-info',
+      'orahako.skbird',
+    ],
   }],
 };
 
