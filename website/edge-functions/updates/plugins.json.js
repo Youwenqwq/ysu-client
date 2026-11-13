@@ -18,6 +18,24 @@ const DEFAULT_INDEX = {
       size: 7164,
       publishedAt: '2026-11-13T00:00:00Z',
     }],
+  }, {
+    id: 'community.perlica-toybox',
+    name: 'Perlica 佩黎卡',
+    summary: '地图找车、扫码或车辆号解锁、骑行控制、历史记录与账户管理。首个完整外部社区功能插件。',
+    author: 'Youwenqwq / ysu-client community',
+    homepage: 'https://github.com/Youwenqwq/ysu-client',
+    categories: ['toybox', 'transport'],
+    versions: [{
+      version: '1.0.0',
+      apiVersion: 1,
+      minAppVersion: '0.15.0',
+      platforms: ['web', 'android'],
+      zipUrl: '/plugins/community.perlica-toybox/1.0.0.zip',
+      sha256: 'c3ad76c73d4709a3607d0c2e214f35dec86ca5e56068caebbae4ff9478d0ab56',
+      size: 209234,
+      publishedAt: '2026-11-13T09:26:20Z',
+      changelog: '首次社区插件发布；包含独立凭据、插件翻译和自有移动子导航。',
+    }],
   }],
 };
 

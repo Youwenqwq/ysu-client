@@ -85,6 +85,16 @@ export {
 } from "@/components/ui/dialog"
 export { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 export {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+export {
   Table,
   TableHeader,
   TableBody,

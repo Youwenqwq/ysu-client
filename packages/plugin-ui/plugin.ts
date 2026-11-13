@@ -6,6 +6,7 @@
  * submodule freely.
  */
 export { usePluginUI } from "@/lib/plugins/use-plugin-ui"
+export { usePluginTranslation } from "@/lib/plugins/use-plugin-translation"
 export { usePluginRouteStore, type ActivePluginRoute } from "@/lib/stores/plugin-route"
 export {
   hasPluginCapability,

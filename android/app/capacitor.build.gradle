@@ -13,6 +13,7 @@ dependencies {
     implementation project(':capacitor-app')
     implementation project(':capacitor-device')
     implementation project(':capacitor-filesystem')
+    implementation project(':capacitor-geolocation')
     implementation project(':capgo-capacitor-updater')
 
 }

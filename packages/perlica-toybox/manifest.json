@@ -1,0 +1,12 @@
+{
+  "id": "community.perlica-toybox",
+  "name": "Perlica",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "minAppVersion": "0.15.0",
+  "kind": "feature",
+  "entry": "dist/index.js",
+  "styles": ["dist/index.css"],
+  "description": "佩黎卡共享单车：地图找车、扫码解锁、骑行中控制、骑行记录与账户信息。",
+  "author": "ysu-client community"
+}

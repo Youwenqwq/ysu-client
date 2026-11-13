@@ -6,6 +6,7 @@ export const SUPPORTED_HOST_MODULES = [
   "next/link",
   "next/image",
   "next/navigation",
+  "sonner",
   "@ysu/academic",
   "@ysu/plugin-ui/components",
   "@ysu/plugin-ui/hooks",

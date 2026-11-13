@@ -7,6 +7,7 @@
  *
  * 协议：
  *   请求  GET/POST /api/proxy?url=<encodeURIComponent(上游完整 URL)>
+ *         或 /api/proxy + x-proxy-target（含凭据时使用，避免进入请求日志）
  *   头部映射（客户端 → 上游）：
  *     x-proxy-cookie  → Cookie      （客户端 JS cookie jar 序列化）
  *     x-proxy-ua      → User-Agent
@@ -57,6 +58,8 @@ const ALLOWED_HOSTS = new Set([
   'epay.ysu.edu.cn',
   // ehall 一卡通（余额查询，只读）
   'ehall.ysu.edu.cn',
+  // Perlica 社区插件（账号与车辆服务）
+  'client3.uqbike.cn',
 ]);
 
 // 允许发起浏览器跨域调用的 Origin（同源请求无 Origin 头，不受限）。
@@ -95,6 +98,7 @@ const SKIP_REQUEST_HEADERS = new Set([
   'x-proxy-ua',
   'x-proxy-referer',
   'x-proxy-origin',
+  'x-proxy-target',
   'x-activation', // 激活凭证仅用于代理鉴权，不透传上游
 ]);
 
@@ -181,7 +185,7 @@ function preflightResponse(origin) {
       ...corsHeaders(origin),
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers':
-        'Content-Type, X-Requested-With, X-Proxy-Cookie, X-Proxy-Ua, X-Proxy-Referer, X-Proxy-Origin, X-Activation',
+        'Content-Type, X-Requested-With, X-Proxy-Cookie, X-Proxy-Ua, X-Proxy-Referer, X-Proxy-Origin, X-Proxy-Target, X-Activation',
       'Access-Control-Max-Age': '86400',
     },
   });
@@ -217,9 +221,9 @@ export async function onRequest({ request, env }) {
   }
 
   const reqUrl = new URL(request.url);
-  const targetRaw = reqUrl.searchParams.get('url');
+  const targetRaw = request.headers.get('x-proxy-target') || reqUrl.searchParams.get('url');
   if (!targetRaw) {
-    return errorResponse(400, 'missing "url" query parameter', origin);
+    return errorResponse(400, 'missing proxy target', origin);
   }
 
   let target;

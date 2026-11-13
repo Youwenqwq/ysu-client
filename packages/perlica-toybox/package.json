@@ -1,0 +1,18 @@
+{
+  "name": "@ysu/perlica-toybox",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ysu/plugin-sdk": "workspace:*",
+    "@ysu/plugin-ui": "workspace:*",
+    "html5-qrcode": "^2.3.8",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.17.0",
+    "react": "^19.2.6",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.22"
+  }
+}

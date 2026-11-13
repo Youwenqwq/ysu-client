@@ -86,6 +86,7 @@ export { STORAGE_KEYS } from "@/lib/storage/keys"
 // ─── Native platform ─────────────────────────────────────────────────────── //
 
 export { isCapacitor, isTablet } from "@/lib/native/platform"
+export { Geolocation } from "@capacitor/geolocation"
 export { stopNotify } from "@/lib/native/notify"
 export { clearWidgetDataFromNative } from "@/lib/native/widget-bridge"
 

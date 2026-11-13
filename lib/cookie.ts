@@ -311,6 +311,8 @@ export interface HttpRequest {
   readonly signal?: AbortSignal
   /** Passed to CapacitorHttp as responseType (e.g. 'arraybuffer' for binary data). */
   readonly responseType?: string
+  /** Web 代理通过专用请求头传递上游 URL，避免凭据进入代理请求 URL。 */
+  readonly proxyTargetInHeader?: boolean
 }
 
 export interface HttpResponse {
@@ -445,7 +447,13 @@ async function proxyHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<Ht
 
   const proxyBase = process.env.NEXT_PUBLIC_PROXY_BASE_URL || "/api/proxy"
   // 片段（#...）不应在 HTTP 请求中，Edge Functions 的 Fetch 未正确剥离，这里处理一下
-  const proxyUrl = `${proxyBase}?url=${encodeURIComponent(stripUrlFragment(req.url))}`
+  const targetUrl = stripUrlFragment(req.url)
+  let proxyUrl = proxyBase
+  if (req.proxyTargetInHeader) {
+    headers.set("x-proxy-target", targetUrl)
+  } else {
+    proxyUrl = `${proxyBase}?url=${encodeURIComponent(targetUrl)}`
+  }
   const response = await fetch(proxyUrl, {
     method: req.method,
     headers,

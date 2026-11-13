@@ -5,6 +5,7 @@ import * as JSXRuntime from "react/jsx-runtime"
 import * as NextLink from "next/link"
 import * as NextImage from "next/image"
 import * as NextNavigation from "next/navigation"
+import * as Sonner from "sonner"
 import * as PluginSDK from "@ysu/plugin-sdk"
 import * as Academic from "@ysu/academic"
 import * as PluginComponents from "@ysu/plugin-ui/components"
@@ -272,6 +273,7 @@ export class PluginHost {
         "next/link": typeof NextLink === "function" ? { default: NextLink } : NextLink,
         "next/image": typeof NextImage === "function" ? { default: NextImage } : NextImage,
         "next/navigation": NextNavigation,
+        sonner: Sonner,
         "@ysu/academic": Academic,
         "@ysu/plugin-ui/components": PluginComponents,
         "@ysu/plugin-ui/hooks": PluginHooks,

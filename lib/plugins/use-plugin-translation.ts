@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useSyncExternalStore } from "react"
-import { usePluginHost } from "@/components/plugin-provider"
+import { usePluginHost } from "@/components/plugin-context"
 import { useI18n } from "@/lib/i18n/context"
 
 export function usePluginTranslation(pluginId: string) {

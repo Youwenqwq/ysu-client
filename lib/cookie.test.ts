@@ -73,6 +73,26 @@ describe("Web 代理传输", () => {
     vi.unstubAllGlobals()
   })
 
+  it("可将含凭据的上游 URL 放入请求头而非代理 URL", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      return new Response("", { status: 200, headers: { "x-proxy-status": "200" } })
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await fetchWithJar(new SimpleCookieJar(), {
+      method: "GET",
+      url: "https://client3.uqbike.cn/user/getByUserId.do?token=secret#fragment",
+      redirect: "manual",
+      proxyTargetInHeader: true,
+    })
+
+    const [input, init] = fetchMock.mock.calls[0]!
+    expect(String(input)).toBe("/api/proxy")
+    expect(new Headers(init?.headers).get("x-proxy-target")).toBe(
+      "https://client3.uqbike.cn/user/getByUserId.do?token=secret"
+    )
+  })
+
   it("上游 URL 的 fragment 不会进入代理请求（jwmobile 登录跳转 #/?token=）", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL) => {
       return new Response("", { status: 200, headers: { "x-proxy-status": "200" } })
