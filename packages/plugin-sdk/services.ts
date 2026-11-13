@@ -17,6 +17,15 @@ export interface PluginAssetService {
   url(path: string): string | undefined
 }
 
+export type PluginNotificationChannel = "grades" | "exams" | "schedule"
+
+export interface PluginNotificationService {
+  /** Registers the channel for the current plugin; disposing the token unregisters it. */
+  register(channel: PluginNotificationChannel): () => void
+  getSnapshot(): readonly PluginNotificationChannel[]
+  subscribe(listener: () => void): () => void
+}
+
 export interface PluginLifecycleService {
   /** Runs after every provider initialization; late subscribers are scheduled immediately. */
   onProviderReady(listener: () => void | Promise<void>): () => void

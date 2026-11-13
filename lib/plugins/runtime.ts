@@ -7,6 +7,8 @@ export type PluginStatus = "registered" | "starting" | "active" | "disabled" | "
 const PLUGIN_SERVICES = [
   "ui",
   "slots",
+  "notifications",
+  "settings",
   "i18n",
   "providers",
   "plugins",

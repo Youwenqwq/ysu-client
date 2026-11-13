@@ -1,11 +1,11 @@
-import { BookOpen, Calendar, Clock } from "lucide-react"
+import { BookOpen, Calendar, Clock, LayoutGrid } from "lucide-react"
 import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { SchedulePage } from "./page"
 import {
-  ClassReminderSettingsSection,
+  ClassReminderSettings,
   ScheduleStartupOption,
   ScheduleWidgetAssistantSettings,
-  ScheduleWidgetSettingsSection,
+  ScheduleWidgetSettingsPanel,
 } from "./settings"
 import { CourseProgressWidget, TodayCoursesWidget } from "@orahako/academic"
 
@@ -19,6 +19,7 @@ export const manifest: PluginManifest = {
 }
 
 export const definition = definePlugin((ctx) => {
+  ctx.notifications.register("schedule")
   ctx.ui.registerOverviewWidget({
     id: "course-progress",
     title: "课程动态",
@@ -70,11 +71,15 @@ export const definition = definePlugin((ctx) => {
     order: 20,
     component: ScheduleStartupOption,
   })
-  ctx.slots.register({
-    id: "widget-settings",
-    slot: "settings.sections",
+  ctx.settings.registerCategory({
+    id: "widgets",
     order: 40,
-    component: ScheduleWidgetSettingsSection,
+    title: "小组件",
+    titleKey: "desktopWidgets.title",
+    description: "添加与管理桌面小组件",
+    descriptionKey: "settings.addWidgetDesc",
+    icon: LayoutGrid,
+    component: ScheduleWidgetSettingsPanel,
   })
   ctx.slots.register({
     id: "widget-assistant",
@@ -84,8 +89,8 @@ export const definition = definePlugin((ctx) => {
   })
   ctx.slots.register({
     id: "class-reminder-settings",
-    slot: "settings.sections",
-    order: 50,
-    component: ClassReminderSettingsSection,
+    slot: "settings.notifications.reminders",
+    order: 10,
+    component: ClassReminderSettings,
   })
 })

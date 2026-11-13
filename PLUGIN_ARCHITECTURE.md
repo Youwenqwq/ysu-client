@@ -80,9 +80,11 @@ Slot 所有者通过 `ctx.slots.declare()` 声明名称与形态。贡献者通�
 - `shell.overlay`：应用根级浮层列表。
 - `dashboard.header.actions`：桌面 Dashboard 头部动作列表。
 - `settings.startupOptions`：启动页选项，由总览、日程等目标插件分别贡献。
-- `settings.sections`：完整设置区块；功能停用时由 Cordis 自动移除。
-- `settings.notificationContent`：原生轮询的监听内容选项。
 - `settings.widgets`：可添加的原生小组件卡片。
+
+功能插件通过 `ctx.settings.registerCategory()` 注册带图标、标题、描述和面板的设置分类。主设置页只显示统一“插件设置”分类列表，`/dashboard/me/settings/plugins/?category=<id>` 承载详情；分类随插件作用域释放，宿主不认识具体功能分类。
+
+`orahako.notifications` 拥有通知分类的单卡片面板和原生通知运行时，并声明 `settings.notifications.content`（轮询内容选项）、`settings.notifications.reminders`（原生提醒分节）与 `settings.notifications.appReminders`（应用内提醒分节）。功能插件保留各自设置 UI，同时通过 `ctx.notifications.register()` 注册 `grades`、`exams` 或 `schedule` 运行时渠道。界面贡献和渠道都随 Cordis 作用域释放；运行时消费渠道快照，不按插件 ID 推断能力。
 
 Overview 挂件由实际功能插件注册，而不是由 `orahako.overview` 代注册。公共组件与数据 Provider 位于 `@orahako/academic`；`order` 决定默认布局顺序，Cordis 在功能停用时移除其挂件。已有用户布局继续按稳定挂件 ID 归一化。
 

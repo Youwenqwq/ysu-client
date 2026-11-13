@@ -13,7 +13,6 @@ export { MFAModal } from "@/components/mfa-modal"
 export { BackgroundImage } from "@/components/background-image"
 export { BackButtonHandler } from "@/components/back-button-handler"
 export { DeepLinkHandler } from "@/components/deep-link-handler"
-export { NotifyProvider } from "@/components/notify-provider"
 export { SDKProvider } from "@/components/sdk-provider"
 export {
   ProviderProvider,

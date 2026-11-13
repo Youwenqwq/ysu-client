@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest"
 import { PluginRuntime } from "@/lib/plugins/runtime"
 import { PluginUIRegistry } from "@/lib/plugins/ui-registry"
 import { PluginSlotRegistry } from "@/lib/plugins/slot-registry"
+import { PluginNotificationRegistry } from "@/lib/plugins/notification-registry"
+import { PluginSettingsRegistry } from "@/lib/plugins/settings-registry"
 import { definition as shell, manifest as shellManifest } from "../shell"
+import {
+  definition as notificationDomain,
+  manifest as notificationsManifest,
+} from "../notifications"
 import { definition as overview, manifest as overviewManifest } from "./index"
 import { definition as ecard, manifest as ecardManifest } from "../ecard"
 import { definition as evaluation, manifest as evaluationManifest } from "../evaluation"
@@ -14,12 +20,17 @@ describe("overview widget ownership", () => {
   it("keeps feature cards owned by their plugins and removes them on disable", () => {
     const registry = new PluginUIRegistry()
     const slots = new PluginSlotRegistry()
+    const notifications = new PluginNotificationRegistry()
+    const settings = new PluginSettingsRegistry()
     const runtime = new PluginRuntime((ctx, manifest) => {
       registry.createService(ctx, manifest)
       slots.createService(ctx, manifest)
+      notifications.createService(ctx, manifest)
+      settings.createService(ctx, manifest)
     })
     const plugins = [
       [shellManifest, shell],
+      [notificationsManifest, notificationDomain],
       [overviewManifest, overview],
       [ecardManifest, ecard],
       [evaluationManifest, evaluation],

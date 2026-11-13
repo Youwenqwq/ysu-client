@@ -32,6 +32,8 @@ import { PluginRuntime } from "./runtime"
 import { PluginUIRegistry } from "./ui-registry"
 import { PluginSlotRegistry } from "./slot-registry"
 import { PluginLifecycleRegistry } from "./lifecycle-service"
+import { PluginNotificationRegistry } from "./notification-registry"
+import { PluginSettingsRegistry } from "./settings-registry"
 import { pluginI18nRegistry } from "./i18n-registry"
 import { providerRegistry } from "@/providers/provider-registry"
 import { createPluginStorageService } from "./storage-service"
@@ -62,6 +64,8 @@ export class PluginHost {
   readonly ui = new PluginUIRegistry()
   readonly slots = new PluginSlotRegistry()
   readonly lifecycle = new PluginLifecycleRegistry()
+  readonly notifications = new PluginNotificationRegistry()
+  readonly settings = new PluginSettingsRegistry()
   readonly i18n = pluginI18nRegistry
   readonly providers = providerRegistry
   readonly packages = new PluginPackageStore()
@@ -81,6 +85,8 @@ export class PluginHost {
     this.ui.createService(ctx, manifest)
     this.slots.createService(ctx, manifest)
     this.lifecycle.createService(ctx, manifest)
+    this.notifications.createService(ctx, manifest)
+    this.settings.createService(ctx, manifest)
     this.i18n.createService(ctx, manifest)
     this.providers.createService(ctx, manifest)
     createPluginStorageService(ctx, manifest)

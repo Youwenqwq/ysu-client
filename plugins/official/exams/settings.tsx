@@ -15,13 +15,16 @@ import {
   CardTitle,
   ToggleGroupItem,
 } from "@orahako/plugin-ui/components"
-import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useHasCapability, useTranslation } from "@orahako/plugin-ui/hooks"
 import { examCompactWidgetPreview, examWidgetPreview } from "@orahako/plugin-ui/assets"
 import { requestWidgetPin, type NativeWidgetId } from "@orahako/plugin-ui/platform"
 
-/** Settings contribution into "settings.notificationContent". */
+/** Settings contribution into "settings.notifications.content". */
 export function ExamNotificationContent() {
   const { t } = useTranslation()
+  const examsAvailable = useHasCapability("exams")
+
+  if (!examsAvailable) return null
 
   return (
     <ToggleGroupItem value="exams" className="text-xs">

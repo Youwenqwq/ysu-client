@@ -3,6 +3,7 @@ import { definition as officialShell, manifest as officialShellManifest } from "
 import { definition as onboarding, manifest as onboardingManifest } from "./onboarding"
 import { definition as ysuProvider, manifest as ysuProviderManifest } from "./ysu"
 import { definition as defaultTheme, manifest as defaultThemeManifest } from "./theme-default"
+import { definition as notifications, manifest as notificationsManifest } from "./notifications"
 import { definition as meter, manifest as meterManifest } from "./meter"
 import { definition as evaluation, manifest as evaluationManifest } from "./evaluation"
 import { definition as trainingPlan, manifest as trainingPlanManifest } from "./training-plan"
@@ -28,6 +29,7 @@ export const OFFICIAL_PLUGINS: readonly OfficialPlugin[] = [
   { manifest: officialShellManifest, definition: officialShell },
   { manifest: onboardingManifest, definition: onboarding },
   { manifest: ysuProviderManifest, definition: ysuProvider },
+  { manifest: notificationsManifest, definition: notifications },
   { manifest: defaultThemeManifest, definition: defaultTheme },
   { manifest: meterManifest, definition: meter },
   { manifest: evaluationManifest, definition: evaluation },

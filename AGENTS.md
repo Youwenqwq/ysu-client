@@ -86,7 +86,8 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 
 - 根布局 `app/layout.tsx` 只挂载 I18n、主题、`PluginProvider`、`PluginThemeManager`、`PluginShell` 和 PWA 组件；`app/dashboard/layout.tsx` 重导出默认 Shell 的 Dashboard 布局。
 - 默认 Shell 的侧边栏、移动顶栏、底部导航、登录门禁和过期登录横幅都在 `plugins/official/shell/dashboard-layout.tsx`，不要在核心代码里重复实现。
-- 功能插件通过 `settings.*` Slot 贡献设置区块、启动页选项、通知内容和小组件入口；总览挂件由实际功能插件注册，不得由一个聚合插件代注册。停用插件后对应 UI 必须自动消失。
+- 功能插件通过 `ctx.settings.registerCategory()` 注册分类面板，通过 `settings.*` Slot 贡献启动页选项、通知子节和小组件入口；不要把分类面板重新散落到主设置页。总览挂件由实际功能插件注册，不得由一个聚合插件代注册。停用插件后对应 UI 必须自动消失。
+- `orahako.notifications` 拥有唯一通知设置分组与原生运行时；功能插件通过 `settings.notifications.*` 贡献自己的 UI，并用 `ctx.notifications.register()` 注册运行时渠道。不要在 Shell、YSU 或设置页恢复按插件 ID 硬编码的通知协调。
 - 外部插件只能导入公共模块：`@orahako/plugin-sdk*`、`@orahako/plugin-ui/*`、`@orahako/academic`、共享的 React / Next / Sonner。禁止 `@/` 私有导入。
 - 已移除的旧聚合层（`lib/dashboard-nav.*`、`lib/dashboard-features.*`、`lib/extras/`、`lib/fees/` 注册表、`lib/api.ts`、`lib/types.ts`、`lib/use-cached-data.ts`）不要恢复；对应能力应落到插件注册中。
 

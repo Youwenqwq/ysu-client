@@ -9,7 +9,7 @@ import {
 import { STORAGE_KEYS } from "@orahako/plugin-ui/stores"
 import { runEpayAutoCheck } from "./auto-check"
 import { EpayPage } from "./page"
-import { EpaySettingsSection } from "./settings"
+import { EpayNotificationSettings } from "./settings"
 
 export const manifest: PluginManifest = {
   id: "orahako.epay",
@@ -63,10 +63,10 @@ export const definition = definePlugin((ctx) => {
   })
 
   ctx.slots.register({
-    id: "settings",
-    slot: "settings.sections",
-    order: 70,
-    component: EpaySettingsSection,
+    id: "reminder-settings",
+    slot: "settings.notifications.appReminders",
+    order: 20,
+    component: EpayNotificationSettings,
   })
 
   ctx.hostLifecycle.onProviderReady(async () => {

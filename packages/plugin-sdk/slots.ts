@@ -40,6 +40,7 @@ export interface PluginSlotRuntime {
     itemKey: string | undefined,
     fallback: ReactNode
   ): ReactNode
+  hasContributions(name: string, itemKey?: string): boolean
 }
 
 export const PluginSlotRuntimeContext = createContext<PluginSlotRuntime | undefined>(undefined)
@@ -53,4 +54,10 @@ export function PluginSlot<Props extends object = object>({
 }: PluginSlotProps<Props>): ReactNode {
   const runtime = useContext(PluginSlotRuntimeContext)
   return runtime?.renderSlot(name, (props ?? {}) as object, itemKey, fallback) ?? fallback
+}
+
+/** Subscribe to whether a declared slot currently has a selectable contribution. */
+export function usePluginSlotHasContributions(name: string, itemKey?: string): boolean {
+  const runtime = useContext(PluginSlotRuntimeContext)
+  return runtime?.hasContributions(name, itemKey) ?? false
 }

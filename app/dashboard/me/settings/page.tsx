@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useSyncExternalStore } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -19,14 +19,14 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useSettingsStore, type LandingPage } from "@/lib/stores/settings"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service"
-import { isCapacitor } from "@/lib/native/platform"
-import { PluginSlot } from "@orahako/plugin-sdk"
+import { PluginSlot, type PluginSettingsCategory } from "@orahako/plugin-sdk"
 import { SettingsSection } from "@/components/settings-section"
+import { usePluginHost } from "@/components/plugin-provider"
+import { usePluginTranslation } from "@/lib/plugins/use-plugin-translation"
 
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
 import { useUpdateStore } from "@/lib/stores/update"
 import { useTheme } from "next-themes"
-import { NotifyPlugin } from "@/lib/native/notify-plugin"
 import {
   LayoutDashboard,
   ChevronRight,
@@ -37,13 +37,41 @@ import {
   Sun,
   Globe,
   UserCircle,
-  Battery,
-  ShieldCheck,
   BarChart3,
 } from "lucide-react"
 
+function PluginSettingsCategoryRow({ category }: { category: PluginSettingsCategory }) {
+  const { t } = usePluginTranslation(category.pluginId)
+  const Icon = category.icon
+  return (
+    <Link
+      href={`/dashboard/me/settings/plugins/?category=${encodeURIComponent(category.id)}`}
+      className="group flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
+    >
+      <div className="rounded-lg bg-muted p-2 text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+        <Icon className="size-4.5" />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="text-sm font-medium">
+          {category.titleKey ? t(category.titleKey) : category.title}
+        </span>
+        <span className="truncate text-xs text-muted-foreground">
+          {category.descriptionKey ? t(category.descriptionKey) : category.description}
+        </span>
+      </div>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+    </Link>
+  )
+}
+
 export default function SettingsPage() {
   const router = useRouter()
+  const { host } = usePluginHost()
+  const categories = useSyncExternalStore(
+    host.settings.subscribe,
+    host.settings.getSnapshot,
+    host.settings.getSnapshot
+  )
   const { t, locale, setLocale } = useTranslation()
   const { theme, setTheme } = useTheme()
   const hasUpdate = useUpdateStore((s) => s.hasUpdate)
@@ -54,37 +82,6 @@ export default function SettingsPage() {
 
   const analyticsConsent = useSettingsStore((s) => s.analyticsConsent)
   const setAnalyticsConsent = useSettingsStore((s) => s.setAnalyticsConsent)
-  const [batteryIgnored, setBatteryIgnored] = useState<boolean | null>(null)
-  const [autoStartDialogOpen, setAutoStartDialogOpen] = useState(false)
-  // Check battery optimization status on mount and when returning from settings
-  useEffect(() => {
-    if (!isCapacitor()) return
-
-    NotifyPlugin.checkBatteryOptimization()
-      .then(({ ignored }) => {
-        setBatteryIgnored(ignored)
-      })
-      .catch(() => {})
-
-    let listener: { remove(): void } | undefined
-    import("@capacitor/app").then(({ App }) => {
-      App.addListener("appStateChange", ({ isActive }) => {
-        if (isActive) {
-          NotifyPlugin.checkBatteryOptimization()
-            .then(({ ignored }) => {
-              setBatteryIgnored(ignored)
-            })
-            .catch(() => {})
-        }
-      }).then((h) => {
-        listener = h
-      })
-    })
-
-    return () => {
-      listener?.remove()
-    }
-  }, [])
 
   async function handleLogout() {
     setLogoutDialogOpen(false)
@@ -214,62 +211,20 @@ export default function SettingsPage() {
         </Card>
       </SettingsSection>
 
-      {/* 通知设置 — 仅 Capacitor 平台 */}
-      {isCapacitor() && (
-        <SettingsSection title={t("settings.notifyTitle")}>
+      {categories.length > 0 && (
+        <SettingsSection title={t("settings.pluginSettings")}>
           <Card className="py-0">
-            <CardContent className="flex flex-col py-1">
-              {/* 系统权限 */}
-              <h3 className="flex items-center gap-2 px-0.5 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">
-                {t("settings.systemPermissions")}
-              </h3>
-
-              {/* 电池优化 */}
-              <button
-                type="button"
-                onClick={() => NotifyPlugin.requestIgnoreBatteryOptimization()}
-                className="flex items-center gap-3 py-3 text-left transition-colors active:bg-muted/60"
-              >
-                <Battery className="size-5 shrink-0 translate-x-0.5 text-muted-foreground" />
-                <div className="flex flex-1 flex-col">
-                  <span className="text-sm">{t("settings.batteryOptimization")}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {t("settings.batteryOptimizationDesc")}
-                  </span>
-                </div>
-                {batteryIgnored !== null && (
-                  <span
-                    className={`text-xs ${batteryIgnored ? "text-green-600" : "text-orange-500"}`}
-                  >
-                    {batteryIgnored
-                      ? t("settings.batteryOptimizationIgnored")
-                      : t("settings.batteryOptimizationNotIgnored")}
-                  </span>
-                )}
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </button>
-
-              {/* 自启动 */}
-              <button
-                type="button"
-                onClick={() => setAutoStartDialogOpen(true)}
-                className="flex items-center gap-3 border-t border-border py-3 text-left transition-colors active:bg-muted/60"
-              >
-                <ShieldCheck className="size-5 shrink-0 text-muted-foreground" />
-                <div className="flex flex-1 flex-col">
-                  <span className="text-sm">{t("settings.autoStart")}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {t("settings.autoStartDesc")}
-                  </span>
-                </div>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </button>
+            <CardContent className="flex flex-col divide-y divide-border py-1">
+              {categories.map((category) => (
+                <PluginSettingsCategoryRow
+                  key={`${category.pluginId}:${category.id}`}
+                  category={category}
+                />
+              ))}
             </CardContent>
           </Card>
         </SettingsSection>
       )}
-
-      <PluginSlot name="settings.sections" />
 
       <SettingsSection title={t("me.sectionAccount")}>
         <Card className="py-0">
@@ -339,18 +294,6 @@ export default function SettingsPage() {
             <Button variant="destructive" onClick={handleLogout}>
               {t("app.logout")}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={autoStartDialogOpen} onOpenChange={setAutoStartDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("settings.autoStartDialogTitle")}</DialogTitle>
-            <DialogDescription>{t("settings.autoStartDialogContent")}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setAutoStartDialogOpen(false)}>{t("dialog.ok")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

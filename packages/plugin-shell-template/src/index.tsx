@@ -5,13 +5,18 @@ import {
   BackButtonHandler,
   DeepLinkHandler,
   MFAModal,
-  NotifyProvider,
   ProviderProvider,
   SDKProvider,
   Toaster,
   TooltipProvider,
 } from "@orahako/plugin-ui/shell"
-import { definePlugin, pluginPageHref, withAppBasePath, type PluginContext } from "@orahako/plugin-sdk"
+import {
+  definePlugin,
+  pluginPageHref,
+  PluginSlot,
+  withAppBasePath,
+  type PluginContext,
+} from "@orahako/plugin-sdk"
 
 class CommunityPageBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
@@ -72,7 +77,7 @@ function CommunityShell({
           <TooltipProvider>
             <BackButtonHandler />
             <DeepLinkHandler />
-            <NotifyProvider />
+            <PluginSlot name="shell.overlay" />
             <main
               style={{
                 minHeight: "100svh",

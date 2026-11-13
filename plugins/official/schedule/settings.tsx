@@ -19,8 +19,11 @@ import {
 import {
   Card,
   CardContent,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
   SettingNumberInput,
-  SettingsSection,
   Switch,
   ToggleGroupItem,
   cn,
@@ -50,7 +53,7 @@ export function ScheduleStartupOption() {
   )
 }
 
-export function ScheduleWidgetSettingsSection() {
+export function ScheduleWidgetSettingsPanel() {
   const { t } = useTranslation()
   const capabilities = useProviderCapabilities()
   const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours)
@@ -58,52 +61,59 @@ export function ScheduleWidgetSettingsSection() {
   const widgetShowNextDaySchedule = useSettingsStore((s) => s.widgetShowNextDaySchedule)
   const setWidgetShowNextDaySchedule = useSettingsStore((s) => s.setWidgetShowNextDaySchedule)
 
-  if (!isCapacitor() || !capabilities.schedule) return null
+  if (!isCapacitor() || !capabilities.schedule) {
+    return (
+      <Empty className="min-h-48">
+        <EmptyHeader>
+          <EmptyTitle>{t("desktopWidgets.title")}</EmptyTitle>
+          <EmptyDescription>{t("desktopWidgets.nativeOnly")}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )
+  }
 
   return (
-    <SettingsSection title={t("settings.widget")}>
-      <Card className="py-0">
-        <CardContent className="flex flex-col py-1">
-          <Link
-            href="/dashboard/me/settings/widgets"
-            className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
-          >
-            <LayoutGrid className="size-5 shrink-0 text-muted-foreground" />
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-sm">{t("settings.addWidget")}</span>
-              <span className="text-xs text-muted-foreground">{t("settings.addWidgetDesc")}</span>
-            </div>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </Link>
-
-          <SettingNumberInput
-            icon={Clock}
-            label={t("settings.widgetSyncReminder")}
-            value={widgetSyncReminderHours}
-            onChange={(v) => {
-              setWidgetSyncReminderHours(v)
-              syncWidgetSettingsToWidget(v, widgetShowNextDaySchedule).catch(() => {})
-            }}
-            min={0}
-            max={168}
-            unit={t("settings.widgetSyncReminderUnit")}
-            bordered
-          />
-
-          <div className="flex items-center gap-3 border-t border-border py-3">
-            <CalendarClock className="size-5 shrink-0 text-muted-foreground" />
-            <span className="flex-1 text-sm">{t("settings.widgetShowNextDay")}</span>
-            <Switch
-              checked={widgetShowNextDaySchedule}
-              onCheckedChange={(v) => {
-                setWidgetShowNextDaySchedule(v)
-                syncWidgetSettingsToWidget(widgetSyncReminderHours, v).catch(() => {})
-              }}
-            />
+    <Card className="py-0">
+      <CardContent className="flex flex-col py-1">
+        <Link
+          href="/dashboard/me/settings/widgets"
+          className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
+        >
+          <LayoutGrid className="size-5 shrink-0 text-muted-foreground" />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="text-sm">{t("settings.addWidget")}</span>
+            <span className="text-xs text-muted-foreground">{t("settings.addWidgetDesc")}</span>
           </div>
-        </CardContent>
-      </Card>
-    </SettingsSection>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </Link>
+
+        <SettingNumberInput
+          icon={Clock}
+          label={t("settings.widgetSyncReminder")}
+          value={widgetSyncReminderHours}
+          onChange={(v) => {
+            setWidgetSyncReminderHours(v)
+            syncWidgetSettingsToWidget(v, widgetShowNextDaySchedule).catch(() => {})
+          }}
+          min={0}
+          max={168}
+          unit={t("settings.widgetSyncReminderUnit")}
+          bordered
+        />
+
+        <div className="flex items-center gap-3 border-t border-border py-3">
+          <CalendarClock className="size-5 shrink-0 text-muted-foreground" />
+          <span className="flex-1 text-sm">{t("settings.widgetShowNextDay")}</span>
+          <Switch
+            checked={widgetShowNextDaySchedule}
+            onCheckedChange={(v) => {
+              setWidgetShowNextDaySchedule(v)
+              syncWidgetSettingsToWidget(widgetSyncReminderHours, v).catch(() => {})
+            }}
+          />
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -134,7 +144,7 @@ export function ScheduleWidgetAssistantSettings() {
   )
 }
 
-export function ClassReminderSettingsSection() {
+export function ClassReminderSettings() {
   const { t } = useTranslation()
   const provider = useProvider()
   const capabilities = useProviderCapabilities()
@@ -240,82 +250,80 @@ export function ClassReminderSettingsSection() {
   }
 
   return (
-    <SettingsSection title={t("settings.classReminderTitle")}>
-      <Card className="py-0">
-        <CardContent className="flex flex-col py-1">
-          <div className="flex items-center gap-3 py-3">
-            <AlarmClock className="size-5 shrink-0 text-muted-foreground" />
-            <div className="flex flex-1 flex-col">
-              <span className="text-sm">{t("settings.classReminderEnabled")}</span>
-              <span className="text-xs text-muted-foreground">
-                {t("settings.classReminderHint")}
-              </span>
-            </div>
+    <>
+      <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
+        {t("settings.classReminderTitle")}
+      </h3>
+
+      <div className="flex items-center gap-3 py-3">
+        <AlarmClock className="size-5 shrink-0 text-muted-foreground" />
+        <div className="flex flex-1 flex-col">
+          <span className="text-sm">{t("settings.classReminderEnabled")}</span>
+          <span className="text-xs text-muted-foreground">{t("settings.classReminderHint")}</span>
+        </div>
+        <Switch
+          checked={classReminderEnabled}
+          disabled={notificationPermissionPending}
+          onCheckedChange={(enabled) => void handleNotificationToggle(enabled)}
+        />
+      </div>
+
+      {classReminderEnabled && (
+        <>
+          <div className="flex items-center gap-3 border-t border-border py-3">
+            <Radio className="size-5 shrink-0 text-muted-foreground" />
+            <label
+              htmlFor="class-live-update"
+              className={cn(
+                "min-w-0 flex-1 text-sm",
+                !liveUpdateSupported && "text-muted-foreground"
+              )}
+            >
+              {t("settings.classLiveUpdateEnabled")}
+            </label>
             <Switch
-              checked={classReminderEnabled}
-              disabled={notificationPermissionPending}
-              onCheckedChange={(enabled) => void handleNotificationToggle(enabled)}
+              id="class-live-update"
+              checked={liveUpdateSupported && classLiveUpdateEnabled}
+              disabled={!liveUpdateSupported || liveUpdatePermissionPending}
+              onCheckedChange={(enabled) => void handleLiveUpdateToggle(enabled)}
             />
           </div>
 
-          {classReminderEnabled && (
-            <>
-              <div className="flex items-center gap-3 border-t border-border py-3">
-                <Radio className="size-5 shrink-0 text-muted-foreground" />
-                <label
-                  htmlFor="class-live-update"
-                  className={cn(
-                    "min-w-0 flex-1 text-sm",
-                    !liveUpdateSupported && "text-muted-foreground"
-                  )}
-                >
-                  {t("settings.classLiveUpdateEnabled")}
-                </label>
-                <Switch
-                  id="class-live-update"
-                  checked={liveUpdateSupported && classLiveUpdateEnabled}
-                  disabled={!liveUpdateSupported || liveUpdatePermissionPending}
-                  onCheckedChange={(enabled) => void handleLiveUpdateToggle(enabled)}
-                />
-              </div>
+          <div className="flex items-center gap-3 border-t border-border py-3">
+            <Vibrate className="size-5 shrink-0 text-muted-foreground" />
+            <label htmlFor="class-vibration" className="min-w-0 flex-1 text-sm">
+              {t("settings.classVibrationEnabled")}
+            </label>
+            <Switch
+              id="class-vibration"
+              checked={classVibrationEnabled}
+              onCheckedChange={setClassVibrationEnabled}
+            />
+          </div>
 
-              <div className="flex items-center gap-3 border-t border-border py-3">
-                <Vibrate className="size-5 shrink-0 text-muted-foreground" />
-                <label htmlFor="class-vibration" className="min-w-0 flex-1 text-sm">
-                  {t("settings.classVibrationEnabled")}
-                </label>
-                <Switch
-                  id="class-vibration"
-                  checked={classVibrationEnabled}
-                  onCheckedChange={setClassVibrationEnabled}
-                />
-              </div>
+          <SettingNumberInput
+            icon={Timer}
+            label={t("settings.classReminderMinutes")}
+            value={classReminderMinutes}
+            onChange={setClassReminderMinutes}
+            min={1}
+            max={120}
+            unit={t("settings.minutes")}
+            bordered
+          />
 
-              <SettingNumberInput
-                icon={Timer}
-                label={t("settings.classReminderMinutes")}
-                value={classReminderMinutes}
-                onChange={setClassReminderMinutes}
-                min={1}
-                max={120}
-                unit={t("settings.minutes")}
-                bordered
-              />
-
-              <SettingNumberInput
-                icon={CalendarClock}
-                label={t("settings.classReminderDays")}
-                value={classReminderDays}
-                onChange={setClassReminderDays}
-                min={1}
-                max={14}
-                unit={t("settings.days")}
-                bordered
-              />
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </SettingsSection>
+          <SettingNumberInput
+            icon={CalendarClock}
+            label={t("settings.classReminderDays")}
+            value={classReminderDays}
+            onChange={setClassReminderDays}
+            min={1}
+            max={14}
+            unit={t("settings.days")}
+            bordered
+          />
+        </>
+      )}
+    </>
   )
 }

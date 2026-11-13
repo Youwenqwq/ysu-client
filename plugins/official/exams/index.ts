@@ -14,6 +14,7 @@ export const manifest: PluginManifest = {
 }
 
 export const definition = definePlugin((ctx) => {
+  ctx.notifications.register("exams")
   ctx.ui.registerOverviewWidget({
     id: "upcoming-exams",
     title: "近期考试",
@@ -28,7 +29,7 @@ export const definition = definePlugin((ctx) => {
   })
   ctx.slots.register({
     id: "exams",
-    slot: "settings.notificationContent",
+    slot: "settings.notifications.content",
     order: 20,
     component: ExamNotificationContent,
   })

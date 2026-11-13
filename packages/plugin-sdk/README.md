@@ -77,9 +77,9 @@ ctx.slots.register({
 })
 ```
 
-`PluginSlot` 让 Shell 渲染 Slot，无需导入宿主私有模块。`ctx.ui.getSnapshot()` 与 `subscribe()` 提供页面和导航快照，供替代 Shell 自行组合。
+`PluginSlot` 让 Shell 渲染 Slot，无需导入宿主私有模块；`usePluginSlotHasContributions()` 可供容器在没有任何贡献时隐藏空分组。`ctx.ui.getSnapshot()` 与 `subscribe()` 提供页面和导航快照，供替代 Shell 自行组合。
 
-默认 Shell 还提供 `settings.startupOptions`、`settings.sections`、`settings.notificationContent` 和 `settings.widgets`。功能插件应通过这些 Slot 贡献设置界面，而不是修改宿主设置页；停用或卸载时贡献会自动注销。
+默认 Shell 还提供 `settings.startupOptions` 和 `settings.widgets`。功能插件通过 `ctx.settings.registerCategory()` 注册带图标、标题、描述和面板组件的设置分类；主设置页统一展示“插件设置”入口，通用详情页渲染对应面板。停用或卸载时分类与 Slot 贡献会自动注销。`orahako.notifications` 进一步提供 `settings.notifications.content`、`settings.notifications.reminders` 与 `settings.notifications.appReminders`，将轮询选项、原生提醒和跨平台应用内提醒组合在同一个通知设置分组中。
 
 ## 页面与 URL
 
@@ -101,12 +101,14 @@ ctx.slots.register({
 
 - `ctx.ui`：Shell、页面、导航、设置入口、总览挂件、全局主题和可订阅快照。
 - `ctx.slots`：带类型、优先级和自动清理的 UI Slot。
+- `ctx.settings`：注册带导航元数据的插件设置分类与详情面板。
 - `ctx.hostLifecycle`：Provider 初始化完成订阅；晚注册也会执行。
 - `ctx.providers`：学校配置与 `AcademicProvider` 工厂注册。
 - `ctx.plugins`：按插件 ID 安装与当前应用和平台兼容的市场版本。
 - `ctx.storage.local` / `ctx.storage.secure`：按插件 ID 命名空间的字符串存储。
 - `ctx.http.fetch`：应用网络栈。
 - `ctx.native`：原生平台检测、图片保存及通知、精确闹钟、电池优化权限申请。
+- `ctx.notifications`：注册通知运行时渠道并读取可订阅快照；渠道随插件作用域自动撤销。
 - `ctx.assets.url(path)`：外部插件包内资源的 Blob URL。
 - `ctx.i18n`：插件字典注册与文本查询。
 - `@orahako/plugin-sdk/host`：Provider 所需的完整宿主协议、认证和会话门面。

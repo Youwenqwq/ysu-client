@@ -1,7 +1,7 @@
 import { GraduationCap } from "lucide-react"
 import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { GradesPage } from "./page"
-import { GradeNotificationContent, GradesGachaSettingsSection } from "./settings"
+import { GradeNotificationContent, GradesSettingsPanel } from "./settings"
 import { useGradeGachaStore } from "./grade-gacha-store"
 import { GpaSummaryWidget } from "@orahako/academic"
 
@@ -15,6 +15,7 @@ export const manifest: PluginManifest = {
 }
 
 export const definition = definePlugin((ctx) => {
+  ctx.notifications.register("grades")
   ctx.ui.registerOverviewWidget({
     id: "gpa",
     title: "平均绩点",
@@ -27,15 +28,19 @@ export const definition = definePlugin((ctx) => {
     defaultVisible: false,
     order: 20,
   })
-  ctx.slots.register({
-    id: "settings",
-    slot: "settings.sections",
+  ctx.settings.registerCategory({
+    id: "grades",
     order: 30,
-    component: GradesGachaSettingsSection,
+    title: "成绩",
+    titleKey: "app.grades",
+    description: "新成绩抽卡",
+    descriptionKey: "settings.gradeGachaDesc",
+    icon: GraduationCap,
+    component: GradesSettingsPanel,
   })
   ctx.slots.register({
     id: "notification-content",
-    slot: "settings.notificationContent",
+    slot: "settings.notifications.content",
     order: 10,
     component: GradeNotificationContent,
   })

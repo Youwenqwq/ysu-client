@@ -1,7 +1,7 @@
 import { CalendarDays, LayoutDashboard } from "lucide-react"
 import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { OverviewPage } from "./page"
-import { OverviewSettingsSection, OverviewStartupOption } from "./settings"
+import { OverviewSettingsPanel, OverviewStartupOption } from "./settings"
 import { WeekSummaryWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
@@ -39,11 +39,15 @@ export const definition = definePlugin((ctx) => {
     order: 10,
     component: OverviewStartupOption,
   })
-  ctx.slots.register({
-    id: "settings",
-    slot: "settings.sections",
+  ctx.settings.registerCategory({
+    id: "overview",
     order: 10,
-    component: OverviewSettingsSection,
+    title: "总览",
+    titleKey: "app.overview",
+    description: "自定义总览布局",
+    descriptionKey: "overviewLayout.settingsDescription",
+    icon: LayoutDashboard,
+    component: OverviewSettingsPanel,
   })
 
   ctx.ui.registerOverviewWidget({

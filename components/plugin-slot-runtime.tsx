@@ -34,6 +34,9 @@ export function PluginSlotRuntimeProvider({
   )
   const runtime = useMemo<PluginSlotRuntime>(
     () => ({
+      hasContributions(name, itemKey) {
+        return registry.select(name, itemKey).length > 0
+      },
       renderSlot(name, props, itemKey, fallback) {
         if (!snapshot.declarations.some((slot) => slot.name === name)) return fallback
         const contributions = registry.select(name, itemKey)

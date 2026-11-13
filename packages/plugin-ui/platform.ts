@@ -15,11 +15,13 @@ export {
 } from "@/lib/native/widget-bridge"
 export {
   syncClassAlarmsToNative,
+  observeNativeNotifications,
   stopNotify,
   setNotificationEnabled,
   checkExactAlarmPermission,
   requestExactAlarmPermission,
 } from "@/lib/native/notify"
+export { NotifyPlugin, type OrahakoNotifyPlugin } from "@/lib/native/notify-plugin"
 export { OrahakoFile, type OrahakoFilePlugin } from "@/lib/native/orahako-file"
 export {
   BACK_PRIORITY,
