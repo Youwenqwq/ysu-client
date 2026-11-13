@@ -6,7 +6,7 @@ const DEFAULT_INDEX = {
     name: '明日方舟 × 新粗野主义',
     summary: '罗德岛终端视觉体系：石墨画布、2px 墨边、零圆角、硬偏移阴影、工程网格与青色信号。',
     author: 'heshuoshuo0512 / Orahako',
-    homepage: 'https://github.com/Youwenqwq/orahako/pull/21',
+    homepage: 'https://github.com/Youwenqwq/ysu-client/pull/21',
     categories: ['theme'],
     versions: [{
       version: '1.0.1',
@@ -24,7 +24,7 @@ const DEFAULT_INDEX = {
     name: 'Perlica 佩黎卡',
     summary: '地图找车、扫码或车辆号解锁、骑行控制、历史记录与账户管理。首个完整外部社区功能插件。',
     author: 'Youwenqwq / Orahako community',
-    homepage: 'https://github.com/Youwenqwq/orahako',
+    homepage: 'https://github.com/Youwenqwq/ysu-client',
     categories: ['toybox', 'transport'],
     versions: [{
       version: '1.0.1',
