@@ -39,14 +39,14 @@ import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@orahako/p
 import { GraduationCap, Info, LogIn, LogOut, Settings, TriangleAlert, User } from "lucide-react"
 import { MobileBottomNav, MobileTopBar } from "@orahako/plugin-ui/shell"
 import { RefreshIndicator, StaleIndicator } from "@orahako/plugin-ui/shell"
-import { useProviderCapabilities } from "@orahako/plugin-ui/hooks"
+import { useProviderCapabilities, useSupportedPlugins } from "@orahako/plugin-ui/hooks"
 import { UpdateDialog } from "@orahako/plugin-ui/shell"
 import { APP_VERSION, APP_BUILD } from "@orahako/plugin-ui/platform"
 import { useStoredMediaUrl } from "@orahako/plugin-ui/hooks"
 import { loadAvatarImage } from "@orahako/plugin-ui/stores"
 import { usePluginHost } from "@orahako/plugin-ui/shell"
 import { usePluginUI } from "@orahako/plugin-ui/plugin"
-import { PluginSlot, pluginPageHref, type PluginIcon } from "@orahako/plugin-sdk"
+import { PluginSlot, pluginPageHref, supportsPlugin, type PluginIcon } from "@orahako/plugin-sdk"
 import { usePluginRouteStore } from "@orahako/plugin-ui/plugin"
 import { hasPluginCapability } from "@orahako/plugin-ui/plugin"
 const SIDEBAR_WIDTH_KEY = "dashboard-sidebar-width"
@@ -214,10 +214,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [])
 
   const capabilities = useProviderCapabilities()
+  const supportedPlugins = useSupportedPlugins()
   const { host } = usePluginHost()
   const { navigation: pluginNavigation } = usePluginUI(host.ui)
-  const availableNavigation = pluginNavigation.filter((item) =>
-    hasPluginCapability(capabilities, item.capability)
+  const availableNavigation = pluginNavigation.filter(
+    (item) =>
+      supportsPlugin(supportedPlugins, item.pluginId) &&
+      hasPluginCapability(capabilities, item.capability)
   )
   const knownGroupOrder = ["main", "academic", "platform", "fees", "extras", "plugins"]
   const groupLabels: Record<string, string> = {

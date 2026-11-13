@@ -1,4 +1,5 @@
 import type { AcademicCapabilities } from "@orahako/plugin-sdk/academic"
+import { supportsPlugin } from "@orahako/plugin-sdk/provider-capabilities"
 import { pluginPageHref } from "@orahako/plugin-sdk/ui"
 
 export function hasPluginCapability(
@@ -35,6 +36,8 @@ export interface SemanticNavSources {
   pages: readonly SemanticPageInput[]
   navigation: readonly SemanticNavigationInput[]
   capabilities?: AcademicCapabilities
+  /** Provider-level plugin allowlist; omitted means every plugin is allowed. */
+  supportedPlugins?: readonly string[]
 }
 
 export interface SemanticNavTarget {
@@ -69,6 +72,7 @@ function compareRank(
 }
 
 function pageAvailable(sources: SemanticNavSources, page: SemanticPageInput): boolean {
+  if (!supportsPlugin(sources.supportedPlugins, page.pluginId)) return false
   if (!hasPluginCapability(sources.capabilities, page.capability)) return false
   const declared = sources.navigation.find((item) => pageKey(item) === pageKey(page))
   return !declared || hasPluginCapability(sources.capabilities, declared.capability)
@@ -96,6 +100,7 @@ export function resolveSemanticTarget(
     )
   )
   for (const item of byNav) {
+    if (!supportsPlugin(sources.supportedPlugins, item.pluginId)) continue
     if (!hasPluginCapability(sources.capabilities, item.capability)) continue
     const page = sources.pages.find((candidate) => pageKey(candidate) === pageKey(item))
     if (!page || !pageAvailable(sources, page)) continue

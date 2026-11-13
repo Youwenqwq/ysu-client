@@ -47,6 +47,7 @@ const ALLOWED_HOSTS = new Set([
   'lp.open.weixin.qq.com',
   'uis.nbu.edu.cn',
   'ehall.nbu.edu.cn',
+  'jwxt.zmu.edu.cn',
   'api.app.zanao.com',
   'b1.cdn.zanao.com',
   'b2.cdn.zanao.com',

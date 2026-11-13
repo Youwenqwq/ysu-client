@@ -156,6 +156,78 @@ describe("landing preference", () => {
   })
 })
 
+describe("provider plugin allowlist", () => {
+  it("keeps every plugin when the provider declares no list", () => {
+    expect(defaultSources.supportedPlugins).toBeUndefined()
+    expect(resolveSemanticTarget("grades", defaultSources)).toEqual({
+      pluginId: "org.orahako.grades",
+      pageId: "index",
+    })
+    expect(resolvePrimaryTarget(defaultSources)).toEqual({
+      pluginId: "org.orahako.overview",
+      pageId: "index",
+    })
+  })
+
+  it("hides page routes and navigation fallbacks from unlisted plugins", () => {
+    const noGrades = sources({
+      ...defaultSources,
+      supportedPlugins: ["org.orahako.overview", "org.orahako.schedule"],
+    })
+    // `grades` resolves through a declared page route.
+    expect(resolveSemanticTarget("grades", noGrades)).toBeUndefined()
+    expect(resolveSemanticTarget("schedule", noGrades)).toEqual({
+      pluginId: "org.orahako.schedule",
+      pageId: "index",
+    })
+
+    // `overview` only exists as a navigation entry, so the fallback path filters too.
+    const noOverview = sources({
+      ...defaultSources,
+      supportedPlugins: ["org.orahako.grades"],
+    })
+    expect(resolveSemanticTarget("overview", noOverview)).toBeUndefined()
+    expect(resolveSemanticTarget("grades", noOverview)).toEqual({
+      pluginId: "org.orahako.grades",
+      pageId: "index",
+    })
+  })
+
+  it("picks the next allowed primary page and landing target", () => {
+    const noOverview = sources({
+      ...defaultSources,
+      supportedPlugins: ["org.orahako.schedule"],
+    })
+    expect(resolvePrimaryTarget(noOverview)).toEqual({
+      pluginId: "org.orahako.schedule",
+      pageId: "index",
+    })
+    expect(landingPreferenceHref("overview", noOverview)).toBe(
+      "/dashboard/plugin/?plugin=org.orahako.schedule&page=index"
+    )
+  })
+
+  it("requires both the allowlist and the capability", () => {
+    const allowlistWithoutCapability = sources({
+      ...defaultSources,
+      capabilities: { ...defaultSources.capabilities!, schedule: false },
+      supportedPlugins: ["org.orahako.schedule"],
+    })
+    // The allowlist never widens capabilities: `schedule` is listed but disabled.
+    expect(resolveSemanticTarget("schedule", allowlistWithoutCapability)).toBeUndefined()
+    // Nor can capabilities widen the allowlist: `student-info` is enabled but unlisted.
+    expect(resolveSemanticTarget("student-info", allowlistWithoutCapability)).toBeUndefined()
+    expect(resolvePrimaryTarget(allowlistWithoutCapability)).toBeUndefined()
+  })
+
+  it("treats an empty allowlist as no plugin pages", () => {
+    const empty = sources({ ...defaultSources, supportedPlugins: [] })
+    expect(resolvePrimaryTarget(empty)).toBeUndefined()
+    expect(resolveSemanticTarget("schedule", empty)).toBeUndefined()
+    expect(landingPreferenceHref("schedule", empty)).toBe(CORE_DASHBOARD_FALLBACK_HREF)
+  })
+})
+
 describe("semanticTargetHref", () => {
   it("builds the plugin page URL", () => {
     expect(semanticTargetHref({ pluginId: "org.orahako.exams", pageId: "index" })).toBe(

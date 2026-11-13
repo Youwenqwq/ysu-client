@@ -101,14 +101,23 @@ ctx.slots.register({
 - `ctx.slots`：带类型、优先级和自动清理的 UI Slot。
 - `ctx.hostLifecycle`：Provider 初始化完成订阅；晚注册也会执行。
 - `ctx.providers`：学校配置与 `AcademicProvider` 工厂注册。
+- `ctx.plugins`：按插件 ID 安装与当前应用和平台兼容的市场版本。
 - `ctx.storage.local` / `ctx.storage.secure`：按插件 ID 命名空间的字符串存储。
 - `ctx.http.fetch`：应用网络栈。
-- `ctx.native`：原生平台检测与图片保存。
+- `ctx.native`：原生平台检测、图片保存及通知、精确闹钟、电池优化权限申请。
 - `ctx.assets.url(path)`：外部插件包内资源的 Blob URL。
 - `ctx.i18n`：插件字典注册与文本查询。
 - `@ysu/plugin-sdk/host`：Provider 所需的完整宿主协议、认证和会话门面。
 
 完整信任插件仍可使用标准浏览器与 Capacitor API；SDK 服务用于减少重复实现，不构成权限边界。
+
+## 学校 Provider
+
+Provider 插件通过 `ctx.providers.registerSchool({ config, providerFactory })` 同时注册学校配置与实现工厂。实现应继承 `BaseProvider`，只覆盖已声明能力的对应方法；认证核心方法必须实现。学校停用后，注册会随插件作用域自动撤销。`supportedPlugins` 可进一步按插件 ID 限定该学校支持的页面、导航和总览挂件；缺省保持兼容，不限制插件。
+
+`plugins/market/zmu-provider` 是非 EMAP 教务系统的最小参考：本地验证码密码登录、CookieJar 会话恢复、学籍、全学期课表、成绩/GPA 和考试均只使用公共 SDK。需要与 CookieJar 绑定的验证码图片时，Provider 应通过 `fetchWithJar` 读取图片并返回 data URL，不能把远端图片 URL 当作可携带会话的普通 `<img>` 地址。
+
+公共 `@orahako/plugin-sdk/crypto` 子路径提供 AES-128-ECB/PKCS7 与 Base64 工具，供确有该协议要求的 Provider 使用。Web 端新增学校域名仍须加入部署侧代理白名单；插件注册本身不能绕过该网络安全边界。
 
 ## 构建与打包
 

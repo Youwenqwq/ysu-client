@@ -8,5 +8,7 @@ describe("official plugin identities", () => {
     expect(ids.filter((id) => id.startsWith("ysu."))).toEqual(["ysu.provider"])
     expect(ids).toContain("orahako.shell")
     expect(ids).toContain("orahako.overview")
+    expect(ids).toContain("orahako.onboarding")
+    expect(ids).not.toContain("zmu.provider")
   })
 })

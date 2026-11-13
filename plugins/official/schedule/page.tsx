@@ -24,7 +24,7 @@ import { Input } from "@orahako/plugin-ui/components"
 import { Spinner } from "@orahako/plugin-ui/components"
 import { Field, FieldGroup, FieldLabel } from "@orahako/plugin-ui/components"
 import { FilterDrawer, FilterTrigger } from "@orahako/plugin-ui/components"
-import { pluginPageHref } from "@orahako/plugin-sdk"
+import { pluginPageHref, ProviderErrorCode } from "@orahako/plugin-sdk"
 import { useTranslation } from "@orahako/plugin-ui/hooks"
 import { useIsMobile } from "@orahako/plugin-ui/hooks"
 import { useBackHandler } from "@orahako/plugin-ui/hooks"
@@ -281,7 +281,7 @@ export function SchedulePage() {
       termCalendarQuery.error,
       periodsQuery.error,
       examsQuery.error,
-    ].filter(Boolean)
+    ].filter((error) => error && error.code !== ProviderErrorCode.FEATURE_NOT_SUPPORTED)
     if (errors.length === 0) return
     toast.error(errors[0]?.message || t("app.updating"))
   }, [
@@ -410,7 +410,9 @@ export function SchedulePage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <Link href={pluginPageHref("orahako.school-schedule")}>{t("app.schoolSchedule")}</Link>
+              <Link href={pluginPageHref("orahako.school-schedule")}>
+                {t("app.schoolSchedule")}
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href={freeRoomHref}>{t("schoolSchedule.freeRoomEntry")}</Link>

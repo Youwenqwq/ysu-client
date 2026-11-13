@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { HttpRequest, HttpResponse } from "@orahako/plugin-sdk/host"
-import { aes128EcbDecrypt, aes128EcbEncrypt, base64ToBytes, bytesToBase64 } from "./crypto"
+import {
+  aes128EcbDecrypt,
+  aes128EcbEncrypt,
+  base64ToBytes,
+  bytesToBase64,
+} from "@orahako/plugin-sdk/crypto"
 
 const sendMock = vi.fn<(req: HttpRequest) => Promise<HttpResponse>>()
 

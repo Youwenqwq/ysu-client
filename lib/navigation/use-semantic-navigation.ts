@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 import { usePluginHost } from "@/components/plugin-provider"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
-import { useProviderCapabilities } from "@/providers/use-provider"
+import { useProviderCapabilities, useSupportedPlugins } from "@/providers/use-provider"
 import {
   resolvePrimaryTarget,
   resolveSemanticTarget,
@@ -28,12 +28,14 @@ export function useSemanticNavigation(): SemanticNav {
   const { host, isReady } = usePluginHost()
   const { pages, navigation } = usePluginUI(host.ui)
   const capabilities = useProviderCapabilities()
+  const supportedPlugins = useSupportedPlugins()
 
   return useMemo(() => {
     const sources: SemanticNavSources = {
       pages: isReady ? pages : [],
       navigation: isReady ? navigation : [],
       capabilities,
+      supportedPlugins,
     }
     return {
       sources,
@@ -47,5 +49,5 @@ export function useSemanticNavigation(): SemanticNav {
         return target ? semanticTargetHref(target) : "/dashboard/me"
       },
     }
-  }, [isReady, pages, navigation, capabilities])
+  }, [isReady, pages, navigation, capabilities, supportedPlugins])
 }

@@ -56,6 +56,8 @@ export {
 } from "@/lib/cookie"
 export type { CookieEntry, HttpRequest, HttpResponse } from "@/lib/cookie"
 
+export { aes128EcbDecrypt, aes128EcbEncrypt, base64ToBytes, bytesToBase64 } from "./crypto"
+
 // ─── Secure storage, cache and storage keys ──────────────────────────────── //
 
 export {

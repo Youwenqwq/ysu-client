@@ -1,0 +1,11 @@
+{
+  "id": "zmu.provider",
+  "name": "遵义医科大学教务",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "kind": "provider",
+  "required": false,
+  "entry": "dist/index.js",
+  "minAppVersion": "0.15.0",
+  "description": "遵义医科大学乘方教务 Provider（验证码登录、学籍、课表、成绩与考试）"
+}

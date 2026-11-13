@@ -13,6 +13,11 @@ export function useProviderCapabilities(): AcademicCapabilities {
   return useProviderContext().provider.capabilities
 }
 
+/** Active provider's plugin allowlist; `undefined` means every plugin is allowed. */
+export function useSupportedPlugins(): readonly string[] | undefined {
+  return useProviderContext().provider.supportedPlugins
+}
+
 export function useHasCapability(capability: keyof AcademicCapabilities): boolean {
   return useProviderContext().provider.capabilities[capability] === true
 }

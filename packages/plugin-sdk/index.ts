@@ -3,6 +3,7 @@ import type { PluginUIService } from "./ui"
 import type { PluginSlotService } from "./slots"
 import type { PluginI18nService } from "./i18n"
 import type { PluginProviderService } from "./providers"
+import type { PluginInstallerService } from "./installer"
 import type {
   PluginAssetService,
   PluginHttpService,
@@ -16,6 +17,7 @@ export type PluginContext = Context & {
   slots: PluginSlotService
   i18n: PluginI18nService
   providers: PluginProviderService
+  plugins: PluginInstallerService
   storage: PluginStorageService
   http: PluginHttpService
   native: PluginNativeService
@@ -46,4 +48,5 @@ export * from "./provider-capabilities"
 export * from "./provider-errors"
 export * from "./provider-school"
 export * from "./services"
+export * from "./installer"
 export * from "./host"

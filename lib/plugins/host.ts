@@ -16,13 +16,21 @@ import * as PluginPlatform from "@orahako/plugin-ui/platform"
 import * as PluginRuntimeUI from "@orahako/plugin-ui/plugin"
 import * as PluginShellRuntime from "@orahako/plugin-ui/shell"
 import * as PluginAssets from "@orahako/plugin-ui/assets"
-import type { PluginManifest } from "@orahako/plugin-sdk"
+import type { Context } from "@cordisjs/core"
+import type {
+  MarketplaceIndex,
+  PluginInstallerService,
+  PluginManifest,
+  PluginPlatform as PluginPlatformType,
+} from "@orahako/plugin-sdk"
+import { APP_VERSION } from "@/lib/version"
+import { isCapacitor } from "@/lib/native/platform"
 import { OFFICIAL_PLUGINS } from "@/plugins/official/registry"
 import { PluginRuntime } from "./runtime"
 import { PluginUIRegistry } from "./ui-registry"
 import { PluginSlotRegistry } from "./slot-registry"
 import { PluginLifecycleRegistry } from "./lifecycle-service"
-import { PluginI18nRegistry } from "./i18n-registry"
+import { pluginI18nRegistry } from "./i18n-registry"
 import { providerRegistry } from "@/providers/provider-registry"
 import { createPluginStorageService } from "./storage-service"
 import { createPluginPlatformServices } from "./platform-service"
@@ -46,26 +54,16 @@ import {
   type PluginRecoveryState,
 } from "./recovery"
 import { usePluginPreferences } from "@/lib/stores/plugin-preferences"
+import { loadPluginMarket, PLUGIN_MARKET_URL, selectCompatibleRelease } from "./market"
 
 export class PluginHost {
   readonly ui = new PluginUIRegistry()
   readonly slots = new PluginSlotRegistry()
   readonly lifecycle = new PluginLifecycleRegistry()
-  readonly i18n = new PluginI18nRegistry()
+  readonly i18n = pluginI18nRegistry
   readonly providers = providerRegistry
   readonly packages = new PluginPackageStore()
-  readonly runtime = new PluginRuntime((ctx, manifest) => {
-    this.ui.createService(ctx, manifest)
-    this.slots.createService(ctx, manifest)
-    this.lifecycle.createService(ctx, manifest)
-    this.i18n.createService(ctx, manifest)
-    this.providers.createService(ctx, manifest)
-    createPluginStorageService(ctx, manifest)
-    createPluginPlatformServices(ctx, manifest)
-    ctx.set("assets", {
-      url: (path: string) => this.external.get(manifest.id)?.assets.get(path),
-    })
-  })
+  readonly runtime = new PluginRuntime((ctx, manifest) => this.configureServices(ctx, manifest))
   readonly loadErrors = new Map<string, string>()
   recovery?: PluginRecoveryState
   bootstrapError?: string
@@ -73,6 +71,25 @@ export class PluginHost {
   private hostModules?: HostModuleRegistry
   private readonly external = new Map<string, LoadedExternalPlugin>()
   private readonly styleElements = new Map<string, HTMLStyleElement[]>()
+
+  private configureServices(ctx: Context, manifest: PluginManifest): void {
+    this.ui.createService(ctx, manifest)
+    this.slots.createService(ctx, manifest)
+    this.lifecycle.createService(ctx, manifest)
+    this.i18n.createService(ctx, manifest)
+    this.providers.createService(ctx, manifest)
+    createPluginStorageService(ctx, manifest)
+    createPluginPlatformServices(ctx, manifest)
+    ctx.set(
+      "plugins",
+      createMarketPluginInstaller({
+        installFromUrl: (url, sha256, expected) => this.installFromUrl(url, sha256, expected),
+      })
+    )
+    ctx.set("assets", {
+      url: (path: string) => this.external.get(manifest.id)?.assets.get(path),
+    })
+  }
 
   bootstrap(): Promise<void> {
     this.bootstrapPromise ??= this.bootstrapAll()
@@ -309,6 +326,47 @@ export class PluginHost {
   private removeStyles(id: string): void {
     for (const element of this.styleElements.get(id) ?? []) element.remove()
     this.styleElements.delete(id)
+  }
+}
+
+export interface MarketPluginInstallerOptions {
+  installFromUrl: (
+    url: string,
+    sha256: string,
+    expected: { id: string; version: string }
+  ) => Promise<PluginManifest>
+  loadMarket?: () => Promise<{ index: MarketplaceIndex }>
+  appVersion?: string
+  platform?: () => PluginPlatformType
+}
+
+/**
+ * Builds the public `ctx.plugins` service around the host's verified package
+ * installer, resolving releases relative to the configured market URL.
+ */
+export function createMarketPluginInstaller({
+  installFromUrl,
+  loadMarket = loadPluginMarket,
+  appVersion = APP_VERSION,
+  platform = () => (isCapacitor() ? "android" : "web"),
+}: MarketPluginInstallerOptions): PluginInstallerService {
+  return {
+    async installFromMarket(pluginId: string): Promise<PluginManifest> {
+      const { index } = await loadMarket()
+      const plugin = index.plugins.find((entry) => entry.id === pluginId)
+      if (!plugin) throw new Error(`Plugin not found in market: ${pluginId}`)
+      const currentPlatform = platform()
+      const release = selectCompatibleRelease(plugin, appVersion, currentPlatform)
+      if (!release) {
+        throw new Error(
+          `No compatible release for plugin ${pluginId} (app ${appVersion}, platform ${currentPlatform})`
+        )
+      }
+      return installFromUrl(new URL(release.zipUrl, PLUGIN_MARKET_URL).toString(), release.sha256, {
+        id: plugin.id,
+        version: release.version,
+      })
+    },
   }
 }
 

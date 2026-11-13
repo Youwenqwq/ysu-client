@@ -11,7 +11,7 @@ const FIPS_CIPHER = hex("69c4e0d86a7b0430d8cdb78070b4c55a")
 describe("aes128Ecb", () => {
   it("FIPS-197 已知答案：单分组加密/解密", () => {
     const encrypted = aes128EcbEncrypt(FIPS_KEY, FIPS_PLAIN)
-    expect(encrypted.length).toBe(32) // 恰好一块明文 → 追加整块填充
+    expect(encrypted.length).toBe(32)
     expect(encrypted.subarray(0, 16)).toEqual(FIPS_CIPHER)
     expect(aes128EcbDecrypt(FIPS_KEY, encrypted)).toEqual(FIPS_PLAIN)
   })

@@ -53,6 +53,7 @@ interface SettingsState {
   customCerBaseUrl: string
   customJwxtBaseUrl: string
   schoolId: string
+  onboardingCompleted: boolean
   scheduleCompactMode: boolean
   gpaVisible: boolean
   overviewLayout: OverviewLayout
@@ -94,6 +95,7 @@ interface SettingsState {
   setCustomCerBaseUrl: (url: string) => void
   setCustomJwxtBaseUrl: (url: string) => void
   setSchoolId: (id: string) => void
+  setOnboardingCompleted: (completed: boolean) => void
   setScheduleCompactMode: (v: boolean) => void
   setGpaVisible: (v: boolean) => void
   setOverviewLayout: (layout: OverviewLayout) => void
@@ -114,6 +116,13 @@ interface SettingsState {
   setEpayNotifyEnabled: (v: boolean) => void
   setEpayLastCheckedAt: (username: string, ts: number) => void
   setHasHydrated: (v: boolean) => void
+}
+
+export function migrateSettings(persisted: unknown, version: number): unknown {
+  if (version === 0 && persisted && typeof persisted === "object" && !Array.isArray(persisted)) {
+    return Object.assign({}, persisted, { onboardingCompleted: true })
+  }
+  return persisted
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -138,6 +147,7 @@ export const useSettingsStore = create<SettingsState>()(
       customCerBaseUrl: "",
       customJwxtBaseUrl: "",
       schoolId: "ysu",
+      onboardingCompleted: false,
       scheduleCompactMode: false,
       gpaVisible: false,
       overviewLayout: createDefaultOverviewLayout(),
@@ -178,6 +188,7 @@ export const useSettingsStore = create<SettingsState>()(
       setCustomCerBaseUrl: (customCerBaseUrl) => set({ customCerBaseUrl }),
       setCustomJwxtBaseUrl: (customJwxtBaseUrl) => set({ customJwxtBaseUrl }),
       setSchoolId: (schoolId) => set({ schoolId }),
+      setOnboardingCompleted: (onboardingCompleted) => set({ onboardingCompleted }),
       setScheduleCompactMode: (scheduleCompactMode) => set({ scheduleCompactMode }),
       setGpaVisible: (gpaVisible) => set({ gpaVisible }),
       setOverviewLayout: (overviewLayout) =>
@@ -210,6 +221,8 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: STORAGE_KEYS.settings,
+      version: 1,
+      migrate: migrateSettings,
       storage: createJSONStorage(() => localStorageAdapter),
       merge: (persisted, current) => {
         const saved: Partial<SettingsState> = {}

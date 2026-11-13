@@ -22,7 +22,7 @@ describe("CapacitorHttp binary response", () => {
     requestMock.mockReset()
   })
 
-  it("使用 arraybuffer 请求并将原生 base64 响应还原为图片字节", async () => {
+  it("跟随重定向时仍使用 arraybuffer，并将原生 base64 响应还原为图片字节", async () => {
     requestMock.mockResolvedValue({
       status: 200,
       headers: { "Content-Type": "image/jpeg" },
@@ -33,7 +33,7 @@ describe("CapacitorHttp binary response", () => {
     const response = await fetchStateless({
       method: "GET",
       url: "http://b1.cdn.zanao.com/avatar.jpeg@!sm_w100_h100",
-      redirect: "manual",
+      redirect: "follow",
       responseType: "arraybuffer",
     })
 

@@ -1097,6 +1097,15 @@ export interface AcademicProvider
   readonly id: string
   readonly name: string
   readonly capabilities: AcademicCapabilities
+  /**
+   * Explicit allowlist of plugin manifest ids this provider supports.
+   *
+   * Omitted (or `undefined`) keeps the historical behaviour: every plugin is
+   * allowed. When present it narrows plugin-contributed pages, navigation
+   * entries, and overview widgets on top of `capabilities`; it never widens
+   * them, so both checks must pass.
+   */
+  readonly supportedPlugins?: readonly string[]
   readonly mobile?: ProviderMobile
   readonly diagnostics?: ProviderDiagnostics
   readonly nativeNotification?: ProviderNativeNotification

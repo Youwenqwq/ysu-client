@@ -9,6 +9,7 @@ const PLUGIN_SERVICES = [
   "slots",
   "i18n",
   "providers",
+  "plugins",
   "storage",
   "http",
   "native",

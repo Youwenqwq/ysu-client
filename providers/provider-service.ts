@@ -50,6 +50,7 @@ export function getActiveProvider(): AcademicProvider {
 
 export function setActiveProviderSchool(schoolId: string): AcademicProvider {
   const nextSchoolId = resolveSupportedSchoolId(schoolId)
+  useAuthStore.getState().activateSchool(nextSchoolId)
   if (nextSchoolId !== getSchoolId()) {
     setSchoolConfig(nextSchoolId)
   }

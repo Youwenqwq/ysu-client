@@ -32,6 +32,7 @@ import { isCapacitor } from "@/lib/native/platform"
 import { useMFAModalStore } from "@/lib/stores/mfa-modal"
 import { landingPreferenceHref } from "@/lib/plugins/navigation"
 import { getActiveProvider, setActiveProviderSchool } from "@/providers/provider-service"
+import { providerRegistry } from "@/providers/provider-registry"
 import { useSemanticNavigation } from "@/lib/navigation/use-semantic-navigation"
 
 export default function LoginPage() {
@@ -43,7 +44,8 @@ export default function LoginPage() {
     return landingPreferenceHref(useSettingsStore.getState().defaultLandingPage, nav.sources)
   }
   const { t } = useTranslation()
-  const schools = getSelectableSchools()
+  const [schools, setSchools] = useState(() => getSelectableSchools())
+  const configuredSchool = useSettingsStore((state) => state.schoolId)
   const [selectedSchool, setSelectedSchool] = useState(getSchoolId())
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -57,6 +59,12 @@ export default function LoginPage() {
   // Web 端 secure-storage 退化为明文 localStorage，刻意不提供"记住密码"，
   // 避免账号密码明文落盘；会话 cookie 的持久化与教务系统本身的安全模型一致。
   const canRemember = isCapacitor()
+
+  useEffect(() => providerRegistry.subscribe(() => setSchools([...getSelectableSchools()])), [])
+
+  useEffect(() => {
+    setSelectedSchool(configuredSchool)
+  }, [configuredSchool])
 
   useEffect(() => {
     if (!isCapacitor()) return
@@ -93,7 +101,13 @@ export default function LoginPage() {
   function showCaptcha() {
     setNeedsCaptcha(true)
     const captchaUrl = getActiveProvider().getCaptchaUrl()
-    setCaptchaUrl(captchaUrl ? `${captchaUrl}?${Date.now()}` : null)
+    setCaptchaUrl(
+      captchaUrl?.startsWith("data:")
+        ? captchaUrl
+        : captchaUrl
+          ? `${captchaUrl}?${Date.now()}`
+          : null
+    )
   }
 
   async function syncRememberedLoginPreference() {
@@ -143,7 +157,7 @@ export default function LoginPage() {
       })
 
       if (res.authenticated && res.credential) {
-        setCredential(res.credential, username)
+        setCredential(res.credential, username, selectedSchool)
         await syncRememberedLoginPreference()
         toast.success(t("login.loginSuccess"))
         router.replace(redirectAfterLogin())
@@ -185,11 +199,9 @@ export default function LoginPage() {
       toast.error(t("login.errorLoginFailed"))
     } catch (err) {
       const e = err as Error & { code?: string; status?: number }
-      if (e.code === "NEED_CAPTCHA" || e.status === 403) {
+      if (e.code === "NEED_CAPTCHA" || e.code === "AUTH_CAPTCHA_REQUIRED") {
         toast.error(t("login.errorCaptchaRequired"))
-        if (!needsCaptcha) {
-          showCaptcha()
-        }
+        await handleCheckCaptcha()
       } else {
         toast.error(e.message || t("login.errorLoginFailed"))
       }
@@ -281,7 +293,7 @@ export default function LoginPage() {
                     src={captchaUrl}
                     alt="captcha"
                     className="cursor-pointer rounded-md border transition-opacity hover:opacity-80"
-                    onClick={() => showCaptcha()}
+                    onClick={() => void handleCheckCaptcha()}
                   />
                   <Input
                     id="captcha"

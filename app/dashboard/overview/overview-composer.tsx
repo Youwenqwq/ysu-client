@@ -79,6 +79,8 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import type { RegisteredPluginOverviewWidget } from "@/lib/plugins/ui-registry"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
+import { useSupportedPlugins } from "@/providers/use-provider"
+import { supportsPlugin } from "@orahako/plugin-sdk"
 import { useSettingsStore } from "@/lib/stores/settings"
 import { cn } from "@/lib/utils"
 import {
@@ -106,13 +108,17 @@ function useOverviewWidgetMeta() {
   const { locale } = useTranslation()
   const { host } = usePluginHost()
   const { overviewWidgets } = usePluginUI(host.ui)
-  const dynamicWidgets: DynamicOverviewWidget[] = overviewWidgets.map((widget) => ({
+  const supportedPlugins = useSupportedPlugins()
+  const available = overviewWidgets.filter((widget) =>
+    supportsPlugin(supportedPlugins, widget.pluginId)
+  )
+  const dynamicWidgets: DynamicOverviewWidget[] = available.map((widget) => ({
     id: pluginOverviewWidgetId(widget.pluginId, widget.id),
     region: widget.region,
     defaultVisible: widget.defaultVisible,
   }))
   const contributions = new Map<string, RegisteredPluginOverviewWidget>()
-  for (const widget of overviewWidgets) {
+  for (const widget of available) {
     contributions.set(pluginOverviewWidgetId(widget.pluginId, widget.id), widget)
   }
   const meta = (id: OverviewWidgetId): OverviewWidgetMeta | undefined => {

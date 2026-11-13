@@ -70,6 +70,20 @@ export function hasCapability(
   return capabilities[key] === true
 }
 
+/**
+ * Whether a provider allows the plugin with `pluginId`.
+ *
+ * `supportedPlugins` is an explicit allowlist: `undefined` allows every plugin
+ * (the historical behaviour) while an array — including an empty one — only
+ * allows the listed manifest ids.
+ */
+export function supportsPlugin(
+  supportedPlugins: readonly string[] | undefined,
+  pluginId: string
+): boolean {
+  return supportedPlugins === undefined || supportedPlugins.includes(pluginId)
+}
+
 export function assertCapability(
   provider: Pick<AcademicProvider, "id" | "capabilities">,
   key: keyof AcademicCapabilities

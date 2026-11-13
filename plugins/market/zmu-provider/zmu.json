@@ -1,0 +1,24 @@
+{
+  "id": "zmu",
+  "name": "遵义医科大学",
+  "nameEn": "Zunyi Medical University",
+  "cas": {
+    "cerBaseUrl": "https://cas-sw.zmu.edu.cn/cas",
+    "aesChars": "",
+    "mfaMethodToCode": {},
+    "mfaMethodToAuthCodeType": {}
+  },
+  "jwxt": {
+    "jwxtBaseUrl": "https://jwxt.zmu.edu.cn",
+    "portalPath": "/new/welcome.page",
+    "appShowPath": "",
+    "appIds": {},
+    "apiPaths": {}
+  },
+  "features": {
+    "hasMobile": false,
+    "hasLabSchedule": false,
+    "hasMfa": false
+  },
+  "visible": true
+}

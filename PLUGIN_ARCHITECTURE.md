@@ -44,7 +44,9 @@ React、实际使用的 Next 入口、`@ysu/academic` 和 UI Kit 子路径均由
 ### 官方插件
 
 - `ysu.shell`：默认登录、Dashboard、设置、导航和全局弹窗组合。
-- `ysu.provider`：YSU CAS/JWXT Provider。
+- `orahako.onboarding`：通过 `shell.overlay` 提供首次学校选择、权限配置和市场 Provider 安装；既有设置经迁移后不再显示。
+- `ysu.provider`：YSU CAS/JWXT Provider，也是唯一内置的学校 Provider；其他学校由市场包注册。
+- Provider 可用 `supportedPlugins` 声明学校支持的功能插件；该列表与 capabilities 共同约束页面、导航、深链和总览挂件。
 - 功能插件：课表、成绩、考试、总览、费用等。
 - 主题插件：向主题注册表贡献 CSS。
 
@@ -62,11 +64,11 @@ Shell 是完整应用根组件，通过 `ctx.ui.registerShell()` 注册。内核
 
 Slot 用于增量 UI 组合，支持三种形态：
 
-| 类型 | 用途 |
-|---|---|
-| `single` | 一个可替换 occupant；最低 priority 生效 |
-| `list` | 按 order 排列的增量内容 |
-| `keyed` | 按 key 选择一个 occupant；最低 priority 生效 |
+| 类型     | 用途                                         |
+| -------- | -------------------------------------------- |
+| `single` | 一个可替换 occupant；最低 priority 生效      |
+| `list`   | 按 order 排列的增量内容                      |
+| `keyed`  | 按 key 选择一个 occupant；最低 priority 生效 |
 
 Slot 所有者通过 `ctx.slots.declare()` 声明名称与形态。贡献者通过 `ctx.slots.register()` 注册组件。未声明的 Slot、keyed 贡献缺少 key、single/keyed 同优先级占位都会在加载时失败，而不是产生不确定 UI。
 

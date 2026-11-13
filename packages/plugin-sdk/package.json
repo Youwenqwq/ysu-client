@@ -13,10 +13,12 @@
     "./provider-capabilities": "./provider-capabilities.ts",
     "./provider-errors": "./provider-errors.ts",
     "./provider-school": "./provider-school.ts",
+    "./crypto": "./crypto.ts",
     "./ui": "./ui.ts",
     "./slots": "./slots.ts",
     "./i18n": "./i18n.ts",
     "./services": "./services.ts",
+    "./installer": "./installer.ts",
     "./market": "./market.ts",
     "./host-modules": "./host-modules.ts"
   },

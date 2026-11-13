@@ -30,6 +30,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
   const hasHydrated = useAuthStore((s) => s.hasHydrated)
   const settingsHydrated = useSettingsStore((s) => s.hasHydrated)
   const schoolId = useSettingsStore((s) => s.schoolId)
+  const onboardingCompleted = useSettingsStore((s) => s.onboardingCompleted)
   const updateMirror = useSettingsStore((s) => s.updateMirror)
   const updateChannel = useSettingsStore((s) => s.updateChannel)
   const setUpdateStatus = useUpdateStore((s) => s.setUpdateStatus)
@@ -108,7 +109,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
         host.lifecycle.setProviderReady(true)
         mutate((key) => Array.isArray(key) && key[0] === "provider")
 
-        if (didRunStartupSideEffects.current) return
+        if (didRunStartupSideEffects.current || !onboardingCompleted) return
         didRunStartupSideEffects.current = true
 
         // Show analytics consent prompt if user hasn't made a choice yet
@@ -181,6 +182,7 @@ export function SDKProvider({ children }: { children: React.ReactNode }) {
     settingsHydrated,
     host,
     schoolId,
+    onboardingCompleted,
     provider,
     t,
     checkAnnouncementsThenUpdates,

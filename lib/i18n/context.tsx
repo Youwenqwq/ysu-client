@@ -1,8 +1,18 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react"
 import { STORAGE_KEYS } from "../storage/keys"
 import { zh, en } from "./dict"
+import { pluginI18nRegistry } from "@/lib/plugins/i18n-registry"
 import type { Locale, Dictionary } from "./dict"
 
 const dictionaries: Record<Locale, Dictionary> = { zh, en }
@@ -78,7 +88,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const dict = dictionaries[locale]
+  const pluginDictVersion = useSyncExternalStore(
+    pluginI18nRegistry.subscribe,
+    pluginI18nRegistry.getSnapshot,
+    pluginI18nRegistry.getSnapshot
+  )
+  const dict = useMemo(() => {
+    void pluginDictVersion
+    return pluginI18nRegistry.getDictionary(locale, dictionaries[locale])
+  }, [locale, pluginDictVersion])
 
   return <I18nContext.Provider value={{ locale, dict, setLocale }}>{children}</I18nContext.Provider>
 }

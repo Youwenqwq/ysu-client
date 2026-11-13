@@ -7,9 +7,9 @@ import { usePluginHost } from "@/components/plugin-provider"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
 import type { RegisteredPluginPage } from "@/lib/plugins/ui-registry"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { pluginPageHref, type PluginPageProps } from "@orahako/plugin-sdk"
+import { pluginPageHref, supportsPlugin, type PluginPageProps } from "@orahako/plugin-sdk"
 import { usePluginRouteStore } from "@/lib/stores/plugin-route"
-import { useProviderCapabilities } from "@/providers/use-provider"
+import { useProviderCapabilities, useSupportedPlugins } from "@/providers/use-provider"
 import { hasPluginCapability, resolveSemanticTarget } from "@/lib/plugins/navigation"
 import { useTranslation } from "@/lib/i18n/use-translation"
 
@@ -48,12 +48,13 @@ function PluginHostContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const capabilities = useProviderCapabilities()
+  const supportedPlugins = useSupportedPlugins()
   const { t } = useTranslation()
   const pluginId = searchParams.get("plugin")
   const pageId = searchParams.get("page") ?? "index"
   const semanticRoute = searchParams.get("route")
   const semanticTarget = semanticRoute
-    ? resolveSemanticTarget(semanticRoute, { pages, navigation, capabilities })
+    ? resolveSemanticTarget(semanticRoute, { pages, navigation, capabilities, supportedPlugins })
     : undefined
   const page = semanticTarget
     ? pages.find(
@@ -91,7 +92,10 @@ function PluginHostContent() {
     )
   }
 
-  if (!hasPluginCapability(capabilities, page.capability)) {
+  if (
+    !supportsPlugin(supportedPlugins, page.pluginId) ||
+    !hasPluginCapability(capabilities, page.capability)
+  ) {
     return (
       <ActivePluginRoute page={page}>
         <PluginMessage

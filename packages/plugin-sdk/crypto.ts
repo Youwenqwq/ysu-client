@@ -1,7 +1,6 @@
 /**
  * AES-128-ECB（PKCS7）纯 TS 实现。
- * WebCrypto 不提供 ECB 模式，而 17wanxiao SWAEEncryptServlet 协议要求
- * ECB + 动态 key，故自带实现。仅处理该协议的小 payload，性能无关。
+ * WebCrypto 不提供 ECB 模式；仅供必须使用该模式的学校/平台协议处理小 payload。
  *
  * state 布局遵循 FIPS-197：列优先，state[r][c] = input[4c + r]。
  */
@@ -56,7 +55,6 @@ function expandKey(key: Uint8Array): Uint8Array {
     let t2 = w[i - 2]!
     let t3 = w[i - 1]!
     if (i % 16 === 0) {
-      // RotWord + SubWord + Rcon
       const tmp = t0
       t0 = SBOX[t1!]! ^ rcon
       t1 = SBOX[t2!]!

@@ -20,6 +20,7 @@ export {
   useProvider,
   useProviderReady,
   useProviderCapabilities,
+  useSupportedPlugins,
   useHasCapability,
 } from "@/providers/use-provider"
 export { useStudentInfo, type UseStudentInfoResult } from "@/providers/use-student-info"

@@ -25,4 +25,7 @@ export interface PluginLifecycleService {
 export interface PluginNativeService {
   readonly isNative: boolean
   saveImage(image: Blob, fileName?: string): Promise<{ uri: string }>
+  requestNotificationPermission(): Promise<boolean>
+  requestExactAlarmPermission(): Promise<boolean>
+  requestBatteryOptimizationExemption(): Promise<boolean>
 }

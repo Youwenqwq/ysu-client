@@ -21,10 +21,10 @@ import { useStudentInfo } from "@/providers/hooks"
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
 import { useTheme } from "next-themes"
 import { APP_VERSION, APP_BUILD } from "@/lib/version"
-import { useProviderCapabilities } from "@/providers/use-provider"
+import { useProviderCapabilities, useSupportedPlugins } from "@/providers/use-provider"
 import { usePluginHost } from "@/components/plugin-provider"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
-import { pluginPageHref, type PluginNavigationGroup } from "@orahako/plugin-sdk"
+import { pluginPageHref, supportsPlugin, type PluginNavigationGroup } from "@orahako/plugin-sdk"
 import { useSemanticNavigation } from "@/lib/navigation/use-semantic-navigation"
 import { hasPluginCapability } from "@/lib/plugins/navigation"
 
@@ -106,9 +106,11 @@ export default function MePage() {
   const initials = (student.data?.name || username || "U").slice(-2)
 
   const capabilities = useProviderCapabilities()
+  const supportedPlugins = useSupportedPlugins()
   const pluginItems = (group: PluginNavigationGroup) =>
     pluginNavigation
       .filter((item) => item.group === group)
+      .filter((item) => supportsPlugin(supportedPlugins, item.pluginId))
       .filter((item) => hasPluginCapability(capabilities, item.capability))
       .map((item) => ({
         href: pluginPageHref(item.pluginId, item.page),
@@ -203,13 +205,15 @@ export default function MePage() {
               label: t("plugins.title"),
               icon: Puzzle,
             },
-            ...pluginSettings.map((setting) => ({
-              href: pluginPageHref(setting.pluginId, setting.page),
-              label: setting.titleKey
-                ? host.i18n.translate(setting.pluginId, setting.titleKey, locale)
-                : setting.title,
-              icon: setting.icon,
-            })),
+            ...pluginSettings
+              .filter((setting) => supportsPlugin(supportedPlugins, setting.pluginId))
+              .map((setting) => ({
+                href: pluginPageHref(setting.pluginId, setting.page),
+                label: setting.titleKey
+                  ? host.i18n.translate(setting.pluginId, setting.titleKey, locale)
+                  : setting.title,
+                icon: setting.icon,
+              })),
           ]}
         />
       </Section>

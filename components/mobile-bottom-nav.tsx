@@ -7,10 +7,10 @@ import { User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { useSettingsStore } from "@/lib/stores/settings"
-import { useProviderCapabilities } from "@/providers/use-provider"
+import { useProviderCapabilities, useSupportedPlugins } from "@/providers/use-provider"
 import { usePluginHost } from "@/components/plugin-provider"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
-import { pluginPageHref } from "@orahako/plugin-sdk"
+import { pluginPageHref, supportsPlugin } from "@orahako/plugin-sdk"
 import { usePluginRouteStore } from "@/lib/stores/plugin-route"
 import { hasPluginCapability } from "@/lib/plugins/navigation"
 
@@ -43,6 +43,7 @@ export function MobileBottomNav() {
   }, [])
 
   const capabilities = useProviderCapabilities()
+  const supportedPlugins = useSupportedPlugins()
   const tabs = [
     ...navigation
       .filter((item) => item.primary)
@@ -56,9 +57,12 @@ export function MobileBottomNav() {
         pluginId: item.pluginId,
       })),
     { href: "/dashboard/me", label: t("app.me"), icon: User },
-  ].filter((tab) =>
-    hasPluginCapability(capabilities, "capability" in tab ? tab.capability : undefined)
-  )
+  ].filter((tab) => {
+    if (!hasPluginCapability(capabilities, "capability" in tab ? tab.capability : undefined)) {
+      return false
+    }
+    return !("pluginId" in tab) || supportsPlugin(supportedPlugins, tab.pluginId)
+  })
 
   return (
     <nav

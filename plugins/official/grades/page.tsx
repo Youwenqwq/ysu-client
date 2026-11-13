@@ -199,6 +199,7 @@ export function GradesPage() {
   }
 
   async function handleOpenStats(grade: Grade) {
+    if (!provider.capabilities.gradeAnalytics) return
     setSelectedGrade(grade)
     setStatsOpen(true)
 
@@ -380,6 +381,7 @@ export function GradesPage() {
             <button
               key={idx}
               type="button"
+              disabled={!provider.capabilities.gradeAnalytics}
               onClick={() => handleOpenStats(g)}
               className="rounded-lg border bg-card p-3 text-left transition-colors hover:bg-muted/50 active:bg-muted/70"
             >

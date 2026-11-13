@@ -24,10 +24,12 @@ export const SUPPORTED_HOST_MODULES = [
   "@orahako/plugin-sdk/provider-capabilities",
   "@orahako/plugin-sdk/provider-errors",
   "@orahako/plugin-sdk/provider-school",
+  "@orahako/plugin-sdk/crypto",
   "@orahako/plugin-sdk/manifest",
   "@orahako/plugin-sdk/ui",
   "@orahako/plugin-sdk/slots",
   "@orahako/plugin-sdk/i18n",
   "@orahako/plugin-sdk/services",
+  "@orahako/plugin-sdk/installer",
   "@orahako/plugin-sdk/market",
 ] as const

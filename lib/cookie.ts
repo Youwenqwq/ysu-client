@@ -666,6 +666,9 @@ async function followRedirects(jar: SimpleCookieJar, req: HttpRequest): Promise<
       body: currentBody,
       redirect: "manual",
       timeoutMs: req.timeoutMs,
+      responseType: req.responseType,
+      signal: req.signal,
+      proxyTargetInHeader: req.proxyTargetInHeader,
     })
 
     if (resp.status < 300 || resp.status >= 400) {
