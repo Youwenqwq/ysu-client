@@ -1,6 +1,8 @@
 import { GraduationCap } from "lucide-react"
 import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { GradesPage } from "./page"
+import { GradeNotificationContent, GradesGachaSettingsSection } from "./settings"
+import { useGradeGachaStore } from "./grade-gacha-store"
 import { GpaSummaryWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
@@ -25,6 +27,18 @@ export const definition = definePlugin((ctx) => {
     defaultVisible: false,
     order: 20,
   })
+  ctx.slots.register({
+    id: "settings",
+    slot: "settings.sections",
+    order: 30,
+    component: GradesGachaSettingsSection,
+  })
+  ctx.slots.register({
+    id: "notification-content",
+    slot: "settings.notificationContent",
+    order: 10,
+    component: GradeNotificationContent,
+  })
   ctx.ui.registerPage({
     id: "index",
     title: "成绩查询",
@@ -44,4 +58,5 @@ export const definition = definePlugin((ctx) => {
     capability: "grades",
     primary: true,
   })
+  ctx.on("dispose", () => useGradeGachaStore.getState().setBaseline([]))
 })

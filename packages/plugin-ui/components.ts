@@ -36,6 +36,9 @@ export {
   FieldTitle,
 } from "@/components/ui/field"
 export { Spinner } from "@/components/ui/spinner"
+export { SettingsSection } from "@/components/settings-section"
+export { SettingNumberInput } from "@/components/setting-number-input"
+export { Switch } from "@/components/ui/switch"
 export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants } from "@/components/ui/tabs"
 export { Alert, AlertTitle, AlertDescription, AlertAction } from "@/components/ui/alert"
 export { Separator } from "@/components/ui/separator"

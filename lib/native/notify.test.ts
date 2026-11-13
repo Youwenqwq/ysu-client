@@ -401,4 +401,27 @@ describe("school-time class alarms", () => {
       notify.computeClassAlarms(courses, null, periods, 7, calendar).map((alarm) => alarm.alarmTime)
     ).toEqual([Date.parse("2026-09-20T01:45:00Z")])
   })
+
+  it("stops polling and cancels alarms when their plugins become unavailable", async () => {
+    await notify.startNativePolling()
+    settings.setState({ classReminderEnabled: true })
+    await notify.syncClassAlarmsToNative([course], week, periods)
+    expect(native.polling).not.toBeNull()
+    expect(native.alarms).not.toEqual([])
+
+    unsubscribe()
+    unsubscribe = notify.observeNativeNotifications(
+      {
+        getAuthToken: native.getAuthToken,
+        getServerConfig: () => ({}),
+      },
+      "ysu",
+      { grades: false, exams: false, schedule: false }
+    )
+    await notify.syncNativeNotifications()
+    await notify.syncClassAlarmsToNative([course], week, periods)
+    expect(native.polling).toBeNull()
+    expect(native.alarms).toEqual([])
+    expect(settings.getState().classReminderEnabled).toBe(true)
+  })
 })

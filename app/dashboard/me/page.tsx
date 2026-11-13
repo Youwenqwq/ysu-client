@@ -207,6 +207,7 @@ export default function MePage() {
             },
             ...pluginSettings
               .filter((setting) => supportsPlugin(supportedPlugins, setting.pluginId))
+              .filter((setting) => hasPluginCapability(capabilities, setting.capability))
               .map((setting) => ({
                 href: pluginPageHref(setting.pluginId, setting.page),
                 label: setting.titleKey

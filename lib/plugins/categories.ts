@@ -10,8 +10,14 @@ export interface PluginCategoryInput {
 
 export function pluginCategory(plugin: PluginCategoryInput): PluginCategory {
   if (plugin.kind === "provider" || plugin.categories?.includes("provider")) return "provider"
-  if (plugin.kind === "shell" || plugin.required) return "system"
-  if (plugin.kind === "theme" || plugin.categories?.includes("appearance")) return "appearance"
+  if (plugin.kind === "shell" || plugin.required || plugin.categories?.includes("system"))
+    return "system"
+  if (
+    plugin.kind === "theme" ||
+    plugin.categories?.includes("appearance") ||
+    plugin.categories?.includes("theme")
+  )
+    return "appearance"
   if (plugin.categories?.includes("toybox")) return "toybox"
   return "academic"
 }

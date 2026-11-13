@@ -9,6 +9,7 @@ import {
 import { STORAGE_KEYS } from "@orahako/plugin-ui/stores"
 import { runEpayAutoCheck } from "./auto-check"
 import { EpayPage } from "./page"
+import { EpaySettingsSection } from "./settings"
 
 export const manifest: PluginManifest = {
   id: "orahako.epay",
@@ -26,6 +27,23 @@ function currentLocale(): PluginLocale {
 }
 
 export const definition = definePlugin((ctx) => {
+  ctx.i18n.register({
+    zh: {
+      settings: { epayReminderTitle: "缴费提醒" },
+      epay: {
+        remindLabel: "未缴自动提醒",
+        remindDesc: "打开应用时自动检查并提醒未缴费用",
+      },
+    },
+    en: {
+      settings: { epayReminderTitle: "Fee Reminder" },
+      epay: {
+        remindLabel: "Unpaid reminder",
+        remindDesc: "Check and remind unpaid fees when the app opens",
+      },
+    },
+  })
+
   ctx.ui.registerPage({
     id: "index",
     title: "缴费查询",
@@ -42,6 +60,13 @@ export const definition = definePlugin((ctx) => {
     group: "fees",
     capability: "epay",
     order: 20,
+  })
+
+  ctx.slots.register({
+    id: "settings",
+    slot: "settings.sections",
+    order: 70,
+    component: EpaySettingsSection,
   })
 
   ctx.hostLifecycle.onProviderReady(async () => {

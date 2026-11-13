@@ -8,6 +8,8 @@ describe("plugin categories", () => {
     expect(pluginCategory({ kind: "feature", required: true })).toBe("system")
     expect(pluginCategory({ kind: "shell" })).toBe("system")
     expect(pluginCategory({ kind: "theme" })).toBe("appearance")
+    expect(pluginCategory({ categories: ["theme"] })).toBe("appearance")
+    expect(pluginCategory({ categories: ["system"] })).toBe("system")
     expect(pluginCategory({ kind: "feature" })).toBe("academic")
   })
 

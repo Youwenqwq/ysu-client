@@ -1,6 +1,7 @@
 import { Calendar, FileText } from "lucide-react"
 import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { ExamsPage } from "./page"
+import { ExamCompactSettingsWidget, ExamNotificationContent, ExamSettingsWidget } from "./settings"
 import { UpcomingExamsWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
@@ -24,6 +25,24 @@ export const definition = definePlugin((ctx) => {
     region: "content",
     defaultVisible: true,
     order: 60,
+  })
+  ctx.slots.register({
+    id: "exams",
+    slot: "settings.notificationContent",
+    order: 20,
+    component: ExamNotificationContent,
+  })
+  ctx.slots.register({
+    id: "exam",
+    slot: "settings.widgets",
+    order: 20,
+    component: ExamSettingsWidget,
+  })
+  ctx.slots.register({
+    id: "exam-compact",
+    slot: "settings.widgets",
+    order: 20,
+    component: ExamCompactSettingsWidget,
   })
   ctx.ui.registerPage({
     id: "index",

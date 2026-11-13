@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Device } from "@capacitor/device"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -18,22 +17,18 @@ import {
 } from "@/components/ui/dialog"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useSettingsStore, type LandingPage } from "@/lib/stores/settings"
-import { Input } from "@/components/ui/input"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service"
 import { isCapacitor } from "@/lib/native/platform"
-import { cn } from "@/lib/utils"
+import { PluginSlot } from "@orahako/plugin-sdk"
+import { SettingsSection } from "@/components/settings-section"
 
-import { syncWidgetSettingsToWidget } from "@/lib/native/widget-bridge"
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
 import { useUpdateStore } from "@/lib/stores/update"
 import { useTheme } from "next-themes"
-import { setNotificationEnabled } from "@/lib/native/notify"
 import { NotifyPlugin } from "@/lib/native/notify-plugin"
 import {
   LayoutDashboard,
-  LayoutGrid,
-  Calendar,
   ChevronRight,
   LogIn,
   LogOut,
@@ -41,20 +36,10 @@ import {
   Image as ImageIcon,
   Sun,
   Globe,
-  Clock,
-  CalendarClock,
-  Sparkles,
   UserCircle,
-  Bell,
-  Timer,
-  AlarmClock,
-  Radio,
-  Vibrate,
   Battery,
-  Wallet2,
   ShieldCheck,
   BarChart3,
-  WifiOff,
 } from "lucide-react"
 
 export default function SettingsPage() {
@@ -65,96 +50,12 @@ export default function SettingsPage() {
 
   const defaultLandingPage = useSettingsStore((s) => s.defaultLandingPage)
   const setDefaultLandingPage = useSettingsStore((s) => s.setDefaultLandingPage)
-  const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours)
-  const setWidgetSyncReminderHours = useSettingsStore((s) => s.setWidgetSyncReminderHours)
-  const widgetShowNextDaySchedule = useSettingsStore((s) => s.widgetShowNextDaySchedule)
-  const setWidgetShowNextDaySchedule = useSettingsStore((s) => s.setWidgetShowNextDaySchedule)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
-  const notifyEnabled = useSettingsStore((s) => s.notifyEnabled)
-  const notifyCheckInterval = useSettingsStore((s) => s.notifyCheckInterval)
-  const setNotifyCheckInterval = useSettingsStore((s) => s.setNotifyCheckInterval)
-  const notifyGrades = useSettingsStore((s) => s.notifyGrades)
-  const setNotifyGrades = useSettingsStore((s) => s.setNotifyGrades)
-  const notifyExams = useSettingsStore((s) => s.notifyExams)
-  const setNotifyExams = useSettingsStore((s) => s.setNotifyExams)
-  const notifyNetworkError = useSettingsStore((s) => s.notifyNetworkError)
-  const setNotifyNetworkError = useSettingsStore((s) => s.setNotifyNetworkError)
-  const classReminderEnabled = useSettingsStore((s) => s.classReminderEnabled)
-  const epayNotifyEnabled = useSettingsStore((s) => s.epayNotifyEnabled)
-  const setEpayNotifyEnabled = useSettingsStore((s) => s.setEpayNotifyEnabled)
-  const classReminderMinutes = useSettingsStore((s) => s.classReminderMinutes)
-  const setClassReminderMinutes = useSettingsStore((s) => s.setClassReminderMinutes)
-  const classLiveUpdateEnabled = useSettingsStore((s) => s.classLiveUpdateEnabled)
-  const setClassLiveUpdateEnabled = useSettingsStore((s) => s.setClassLiveUpdateEnabled)
-  const classVibrationEnabled = useSettingsStore((s) => s.classVibrationEnabled)
-  const setClassVibrationEnabled = useSettingsStore((s) => s.setClassVibrationEnabled)
-  const classReminderDays = useSettingsStore((s) => s.classReminderDays)
-  const setClassReminderDays = useSettingsStore((s) => s.setClassReminderDays)
   const analyticsConsent = useSettingsStore((s) => s.analyticsConsent)
   const setAnalyticsConsent = useSettingsStore((s) => s.setAnalyticsConsent)
-  const gradeGachaEnabled = useSettingsStore((s) => s.gradeGachaEnabled)
-  const setGradeGachaEnabled = useSettingsStore((s) => s.setGradeGachaEnabled)
   const [batteryIgnored, setBatteryIgnored] = useState<boolean | null>(null)
   const [autoStartDialogOpen, setAutoStartDialogOpen] = useState(false)
-  const [notificationPermissionPending, setNotificationPermissionPending] = useState(false)
-  const [liveUpdatePermissionPending, setLiveUpdatePermissionPending] = useState(false)
-  const awaitingExactAlarmPermission = useRef(false)
-  const [liveUpdateSupported, setLiveUpdateSupported] = useState(false)
-
-  useEffect(() => {
-    if (!isCapacitor()) return
-    let mounted = true
-    Device.getInfo()
-      .then((info) => {
-        if (mounted) {
-          setLiveUpdateSupported(info.platform === "android" && (info.androidSDKVersion ?? 0) >= 36)
-        }
-      })
-      .catch(() => {})
-    return () => {
-      mounted = false
-    }
-  }, [])
-
-  async function handleNotificationToggle(kind: "polling" | "classes", enabled: boolean) {
-    if (kind === "classes" && !enabled) awaitingExactAlarmPermission.current = false
-    setNotificationPermissionPending(true)
-    try {
-      if (!(await setNotificationEnabled(kind, enabled))) {
-        toast.error(t("settings.notificationPermissionDenied"))
-      }
-    } catch {
-      toast.error(t("settings.notificationSyncFailed"))
-    } finally {
-      setNotificationPermissionPending(false)
-    }
-  }
-
-  async function handleLiveUpdateToggle(enabled: boolean) {
-    if (!enabled) {
-      awaitingExactAlarmPermission.current = false
-      setClassLiveUpdateEnabled(false)
-      return
-    }
-    awaitingExactAlarmPermission.current = true
-    setLiveUpdatePermissionPending(true)
-    try {
-      const { granted } = await NotifyPlugin.requestExactAlarmPermission()
-      if (granted) {
-        awaitingExactAlarmPermission.current = false
-        setClassLiveUpdateEnabled(true)
-      } else {
-        toast.info(t("settings.classLiveUpdateExactAlarmRequired"))
-      }
-    } catch {
-      awaitingExactAlarmPermission.current = false
-      toast.error(t("settings.notificationSyncFailed"))
-    } finally {
-      setLiveUpdatePermissionPending(false)
-    }
-  }
-
   // Check battery optimization status on mount and when returning from settings
   useEffect(() => {
     if (!isCapacitor()) return
@@ -174,16 +75,6 @@ export default function SettingsPage() {
               setBatteryIgnored(ignored)
             })
             .catch(() => {})
-          if (awaitingExactAlarmPermission.current) {
-            NotifyPlugin.checkExactAlarmPermission()
-              .then(({ granted }) => {
-                if (granted && awaitingExactAlarmPermission.current) {
-                  awaitingExactAlarmPermission.current = false
-                  setClassLiveUpdateEnabled(true)
-                }
-              })
-              .catch(() => {})
-          }
         }
       }).then((h) => {
         listener = h
@@ -193,7 +84,7 @@ export default function SettingsPage() {
     return () => {
       listener?.remove()
     }
-  }, [setClassLiveUpdateEnabled])
+  }, [])
 
   async function handleLogout() {
     setLogoutDialogOpen(false)
@@ -230,23 +121,11 @@ export default function SettingsPage() {
     router.replace("/login")
   }
 
-  // 新成绩抽卡开关：Web 端直接跟在背景图下方，Capacitor 端位于小组件小节内
-  const gradeGachaRow = (
-    <div className="flex items-center gap-3 border-t border-border py-3">
-      <Sparkles className="size-5 shrink-0 text-muted-foreground" />
-      <div className="flex flex-1 flex-col">
-        <span className="text-sm">{t("settings.gradeGacha")}</span>
-        <span className="text-xs text-muted-foreground">{t("settings.gradeGachaDesc")}</span>
-      </div>
-      <Switch checked={gradeGachaEnabled} onCheckedChange={setGradeGachaEnabled} />
-    </div>
-  )
-
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
 
-      <Section title={t("me.sectionPreferences")}>
+      <SettingsSection title={t("me.sectionPreferences")}>
         <Card className="py-0">
           <CardContent className="flex flex-col py-1">
             {/* 通用 */}
@@ -265,30 +144,9 @@ export default function SettingsPage() {
                 variant="outline"
                 size="sm"
               >
-                <ToggleGroupItem value="overview" className="gap-1 text-xs">
-                  <LayoutDashboard className="size-3.5" />
-                  {t("settings.startupOverview")}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="schedule" className="gap-1 text-xs">
-                  <Calendar className="size-3.5" />
-                  {t("settings.startupSchedule")}
-                </ToggleGroupItem>
+                <PluginSlot name="settings.startupOptions" />
               </ToggleGroup>
             </div>
-
-            <Link
-              href="/dashboard/me/settings/overview"
-              className="flex items-center gap-3 border-t border-border py-3 transition-colors active:bg-muted/60"
-            >
-              <LayoutDashboard className="size-5 shrink-0 text-muted-foreground" />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="text-sm">{t("overviewLayout.customize")}</span>
-                <span className="text-xs text-muted-foreground">
-                  {t("overviewLayout.settingsDescription")}
-                </span>
-              </div>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </Link>
 
             {/* 主题 */}
             <div className="flex items-center gap-3 border-t border-border py-3">
@@ -352,70 +210,13 @@ export default function SettingsPage() {
               <span className="flex-1 text-sm">{t("app.backgroundImage")}</span>
               <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
             </Link>
-
-            {/* 新成绩抽卡（Web 端直接跟在背景图下方；Capacitor 端在小组件小节内） */}
-            {!isCapacitor() && gradeGachaRow}
-
-            {/* 小组件 — 仅 Capacitor 平台 */}
-            {isCapacitor() && (
-              <>
-                <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
-                  {t("settings.widget")}
-                </h3>
-
-                <Link
-                  href="/dashboard/me/settings/widgets"
-                  className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
-                >
-                  <LayoutGrid className="size-5 shrink-0 text-muted-foreground" />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-sm">{t("settings.addWidget")}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {t("settings.addWidgetDesc")}
-                    </span>
-                  </div>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                </Link>
-
-                {/* 课表同步提醒阈值 */}
-                <SettingNumberInput
-                  icon={Clock}
-                  label={t("settings.widgetSyncReminder")}
-                  value={widgetSyncReminderHours}
-                  onChange={(v) => {
-                    setWidgetSyncReminderHours(v)
-                    syncWidgetSettingsToWidget(v, widgetShowNextDaySchedule).catch(() => {})
-                  }}
-                  min={0}
-                  max={168}
-                  unit={t("settings.widgetSyncReminderUnit")}
-                  bordered
-                />
-
-                {/* 无课显示下一有课日 */}
-                <div className="flex items-center gap-3 border-t border-border py-3">
-                  <CalendarClock className="size-5 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 text-sm">{t("settings.widgetShowNextDay")}</span>
-                  <Switch
-                    checked={widgetShowNextDaySchedule}
-                    onCheckedChange={(v) => {
-                      setWidgetShowNextDaySchedule(v)
-                      syncWidgetSettingsToWidget(widgetSyncReminderHours, v).catch(() => {})
-                    }}
-                  />
-                </div>
-
-                {/* 新成绩抽卡 */}
-                {gradeGachaRow}
-              </>
-            )}
           </CardContent>
         </Card>
-      </Section>
+      </SettingsSection>
 
       {/* 通知设置 — 仅 Capacitor 平台 */}
       {isCapacitor() && (
-        <Section title={t("settings.notifyTitle")}>
+        <SettingsSection title={t("settings.notifyTitle")}>
           <Card className="py-0">
             <CardContent className="flex flex-col py-1">
               {/* 系统权限 */}
@@ -463,178 +264,14 @@ export default function SettingsPage() {
                 </div>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
               </button>
-
-              {/* 成绩/考试通知 */}
-              <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
-                {t("settings.notifyContentTitle")}
-              </h3>
-
-              {/* 通知开关 */}
-              <div className="flex items-center gap-3 py-3">
-                <Bell className="size-5 shrink-0 text-muted-foreground" />
-                <div className="flex flex-1 flex-col">
-                  <span className="text-sm">{t("settings.notifyEnabled")}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {t("settings.notifyEnabledDesc")}
-                  </span>
-                </div>
-                <Switch
-                  checked={notifyEnabled}
-                  disabled={notificationPermissionPending}
-                  onCheckedChange={(enabled) => void handleNotificationToggle("polling", enabled)}
-                />
-              </div>
-
-              {/* 检查频率 */}
-              {notifyEnabled && (
-                <SettingNumberInput
-                  icon={Timer}
-                  label={t("settings.notifyInterval")}
-                  description={t("settings.notifyIntervalHint")}
-                  value={notifyCheckInterval}
-                  onChange={setNotifyCheckInterval}
-                  min={15}
-                  max={1440}
-                  unit={t("settings.notifyIntervalUnit")}
-                  bordered
-                />
-              )}
-
-              {/* 监听内容 */}
-              {notifyEnabled && (
-                <div className="flex items-center gap-3 border-t border-border py-3">
-                  <CalendarClock className="size-5 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 text-sm">{t("settings.notifyContent")}</span>
-                  <ToggleGroup
-                    type="multiple"
-                    value={[...(notifyGrades ? ["grades"] : []), ...(notifyExams ? ["exams"] : [])]}
-                    onValueChange={(v) => {
-                      setNotifyGrades(v.includes("grades"))
-                      setNotifyExams(v.includes("exams"))
-                    }}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <ToggleGroupItem value="grades" className="text-xs">
-                      {t("settings.notifyGrades")}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="exams" className="text-xs">
-                      {t("settings.notifyExams")}
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-              )}
-
-              {/* 网络错误提醒 */}
-              {notifyEnabled && (
-                <div className="flex items-center gap-3 border-t border-border py-3">
-                  <WifiOff className="size-5 shrink-0 text-muted-foreground" />
-                  <div className="flex flex-1 flex-col">
-                    <span className="text-sm">{t("settings.notifyNetworkError")}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {t("settings.notifyNetworkErrorDesc")}
-                    </span>
-                  </div>
-                  <Switch checked={notifyNetworkError} onCheckedChange={setNotifyNetworkError} />
-                </div>
-              )}
-
-              {/* 上课提醒 */}
-              <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
-                {t("settings.classReminderTitle")}
-              </h3>
-              <div className="flex items-center gap-3 py-3">
-                <AlarmClock className="size-5 shrink-0 text-muted-foreground" />
-                <div className="flex flex-1 flex-col">
-                  <span className="text-sm">{t("settings.classReminderEnabled")}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {t("settings.classReminderHint")}
-                  </span>
-                </div>
-                <Switch
-                  checked={classReminderEnabled}
-                  disabled={notificationPermissionPending}
-                  onCheckedChange={(enabled) => void handleNotificationToggle("classes", enabled)}
-                />
-              </div>
-              {classReminderEnabled && (
-                <>
-                  <div className="flex items-center gap-3 border-t border-border py-3">
-                    <Radio className="size-5 shrink-0 text-muted-foreground" />
-                    <label
-                      htmlFor="class-live-update"
-                      className={cn(
-                        "min-w-0 flex-1 text-sm",
-                        !liveUpdateSupported && "text-muted-foreground"
-                      )}
-                    >
-                      {t("settings.classLiveUpdateEnabled")}
-                    </label>
-                    <Switch
-                      id="class-live-update"
-                      checked={liveUpdateSupported && classLiveUpdateEnabled}
-                      disabled={!liveUpdateSupported || liveUpdatePermissionPending}
-                      onCheckedChange={(enabled) => void handleLiveUpdateToggle(enabled)}
-                    />
-                  </div>
-                  <div className="flex items-center gap-3 border-t border-border py-3">
-                    <Vibrate className="size-5 shrink-0 text-muted-foreground" />
-                    <label htmlFor="class-vibration" className="min-w-0 flex-1 text-sm">
-                      {t("settings.classVibrationEnabled")}
-                    </label>
-                    <Switch
-                      id="class-vibration"
-                      checked={classVibrationEnabled}
-                      onCheckedChange={setClassVibrationEnabled}
-                    />
-                  </div>
-                  <SettingNumberInput
-                    icon={Timer}
-                    label={t("settings.classReminderMinutes")}
-                    value={classReminderMinutes}
-                    onChange={setClassReminderMinutes}
-                    min={1}
-                    max={120}
-                    unit={t("settings.minutes")}
-                    bordered
-                  />
-                  <SettingNumberInput
-                    icon={CalendarClock}
-                    label={t("settings.classReminderDays")}
-                    value={classReminderDays}
-                    onChange={setClassReminderDays}
-                    min={1}
-                    max={14}
-                    unit={t("settings.days")}
-                    bordered
-                  />
-                </>
-              )}
             </CardContent>
           </Card>
-        </Section>
+        </SettingsSection>
       )}
 
-      <Section title={t("settings.epayReminderTitle")}>
-        <Card className="py-0">
-          <CardContent className="flex flex-col py-1">
-            <div className="flex items-center gap-3 py-3">
-              <Wallet2 className="size-5 shrink-0 text-muted-foreground" />
-              <div className="flex flex-1 flex-col">
-                <span className="text-sm">{t("epay.remindLabel")}</span>
-                <span className="text-xs text-muted-foreground">{t("epay.remindDesc")}</span>
-              </div>
-              <Switch
-                aria-label={t("epay.remindLabel")}
-                checked={epayNotifyEnabled}
-                onCheckedChange={setEpayNotifyEnabled}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </Section>
+      <PluginSlot name="settings.sections" />
 
-      <Section title={t("me.sectionAccount")}>
+      <SettingsSection title={t("me.sectionAccount")}>
         <Card className="py-0">
           <CardContent className="flex flex-col py-1">
             <button
@@ -656,7 +293,7 @@ export default function SettingsPage() {
             </button>
           </CardContent>
         </Card>
-      </Section>
+      </SettingsSection>
 
       <div className="flex flex-col gap-2">
         <Card className="py-0">
@@ -673,7 +310,7 @@ export default function SettingsPage() {
         </Card>
       </div>
 
-      <Section title={t("about.title")}>
+      <SettingsSection title={t("about.title")}>
         <Card className="py-0">
           <CardContent className="flex flex-col py-1">
             <Link
@@ -687,7 +324,7 @@ export default function SettingsPage() {
             </Link>
           </CardContent>
         </Card>
-      </Section>
+      </SettingsSection>
 
       <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
         <DialogContent>
@@ -717,77 +354,6 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {title}
-      </h2>
-      {children}
-    </section>
-  )
-}
-
-function SettingNumberInput({
-  icon: Icon,
-  label,
-  description,
-  value,
-  onChange,
-  min,
-  max,
-  unit,
-  bordered,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  description?: string
-  value: number
-  onChange: (v: number) => void
-  min: number
-  max: number
-  unit: string
-  bordered?: boolean
-}) {
-  const [local, setLocal] = useState(String(value))
-
-  function commit() {
-    const val = parseInt(local, 10)
-    const clamped = Math.min(max, Math.max(min, Number.isNaN(val) ? value : val))
-    setLocal(String(clamped))
-    if (clamped !== value) onChange(clamped)
-  }
-
-  return (
-    <div className={cn("flex items-center gap-3 py-3", bordered && "border-t border-border")}>
-      <Icon className="size-5 shrink-0 text-muted-foreground" />
-      <div className="flex flex-1 flex-col">
-        <span className="text-sm">{label}</span>
-        {description && <span className="text-xs text-muted-foreground">{description}</span>}
-      </div>
-      <div className="flex items-center gap-1.5">
-        <Input
-          name="setting-number"
-          type="number"
-          value={local}
-          onChange={(e) => setLocal(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              commit()
-              ;(e.target as HTMLInputElement).blur()
-            }
-          }}
-          className="h-7 w-16 text-right text-sm"
-          min={min}
-          max={max}
-        />
-        <span className="text-sm text-muted-foreground">{unit}</span>
-      </div>
     </div>
   )
 }

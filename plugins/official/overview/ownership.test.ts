@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { PluginRuntime } from "@/lib/plugins/runtime"
 import { PluginUIRegistry } from "@/lib/plugins/ui-registry"
+import { PluginSlotRegistry } from "@/lib/plugins/slot-registry"
+import { definition as shell, manifest as shellManifest } from "../shell"
 import { definition as overview, manifest as overviewManifest } from "./index"
 import { definition as ecard, manifest as ecardManifest } from "../ecard"
 import { definition as evaluation, manifest as evaluationManifest } from "../evaluation"
@@ -11,8 +13,13 @@ import { definition as schedule, manifest as scheduleManifest } from "../schedul
 describe("overview widget ownership", () => {
   it("keeps feature cards owned by their plugins and removes them on disable", () => {
     const registry = new PluginUIRegistry()
-    const runtime = new PluginRuntime(registry.createService)
+    const slots = new PluginSlotRegistry()
+    const runtime = new PluginRuntime((ctx, manifest) => {
+      registry.createService(ctx, manifest)
+      slots.createService(ctx, manifest)
+    })
     const plugins = [
+      [shellManifest, shell],
       [overviewManifest, overview],
       [ecardManifest, ecard],
       [evaluationManifest, evaluation],

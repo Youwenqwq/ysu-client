@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 import { getSchoolConfigOrNull } from "@orahako/plugin-sdk/host"
 import { PluginRuntime } from "@/lib/plugins/runtime"
 import { ProviderPluginRegistry } from "@/providers/provider-registry"
+import { PluginSlotRegistry } from "@/lib/plugins/slot-registry"
 import { definition, manifest } from "./index"
 
 describe("YSU provider plugin", () => {
@@ -11,7 +12,17 @@ describe("YSU provider plugin", () => {
 
   it("registers and revokes the YSU provider when started and stopped", async () => {
     const providers = new ProviderPluginRegistry()
-    const runtime = new PluginRuntime(providers.createService)
+    const slots = new PluginSlotRegistry()
+    const runtime = new PluginRuntime((ctx, plugin) => {
+      providers.createService(ctx, plugin)
+      slots.createService(ctx, plugin)
+    })
+    runtime.register(
+      { ...manifest, id: "test.shell", kind: "shell" },
+      (ctx) => ctx.slots.declare({ name: "settings.sections", kind: "list" }),
+      "builtin"
+    )
+    runtime.start("test.shell")
     runtime.register(manifest, definition, "builtin")
     runtime.start(manifest.id)
     await vi.waitFor(() => expect(providers.hasProvider("ysu")).toBe(true))

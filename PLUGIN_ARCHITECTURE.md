@@ -79,6 +79,10 @@ Slot 所有者通过 `ctx.slots.declare()` 声明名称与形态。贡献者通�
 
 - `shell.overlay`：应用根级浮层列表。
 - `dashboard.header.actions`：桌面 Dashboard 头部动作列表。
+- `settings.startupOptions`：启动页选项，由总览、日程等目标插件分别贡献。
+- `settings.sections`：完整设置区块；功能停用时由 Cordis 自动移除。
+- `settings.notificationContent`：原生轮询的监听内容选项。
+- `settings.widgets`：可添加的原生小组件卡片。
 
 Overview 挂件由实际功能插件注册，而不是由 `ysu.overview` 代注册。公共组件与数据 Provider 位于 `@ysu/academic`；`order` 决定默认布局顺序，Cordis 在功能停用时移除其挂件。已有用户布局继续按稳定挂件 ID 归一化。
 

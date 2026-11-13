@@ -77,7 +77,9 @@ ctx.slots.register({
 })
 ```
 
-`PluginSlot` 让 Shell 渲染 Slot，无需导入宿主私有模块。`ctx.ui.getSnapshot()` 与 `ctx.ui.subscribe()` 提供页面和导航快照，供替代 Shell 自行组合。
+`PluginSlot` 让 Shell 渲染 Slot，无需导入宿主私有模块。`ctx.ui.getSnapshot()` 与 `subscribe()` 提供页面和导航快照，供替代 Shell 自行组合。
+
+默认 Shell 还提供 `settings.startupOptions`、`settings.sections`、`settings.notificationContent` 和 `settings.widgets`。功能插件应通过这些 Slot 贡献设置界面，而不是修改宿主设置页；停用或卸载时贡献会自动注销。
 
 ## 页面与 URL
 

@@ -49,5 +49,9 @@ function OfficialShell({ children }: { children: ReactNode }) {
 export const definition = definePlugin((ctx) => {
   ctx.slots.declare({ name: "shell.overlay", kind: "list" })
   ctx.slots.declare({ name: "dashboard.header.actions", kind: "list" })
+  ctx.slots.declare({ name: "settings.startupOptions", kind: "list" })
+  ctx.slots.declare({ name: "settings.sections", kind: "list" })
+  ctx.slots.declare({ name: "settings.notificationContent", kind: "list" })
+  ctx.slots.declare({ name: "settings.widgets", kind: "list" })
   ctx.ui.registerShell({ id: "default", name: "酸橙盒", component: OfficialShell })
 })

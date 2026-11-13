@@ -1,6 +1,12 @@
 import { BookOpen, Calendar, Clock } from "lucide-react"
 import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { SchedulePage } from "./page"
+import {
+  ClassReminderSettingsSection,
+  ScheduleStartupOption,
+  ScheduleWidgetAssistantSettings,
+  ScheduleWidgetSettingsSection,
+} from "./settings"
 import { CourseProgressWidget, TodayCoursesWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
@@ -57,5 +63,29 @@ export const definition = definePlugin((ctx) => {
     order: 10,
     capability: "schedule",
     primary: true,
+  })
+  ctx.slots.register({
+    id: "startup-option",
+    slot: "settings.startupOptions",
+    order: 20,
+    component: ScheduleStartupOption,
+  })
+  ctx.slots.register({
+    id: "widget-settings",
+    slot: "settings.sections",
+    order: 40,
+    component: ScheduleWidgetSettingsSection,
+  })
+  ctx.slots.register({
+    id: "widget-assistant",
+    slot: "settings.widgets",
+    order: 10,
+    component: ScheduleWidgetAssistantSettings,
+  })
+  ctx.slots.register({
+    id: "class-reminder-settings",
+    slot: "settings.sections",
+    order: 50,
+    component: ClassReminderSettingsSection,
   })
 })

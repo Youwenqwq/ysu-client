@@ -33,6 +33,7 @@ let lifecycleRevision = 0
 let stopped = false
 let notificationProvider: ProviderNativeNotification | undefined
 let notificationProviderId: string | undefined
+let notificationFeatures = { grades: true, exams: true, schedule: true }
 let lastPollingHash = ""
 let lastCastgc = ""
 let pendingTokenRefresh = false
@@ -106,12 +107,14 @@ async function readCastgc(
 /** Bind the single control source; React cleanup only removes subscriptions. */
 export function observeNativeNotifications(
   nativeNotification: ProviderNativeNotification | undefined,
-  providerId: string
+  providerId: string,
+  features = { grades: true, exams: true, schedule: true }
 ): () => void {
   if (!isCapacitor()) return () => {}
   if (notificationProviderId && notificationProviderId !== providerId) stopNotify()
   notificationProvider = nativeNotification
   notificationProviderId = providerId
+  notificationFeatures = features
   stopped = !useAuthStore.getState().isAuthenticated
 
   const sync = () => {
@@ -181,11 +184,14 @@ export function syncNativeNotifications(checkNow = false, refreshToken = false):
     if (!auth.hasHydrated || !settings.hasHydrated) return
     const provider = notificationProvider
     const providerId = notificationProviderId
+    const checkGrades = settings.notifyGrades && notificationFeatures.grades
+    const checkExams = settings.notifyExams && notificationFeatures.exams
     const valid = () =>
       revision === pollingRevision && !stopped && useAuthStore.getState().isAuthenticated
     if (
       !valid() ||
       (!settings.notifyEnabled && !pendingTokenRefresh) ||
+      (!checkGrades && !checkExams && !settings.notifyNetworkError) ||
       auth.sessionExpired ||
       !provider ||
       !providerId ||
@@ -200,8 +206,8 @@ export function syncNativeNotifications(checkNow = false, refreshToken = false):
       auth.username,
       auth.credential,
       settings.notifyCheckInterval,
-      settings.notifyGrades,
-      settings.notifyExams,
+      checkGrades,
+      checkExams,
       settings.notifyNetworkError,
     ])
     if (hash === lastPollingHash && !pendingTokenRefresh && !pendingCheck) return
@@ -235,8 +241,8 @@ export function syncNativeNotifications(checkNow = false, refreshToken = false):
     }
     await NotifyPlugin.startPolling({
       intervalMinutes: settings.notifyCheckInterval,
-      checkGrades: settings.notifyGrades,
-      checkExams: settings.notifyExams,
+      checkGrades,
+      checkExams,
       notifyNetworkError: settings.notifyNetworkError,
     })
     if (!valid()) return
@@ -248,11 +254,26 @@ export function syncNativeNotifications(checkNow = false, refreshToken = false):
   }))
 }
 
+export function checkExactAlarmPermission(): Promise<{ granted: boolean }> {
+  return NotifyPlugin.checkExactAlarmPermission()
+}
+
+export function requestExactAlarmPermission(): Promise<{ granted: boolean }> {
+  return NotifyPlugin.requestExactAlarmPermission()
+}
+
 /** Permission is requested by user interaction, independently for both features. */
 export async function setNotificationEnabled(
   kind: "polling" | "classes",
   enabled: boolean
 ): Promise<boolean> {
+  if (
+    enabled &&
+    ((kind === "classes" && !notificationFeatures.schedule) ||
+      (kind === "polling" && !notificationFeatures.grades && !notificationFeatures.exams))
+  ) {
+    return false
+  }
   const revision = ++permissionRevisions[kind]
   const lifecycle = lifecycleRevision
   const auth = useAuthStore.getState()
@@ -458,7 +479,7 @@ function refreshClassAlarms(): Promise<void> {
     if (!auth.hasHydrated || !settings.hasHydrated) return
     const valid = () =>
       revision === alarmRevision && !stopped && useAuthStore.getState().isAuthenticated
-    if (!valid() || !settings.classReminderEnabled) {
+    if (!valid() || !settings.classReminderEnabled || !notificationFeatures.schedule) {
       await NotifyPlugin.cancelClassAlarms()
       lastAlarmHash = ""
       return

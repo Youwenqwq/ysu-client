@@ -2,6 +2,7 @@ import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@orahako/
 import { unregisterSchoolConfig } from "@orahako/plugin-sdk/host"
 import type { SchoolConfig } from "@orahako/plugin-sdk/provider-school"
 import ysuConfig from "./ysu.json"
+import { NotifySettingsSection } from "./settings-notifications"
 import { YSUProvider } from "./ysu-provider"
 
 export const manifest: PluginManifest = {
@@ -21,7 +22,14 @@ export const definition = definePlugin((ctx) => {
     config,
     providerFactory: () => new YSUProvider(),
   })
+  const disposeSettings = ctx.slots.register({
+    id: "notifications",
+    slot: "settings.sections",
+    order: 45,
+    component: NotifySettingsSection,
+  })
   ctx.on("dispose", () => {
+    disposeSettings()
     disposeRegistration()
     unregisterSchoolConfig(config)
   })

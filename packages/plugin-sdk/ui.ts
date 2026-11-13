@@ -58,6 +58,7 @@ export interface PluginSettingDefinition {
   page: string
   icon: PluginIcon
   order?: number
+  capability?: string
 }
 
 export interface PluginThemeDefinition {

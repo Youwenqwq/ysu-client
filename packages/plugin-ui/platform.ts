@@ -13,7 +13,13 @@ export {
   type WidgetWeekInfo,
   type WidgetExam,
 } from "@/lib/native/widget-bridge"
-export { syncClassAlarmsToNative, stopNotify } from "@/lib/native/notify"
+export {
+  syncClassAlarmsToNative,
+  stopNotify,
+  setNotificationEnabled,
+  checkExactAlarmPermission,
+  requestExactAlarmPermission,
+} from "@/lib/native/notify"
 export { OrahakoFile, type OrahakoFilePlugin } from "@/lib/native/orahako-file"
 export {
   BACK_PRIORITY,
