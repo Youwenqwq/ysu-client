@@ -1,79 +1,70 @@
-<p align="center">
-  <img src="public/icon.svg" width="128" height="128" alt="燕大终端图标" />
-</p>
+# 酸橙盒（Orahako）
 
-<h1 align="center">燕大终端</h1>
+面向大学通用线上服务的第三方客户端，构建于**一切皆插件**的 [Cordis](https://github.com/cordiverse/cordis) 架构之上。默认提供燕大 Provider 与官方界面；其他学校、功能页面、主题和整个应用 Shell 都可以通过插件替换。
 
-<p align="center">
-  <a href="README.zh-CN.md">详细文档（中文）</a> · <a href="README.en.md">English</a>
-</p>
+文档：[插件组合架构](PLUGIN_ARCHITECTURE.md) · [插件 SDK](packages/plugin-sdk/README.md)
 
-<p align="center">
-  燕山大学教务系统第三方 Android 客户端
-</p>
+## 开发者预览
 
----
+本项目正在积极开发中，处于 0.x 阶段。**插件 API、清单格式、Slot / Provider 契约与运行时行为都可能发生不兼容变更，暂不保证插件接口的稳定性。**；插件作者应约束 `apiVersion` 与 `minAppVersion`。
 
-> 本项目为 **第三方客户端，与燕山大学官方无任何关联。** 仅供个人学习交流，代码**完全由 AI 进行编写**，
-> 人工仅进行了基本设计调试与粗略审计，使用即默认了解并接受相关风险，请勿用于侵犯他人权益或违反学校规定的场景。
+本项目与燕山大学官方无任何关联。
 
-## 这是什么
+## 功能
 
-燕大终端是一个 Android 应用，可以让你更方便地使用燕山大学教务系统。设计初衷是解决第三方课表需手动更新，
-而今日校园 App 加载又过于缓慢，导致信息查询低效率的问题。
+目前内置插件提供如下功能：
 
-本项目实现了以下功能：
+- **学业**：成绩与 GPA、日程与调课、考试与补考、学生信息、培养方案、评教
+- **校园**：劳动教育、双创学分、综合测评、全校课表与空教室、一卡通 / 空调 / 缴费
+- **通知**：上课提醒与 Android Live Update、成绩 / 考试监听、桌面小组件
+- **扩展**：多学校 Provider、外部 Shell 与主题
 
-- **登录**：CAS 统一认证，支持验证码和 MFA 多因素验证，记住登录状态；
-  内置登录速率限制保护，防止频繁登录触发风控
-- **查成绩**：按学期筛选，查看统计、分布和排名；支持学期 GPA 计算与学位课程标识
-- **看课表**：合并理论课与实验课，按周切换，桌面和移动端双布局；
-  实时高亮当前课程，支持课程活动签到 / 签退，支持手动调课。
-- **查考试**：按学期查看考试安排
-- **看绩点**：学分和绩点一目了然
-- **培养方案**：查看课程完成情况和学业预警
-- **评教**：支持学生评教功能，评教支持批量一键自动填写最高分
-- **劳动平台**: 劳动记录和劳动时长
-- **双创平台**: 双创学分，认定记录，竞赛库等
-- **综合测评**: 综测成绩和指标明细查询
-- **全校课表**: 查询全校课表和空教室
-- **费用查询**: 空调用量，一卡通余额和缴费查询
-- **上课通知**：可按完整课表和未来周次生成提醒；Android 16+ 且允许精确闹钟后可启用**Android Live Update**显示课前、上课及连堂状态，课前倒计时会在后台自动更新；强震动可独立开启.
-- **成绩/考试监听**：支持以最低 15 分钟的间隔监听教务系统，提醒新增成绩和考试安排变化
-- **桌面小组件**：提供今日 / 明日课表与考试小组件，可从日程页助手或设置页样式指南添加
-
-应用通过 Capacitor 打包为 Android WebView 壳应用，支持 OTA 热更新与 APK 外壳版本检测。
-
-## 插件
-
-应用 Shell、Provider、业务页面、UI Slot、总览挂件和主题通过同一套 Cordis 插件协议组合。用户可在「我的 → 插件」管理官方/外部插件、切换应用 Shell 与主题、安装 ZIP 或访问插件市场。社区插件既能向默认 UI 添加内容，也能完全替换应用界面。
-
-插件是拥有完整应用能力的主上下文代码，可访问凭据、会话和原生能力；只安装可信来源，更新同样需要信任。架构边界见 [插件组合架构](PLUGIN_ARCHITECTURE.md)，包格式与 API 见 [插件 SDK 文档](packages/plugin-sdk/README.md)。可复制 [功能插件模板](packages/plugin-template) 或 [完整 Shell 模板](packages/plugin-shell-template) 开始开发；[Perlica 社区插件](packages/perlica-toybox) 展示了真实地图、扫码、独立凭据与第三方协议的完整适配。
-
-## 数据来源与安全性
-
-燕大终端 App 的所有业务逻辑**均在本地实现**，从官方教务系统获取数据并保存在本地，中间不经过任何其他服务器。
-登录之后的凭据数据存储在本地，凭据通过系统安全存储（Android Keystore / iOS Keychain）加密保存。
-
-为保证教务系统数据不受意外修改，本项目除学生评教外，均仅实现了数据查询功能。
+功能是否出现由当前学校 Provider 的能力声明与 `supportedPlugins` 决定。
 
 ## 安装
 
-从 [GitHub Releases](https://github.com/Youwenqwq/ysu-client/releases) 下载最新的 APK 安装包。
+从 [GitHub Releases](https://github.com/Youwenqwq/ysu-client/releases) 下载最新 APK。网络异常时可在应用内配置 GitHub 代理镜像。
 
-> 如遇网络故障，可在应用内配置 GitHub 代理镜像。设置入口会在出现网络故障时弹出。
+Web 端为同一代码库的静态导出 PWA；原生端通过 Capacitor 打包，支持 OTA 热更新与外壳版本检测。
+
+## 插件
+
+在「我的 → 插件」安装市场插件或本地 ZIP，切换 Shell 与主题，并按当前学校安装推荐组合包。插件与应用同权，可访问凭据、会话、网络和原生能力，因此请注意安全，只安装可信来源。
+
+- 架构边界：[PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md)
+- 包格式与 API：[packages/plugin-sdk](packages/plugin-sdk/README.md)
+- 起步模板：[功能插件](packages/plugin-template) · [完整 Shell](packages/plugin-shell-template)
+- 完整示例：[Perlica 社区插件](packages/perlica-toybox)
+
+## 数据与安全
+
+业务逻辑在本地运行。原生端直接访问学校系统；Web 端经同源 EdgeOne 边缘函数按域名白名单转发，官方插件不提供集中存储教务数据的业务后端。凭据保存在系统安全存储中。
+
+插件市场只分发插件包与索引，插件自身的网络行为由插件与用户授权决定。
 
 ## 兼容性
 
-应用运行在系统 WebView 中。如遇渲染异常，请检查 WebView 版本是否过低——
-**最低要求 Chromium v111**。可通过 Play Store 等方式更新 Android System WebView。
+对于 Capacitor 端，要求：
+- Android 7.0（API 24）及以上
+- 系统 WebView 最低要求 Chromium v111
+
+对于 Web 端：
+
+- Chromium 内核大于 v119
+
+## 开发
+
+```sh
+pnpm install
+pnpm run dev       # Web / PWA
+pnpm run test
+pnpm run build
+pnpm plugin pack packages/plugin-template
+```
 
 ## 相关项目
 
-业务逻辑参考以下项目实现：
-
 - [ysu-sdk](https://github.com/Youwenqwq/ysu-sdk) — 教务系统 SDK
-- [ysu-api](https://github.com/Youwenqwq/ysu-api) — 教务系统 API 服务
 
 ## 协议
 
