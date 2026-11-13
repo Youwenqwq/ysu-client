@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { useRouter, usePathname } from "next/navigation"
+import { Suspense, useCallback, useEffect, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useAuthStore } from "@/lib/stores/auth"
 import { useMobileHeaderStore } from "@/lib/stores/mobile-header"
@@ -137,6 +137,36 @@ function SidebarResizeHandle() {
       onDoubleClick={() => setOpen(false)}
       className="absolute inset-y-0 -right-2 z-20 hidden w-4 cursor-col-resize touch-none justify-center after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent after:transition-colors hover:after:bg-sidebar-border md:flex"
     />
+  )
+}
+
+function RouteTransition({
+  fullscreen,
+  children,
+}: {
+  fullscreen: boolean
+  children: React.ReactNode
+}) {
+  const pathname = usePathname().replace(/\/$/, "")
+  const searchParams = useSearchParams()
+  const pluginId = searchParams.get("plugin")
+  const pageId = searchParams.get("page") ?? "index"
+  // Recreate the animated container when the displayed page identity changes.
+  // Plugin pages share one pathname, so pathname alone cannot detect tab switches.
+  const routeKey = pluginId ? `${pathname}?${pluginId}:${pageId}` : pathname
+
+  return (
+    <div
+      key={routeKey}
+      className={cn(
+        "flex flex-1 flex-col md:p-8",
+        fullscreen
+          ? "min-h-0 overflow-hidden"
+          : "animate-in p-4 duration-500 fade-in slide-in-from-bottom-2"
+      )}
+    >
+      {children}
+    </div>
   )
 }
 
@@ -463,17 +493,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </DropdownMenu>
           </div>
         </header>
-        <div
-          key={pathname}
-          className={cn(
-            "flex flex-1 flex-col md:p-8",
-            mobileFullscreen
-              ? "min-h-0 overflow-hidden"
-              : "animate-in p-4 duration-500 fade-in slide-in-from-bottom-2"
-          )}
-        >
-          {children}
-        </div>
+        <Suspense fallback={null}>
+          <RouteTransition fullscreen={mobileFullscreen}>{children}</RouteTransition>
+        </Suspense>
       </main>
       {!mobileFullscreen && <MobileBottomNav />}
     </SidebarProvider>
