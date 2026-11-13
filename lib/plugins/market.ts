@@ -4,11 +4,11 @@ import type {
   MarketplacePlugin,
   MarketplaceRelease,
   PluginPlatform,
-} from "@ysu/plugin-sdk"
-import { PLUGIN_API_VERSION } from "@ysu/plugin-sdk"
+} from "@orahako/plugin-sdk"
+import { PLUGIN_API_VERSION } from "@orahako/plugin-sdk"
 
 export const PLUGIN_MARKET_URL = "https://ysu.welain.com/updates/plugins.json"
-const MARKET_CACHE_KEY = "academic-client-plugin-market-cache"
+const MARKET_CACHE_KEY = "orahako-plugin-market-cache"
 
 export interface PluginMarketResult {
   index: MarketplaceIndex

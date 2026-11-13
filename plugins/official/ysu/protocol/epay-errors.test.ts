@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type * as HostModule from "@ysu/plugin-sdk/host"
-import { type HttpResponse } from "@ysu/plugin-sdk/host"
+import type * as HostModule from "@orahako/plugin-sdk/host"
+import { type HttpResponse } from "@orahako/plugin-sdk/host"
 
 const mocks = vi.hoisted(() => ({
   authorize: vi.fn(),
@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   fetchWithJar: vi.fn<typeof HostModule.fetchWithJar>(),
 }))
 
-vi.mock("@ysu/plugin-sdk/host", async (importOriginal) => ({
+vi.mock("@orahako/plugin-sdk/host", async (importOriginal) => ({
   ...(await importOriginal<typeof HostModule>()),
   fetchWithJar: mocks.fetchWithJar,
 }))

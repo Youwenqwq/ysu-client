@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import type { PluginManifest, PluginSlotService } from "@ysu/plugin-sdk"
+import type { PluginManifest, PluginSlotService } from "@orahako/plugin-sdk"
 import { PluginRuntime } from "./runtime"
 import { PluginSlotRegistry } from "./slot-registry"
 

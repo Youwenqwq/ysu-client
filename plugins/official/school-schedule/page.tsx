@@ -1,32 +1,32 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { Input } from "@ysu/plugin-ui/components"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@ysu/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Input } from "@orahako/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@orahako/plugin-ui/components"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
 import {
   Drawer,
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
   DrawerTitle,
-} from "@ysu/plugin-ui/components"
-import { Field, FieldGroup, FieldLabel } from "@ysu/plugin-ui/components"
-import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@ysu/plugin-ui/components"
-import { FilterDrawer, FilterTrigger } from "@ysu/plugin-ui/components"
-import type { PluginPageProps } from "@ysu/plugin-sdk"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
-import { ResponsiveSelect } from "@ysu/plugin-ui/components"
-import { cn } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Field, FieldGroup, FieldLabel } from "@orahako/plugin-ui/components"
+import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@orahako/plugin-ui/components"
+import { FilterDrawer, FilterTrigger } from "@orahako/plugin-ui/components"
+import type { PluginPageProps } from "@orahako/plugin-sdk"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
+import { ResponsiveSelect } from "@orahako/plugin-ui/components"
+import { cn } from "@orahako/plugin-ui/components"
 import {
   useCurrentWeek,
   useClassPeriods,
@@ -40,15 +40,15 @@ import {
   useSchoolGradeYears,
   useSchoolMajors,
   useTermCalendar,
-} from "@ysu/plugin-ui/hooks"
-import type { Course, SchoolClassInfo, ClassroomInfo } from "@ysu/plugin-sdk/academic"
-import { useIsMobile } from "@ysu/plugin-ui/hooks"
-import { useBackHandler } from "@ysu/plugin-ui/hooks"
-import { useAcademicTime } from "@ysu/plugin-ui/hooks"
-import { buildCourseColorMap } from "@ysu/academic"
-import { ScheduleMobile } from "@ysu/academic"
-import { ScheduleTablet } from "@ysu/academic"
-import { isCourseActiveInWeek, periodIsInUse } from "@ysu/academic"
+} from "@orahako/plugin-ui/hooks"
+import type { Course, SchoolClassInfo, ClassroomInfo } from "@orahako/plugin-sdk/academic"
+import { useIsMobile } from "@orahako/plugin-ui/hooks"
+import { useBackHandler } from "@orahako/plugin-ui/hooks"
+import { useAcademicTime } from "@orahako/plugin-ui/hooks"
+import { buildCourseColorMap } from "@orahako/academic"
+import { ScheduleMobile } from "@orahako/academic"
+import { ScheduleTablet } from "@orahako/academic"
+import { isCourseActiveInWeek, periodIsInUse } from "@orahako/academic"
 import { ArrowLeft, CalendarSearch, ChevronLeft, ChevronRight, Search } from "lucide-react"
 
 const ALL = "__all__"

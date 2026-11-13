@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { ProviderErrorCode } from "@ysu/plugin-sdk/provider-errors"
+import { ProviderErrorCode } from "@orahako/plugin-sdk/provider-errors"
 import { mapCASSessionError } from "./cas-auth"
 import { NotAuthenticatedError } from "./protocol/cas"
 

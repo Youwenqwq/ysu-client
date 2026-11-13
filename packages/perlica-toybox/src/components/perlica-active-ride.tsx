@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Bike, Clock3, Pause, Play, RotateCcw } from "lucide-react"
-import { toast } from "@ysu/plugin-sdk/host"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
+import { toast } from "@orahako/plugin-sdk/host"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
 import {
   Dialog,
   DialogContent,
@@ -12,10 +12,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
 import type { PerlicaClient } from "../extras/client"
 import type { PerlicaCoords, PerlicaDispatchCheck, PerlicaOrder } from "../extras/types"
-import { usePluginTranslation } from "@ysu/plugin-ui/plugin"
+import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
 
 const VISIBLE_POLL_MS = 8_000

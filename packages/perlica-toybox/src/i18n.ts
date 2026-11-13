@@ -1,4 +1,4 @@
-import type { PluginTranslations } from "@ysu/plugin-sdk"
+import type { PluginTranslations } from "@orahako/plugin-sdk"
 
 /**
  * Perlica copy lifted from the host dictionary at port time. The package owns

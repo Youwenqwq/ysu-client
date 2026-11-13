@@ -1,10 +1,10 @@
 import type { Context } from "@cordisjs/core"
-import type { PluginManifest } from "@ysu/plugin-sdk"
+import type { PluginManifest } from "@orahako/plugin-sdk"
 import type {
   PluginProviderService,
   ProviderFactory,
   SchoolRegistration,
-} from "@ysu/plugin-sdk/providers"
+} from "@orahako/plugin-sdk/providers"
 import { registerSchoolConfig, unregisterSchoolConfig } from "@/lib/server-config"
 import { trackPluginRegistration } from "@/lib/plugins/track-registration"
 import type { AcademicProvider } from "./types"

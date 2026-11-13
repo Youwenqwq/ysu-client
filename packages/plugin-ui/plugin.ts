@@ -1,8 +1,8 @@
 /**
- * @ysu/plugin-ui/plugin — plugin-host-facing hooks and navigation resolvers.
+ * @orahako/plugin-ui/plugin — plugin-host-facing hooks and navigation resolvers.
  *
  * Pure resolvers plus UI-store hooks; none of these load the plugin provider
- * context (that lives in `@ysu/plugin-ui/shell`), so plugins can import this
+ * context (that lives in `@orahako/plugin-ui/shell`), so plugins can import this
  * submodule freely.
  */
 export { usePluginUI } from "@/lib/plugins/use-plugin-ui"

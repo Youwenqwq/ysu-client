@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import type { AcademicProvider, PluginManifest, SchoolConfig } from "@ysu/plugin-sdk"
+import type { AcademicProvider, PluginManifest, SchoolConfig } from "@orahako/plugin-sdk"
 import { PluginRuntime } from "@/lib/plugins/runtime"
 import { providerRegistry } from "./provider-registry"
 import { getActiveProvider, setActiveProviderSchool } from "./provider-service"

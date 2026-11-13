@@ -23,17 +23,17 @@ function sources(overrides: Partial<SemanticNavSources> = {}): SemanticNavSource
 
 const defaultSources = sources({
   pages: [
-    { pluginId: "org.ysu.overview", id: "index" },
+    { pluginId: "org.orahako.overview", id: "index" },
     {
-      pluginId: "org.ysu.schedule",
+      pluginId: "org.orahako.schedule",
       id: "index",
       route: "schedule",
       primary: true,
       capability: "schedule",
     },
-    { pluginId: "org.ysu.grades", id: "index", route: "grades" },
+    { pluginId: "org.orahako.grades", id: "index", route: "grades" },
     {
-      pluginId: "org.ysu.student-info",
+      pluginId: "org.orahako.student-info",
       id: "index",
       route: "student-info",
       capability: "studentInfo",
@@ -41,27 +41,27 @@ const defaultSources = sources({
   ],
   navigation: [
     {
-      pluginId: "org.ysu.overview",
+      pluginId: "org.orahako.overview",
       id: "overview",
       page: "index",
       title: "总览",
       order: 0,
       primary: true,
     },
-    { pluginId: "org.ysu.schedule", id: "schedule", page: "index", title: "日程", order: 10 },
-    { pluginId: "org.ysu.grades", id: "grades", page: "index", title: "成绩", order: 20 },
+    { pluginId: "org.orahako.schedule", id: "schedule", page: "index", title: "日程", order: 10 },
+    { pluginId: "org.orahako.grades", id: "grades", page: "index", title: "成绩", order: 20 },
   ],
 })
 
 describe("semantic target resolution", () => {
   it("resolves by declared page route, then by navigation id", () => {
     expect(resolveSemanticTarget("schedule", defaultSources)).toEqual({
-      pluginId: "org.ysu.schedule",
+      pluginId: "org.orahako.schedule",
       pageId: "index",
     })
     // `overview` has no page route; it resolves through its navigation entry.
     expect(resolveSemanticTarget("overview", defaultSources)).toEqual({
-      pluginId: "org.ysu.overview",
+      pluginId: "org.orahako.overview",
       pageId: "index",
     })
   })
@@ -101,7 +101,7 @@ describe("semantic target resolution", () => {
 describe("primary target resolution", () => {
   it("prefers a primary page ordered by navigation order", () => {
     expect(resolvePrimaryTarget(defaultSources)).toEqual({
-      pluginId: "org.ysu.overview",
+      pluginId: "org.orahako.overview",
       pageId: "index",
     })
   })
@@ -125,10 +125,10 @@ describe("primary target resolution", () => {
 describe("landing preference", () => {
   it("keeps the schedule/overview preference semantics", () => {
     expect(landingPreferenceHref("schedule", defaultSources)).toBe(
-      "/dashboard/plugin/?plugin=org.ysu.schedule&page=index"
+      "/dashboard/plugin/?plugin=org.orahako.schedule&page=index"
     )
     expect(landingPreferenceHref("overview", defaultSources)).toBe(
-      "/dashboard/plugin/?plugin=org.ysu.overview&page=index"
+      "/dashboard/plugin/?plugin=org.orahako.overview&page=index"
     )
   })
 
@@ -141,7 +141,7 @@ describe("landing preference", () => {
           navigation: defaultSources.navigation.slice(0, 1),
         })
       )
-    ).toBe("/dashboard/plugin/?plugin=org.ysu.overview&page=index")
+    ).toBe("/dashboard/plugin/?plugin=org.orahako.overview&page=index")
     expect(landingPreferenceHref("overview", sources())).toBe(CORE_DASHBOARD_FALLBACK_HREF)
   })
 
@@ -151,15 +151,15 @@ describe("landing preference", () => {
       capabilities: { ...defaultSources.capabilities!, schedule: false },
     })
     expect(landingPreferenceHref("schedule", disabledSchedule)).toBe(
-      "/dashboard/plugin/?plugin=org.ysu.overview&page=index"
+      "/dashboard/plugin/?plugin=org.orahako.overview&page=index"
     )
   })
 })
 
 describe("semanticTargetHref", () => {
   it("builds the plugin page URL", () => {
-    expect(semanticTargetHref({ pluginId: "org.ysu.exams", pageId: "index" })).toBe(
-      "/dashboard/plugin/?plugin=org.ysu.exams&page=index"
+    expect(semanticTargetHref({ pluginId: "org.orahako.exams", pageId: "index" })).toBe(
+      "/dashboard/plugin/?plugin=org.orahako.exams&page=index"
     )
   })
 })

@@ -23,7 +23,7 @@ import {
   toast,
   useAuthStore,
   useMFAModalStore,
-} from "@ysu/plugin-sdk/host"
+} from "@orahako/plugin-sdk/host"
 import { isYSUMfaMethod } from "./types"
 
 let inflightAutoLogin: Promise<boolean> | null = null

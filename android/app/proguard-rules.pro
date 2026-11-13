@@ -38,8 +38,8 @@
 -keepclassmembers class ee.forgr.** { *; }
 
 # === App-specific plugins ===
--keep class com.youwenqwq.ysuclient.** { *; }
--keepclassmembers class com.youwenqwq.ysuclient.** { *; }
+-keep class me.uwen.orahako.** { *; }
+-keepclassmembers class me.uwen.orahako.** { *; }
 
 # === Kotlin ===
 -keepattributes RuntimeVisibleAnnotations,RuntimeInvisibleAnnotations

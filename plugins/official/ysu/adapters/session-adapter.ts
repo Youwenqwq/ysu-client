@@ -4,7 +4,7 @@ import {
 } from "../session"
 import { warmupWEU } from "../protocol/jwxt"
 import { ensureMobileAuthorized } from "../protocol/jwmobile"
-import { isFeatureAvailable } from "@ysu/plugin-sdk/host"
+import { isFeatureAvailable } from "@orahako/plugin-sdk/host"
 
 export async function initializeSession(): Promise<void> {
   await initializeProviderSession()

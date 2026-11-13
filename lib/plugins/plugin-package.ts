@@ -3,7 +3,7 @@ import {
   PluginManifestError,
   validatePluginManifest,
   type PluginManifest,
-} from "@ysu/plugin-sdk/manifest"
+} from "@orahako/plugin-sdk/manifest"
 import { isSafePackagePath } from "./package-path.ts"
 
 export const PLUGIN_MANIFEST_PATH = "manifest.json"

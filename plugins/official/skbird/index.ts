@@ -1,5 +1,5 @@
 import { Bird } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { SkbirdIndexPage } from "./pages/index"
 import { SkbirdThreadPage } from "./pages/thread"
 import { SkbirdMessagesPage } from "./pages/messages"

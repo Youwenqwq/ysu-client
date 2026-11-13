@@ -8,10 +8,10 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useStudentInfo } from "@ysu/plugin-ui/hooks"
+} from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useStudentInfo } from "@orahako/plugin-ui/hooks"
 export function StudentInfoPage() {
   const { t } = useTranslation()
   const { data: student, isLoading, isError, error } = useStudentInfo()

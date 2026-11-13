@@ -7,7 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
 import { toast } from "sonner"
 import {
   Card,
@@ -15,36 +15,36 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@ysu/plugin-ui/components"
-import { Alert, AlertDescription, AlertTitle } from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { Input } from "@ysu/plugin-ui/components"
-import { Spinner } from "@ysu/plugin-ui/components"
-import { Field, FieldGroup, FieldLabel } from "@ysu/plugin-ui/components"
-import { FilterDrawer, FilterTrigger } from "@ysu/plugin-ui/components"
-import { pluginPageHref } from "@ysu/plugin-sdk"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useIsMobile } from "@ysu/plugin-ui/hooks"
-import { useBackHandler } from "@ysu/plugin-ui/hooks"
-import { useAcademicTime } from "@ysu/plugin-ui/hooks"
-import { useMobileHeaderLayout, useMobileHeaderRight } from "@ysu/plugin-ui/stores"
-import { useEffectiveSchedule } from "@ysu/plugin-ui/hooks"
+} from "@orahako/plugin-ui/components"
+import { Alert, AlertDescription, AlertTitle } from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Input } from "@orahako/plugin-ui/components"
+import { Spinner } from "@orahako/plugin-ui/components"
+import { Field, FieldGroup, FieldLabel } from "@orahako/plugin-ui/components"
+import { FilterDrawer, FilterTrigger } from "@orahako/plugin-ui/components"
+import { pluginPageHref } from "@orahako/plugin-sdk"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useIsMobile } from "@orahako/plugin-ui/hooks"
+import { useBackHandler } from "@orahako/plugin-ui/hooks"
+import { useAcademicTime } from "@orahako/plugin-ui/hooks"
+import { useMobileHeaderLayout, useMobileHeaderRight } from "@orahako/plugin-ui/stores"
+import { useEffectiveSchedule } from "@orahako/plugin-ui/hooks"
 import {
   schedulePatchAffectsWeek,
   scheduleWeek,
   type ScheduleDrop,
   type SchedulePatch,
   type ScheduleSelection,
-} from "@ysu/plugin-ui/academic"
+} from "@orahako/plugin-ui/academic"
 import {
   useClassPeriods,
   useCurrentWeek,
   useExams,
   useSchedule,
   useTermCalendar,
-} from "@ysu/plugin-ui/hooks"
+} from "@orahako/plugin-ui/hooks"
 import {
   CalendarDays,
   CalendarSearch,
@@ -59,18 +59,18 @@ import {
   Undo2,
   TriangleAlert,
 } from "lucide-react"
-import { cn } from "@ysu/plugin-ui/components"
-import { isCourseActiveInWeek, parseTimeToMinutes, periodIsInUse } from "@ysu/academic"
-import { computeExamBlocks } from "@ysu/academic"
-import { buildCourseColorMap } from "@ysu/academic"
-import { ScheduleTablet } from "@ysu/academic"
-import { ScheduleMobile } from "@ysu/academic"
+import { cn } from "@orahako/plugin-ui/components"
+import { isCourseActiveInWeek, parseTimeToMinutes, periodIsInUse } from "@orahako/academic"
+import { computeExamBlocks } from "@orahako/academic"
+import { buildCourseColorMap } from "@orahako/academic"
+import { ScheduleTablet } from "@orahako/academic"
+import { ScheduleMobile } from "@orahako/academic"
 import { ScheduleDragProvider } from "./schedule-drag"
 import { ScheduleAdjustmentDialog, ScheduleAdjustmentsDialog } from "./schedule-editor-dialogs"
 import { WidgetDiscovery } from "./widget-discovery"
-import { syncExamsToWidget, syncScheduleToWidget } from "@ysu/plugin-ui/platform"
-import { syncClassAlarmsToNative } from "@ysu/plugin-ui/platform"
-import { useSettingsStore } from "@ysu/plugin-ui/stores"
+import { syncExamsToWidget, syncScheduleToWidget } from "@orahako/plugin-ui/platform"
+import { syncClassAlarmsToNative } from "@orahako/plugin-ui/platform"
+import { useSettingsStore } from "@orahako/plugin-ui/stores"
 export function SchedulePage() {
   const { t } = useTranslation()
   const isMobile = useIsMobile()

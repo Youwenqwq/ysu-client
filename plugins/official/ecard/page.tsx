@@ -1,15 +1,15 @@
 "use client"
 
 import { CreditCard, RefreshCw } from "lucide-react"
-import { Button } from "@ysu/plugin-ui/components"
-import { Alert, AlertDescription } from "@ysu/plugin-ui/components"
-import { Card, CardContent } from "@ysu/plugin-ui/components"
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
-import { useEcardBalance } from "@ysu/plugin-ui/hooks"
-import { cn } from "@ysu/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Alert, AlertDescription } from "@orahako/plugin-ui/components"
+import { Card, CardContent } from "@orahako/plugin-ui/components"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
+import { useEcardBalance } from "@orahako/plugin-ui/hooks"
+import { cn } from "@orahako/plugin-ui/components"
 export function EcardPage() {
   const { t, locale } = useTranslation()
   const {

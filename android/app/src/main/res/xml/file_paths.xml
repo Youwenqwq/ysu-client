@@ -2,5 +2,5 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <external-path name="my_images" path="." />
     <cache-path name="my_cache_images" path="." />
-    <external-cache-path name="apk_update" path="ysu_apk_update/" />
+    <external-cache-path name="apk_update" path="orahako_apk_update/" />
 </paths>

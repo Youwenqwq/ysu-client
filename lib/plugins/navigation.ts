@@ -1,5 +1,5 @@
-import type { AcademicCapabilities } from "@ysu/plugin-sdk/academic"
-import { pluginPageHref } from "@ysu/plugin-sdk/ui"
+import type { AcademicCapabilities } from "@orahako/plugin-sdk/academic"
+import { pluginPageHref } from "@orahako/plugin-sdk/ui"
 
 export function hasPluginCapability(
   capabilities: AcademicCapabilities | undefined,

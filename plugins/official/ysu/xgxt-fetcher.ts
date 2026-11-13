@@ -27,7 +27,7 @@ import type {
   YearScoreStatic as XgxtYearScoreStatic,
 } from "./protocol/xgxt"
 import { mapCASSessionError } from "./cas-auth"
-import { ProviderError, ProviderErrorCode, wrapError } from "@ysu/plugin-sdk/provider-errors"
+import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
 
 function mapXgxtError(e: unknown): ProviderError {
   const sessionError = mapCASSessionError(e)

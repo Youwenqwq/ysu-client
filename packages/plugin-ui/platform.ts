@@ -1,5 +1,5 @@
 /**
- * @ysu/plugin-ui/platform — native bridge, navigation, and widget helpers.
+ * @orahako/plugin-ui/platform — native bridge, navigation, and widget helpers.
  */
 export { isCapacitor, isTablet } from "@/lib/native/platform"
 export {
@@ -14,7 +14,7 @@ export {
   type WidgetExam,
 } from "@/lib/native/widget-bridge"
 export { syncClassAlarmsToNative, stopNotify } from "@/lib/native/notify"
-export { YsuFile, type YsuFilePlugin } from "@/lib/native/ysu-file"
+export { OrahakoFile, type OrahakoFilePlugin } from "@/lib/native/orahako-file"
 export {
   BACK_PRIORITY,
   registerBackHandler,

@@ -13,7 +13,7 @@ import {
   type SchedulePatch,
   type ScheduleTrace,
 } from "@/lib/academic/schedule-patches"
-import type { Course } from "@ysu/plugin-sdk/academic"
+import type { Course } from "@orahako/plugin-sdk/academic"
 
 export interface ScheduleEditorValue {
   enabled: boolean

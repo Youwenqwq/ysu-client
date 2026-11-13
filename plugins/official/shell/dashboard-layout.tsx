@@ -3,11 +3,11 @@
 import { Suspense, useCallback, useEffect, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { useAuthStore } from "@ysu/plugin-ui/stores"
-import { useMobileHeaderStore } from "@ysu/plugin-ui/stores"
-import { cn } from "@ysu/plugin-ui/components"
-import { useSettingsStore } from "@ysu/plugin-ui/stores"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
+import { useAuthStore } from "@orahako/plugin-ui/stores"
+import { useMobileHeaderStore } from "@orahako/plugin-ui/stores"
+import { cn } from "@orahako/plugin-ui/components"
+import { useSettingsStore } from "@orahako/plugin-ui/stores"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
 import {
   Sidebar,
   SidebarContent,
@@ -23,32 +23,32 @@ import {
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,
-} from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { Alert, AlertTitle } from "@ysu/plugin-ui/components"
-import { Avatar, AvatarFallback, AvatarImage } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Alert, AlertTitle } from "@orahako/plugin-ui/components"
+import { Avatar, AvatarFallback, AvatarImage } from "@orahako/plugin-ui/components"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
 import { toast } from "sonner"
-import { logoutActiveProvider, reloginActiveProvider } from "@ysu/plugin-ui/stores"
-import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@ysu/plugin-ui/platform"
+import { logoutActiveProvider, reloginActiveProvider } from "@orahako/plugin-ui/stores"
+import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@orahako/plugin-ui/platform"
 import { GraduationCap, Info, LogIn, LogOut, Settings, TriangleAlert, User } from "lucide-react"
-import { MobileBottomNav, MobileTopBar } from "@ysu/plugin-ui/shell"
-import { RefreshIndicator, StaleIndicator } from "@ysu/plugin-ui/shell"
-import { useProviderCapabilities } from "@ysu/plugin-ui/hooks"
-import { UpdateDialog } from "@ysu/plugin-ui/shell"
-import { APP_VERSION, APP_BUILD } from "@ysu/plugin-ui/platform"
-import { useStoredMediaUrl } from "@ysu/plugin-ui/hooks"
-import { loadAvatarImage } from "@ysu/plugin-ui/stores"
-import { usePluginHost } from "@ysu/plugin-ui/shell"
-import { usePluginUI } from "@ysu/plugin-ui/plugin"
-import { PluginSlot, pluginPageHref, type PluginIcon } from "@ysu/plugin-sdk"
-import { usePluginRouteStore } from "@ysu/plugin-ui/plugin"
-import { hasPluginCapability } from "@ysu/plugin-ui/plugin"
+import { MobileBottomNav, MobileTopBar } from "@orahako/plugin-ui/shell"
+import { RefreshIndicator, StaleIndicator } from "@orahako/plugin-ui/shell"
+import { useProviderCapabilities } from "@orahako/plugin-ui/hooks"
+import { UpdateDialog } from "@orahako/plugin-ui/shell"
+import { APP_VERSION, APP_BUILD } from "@orahako/plugin-ui/platform"
+import { useStoredMediaUrl } from "@orahako/plugin-ui/hooks"
+import { loadAvatarImage } from "@orahako/plugin-ui/stores"
+import { usePluginHost } from "@orahako/plugin-ui/shell"
+import { usePluginUI } from "@orahako/plugin-ui/plugin"
+import { PluginSlot, pluginPageHref, type PluginIcon } from "@orahako/plugin-sdk"
+import { usePluginRouteStore } from "@orahako/plugin-ui/plugin"
+import { hasPluginCapability } from "@orahako/plugin-ui/plugin"
 const SIDEBAR_WIDTH_KEY = "dashboard-sidebar-width"
 const DEFAULT_SIDEBAR_WIDTH = 288 // 18rem
 const MIN_SIDEBAR_WIDTH = 208 // 13rem

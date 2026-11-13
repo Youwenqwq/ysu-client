@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type * as HostModule from "@ysu/plugin-sdk/host"
+import type * as HostModule from "@orahako/plugin-sdk/host"
 
 const mocks = vi.hoisted(() => ({ fetchWithJar: vi.fn() }))
-vi.mock("@ysu/plugin-sdk/host", async (importOriginal) => ({
+vi.mock("@orahako/plugin-sdk/host", async (importOriginal) => ({
   ...(await importOriginal<typeof HostModule>()),
   fetchWithJar: mocks.fetchWithJar,
 }))
 
-import { registerSchoolConfig, SimpleCookieJar, type HttpResponse } from "@ysu/plugin-sdk/host"
+import { registerSchoolConfig, SimpleCookieJar, type HttpResponse } from "@orahako/plugin-sdk/host"
 import ysuConfig from "../ysu.json"
 import {
   authorize,

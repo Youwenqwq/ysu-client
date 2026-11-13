@@ -1,7 +1,7 @@
-import type { ProviderDiagnosticCookie, ProviderDiagnostics } from "@ysu/plugin-sdk/academic"
+import type { ProviderDiagnosticCookie, ProviderDiagnostics } from "@orahako/plugin-sdk/academic"
 import { getJar as getCasJar, isAuthenticated as checkCASAuth } from "./protocol/cas"
 import { getJar as getJwxtJar, resetJWXT } from "./protocol/jwxt"
-import { casUrls } from "@ysu/plugin-sdk/host"
+import { casUrls } from "@orahako/plugin-sdk/host"
 import { ensureMobileAuthorized } from "./protocol/jwmobile"
 
 async function getJarCookies(

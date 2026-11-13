@@ -9,7 +9,7 @@ import {
   studentSign,
 } from "../protocol/jwmobile"
 import { mapCASSessionError } from "../cas-auth"
-import { ProviderError, ProviderErrorCode, wrapError } from "@ysu/plugin-sdk/provider-errors"
+import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
 import type {
   CurrentLesson,
   CurrentLessonQuery,
@@ -18,7 +18,7 @@ import type {
   StudentSignInput,
   StudentSignResult,
   StudentSigninStatus,
-} from "@ysu/plugin-sdk/academic"
+} from "@orahako/plugin-sdk/academic"
 
 function mapMobileError(error: unknown): ProviderError {
   const sessionError = mapCASSessionError(error)

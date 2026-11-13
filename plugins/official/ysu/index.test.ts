@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { getSchoolConfigOrNull } from "@ysu/plugin-sdk/host"
+import { getSchoolConfigOrNull } from "@orahako/plugin-sdk/host"
 import { PluginRuntime } from "@/lib/plugins/runtime"
 import { ProviderPluginRegistry } from "@/providers/provider-registry"
 import { definition, manifest } from "./index"

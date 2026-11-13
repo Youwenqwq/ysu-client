@@ -11,15 +11,15 @@ import {
   ResponsiveModalFooter,
   ResponsiveModalHeader,
   ResponsiveModalTitle,
-} from "@ysu/plugin-ui/components"
-import { Alert, AlertDescription, AlertTitle } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { Field, FieldGroup, FieldLabel } from "@ysu/plugin-ui/components"
-import { Input } from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useBackLayer } from "@ysu/plugin-ui/hooks"
-import { cn } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Alert, AlertDescription, AlertTitle } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Field, FieldGroup, FieldLabel } from "@orahako/plugin-ui/components"
+import { Input } from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useBackLayer } from "@orahako/plugin-ui/hooks"
+import { cn } from "@orahako/plugin-ui/components"
 import {
   scheduleDate,
   schedulePatchDependents,
@@ -27,8 +27,8 @@ import {
   type ScheduleIssue,
   type ScheduleOccurrence,
   type SchedulePatch,
-} from "@ysu/plugin-ui/academic"
-import type { ClassPeriod } from "@ysu/plugin-sdk/academic"
+} from "@orahako/plugin-ui/academic"
+import type { ClassPeriod } from "@orahako/plugin-sdk/academic"
 type PatchDraft = Omit<SchedulePatch, "id" | "createdAt" | "enabled">
 
 interface AdjustmentProps {

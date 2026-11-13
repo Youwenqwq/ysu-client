@@ -5,4 +5,4 @@ export {
   hasCapability,
   assertCapability,
   getEnabledCapabilities,
-} from "@ysu/plugin-sdk/provider-capabilities"
+} from "@orahako/plugin-sdk/provider-capabilities"

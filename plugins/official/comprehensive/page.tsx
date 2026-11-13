@@ -7,15 +7,15 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@ysu/plugin-ui/components"
-import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@ysu/plugin-ui/components"
-import { FilterChips } from "@ysu/plugin-ui/components"
-import { FilterDrawer, FilterOptionList, FilterTrigger } from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
+} from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@orahako/plugin-ui/components"
+import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@orahako/plugin-ui/components"
+import { FilterChips } from "@orahako/plugin-ui/components"
+import { FilterDrawer, FilterOptionList, FilterTrigger } from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
 import {
   useComprehensiveIndicators,
   useComprehensiveRadar,
@@ -24,7 +24,7 @@ import {
   useComprehensiveResult,
   useComprehensiveTerms,
   useComprehensiveYearScores,
-} from "@ysu/plugin-ui/hooks"
+} from "@orahako/plugin-ui/hooks"
 function ResultPanel({ year, term }: { year: string; term: string }) {
   const { t } = useTranslation()
   const opts = useMemo(() => ({ year, term }), [year, term])

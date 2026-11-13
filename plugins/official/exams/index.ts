@@ -1,7 +1,7 @@
 import { Calendar, FileText } from "lucide-react"
-import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { ExamsPage } from "./page"
-import { UpcomingExamsWidget } from "@ysu/academic"
+import { UpcomingExamsWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
   id: "ysu.exams",

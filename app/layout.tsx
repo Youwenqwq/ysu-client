@@ -25,17 +25,17 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "燕大终端",
-    template: "%s · 燕大终端",
+    default: "酸橙盒",
+    template: "%s · 酸橙盒",
   },
   description:
-    "YSU Terminal — a third-party shadcn/ui client for the Yanshan University academic system.",
-  applicationName: "燕大终端",
-  authors: [{ name: "ysu-client contributors" }],
-  keywords: ["燕大终端", "YSU Terminal", "燕山大学", "YSU", "教务系统"],
+    "Orahako — a third-party shadcn/ui client for the Yanshan University academic system.",
+  applicationName: "酸橙盒",
+  authors: [{ name: "orahako contributors" }],
+  keywords: ["酸橙盒", "Orahako", "燕山大学", "YSU", "教务系统"],
   appleWebApp: {
     capable: true,
-    title: "燕大终端",
+    title: "酸橙盒",
     statusBarStyle: "default",
   },
 }

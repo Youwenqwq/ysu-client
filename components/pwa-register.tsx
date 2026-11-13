@@ -11,8 +11,8 @@ import {
   prepareWebUpdate,
   watchPwaRegistration,
 } from "@/lib/pwa-updater"
-const OFFLINE_READY_KEY = "academic-client-pwa-offline-ready"
-const OFFLINE_READY_STANDALONE_KEY = "academic-client-pwa-offline-ready-standalone"
+const OFFLINE_READY_KEY = "orahako-pwa-offline-ready"
+const OFFLINE_READY_STANDALONE_KEY = "orahako-pwa-offline-ready-standalone"
 
 export function PwaRegister() {
   const { t } = useTranslation()

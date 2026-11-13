@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react"
 import type { Circle, CircleMarker, DivIcon, Map as LeafletMap, Marker, Polygon } from "leaflet"
 import { gcj02ToWgs84, isUsableLatLng, wgs84ToGcj02 } from "../extras/geo"
-import { usePluginTranslation } from "@ysu/plugin-ui/plugin"
+import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
-import { cn } from "@ysu/plugin-ui/components"
+import { cn } from "@orahako/plugin-ui/components"
 import { addAmapTileLayer, type Leaflet } from "./perlica-map-tiles"
 
 export interface PerlicaMapCenter {

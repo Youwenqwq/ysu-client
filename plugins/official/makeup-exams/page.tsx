@@ -8,18 +8,18 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Tabs, TabsList, TabsTrigger } from "@ysu/plugin-ui/components"
-import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@ysu/plugin-ui/components"
-import { FilterChips } from "@ysu/plugin-ui/components"
-import { formatTimeRange } from "@ysu/plugin-ui/academic"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useMakeupExamBatches, useMakeupExamCourses } from "@ysu/plugin-ui/hooks"
-import { useProvider } from "@ysu/plugin-ui/hooks"
-import { Button } from "@ysu/plugin-ui/components"
-import { Spinner } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger } from "@orahako/plugin-ui/components"
+import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@orahako/plugin-ui/components"
+import { FilterChips } from "@orahako/plugin-ui/components"
+import { formatTimeRange } from "@orahako/plugin-ui/academic"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useMakeupExamBatches, useMakeupExamCourses } from "@orahako/plugin-ui/hooks"
+import { useProvider } from "@orahako/plugin-ui/hooks"
+import { Button } from "@orahako/plugin-ui/components"
+import { Spinner } from "@orahako/plugin-ui/components"
 import {
   Dialog,
   DialogContent,
@@ -27,8 +27,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@ysu/plugin-ui/components"
-import type { MakeupExamCourse } from "@ysu/plugin-sdk"
+} from "@orahako/plugin-ui/components"
+import type { MakeupExamCourse } from "@orahako/plugin-sdk"
 import { Clock, FilePenLine, School } from "lucide-react"
 
 export function MakeupExamsPage() {

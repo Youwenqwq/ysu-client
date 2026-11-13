@@ -1,4 +1,4 @@
-import { pluginPageHref } from "@ysu/plugin-sdk/ui"
+import { pluginPageHref } from "@orahako/plugin-sdk/ui"
 import { usePluginRouteStore } from "../stores/plugin-route"
 
 const DEPTH_KEY = "__academicBackDepth"

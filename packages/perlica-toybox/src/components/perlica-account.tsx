@@ -2,13 +2,13 @@
 
 import type { ReactNode } from "react"
 import { Bell, CreditCard, RefreshCw, UserRound } from "lucide-react"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
 import type { PerlicaRaw, PerlicaRideCard, PerlicaUserInfo } from "../extras/types"
-import { usePluginTranslation } from "@ysu/plugin-ui/plugin"
+import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
-import { cn } from "@ysu/plugin-ui/components"
+import { cn } from "@orahako/plugin-ui/components"
 
 export interface PerlicaAccountProps {
   user: PerlicaUserInfo | null

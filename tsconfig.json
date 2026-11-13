@@ -27,22 +27,22 @@
       "@/*": [
         "./*"
       ],
-      "@ysu/plugin-sdk": [
+      "@orahako/plugin-sdk": [
         "./packages/plugin-sdk/index.ts"
       ],
-      "@ysu/plugin-sdk/*": [
+      "@orahako/plugin-sdk/*": [
         "./packages/plugin-sdk/*"
       ],
-      "@ysu/plugin-ui": [
+      "@orahako/plugin-ui": [
         "./packages/plugin-ui/index.ts"
       ],
-      "@ysu/plugin-ui/*": [
+      "@orahako/plugin-ui/*": [
         "./packages/plugin-ui/*"
       ],
-      "@ysu/academic": [
+      "@orahako/academic": [
         "./packages/academic/index.ts"
       ],
-      "@ysu/academic/*": [
+      "@orahako/academic/*": [
         "./packages/academic/*"
       ]
     }

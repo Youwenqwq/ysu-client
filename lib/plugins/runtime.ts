@@ -1,5 +1,5 @@
 import { Context, type ForkScope, type Plugin } from "@cordisjs/core"
-import type { PluginContext, PluginDefinition, PluginManifest } from "@ysu/plugin-sdk"
+import type { PluginContext, PluginDefinition, PluginManifest } from "@orahako/plugin-sdk"
 
 export type PluginSource = "builtin" | "external"
 export type PluginStatus = "registered" | "starting" | "active" | "disabled" | "failed"

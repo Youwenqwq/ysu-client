@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli"
 
 const config: CapacitorConfig = {
-  appId: "com.youwenqwq.ysuclient",
-  appName: "燕大终端",
+  appId: "me.uwen.orahako",
+  appName: "酸橙盒",
   webDir: "dist",
   plugins: {
     CapacitorHttp: {

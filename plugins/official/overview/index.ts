@@ -1,7 +1,7 @@
 import { CalendarDays, LayoutDashboard } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { OverviewPage } from "./page"
-import { WeekSummaryWidget } from "@ysu/academic"
+import { WeekSummaryWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
   id: "ysu.overview",

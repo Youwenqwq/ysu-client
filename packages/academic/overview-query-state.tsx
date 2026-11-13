@@ -1,11 +1,11 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { Alert, AlertDescription } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { ProviderErrorCode } from "@ysu/plugin-sdk/provider-errors"
+import { Alert, AlertDescription } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { ProviderErrorCode } from "@orahako/plugin-sdk/provider-errors"
 interface OverviewQuery {
   data: unknown
   isLoading: boolean

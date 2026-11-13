@@ -7,15 +7,15 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@ysu/plugin-ui/components"
-import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@ysu/plugin-ui/components"
-import { formatTimeRange } from "@ysu/plugin-ui/academic"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useLaborActivities, useLaborRecords, useLaborSummary } from "@ysu/plugin-ui/hooks"
-import { cn } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@orahako/plugin-ui/components"
+import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@orahako/plugin-ui/components"
+import { formatTimeRange } from "@orahako/plugin-ui/academic"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useLaborActivities, useLaborRecords, useLaborSummary } from "@orahako/plugin-ui/hooks"
+import { cn } from "@orahako/plugin-ui/components"
 import { Clock, MapPin, ScrollText, User } from "lucide-react"
 
 function RecordsPanel() {

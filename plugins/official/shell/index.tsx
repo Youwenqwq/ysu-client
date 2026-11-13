@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { definePlugin, PluginSlot, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, PluginSlot, type PluginManifest } from "@orahako/plugin-sdk"
 import {
   ActivationGate,
   BackButtonHandler,
@@ -13,11 +13,11 @@ import {
   SDKProvider,
   Toaster,
   TooltipProvider,
-} from "@ysu/plugin-ui/shell"
+} from "@orahako/plugin-ui/shell"
 
 export const manifest: PluginManifest = {
   id: "ysu.shell",
-  name: "燕大终端界面",
+  name: "酸橙盒界面",
   version: "1.0.0",
   apiVersion: 1,
   kind: "shell",
@@ -49,5 +49,5 @@ function OfficialShell({ children }: { children: ReactNode }) {
 export const definition = definePlugin((ctx) => {
   ctx.slots.declare({ name: "shell.overlay", kind: "list" })
   ctx.slots.declare({ name: "dashboard.header.actions", kind: "list" })
-  ctx.ui.registerShell({ id: "default", name: "燕大终端", component: OfficialShell })
+  ctx.ui.registerShell({ id: "default", name: "酸橙盒", component: OfficialShell })
 })

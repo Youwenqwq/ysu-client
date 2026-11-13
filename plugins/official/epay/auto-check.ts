@@ -6,9 +6,9 @@
  * 仅读取状态，不发起任何支付。
  */
 
-import { useAuthStore } from "@ysu/plugin-ui/stores"
-import { useSettingsStore } from "@ysu/plugin-ui/stores"
-import { getActiveProvider } from "@ysu/plugin-ui/stores"
+import { useAuthStore } from "@orahako/plugin-ui/stores"
+import { useSettingsStore } from "@orahako/plugin-ui/stores"
+import { getActiveProvider } from "@orahako/plugin-ui/stores"
 /** 距离上次检查的最小间隔（毫秒）：3 小时 */
 const MIN_INTERVAL_MS = 3 * 3600 * 1000
 

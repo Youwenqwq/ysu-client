@@ -1,5 +1,5 @@
 /**
- * @ysu/plugin-ui/academic — academic schedule/term utilities.
+ * @orahako/plugin-ui/academic — academic schedule/term utilities.
  */
 export { formatLocalDateTime, formatTimeRange, parseAcademicDateTime } from "@/lib/academic/time"
 export {

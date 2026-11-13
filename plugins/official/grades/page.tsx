@@ -1,6 +1,6 @@
 "use client"
 
-import { ResponsiveSelect } from "@ysu/plugin-ui/components"
+import { ResponsiveSelect } from "@orahako/plugin-ui/components"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
@@ -9,15 +9,15 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Input } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { Spinner } from "@ysu/plugin-ui/components"
-import { Field, FieldGroup, FieldLabel } from "@ysu/plugin-ui/components"
-import { FilterDrawer, FilterTrigger } from "@ysu/plugin-ui/components"
-import { ToggleGroup, ToggleGroupItem } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Input } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Spinner } from "@orahako/plugin-ui/components"
+import { Field, FieldGroup, FieldLabel } from "@orahako/plugin-ui/components"
+import { FilterDrawer, FilterTrigger } from "@orahako/plugin-ui/components"
+import { ToggleGroup, ToggleGroupItem } from "@orahako/plugin-ui/components"
 import {
   ResponsiveModal,
   ResponsiveModalBody,
@@ -25,16 +25,16 @@ import {
   ResponsiveModalDescription,
   ResponsiveModalHeader,
   ResponsiveModalTitle,
-} from "@ysu/plugin-ui/components"
-import { Separator } from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
+} from "@orahako/plugin-ui/components"
+import { Separator } from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
 import { GpaSummary } from "./gpa-summary"
-import { useCurrentWeek, useGPAStats, useGrades } from "@ysu/plugin-ui/hooks"
-import { useProvider } from "@ysu/plugin-ui/hooks"
-import type { Grade, GradeStatistics, GradeDistribution, GradeRanking } from "@ysu/plugin-sdk"
+import { useCurrentWeek, useGPAStats, useGrades } from "@orahako/plugin-ui/hooks"
+import { useProvider } from "@orahako/plugin-ui/hooks"
+import type { Grade, GradeStatistics, GradeDistribution, GradeRanking } from "@orahako/plugin-sdk"
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, Dices } from "lucide-react"
-import { useSettingsStore } from "@ysu/plugin-ui/stores"
+import { useSettingsStore } from "@orahako/plugin-ui/stores"
 import { useGradeGachaStore, gradeKey, type PendingGrade } from "./grade-gacha-store"
 import { GradeGachaModal } from "./grade-gacha"
 

@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react"
 import { X } from "lucide-react"
 import { toast } from "sonner"
-import { fetchStateless, headerSingle } from "@ysu/plugin-sdk/host"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
+import { fetchStateless, headerSingle } from "@orahako/plugin-sdk/host"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
 import {
   Drawer,
   DrawerClose,
@@ -14,11 +14,11 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-} from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useBackLayer } from "@ysu/plugin-ui/hooks"
-import { isCapacitor } from "@ysu/plugin-ui/platform"
-import { YsuFile } from "@ysu/plugin-ui/platform"
+} from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useBackLayer } from "@orahako/plugin-ui/hooks"
+import { isCapacitor } from "@orahako/plugin-ui/platform"
+import { OrahakoFile } from "@orahako/plugin-ui/platform"
 /** 关闭动画时长，与过渡类 duration 匹配 */
 const LIGHTBOX_TRANSITION_MS = 200
 
@@ -206,7 +206,7 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
     setSaving(true)
     try {
       const blob = await loadDisplayedBlob()
-      await YsuFile.saveImageToGallery({
+      await OrahakoFile.saveImageToGallery({
         base64: await blobToBase64(blob),
         mimeType: blob.type || "image/jpeg",
         fileName: `skbird_${Date.now()}.${extForMime(blob.type || "image/jpeg")}`,

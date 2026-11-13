@@ -39,7 +39,7 @@ import {
   stopNotify,
   useAuthStore,
   useRefreshStore,
-} from "@ysu/plugin-sdk/host"
+} from "@orahako/plugin-sdk/host"
 import { withAuthTransition } from "./auth-transition"
 
 /** 从 auth-store 恢复 CAS 凭据、JWXT 会话和 mobile 会话到各自的 jar。 */
@@ -52,12 +52,8 @@ export async function initializeSession(): Promise<void> {
   // 清理因 credential 轮换产生的孤立缓存
   cleanStaleCacheVersions()
   // OTA 更新后清理旧版本和下载缓存，仅当 updater 设置了标志位时才执行
-  if (
-    localStorage.getItem(STORAGE_KEYS.otaCleanup) ||
-    localStorage.getItem(STORAGE_KEYS.legacyOtaCleanup)
-  ) {
+  if (localStorage.getItem(STORAGE_KEYS.otaCleanup)) {
     localStorage.removeItem(STORAGE_KEYS.otaCleanup)
-    localStorage.removeItem(STORAGE_KEYS.legacyOtaCleanup)
     cleanOtaArtifacts()
   }
   // Restore CASTGC to CapacitorHttp system cookie store (for native platforms)

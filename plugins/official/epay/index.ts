@@ -5,8 +5,8 @@ import {
   definePlugin,
   type PluginLocale,
   type PluginManifest,
-} from "@ysu/plugin-sdk"
-import { getLocalStorageItemWithFallback, STORAGE_KEYS } from "@ysu/plugin-ui/stores"
+} from "@orahako/plugin-sdk"
+import { STORAGE_KEYS } from "@orahako/plugin-ui/stores"
 import { runEpayAutoCheck } from "./auto-check"
 import { EpayPage } from "./page"
 
@@ -21,7 +21,7 @@ export const manifest: PluginManifest = {
 
 function currentLocale(): PluginLocale {
   if (typeof window === "undefined") return "zh"
-  const locale = getLocalStorageItemWithFallback(STORAGE_KEYS.locale, STORAGE_KEYS.legacyLocale)
+  const locale = localStorage.getItem(STORAGE_KEYS.locale)
   return locale === "en" ? "en" : "zh"
 }
 

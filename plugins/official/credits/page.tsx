@@ -7,23 +7,23 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { Input } from "@ysu/plugin-ui/components"
-import { Spinner } from "@ysu/plugin-ui/components"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Input } from "@orahako/plugin-ui/components"
+import { Spinner } from "@orahako/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@orahako/plugin-ui/components"
 import {
   EmptyState as SharedEmptyState,
   LoadingCards,
   useErrorToast,
   ValidatingList,
-} from "@ysu/plugin-ui/components"
-import { FilterChips } from "@ysu/plugin-ui/components"
-import { FilterDrawer, FilterOptionList, FilterTrigger } from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
+} from "@orahako/plugin-ui/components"
+import { FilterChips } from "@orahako/plugin-ui/components"
+import { FilterDrawer, FilterOptionList, FilterTrigger } from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
 import {
   useCreditBatches,
   useCreditCompetitions,
@@ -31,15 +31,15 @@ import {
   useCreditLibraryActivities,
   useCreditRecords,
   useCreditSummary,
-} from "@ysu/plugin-ui/hooks"
+} from "@orahako/plugin-ui/hooks"
 import type {
   CatalogPage,
   CatalogQueryOptions,
   Competition,
   CreditRecord,
   LibraryActivity,
-} from "@ysu/plugin-sdk/academic"
-import type { ProviderQueryResult } from "@ysu/plugin-ui/hooks"
+} from "@orahako/plugin-sdk/academic"
+import type { ProviderQueryResult } from "@orahako/plugin-ui/hooks"
 import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react"
 
 function DeclarationsPanel() {

@@ -1,5 +1,5 @@
 /**
- * @ysu/plugin-ui/stores — host Zustand stores and storage adapters.
+ * @orahako/plugin-ui/stores — host Zustand stores and storage adapters.
  */
 export { useAuthStore } from "@/lib/stores/auth"
 export { useSettingsStore } from "@/lib/stores/settings"
@@ -22,12 +22,7 @@ export {
   logoutActiveProvider,
   reloginActiveProvider,
 } from "@/providers/provider-service"
-export {
-  STORAGE_KEYS,
-  getLocalStorageItemWithFallback,
-  migrateLocalStorageKey,
-  removeLocalStorageKeyPair,
-} from "@/lib/storage/keys"
+export { STORAGE_KEYS } from "@/lib/storage/keys"
 export { localStorageAdapter } from "@/lib/storage/local"
 export { secureStorage } from "@/lib/storage/secure"
 export { loadAvatarImage, saveAvatarImage, removeAvatarImage } from "@/lib/storage/avatar"

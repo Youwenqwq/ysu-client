@@ -10,7 +10,7 @@ import { useSettingsStore } from "@/lib/stores/settings"
 import { useProviderCapabilities } from "@/providers/use-provider"
 import { usePluginHost } from "@/components/plugin-provider"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
-import { pluginPageHref } from "@ysu/plugin-sdk"
+import { pluginPageHref } from "@orahako/plugin-sdk"
 import { usePluginRouteStore } from "@/lib/stores/plugin-route"
 import { hasPluginCapability } from "@/lib/plugins/navigation"
 

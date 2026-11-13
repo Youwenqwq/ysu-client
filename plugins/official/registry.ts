@@ -1,4 +1,4 @@
-import type { PluginDefinition, PluginManifest } from "@ysu/plugin-sdk"
+import type { PluginDefinition, PluginManifest } from "@orahako/plugin-sdk"
 import { definition as officialShell, manifest as officialShellManifest } from "./shell"
 import { definition as ysuProvider, manifest as ysuProviderManifest } from "./ysu"
 import { definition as defaultTheme, manifest as defaultThemeManifest } from "./theme-default"

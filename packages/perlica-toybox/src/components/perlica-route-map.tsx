@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { DivIcon, Map as LeafletMap, Marker, Polyline } from "leaflet"
 import { isUsableLatLng, wgs84ToGcj02 } from "../extras/geo"
-import { usePluginTranslation } from "@ysu/plugin-ui/plugin"
+import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
 import { addAmapTileLayer, type Leaflet } from "./perlica-map-tiles"
 import type { PerlicaMapCenter } from "./perlica-map"

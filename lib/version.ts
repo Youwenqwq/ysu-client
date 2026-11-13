@@ -4,7 +4,7 @@ export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"
 export const APP_BUILD = process.env.NEXT_PUBLIC_APP_BUILD ?? "dev"
 export const APP_COPYRIGHT = `© ${new Date().getFullYear()} Youwenqwq`
 export const APP_LICENSE = "GPL-3.0"
-export const APP_REPO = "https://github.com/Youwenqwq/ysu-client"
+export const APP_REPO = "https://github.com/Youwenqwq/orahako"
 
 export const APP_OPEN_SOURCE: readonly { name: string; url: string }[] = [
   { name: "Next.js", url: "https://nextjs.org" },
@@ -32,5 +32,5 @@ export const APP_PEOPLE: readonly {
     url: "https://mimo.xiaomi.com/",
     contribution: "为本项目提供了 Token Plan",
   },
-  { name: "燕大终端的各位用户", contribution: "感谢大家使用本项目~" },
+  { name: "酸橙盒的各位用户", contribution: "感谢大家使用本项目~" },
 ]

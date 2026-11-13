@@ -1,5 +1,5 @@
-import { casUrls, getSchoolConfig, loadCASTGC, serverConfig } from "@ysu/plugin-sdk/host"
-import type { ProviderNativeNotification } from "@ysu/plugin-sdk/academic"
+import { casUrls, getSchoolConfig, loadCASTGC, serverConfig } from "@orahako/plugin-sdk/host"
+import type { ProviderNativeNotification } from "@orahako/plugin-sdk/academic"
 
 export interface NativeFieldMappings {
   grade: Record<string, string[]>

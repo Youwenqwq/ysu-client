@@ -18,7 +18,7 @@ import type {
   LaborSummary as LdxtLaborSummary,
 } from "./protocol/ldxt"
 import { mapCASSessionError } from "./cas-auth"
-import { ProviderError, ProviderErrorCode, wrapError } from "@ysu/plugin-sdk/provider-errors"
+import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
 
 function mapLdxtError(e: unknown): ProviderError {
   const sessionError = mapCASSessionError(e)

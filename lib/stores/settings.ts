@@ -1,15 +1,13 @@
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
 import type { UpdateChannel } from "../updater"
-import { migrateLocalStorageKey, STORAGE_KEYS } from "../storage/keys"
+import { STORAGE_KEYS } from "../storage/keys"
 import { localStorageAdapter } from "../storage/local"
 import {
   createDefaultOverviewLayout,
   normalizeOverviewLayout,
   type OverviewLayout,
 } from "@/app/dashboard/overview/layout-config"
-
-migrateLocalStorageKey(STORAGE_KEYS.settings, STORAGE_KEYS.legacySettings)
 
 export type CardStyle = "solid" | "translucent" | "glass"
 export type BackgroundStyle = "overlay" | "blur-overlay"

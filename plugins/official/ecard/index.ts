@@ -1,5 +1,5 @@
 import { CreditCard } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { EcardPage } from "./page"
 import { EcardSummaryWidget } from "./summary-widget"
 

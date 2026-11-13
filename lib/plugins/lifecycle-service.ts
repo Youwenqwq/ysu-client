@@ -1,4 +1,4 @@
-import type { PluginLifecycleService } from "@ysu/plugin-sdk"
+import type { PluginLifecycleService } from "@orahako/plugin-sdk"
 import type { PluginServiceFactory } from "./runtime"
 import { trackPluginRegistration } from "./track-registration"
 

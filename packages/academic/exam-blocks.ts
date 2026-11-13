@@ -5,7 +5,7 @@
  * 转换规则：考试日期落在当前展示周内 → 星期几；考试时间区间与节次
  * 时刻表重叠 → 起止节次（无重叠时钳到最近节次，如晚间考试）。
  */
-import type { ClassPeriod, CurrentWeek, Exam } from "@ysu/plugin-sdk/academic"
+import type { ClassPeriod, CurrentWeek, Exam } from "@orahako/plugin-sdk/academic"
 import { getExamEndTime, getExamStartTime } from "@/lib/academic/exam-utils"
 import { getAcademicClock } from "@/lib/academic/academic-time"
 import { buildSectionTimeMap } from "./schedule-utils"

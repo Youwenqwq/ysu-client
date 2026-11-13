@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { MarketplacePlugin } from "@ysu/plugin-sdk"
+import type { MarketplacePlugin } from "@orahako/plugin-sdk"
 import { findAvailableUpdates, selectCompatibleRelease, validateMarketplaceIndex } from "./market"
 
 const plugin: MarketplacePlugin = {

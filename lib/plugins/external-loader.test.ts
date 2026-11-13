@@ -1,6 +1,6 @@
 import { strToU8 } from "fflate"
 import { describe, expect, it } from "vitest"
-import type { PluginManifest } from "@ysu/plugin-sdk"
+import type { PluginManifest } from "@orahako/plugin-sdk"
 import {
   analyzeModuleImports,
   applyModuleImportRewrites,
@@ -128,10 +128,10 @@ describe("loadExternalPlugin", () => {
     const fixture = createBlobUrlFixture()
     const pkg = makePackage({
       "index.js":
-        'import { ProviderError } from "@ysu/plugin-sdk/provider-errors"; export default { apply() {} }',
+        'import { ProviderError } from "@orahako/plugin-sdk/provider-errors"; export default { apply() {} }',
     })
     await loadExternalPlugin(pkg, {
-      hostModules: { "@ysu/plugin-sdk/provider-errors": "blob:provider-errors" },
+      hostModules: { "@orahako/plugin-sdk/provider-errors": "blob:provider-errors" },
       blobUrls: fixture.api,
       importModule: async (url) => {
         expect(await fixture.blobs.get(url)!.text()).toContain('from "blob:provider-errors"')

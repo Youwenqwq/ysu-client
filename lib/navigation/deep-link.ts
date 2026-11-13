@@ -1,9 +1,9 @@
-import { pluginPageHref } from "@ysu/plugin-sdk/ui"
+import { pluginPageHref } from "@orahako/plugin-sdk/ui"
 import { CORE_DASHBOARD_FALLBACK_HREF, resolveSemanticTarget } from "../plugins/navigation"
 import type { SemanticNavSources } from "../plugins/navigation"
 
 /**
- * Map a `ysuclient://` host to the semantic id of the destination page. The ids
+ * Map a `orahako://` host to the semantic id of the destination page. The ids
  * are core-owned and stable; the concrete plugin page is resolved at runtime.
  */
 const NOTIFICATION_DESTINATIONS: Record<string, string> = {
@@ -16,7 +16,7 @@ export function notificationDestination(url: string, sources?: SemanticNavSource
   try {
     const parsed = new URL(url)
     if (
-      parsed.protocol !== "ysuclient:" ||
+      parsed.protocol !== "orahako:" ||
       parsed.username ||
       parsed.password ||
       parsed.port ||

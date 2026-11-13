@@ -1,5 +1,5 @@
 /**
- * @ysu/plugin-ui/components — shadcn/ui primitives and shared presentational
+ * @orahako/plugin-ui/components — shadcn/ui primitives and shared presentational
  * components. Pure rendering + Radix; no host state, no plugin registry.
  */
 export { Button, buttonVariants } from "@/components/ui/button"

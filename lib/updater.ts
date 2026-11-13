@@ -1,10 +1,10 @@
 import { CapacitorUpdater } from "@capgo/capacitor-updater"
 import { App } from "@capacitor/app"
 import { clean, compare, gt, prerelease, valid } from "semver"
-import { getLocalStorageItemWithFallback, STORAGE_KEYS } from "./storage/keys"
+import { STORAGE_KEYS } from "./storage/keys"
 import { APP_VERSION } from "./version"
 import { isCapacitor } from "./native/platform"
-import { YsuFile } from "./native/ysu-file"
+import { OrahakoFile } from "./native/orahako-file"
 
 export type UpdateChannel = "stable" | "prerelease"
 
@@ -39,14 +39,12 @@ interface UpdateCandidate extends VersionManifestEntry {
   normalizedVersion: string
 }
 
-const GITHUB_RELEASE_BASE = "https://github.com/Youwenqwq/ysu-client/releases/latest/download"
+const GITHUB_RELEASE_BASE = "https://github.com/Youwenqwq/orahako/releases/latest/download"
 const ASSET_NAME = "dist.zip"
 const VERSION_JSON_NAME = "version.json"
 const LAST_CHECK_KEY = STORAGE_KEYS.lastUpdateCheck
-const LEGACY_LAST_CHECK_KEY = STORAGE_KEYS.legacyLastUpdateCheck
 const CHECK_COOLDOWN_MS = 30 * 60 * 1000 // 30 minutes
 export const OTA_CLEANUP_FLAG = STORAGE_KEYS.otaCleanup
-export const LEGACY_OTA_CLEANUP_FLAG = STORAGE_KEYS.legacyOtaCleanup
 
 export const UPDATE_MIRRORS: readonly UpdateMirror[] = [{ label: "GitHub 直连", value: "" }]
 
@@ -165,10 +163,7 @@ export async function checkForUpdate(
   channel: UpdateChannel = "stable"
 ): Promise<UpdateInfo> {
   if (auto) {
-    const last = getLocalStorageItemWithFallback(
-      `${LAST_CHECK_KEY}:${channel}`,
-      `${LEGACY_LAST_CHECK_KEY}:${channel}`
-    )
+    const last = localStorage.getItem(`${LAST_CHECK_KEY}:${channel}`)
     if (last && Date.now() - Number(last) < CHECK_COOLDOWN_MS) {
       return EMPTY_RESULT
     }
@@ -275,7 +270,7 @@ export function openApkDownload(url: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// In-app APK download via native YsuFile plugin
+// In-app APK download via native OrahakoFile plugin
 // ---------------------------------------------------------------------------
 
 /** Path of the last successfully downloaded APK (kept in module scope). */
@@ -290,12 +285,12 @@ export async function downloadApkInApp(
     throw new Error("No APK download URL")
   }
 
-  const listener = await YsuFile.addListener("downloadProgress", (state) => {
+  const listener = await OrahakoFile.addListener("downloadProgress", (state) => {
     onProgress?.(state.percent)
   })
 
   try {
-    const result = await YsuFile.downloadApk({ url: info.apkDownloadUrl })
+    const result = await OrahakoFile.downloadApk({ url: info.apkDownloadUrl })
     lastDownloadedApkPath = result.path
   } finally {
     await listener.remove()
@@ -307,11 +302,11 @@ export async function installDownloadedApk(): Promise<void> {
   if (!lastDownloadedApkPath) {
     throw new Error("No APK downloaded")
   }
-  await YsuFile.installApk({ path: lastDownloadedApkPath })
+  await OrahakoFile.installApk({ path: lastDownloadedApkPath })
 }
 
 /** Clear the APK cache directory. */
 export async function clearApkCache(): Promise<void> {
-  await YsuFile.clearDirectory({})
+  await OrahakoFile.clearDirectory({})
   lastDownloadedApkPath = null
 }

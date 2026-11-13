@@ -1,7 +1,7 @@
 "use client"
 
 import { Component, createElement, useMemo, useSyncExternalStore, type ReactNode } from "react"
-import { PluginSlotRuntimeContext, type PluginSlotRuntime } from "@ysu/plugin-sdk"
+import { PluginSlotRuntimeContext, type PluginSlotRuntime } from "@orahako/plugin-sdk"
 import type { PluginSlotRegistry } from "@/lib/plugins/slot-registry"
 
 class SlotContributionBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

@@ -1,6 +1,6 @@
-import type { PluginHttpService, PluginNativeService } from "@ysu/plugin-sdk"
+import type { PluginHttpService, PluginNativeService } from "@orahako/plugin-sdk"
 import { isCapacitor } from "@/lib/native/platform"
-import { YsuFile } from "@/lib/native/ysu-file"
+import { OrahakoFile } from "@/lib/native/orahako-file"
 import type { PluginServiceFactory } from "./runtime"
 
 export const createPluginPlatformServices: PluginServiceFactory = (ctx) => {
@@ -11,7 +11,7 @@ export const createPluginPlatformServices: PluginServiceFactory = (ctx) => {
     isNative: isCapacitor(),
     saveImage: async (image, fileName) => {
       const base64 = await blobToBase64(image)
-      return YsuFile.saveImageToGallery({ base64, mimeType: image.type, fileName })
+      return OrahakoFile.saveImageToGallery({ base64, mimeType: image.type, fileName })
     },
   }
   ctx.set("http", http)

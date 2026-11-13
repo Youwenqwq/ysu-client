@@ -1,5 +1,5 @@
 import { CalendarDays } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { SchoolSchedulePage } from "./page"
 
 export const manifest: PluginManifest = {

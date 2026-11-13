@@ -2,13 +2,13 @@ apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
 
 android {
-    namespace = "com.youwenqwq.ysuclient"
+    namespace = "me.uwen.orahako"
     compileSdk = rootProject.ext.compileSdkVersion
     buildFeatures {
         buildConfig = true
     }
     defaultConfig {
-        applicationId "com.youwenqwq.ysuclient"
+        applicationId "me.uwen.orahako"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionName "1.6.0"

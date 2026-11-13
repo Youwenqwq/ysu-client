@@ -1,6 +1,6 @@
 export const zh = {
   app: {
-    name: "燕大终端",
+    name: "酸橙盒",
     offlineReady: "该应用已可离线使用",
     nav: "导航",
     toggleSidebar: "折叠/展开侧边栏",
@@ -179,7 +179,7 @@ export const zh = {
     manualTitle: "手动添加",
     manualDescription: "如果系统没有弹出添加界面，可以从手机桌面完成：",
     manualStep1: "长按或双指捏合桌面空白处，选择“卡片”“小组件”或“窗口小工具”。",
-    manualStep2: "搜索“燕大终端”，或在“全部卡片”“插件”等分类中找到本应用。",
+    manualStep2: "搜索“酸橙盒”，或在“全部卡片”“插件”等分类中找到本应用。",
     manualStep3: "点击或长按需要的小组件，将其添加到桌面空白区域。",
     manualStep4: "按桌面提示调整大小和位置。",
     resizeNote: "课表与考试提醒支持调整尺寸，具体操作可能因桌面应用而异。",
@@ -203,7 +203,7 @@ export const zh = {
     checkUpdate: "检查更新",
     installApp: "安装应用",
     installAppDesc: "添加到主屏幕",
-    installAppIosTitle: "安装燕大终端",
+    installAppIosTitle: "安装酸橙盒",
     installAppIosStep1: "打开浏览器的分享菜单",
     installAppIosStep2: "选择“添加到主屏幕”",
     installAppIosStep3: "确认添加",
@@ -271,7 +271,7 @@ export const zh = {
     dialogDescription: "应用公告",
   },
   login: {
-    title: "燕大终端",
+    title: "酸橙盒",
     schoolLabel: "学校",
     usernameLabel: "学号",
     usernamePlaceholder: "请输入学号",
@@ -1197,7 +1197,7 @@ export const zh = {
 
 export const en = {
   app: {
-    name: "YSU Terminal",
+    name: "Orahako",
     offlineReady: "This app is ready for offline use",
     nav: "Navigation",
     toggleSidebar: "Toggle sidebar",
@@ -1381,7 +1381,7 @@ export const en = {
     manualDescription: "If no system dialog appears, add a widget from your home screen:",
     manualStep1: "Long-press or pinch an empty home-screen area, then choose Cards or Widgets.",
     manualStep2:
-      "Search for YSU Terminal, or find it under All cards, Plugins, or a similar category.",
+      "Search for Orahako, or find it under All cards, Plugins, or a similar category.",
     manualStep3: "Tap or long-press a widget to add it to an empty home-screen area.",
     manualStep4: "Adjust its size and position as prompted by your launcher.",
     resizeNote: "Schedule and exam widgets are resizable; exact steps vary by launcher.",
@@ -1406,7 +1406,7 @@ export const en = {
     checkUpdate: "Check for Updates",
     installApp: "Install App",
     installAppDesc: "Add to Home Screen",
-    installAppIosTitle: "Install YSU Terminal",
+    installAppIosTitle: "Install Orahako",
     installAppIosStep1: "Open the browser Share menu",
     installAppIosStep2: "Choose “Add to Home Screen”",
     installAppIosStep3: "Confirm to add the app",
@@ -1474,7 +1474,7 @@ export const en = {
     dialogDescription: "App announcement",
   },
   login: {
-    title: "YSU Terminal",
+    title: "Orahako",
     schoolLabel: "School",
     usernameLabel: "Student ID",
     usernamePlaceholder: "Enter student ID",

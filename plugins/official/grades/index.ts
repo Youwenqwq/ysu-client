@@ -1,7 +1,7 @@
 import { GraduationCap } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { GradesPage } from "./page"
-import { GpaSummaryWidget } from "@ysu/academic"
+import { GpaSummaryWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
   id: "ysu.grades",

@@ -1,4 +1,4 @@
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { StudentInfoPage } from "./page"
 
 export const manifest: PluginManifest = {

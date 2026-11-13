@@ -11,8 +11,8 @@ import {
   type EcardSessionStatus,
 } from "./protocol/ecard"
 import { mapCASSessionError } from "./cas-auth"
-import { ProviderError, ProviderErrorCode, wrapError } from "@ysu/plugin-sdk/provider-errors"
-import { getSchoolConfigScope, useAuthStore } from "@ysu/plugin-sdk/host"
+import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
+import { getSchoolConfigScope, useAuthStore } from "@orahako/plugin-sdk/host"
 
 export type { EcardBalance, EcardSessionStatus } from "./protocol/ecard"
 

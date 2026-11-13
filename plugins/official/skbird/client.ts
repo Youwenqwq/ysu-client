@@ -9,7 +9,7 @@
  *
  * 参考实现：purepy/zanao.py（签名 118/118 抓包验证）。
  */
-import { fetchStateless } from "@ysu/plugin-sdk/host"
+import { fetchStateless } from "@orahako/plugin-sdk/host"
 import { makeSign, type SignEntry } from "./sign"
 import {
   toCategoryList,

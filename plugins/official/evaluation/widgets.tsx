@@ -2,12 +2,12 @@
 
 import Link from "next/link"
 import { ChevronRight, ClipboardCheck } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@ysu/plugin-ui/components"
-import { useIsMobile, type ProviderQueryResult } from "@ysu/plugin-ui/hooks"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import type { EvaluationTask } from "@ysu/plugin-sdk/academic"
-import { pluginPageHref } from "@ysu/plugin-sdk"
-import { QueryState, useOverviewEvaluation } from "@ysu/academic"
+import { Card, CardContent, CardHeader, CardTitle } from "@orahako/plugin-ui/components"
+import { useIsMobile, type ProviderQueryResult } from "@orahako/plugin-ui/hooks"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import type { EvaluationTask } from "@orahako/plugin-sdk/academic"
+import { pluginPageHref } from "@orahako/plugin-sdk"
+import { QueryState, useOverviewEvaluation } from "@orahako/academic"
 
 function EvaluationSummary({
   query,

@@ -1,5 +1,5 @@
 import { Puzzle } from "lucide-react"
-import { definePlugin } from "@ysu/plugin-sdk"
+import { definePlugin } from "@orahako/plugin-sdk"
 import { HelloPage } from "./page"
 import "./style.css"
 

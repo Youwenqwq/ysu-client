@@ -3,11 +3,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { Button } from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useBackHandler } from "@ysu/plugin-ui/hooks"
-import { BACK_PRIORITY } from "@ysu/plugin-ui/platform"
-import { cn } from "@ysu/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useBackHandler } from "@orahako/plugin-ui/hooks"
+import { BACK_PRIORITY } from "@orahako/plugin-ui/platform"
+import { cn } from "@orahako/plugin-ui/components"
 import {
   scheduleOccurrence,
   type ScheduleDrop,
@@ -15,8 +15,8 @@ import {
   type SchedulePatch,
   type ScheduleSelection,
   type ScheduleTrace,
-} from "@ysu/plugin-ui/academic"
-import { ScheduleEditorContext, type ScheduleEditorValue } from "@ysu/academic"
+} from "@orahako/plugin-ui/academic"
+import { ScheduleEditorContext, type ScheduleEditorValue } from "@orahako/academic"
 interface ScheduleDragProviderProps {
   enabled: boolean
   editing: boolean

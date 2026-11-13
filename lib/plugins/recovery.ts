@@ -1,6 +1,6 @@
 import { APP_BUILD } from "@/lib/version"
 
-const RECOVERY_KEY = "academic-client-plugin-recovery"
+const RECOVERY_KEY = "orahako-plugin-recovery"
 
 export interface PluginRecoveryState {
   phase: "starting" | "ready"

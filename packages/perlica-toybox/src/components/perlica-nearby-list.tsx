@@ -1,12 +1,12 @@
 "use client"
 
 import { Bike, ChevronRight, Clock3 } from "lucide-react"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
 import type { PerlicaMachine } from "../extras/types"
-import { usePluginTranslation } from "@ysu/plugin-ui/plugin"
+import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
-import { cn } from "@ysu/plugin-ui/components"
+import { cn } from "@orahako/plugin-ui/components"
 
 interface Props {
   machines: PerlicaMachine[]

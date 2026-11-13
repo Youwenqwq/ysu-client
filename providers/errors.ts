@@ -4,4 +4,4 @@ export {
   ProviderErrorCode,
   isProviderError,
   wrapError,
-} from "@ysu/plugin-sdk/provider-errors"
+} from "@orahako/plugin-sdk/provider-errors"

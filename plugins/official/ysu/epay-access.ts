@@ -12,8 +12,8 @@ import {
   EpayProtocolError,
   type EpaySessionStatus,
 } from "./protocol/epay"
-import { getSchoolConfigScope, useAuthStore } from "@ysu/plugin-sdk/host"
-import { ProviderError, ProviderErrorCode, wrapError } from "@ysu/plugin-sdk/provider-errors"
+import { getSchoolConfigScope, useAuthStore } from "@orahako/plugin-sdk/host"
+import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
 import { mapCASSessionError } from "./cas-auth"
 
 export type { EpayRecord, EpaySessionStatus } from "./protocol/epay"

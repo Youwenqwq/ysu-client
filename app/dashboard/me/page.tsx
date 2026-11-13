@@ -24,7 +24,7 @@ import { APP_VERSION, APP_BUILD } from "@/lib/version"
 import { useProviderCapabilities } from "@/providers/use-provider"
 import { usePluginHost } from "@/components/plugin-provider"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
-import { pluginPageHref, type PluginNavigationGroup } from "@ysu/plugin-sdk"
+import { pluginPageHref, type PluginNavigationGroup } from "@orahako/plugin-sdk"
 import { useSemanticNavigation } from "@/lib/navigation/use-semantic-navigation"
 import { hasPluginCapability } from "@/lib/plugins/navigation"
 

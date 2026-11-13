@@ -17,7 +17,7 @@ import {
   onSchoolConfigChanged,
   serverConfig,
   type CookieEntry,
-} from "@ysu/plugin-sdk/host"
+} from "@orahako/plugin-sdk/host"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 import { authorize, getCredentialApplied } from "./cas"
 

@@ -4,16 +4,16 @@ import { useEffect, useId, useRef, useState } from "react"
 import type { ChangeEvent } from "react"
 import type { Html5Qrcode } from "html5-qrcode"
 import { Camera, Image as ImageIcon, Square, Video, X } from "lucide-react"
-import { Button } from "@ysu/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
 import { parsePerlicaCode } from "../extras/scan"
-import { usePluginTranslation } from "@ysu/plugin-ui/plugin"
+import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
 
 type QrScanner = Html5Qrcode

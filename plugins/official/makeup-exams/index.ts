@@ -1,5 +1,5 @@
 import { FilePenLine } from "lucide-react"
-import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { MakeupExamsPage } from "./page"
 
 export const manifest: PluginManifest = {

@@ -7,14 +7,14 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@ysu/plugin-ui/components"
-import { Avatar, AvatarFallback, AvatarImage } from "@ysu/plugin-ui/components"
-import { useSettingsStore } from "@ysu/plugin-ui/stores"
-import { useStoredMediaUrl } from "@ysu/plugin-ui/hooks"
-import { loadAvatarImage } from "@ysu/plugin-ui/stores"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useStudentInfo } from "@ysu/plugin-ui/hooks"
-import { QueryState } from "@ysu/academic"
+} from "@orahako/plugin-ui/components"
+import { Avatar, AvatarFallback, AvatarImage } from "@orahako/plugin-ui/components"
+import { useSettingsStore } from "@orahako/plugin-ui/stores"
+import { useStoredMediaUrl } from "@orahako/plugin-ui/hooks"
+import { loadAvatarImage } from "@orahako/plugin-ui/stores"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useStudentInfo } from "@orahako/plugin-ui/hooks"
+import { QueryState } from "@orahako/academic"
 
 export function ProfileWidget({ compact, children }: { compact: boolean; children?: ReactNode }) {
   const { t } = useTranslation()

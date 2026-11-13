@@ -34,10 +34,10 @@ import {
   getText,
   recordLoginAttempt,
   useAuthStore,
-} from "@ysu/plugin-sdk/host"
+} from "@orahako/plugin-sdk/host"
 import { withAuthTransition } from "./auth-transition"
-import { ProviderError, ProviderErrorCode, wrapError } from "@ysu/plugin-sdk/provider-errors"
-import type { WechatQrPollResult } from "@ysu/plugin-sdk/academic"
+import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
+import type { WechatQrPollResult } from "@orahako/plugin-sdk/academic"
 import { getYSUMfaMethods, isYSUMfaMethod } from "./types"
 
 export interface LoginStep1Result {

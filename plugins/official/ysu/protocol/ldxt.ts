@@ -11,7 +11,7 @@ import {
   fetchWithJar,
   getSchoolConfig,
   type HttpResponse,
-} from "@ysu/plugin-sdk/host"
+} from "@orahako/plugin-sdk/host"
 import { authorize, getCredentialApplied } from "./cas"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 import { parseTables, type TableData } from "./table"

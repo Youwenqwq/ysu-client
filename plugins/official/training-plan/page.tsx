@@ -1,6 +1,6 @@
 "use client"
 
-import { ResponsiveSelect } from "@ysu/plugin-ui/components"
+import { ResponsiveSelect } from "@orahako/plugin-ui/components"
 import { useMemo, useState } from "react"
 import {
   Card,
@@ -8,13 +8,13 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { Alert, AlertDescription, AlertTitle } from "@ysu/plugin-ui/components"
-import { Field, FieldGroup, FieldLabel } from "@ysu/plugin-ui/components"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Alert, AlertDescription, AlertTitle } from "@orahako/plugin-ui/components"
+import { Field, FieldGroup, FieldLabel } from "@orahako/plugin-ui/components"
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@orahako/plugin-ui/components"
 import {
   Table,
   TableBody,
@@ -22,13 +22,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
+} from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
 import { toast } from "sonner"
-import { useProvider } from "@ysu/plugin-ui/hooks"
-import { Spinner } from "@ysu/plugin-ui/components"
-import type { AcademicCompletion } from "@ysu/plugin-sdk"
-import { useAcademicCompletion, useAcademicWarnings, useTrainingPlan } from "@ysu/plugin-ui/hooks"
+import { useProvider } from "@orahako/plugin-ui/hooks"
+import { Spinner } from "@orahako/plugin-ui/components"
+import type { AcademicCompletion } from "@orahako/plugin-sdk"
+import { useAcademicCompletion, useAcademicWarnings, useTrainingPlan } from "@orahako/plugin-ui/hooks"
 import { AlertTriangle, CheckCircle2, RefreshCw, RotateCcw, Search } from "lucide-react"
 
 const ALL = "__all__"

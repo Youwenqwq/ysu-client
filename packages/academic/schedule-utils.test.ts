@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { CurrentWeek, Course } from "@ysu/plugin-sdk/academic"
+import type { CurrentWeek, Course } from "@orahako/plugin-sdk/academic"
 import {
   computeWeekDateLabels,
   isCourseActiveInWeek,

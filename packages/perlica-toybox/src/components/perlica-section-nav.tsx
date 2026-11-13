@@ -1,8 +1,8 @@
 "use client"
 
 import { Bike, History, MapPin, RefreshCw, Settings, UserRound } from "lucide-react"
-import { Button, cn } from "@ysu/plugin-ui/components"
-import { usePluginTranslation } from "@ysu/plugin-ui/plugin"
+import { Button, cn } from "@orahako/plugin-ui/components"
+import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
 import { PERLICA_TABS, type PerlicaTab } from "../extras/app-nav"
 

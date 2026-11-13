@@ -1,11 +1,11 @@
 {
-  "name": "@ysu/perlica-toybox",
-  "version": "1.0.0",
+  "name": "@orahako/perlica-toybox",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@ysu/plugin-sdk": "workspace:*",
-    "@ysu/plugin-ui": "workspace:*",
+    "@orahako/plugin-sdk": "workspace:*",
+    "@orahako/plugin-ui": "workspace:*",
     "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.17.0",

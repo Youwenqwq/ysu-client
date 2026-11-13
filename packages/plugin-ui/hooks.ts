@@ -1,5 +1,5 @@
 /**
- * @ysu/plugin-ui/hooks — React hooks over host state and i18n.
+ * @orahako/plugin-ui/hooks — React hooks over host state and i18n.
  */
 export { useTranslation } from "@/lib/i18n/use-translation"
 export { useIsMobile } from "@/hooks/use-mobile"

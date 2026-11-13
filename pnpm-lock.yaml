@@ -202,13 +202,13 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.6)
-      '@ysu/academic':
+      '@orahako/academic':
         specifier: workspace:*
         version: link:packages/academic
-      '@ysu/plugin-sdk':
+      '@orahako/plugin-sdk':
         specifier: workspace:*
         version: link:packages/plugin-sdk
-      '@ysu/plugin-ui':
+      '@orahako/plugin-ui':
         specifier: workspace:*
         version: link:packages/plugin-ui
       canvas-confetti:
@@ -334,10 +334,10 @@ importers:
 
   packages/perlica-toybox:
     dependencies:
-      '@ysu/plugin-sdk':
+      '@orahako/plugin-sdk':
         specifier: workspace:*
         version: link:../plugin-sdk
-      '@ysu/plugin-ui':
+      '@orahako/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
       html5-qrcode:
@@ -377,10 +377,10 @@ importers:
       '@cordisjs/core':
         specifier: 3.18.1
         version: 3.18.1
-      '@ysu/plugin-sdk':
+      '@orahako/plugin-sdk':
         specifier: workspace:*
         version: link:../plugin-sdk
-      '@ysu/plugin-ui':
+      '@orahako/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
       react:
@@ -392,7 +392,7 @@ importers:
       '@cordisjs/core':
         specifier: 3.18.1
         version: 3.18.1
-      '@ysu/plugin-sdk':
+      '@orahako/plugin-sdk':
         specifier: workspace:*
         version: link:../plugin-sdk
       lucide-react:

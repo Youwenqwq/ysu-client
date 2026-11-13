@@ -1,8 +1,8 @@
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
-import type { Grade } from "@ysu/plugin-sdk"
-import { STORAGE_KEYS } from "@ysu/plugin-ui/stores"
-import { localStorageAdapter } from "@ysu/plugin-ui/stores"
+import type { Grade } from "@orahako/plugin-sdk"
+import { STORAGE_KEYS } from "@orahako/plugin-ui/stores"
+import { localStorageAdapter } from "@orahako/plugin-ui/stores"
 /** 待抽取的新成绩(快照自 Grade,避免持久化整行原始数据) */
 export interface PendingGrade {
   key: string

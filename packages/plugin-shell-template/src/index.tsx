@@ -10,8 +10,8 @@ import {
   SDKProvider,
   Toaster,
   TooltipProvider,
-} from "@ysu/plugin-ui/shell"
-import { definePlugin, pluginPageHref, withAppBasePath, type PluginContext } from "@ysu/plugin-sdk"
+} from "@orahako/plugin-ui/shell"
+import { definePlugin, pluginPageHref, withAppBasePath, type PluginContext } from "@orahako/plugin-sdk"
 
 class CommunityPageBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }

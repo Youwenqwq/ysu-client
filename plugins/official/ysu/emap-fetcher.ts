@@ -7,7 +7,7 @@
 import { persistJWXTSession } from "./session"
 import { NotLoggedInError, JWXTBusinessError, JWXTProtocolError, JWXTError } from "./protocol/jwxt"
 import { mapCASSessionError } from "./cas-auth"
-import { ProviderError, ProviderErrorCode, wrapError } from "@ysu/plugin-sdk/provider-errors"
+import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
 import {
   StudentInfo as JWXTStudentInfo,
   Grade as JWXTGrade,

@@ -1,4 +1,4 @@
-import type { PluginKeyValueStorage, PluginStorageService } from "@ysu/plugin-sdk"
+import type { PluginKeyValueStorage, PluginStorageService } from "@orahako/plugin-sdk"
 import { localStorageAdapter } from "@/lib/storage/local"
 import { secureStorage } from "@/lib/storage/secure"
 import type { PluginServiceFactory } from "./runtime"
@@ -8,7 +8,7 @@ function namespacedStorage(
   storage: typeof localStorageAdapter,
   secure: boolean
 ): PluginKeyValueStorage {
-  const prefix = `academic-client-plugin:${pluginId}:`
+  const prefix = `orahako-plugin:${pluginId}:`
   return {
     getItem: async (key) => {
       if (secure) return storage.getItem(`${prefix}${key}`)

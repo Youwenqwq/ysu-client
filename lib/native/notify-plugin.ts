@@ -1,11 +1,11 @@
 /**
  * Capacitor 原生通知插件桥接。
  *
- * 对应原生插件: com.youwenqwq.ysuclient.notify.YsuNotifyPlugin
+ * 对应原生插件: me.uwen.orahako.notify.OrahakoNotifyPlugin
  */
 import { registerPlugin } from "@capacitor/core"
 
-export interface YsuNotifyPlugin {
+export interface OrahakoNotifyPlugin {
   // ─── CASTGC management ──────────────────────────────────────────────────
   setCastgc(options: { castgc: string }): Promise<void>
   clearCastgc(): Promise<void>
@@ -58,4 +58,4 @@ export interface YsuNotifyPlugin {
   }): Promise<{ posted: boolean }>
 }
 
-export const NotifyPlugin = registerPlugin<YsuNotifyPlugin>("YsuNotify")
+export const NotifyPlugin = registerPlugin<OrahakoNotifyPlugin>("OrahakoNotify")

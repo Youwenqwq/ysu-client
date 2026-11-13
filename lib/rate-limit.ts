@@ -1,7 +1,6 @@
-import { getLocalStorageItemWithFallback, STORAGE_KEYS } from "./storage/keys"
+import { STORAGE_KEYS } from "./storage/keys"
 
 const STORAGE_KEY = STORAGE_KEYS.loginRateLimit
-const LEGACY_STORAGE_KEY = STORAGE_KEYS.legacyLoginRateLimit
 
 const WINDOW_MS = 15 * 60 * 1000 // 15 minutes
 const INTERVAL_MS = 60 * 1000 // 1 minute
@@ -20,7 +19,7 @@ export interface RateLimitResult {
 function readState(): RateLimitState {
   if (typeof window === "undefined") return { attempts: [] }
   try {
-    const raw = getLocalStorageItemWithFallback(STORAGE_KEY, LEGACY_STORAGE_KEY)
+    const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { attempts: [] }
     const parsed = JSON.parse(raw) as unknown
     if (
@@ -42,7 +41,6 @@ function readState(): RateLimitState {
 function writeState(state: RateLimitState): void {
   if (typeof window === "undefined") return
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  localStorage.removeItem(LEGACY_STORAGE_KEY)
 }
 
 function cleanOldAttempts(attempts: number[]): number[] {

@@ -9,13 +9,13 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { Spinner } from "@ysu/plugin-ui/components"
-import { Progress } from "@ysu/plugin-ui/components"
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Spinner } from "@orahako/plugin-ui/components"
+import { Progress } from "@orahako/plugin-ui/components"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@orahako/plugin-ui/components"
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -24,25 +24,25 @@ import {
   ResponsiveModalHeader,
   ResponsiveModalTitle,
   ResponsiveModalBody,
-} from "@ysu/plugin-ui/components"
-import { Checkbox } from "@ysu/plugin-ui/components"
-import { RadioGroup, RadioGroupItem } from "@ysu/plugin-ui/components"
-import { Label } from "@ysu/plugin-ui/components"
-import { Textarea } from "@ysu/plugin-ui/components"
-import { Input } from "@ysu/plugin-ui/components"
-import { Field, FieldLabel } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Checkbox } from "@orahako/plugin-ui/components"
+import { RadioGroup, RadioGroupItem } from "@orahako/plugin-ui/components"
+import { Label } from "@orahako/plugin-ui/components"
+import { Textarea } from "@orahako/plugin-ui/components"
+import { Input } from "@orahako/plugin-ui/components"
+import { Field, FieldLabel } from "@orahako/plugin-ui/components"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
-import { cn } from "@ysu/plugin-ui/components"
-import { useEvaluationTypes, usePendingEvaluations } from "@ysu/plugin-ui/hooks"
-import { useProvider } from "@ysu/plugin-ui/hooks"
-import type { EvaluationTask, EvaluationDetail, Question, EvaluationAnswer } from "@ysu/plugin-sdk"
+} from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
+import { cn } from "@orahako/plugin-ui/components"
+import { useEvaluationTypes, usePendingEvaluations } from "@orahako/plugin-ui/hooks"
+import { useProvider } from "@orahako/plugin-ui/hooks"
+import type { EvaluationTask, EvaluationDetail, Question, EvaluationAnswer } from "@orahako/plugin-sdk"
 import { ChevronDown, ChevronRight, ClipboardCheck, Sparkles } from "lucide-react"
 
 interface BatchTaskResult {

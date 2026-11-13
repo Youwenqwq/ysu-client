@@ -7,7 +7,6 @@ import { getText } from "../i18n/get-text"
 import { STORAGE_KEYS } from "./keys"
 
 const CACHE_PREFIX = STORAGE_KEYS.cachePrefix
-const LEGACY_CACHE_PREFIX = STORAGE_KEYS.legacyCachePrefix
 
 /** 默认 TTL: 24 小时 */
 export const DEFAULT_TTL_MS = 1000 * 60 * 60 * 24
@@ -51,19 +50,13 @@ export function cacheGetStale<T>(
   ttl = DEFAULT_TTL_MS
 ): { data: T; stale: boolean } | null {
   const currentKey = `${CACHE_PREFIX}${key}`
-  const legacyKey = `${LEGACY_CACHE_PREFIX}${key}`
   try {
-    const raw = localStorage.getItem(currentKey) ?? localStorage.getItem(legacyKey)
+    const raw = localStorage.getItem(currentKey)
     if (!raw) return null
     const entry: CacheEntry<T> = JSON.parse(raw)
     if (entry.v !== CACHE_VERSION) {
       localStorage.removeItem(currentKey)
-      localStorage.removeItem(legacyKey)
       return null
-    }
-    if (!localStorage.getItem(currentKey)) {
-      localStorage.setItem(currentKey, raw)
-      localStorage.removeItem(legacyKey)
     }
     const stale = Date.now() - entry.ts > ttl
     return { data: entry.data, stale }
@@ -93,7 +86,7 @@ export function clearAllCache(): void {
     const keysToRemove: string[] = []
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
-      if (key && (key.startsWith(CACHE_PREFIX) || key.startsWith(LEGACY_CACHE_PREFIX))) {
+      if (key && key.startsWith(CACHE_PREFIX)) {
         keysToRemove.push(key)
       }
     }

@@ -1,7 +1,7 @@
 import type { AcademicCompletion as ProtocolAcademicCompletion } from "./protocol/jwxt"
-import { getSchoolConfig, isFeatureAvailable, useAuthStore } from "@ysu/plugin-sdk/host"
-import { BaseProvider } from "@ysu/plugin-sdk/provider-base"
-import { ProviderError, ProviderErrorCode } from "@ysu/plugin-sdk/provider-errors"
+import { getSchoolConfig, isFeatureAvailable, useAuthStore } from "@orahako/plugin-sdk/host"
+import { BaseProvider } from "@orahako/plugin-sdk/provider-base"
+import { ProviderError, ProviderErrorCode } from "@orahako/plugin-sdk/provider-errors"
 import type {
   AcademicCapabilities,
   AcademicCompletion,
@@ -79,7 +79,7 @@ import type {
   UnscheduledCourseQueryOptions,
   WechatMfaContext,
   WechatQrPollResult,
-} from "@ysu/plugin-sdk/academic"
+} from "@orahako/plugin-sdk/academic"
 import {
   checkCaptchaNeeded,
   completeWechatMFA,

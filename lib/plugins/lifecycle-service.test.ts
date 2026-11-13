@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import type { PluginManifest } from "@ysu/plugin-sdk"
+import type { PluginManifest } from "@orahako/plugin-sdk"
 import { PluginLifecycleRegistry } from "./lifecycle-service"
 import { PluginRuntime } from "./runtime"
 

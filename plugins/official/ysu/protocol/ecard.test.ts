@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type * as HostModule from "@ysu/plugin-sdk/host"
+import type * as HostModule from "@orahako/plugin-sdk/host"
 import type * as CasModule from "./cas"
 
 const mocks = vi.hoisted(() => ({
@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   },
 }))
 
-vi.mock("@ysu/plugin-sdk/host", async (importOriginal) => ({
+vi.mock("@orahako/plugin-sdk/host", async (importOriginal) => ({
   ...(await importOriginal<typeof HostModule>()),
   fetchWithJar: mocks.fetchWithJar,
   useAuthStore: { getState: () => mocks.authState },
@@ -28,7 +28,7 @@ vi.mock("./cas", async (importOriginal) => ({
   getCredentialApplied: mocks.getCredentialApplied,
 }))
 
-import { type HttpResponse } from "@ysu/plugin-sdk/host"
+import { type HttpResponse } from "@orahako/plugin-sdk/host"
 
 import {
   EcardNotLoggedInError,
@@ -39,7 +39,7 @@ import {
 } from "./ecard"
 import { NotAuthenticatedError } from "./cas"
 import { fetchEcardBalance } from "../ecard-access"
-import { ProviderErrorCode } from "@ysu/plugin-sdk/provider-errors"
+import { ProviderErrorCode } from "@orahako/plugin-sdk/provider-errors"
 
 /** 真实抓包结构（余额 18.55，学号已脱敏） */
 const REAL = {

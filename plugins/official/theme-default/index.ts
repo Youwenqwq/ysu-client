@@ -1,4 +1,4 @@
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 
 export const manifest: PluginManifest = {
   id: "ysu.theme.default",

@@ -12,7 +12,7 @@ import {
 import { CalendarOff, Layers } from "lucide-react"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { cn } from "@/lib/utils"
-import type { ClassPeriod, Course, CurrentWeek, Exam } from "@ysu/plugin-sdk/academic"
+import type { ClassPeriod, Course, CurrentWeek, Exam } from "@orahako/plugin-sdk/academic"
 import { computeExamBlocks, type ExamBlock } from "./exam-blocks"
 import { formatExamTime } from "@/lib/academic/exam-utils"
 import {

@@ -23,16 +23,16 @@ export default function manifest(): LocalizedManifest {
 
   return {
     id: `${basePath}/`,
-    name: "燕大终端",
-    short_name: "燕大终端",
+    name: "酸橙盒",
+    short_name: "酸橙盒",
     description: "面向燕山大学教务系统的第三方客户端",
     lang: "zh-CN",
     dir: "ltr",
     name_localized: {
-      en: "YSU Terminal",
+      en: "Orahako",
     },
     short_name_localized: {
-      en: "YSU Terminal",
+      en: "Orahako",
     },
     description_localized: {
       en: "A third-party client for the Yanshan University academic system.",

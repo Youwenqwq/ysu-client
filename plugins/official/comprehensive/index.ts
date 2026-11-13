@@ -1,5 +1,5 @@
 import { Gauge } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { ComprehensivePage } from "./page"
 
 export const manifest: PluginManifest = {

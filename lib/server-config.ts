@@ -5,7 +5,7 @@
  * 修改后需重新登录才能生效（cookie 域名变更）。
  */
 
-import { getLocalStorageItemWithFallback, STORAGE_KEYS } from "./storage/keys"
+import { STORAGE_KEYS } from "./storage/keys"
 import {
   DEFAULT_SCHOOL_ID,
   getSchoolConfigById,
@@ -230,7 +230,7 @@ export function getJwxtCookieDomain(): string {
 
 export function initServerConfig(): void {
   try {
-    const raw = getLocalStorageItemWithFallback(STORAGE_KEYS.settings, STORAGE_KEYS.legacySettings)
+    const raw = localStorage.getItem(STORAGE_KEYS.settings)
     if (!raw) return
     const parsed = JSON.parse(raw)
 

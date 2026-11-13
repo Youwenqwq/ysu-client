@@ -1,4 +1,4 @@
-import type { PluginI18nService, PluginLocale, PluginTranslations } from "@ysu/plugin-sdk"
+import type { PluginI18nService, PluginLocale, PluginTranslations } from "@orahako/plugin-sdk"
 import { en, zh } from "@/lib/i18n/dict"
 import { translateDictionary } from "@/lib/i18n/translate"
 import type { PluginServiceFactory } from "./runtime"

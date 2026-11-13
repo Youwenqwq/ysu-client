@@ -1,4 +1,4 @@
-import { fetchStateless, type HttpResponse } from "@ysu/plugin-sdk/host"
+import { fetchStateless, type HttpResponse } from "@orahako/plugin-sdk/host"
 import {
   toPerlicaCurrentOrder,
   toPerlicaDispatchCheck,

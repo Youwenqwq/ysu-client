@@ -10,12 +10,12 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^@\/(.*)$/, replacement: `${root}$1` },
-      { find: /^@ysu\/plugin-sdk$/, replacement: `${sdk}index.ts` },
-      { find: /^@ysu\/plugin-sdk\/(.*)$/, replacement: `${sdk}$1` },
-      { find: /^@ysu\/academic$/, replacement: `${academic}index.ts` },
-      { find: /^@ysu\/academic\/(.*)$/, replacement: `${academic}$1` },
-      { find: /^@ysu\/plugin-ui$/, replacement: `${pluginUi}index.ts` },
-      { find: /^@ysu\/plugin-ui\/(.*)$/, replacement: `${pluginUi}$1` },
+      { find: /^@orahako\/plugin-sdk$/, replacement: `${sdk}index.ts` },
+      { find: /^@orahako\/plugin-sdk\/(.*)$/, replacement: `${sdk}$1` },
+      { find: /^@orahako\/academic$/, replacement: `${academic}index.ts` },
+      { find: /^@orahako\/academic\/(.*)$/, replacement: `${academic}$1` },
+      { find: /^@orahako\/plugin-ui$/, replacement: `${pluginUi}index.ts` },
+      { find: /^@orahako\/plugin-ui\/(.*)$/, replacement: `${pluginUi}$1` },
     ],
   },
   test: {

@@ -6,8 +6,8 @@
  *
  * 接口返回"宽松 JSON"（key 不带引号），用 parseLooseJson 处理。
  */
-import type { EpayRecord, EpayRecordStatus, EpaySessionStatus } from "@ysu/plugin-sdk/academic"
-import { SimpleCookieJar, fetchWithJar, type HttpResponse } from "@ysu/plugin-sdk/host"
+import type { EpayRecord, EpayRecordStatus, EpaySessionStatus } from "@orahako/plugin-sdk/academic"
+import { SimpleCookieJar, fetchWithJar, type HttpResponse } from "@orahako/plugin-sdk/host"
 import { parseLooseJson } from "./parse-json"
 import { authorize, getCredentialApplied } from "./cas"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"

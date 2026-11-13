@@ -1,5 +1,5 @@
 import { ClipboardCheck, ListChecks } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { EvaluationPage } from "./page"
 import { EvaluationSummaryWidget, EvaluationTasksWidget } from "./widgets"
 

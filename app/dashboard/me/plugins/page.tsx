@@ -26,7 +26,7 @@ import type { InstalledPluginSummary } from "@/lib/plugins/package-store"
 import { isCapacitor } from "@/lib/native/platform"
 import { APP_VERSION } from "@/lib/version"
 import { useTranslation } from "@/lib/i18n/use-translation"
-import type { MarketplacePlugin } from "@ysu/plugin-sdk"
+import type { MarketplacePlugin } from "@orahako/plugin-sdk"
 
 export default function PluginsPage() {
   const { host, isReady } = usePluginHost()

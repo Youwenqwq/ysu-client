@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { ProviderError, ProviderErrorCode } from "@ysu/plugin-sdk/provider-errors"
+import { ProviderError, ProviderErrorCode } from "@orahako/plugin-sdk/provider-errors"
 
 const mocks = vi.hoisted(() => ({
   EpayNotLoggedInError: class EpayNotLoggedInError extends Error {},
@@ -15,7 +15,7 @@ vi.mock("./protocol/epay", () => ({
   resetEpay: vi.fn(),
 }))
 vi.mock("./cas-auth", () => ({ mapCASSessionError: () => undefined }))
-vi.mock("@ysu/plugin-sdk/host", () => ({
+vi.mock("@orahako/plugin-sdk/host", () => ({
   getSchoolConfigScope: () => "ysu",
   useAuthStore: { getState: mocks.getAuth },
 }))

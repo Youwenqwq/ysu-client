@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { ClassPeriod, Exam } from "@ysu/plugin-sdk/academic"
+import type { ClassPeriod, Exam } from "@orahako/plugin-sdk/academic"
 import { computeExamBlocks } from "./exam-blocks"
 
 const periods: ClassPeriod[] = [

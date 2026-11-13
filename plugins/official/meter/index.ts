@@ -1,5 +1,5 @@
 import { AirVent } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { MeterPage } from "./page"
 
 export const manifest: PluginManifest = {

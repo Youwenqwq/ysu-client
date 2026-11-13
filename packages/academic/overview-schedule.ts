@@ -7,16 +7,16 @@ import {
   useExams,
   useSchedule,
   useTermCalendar,
-} from "@ysu/plugin-ui/hooks"
-import { useSettingsStore } from "@ysu/plugin-ui/stores"
-import { syncScheduleToWidget, syncExamsToWidget } from "@ysu/plugin-ui/platform"
-import { syncClassAlarmsToNative } from "@ysu/plugin-ui/platform"
-import { compareExamStartTime, isExamCompleted } from "@ysu/plugin-ui/academic"
-import type { ScheduleOccurrence } from "@ysu/plugin-ui/academic"
-import type { ClassPeriod, Course, CurrentWeek, Exam } from "@ysu/plugin-sdk/academic"
-import type { ProviderQueryResult } from "@ysu/plugin-ui/hooks"
-import { useEffectiveSchedule } from "@ysu/plugin-ui/hooks"
-import { useAcademicTime } from "@ysu/plugin-ui/hooks"
+} from "@orahako/plugin-ui/hooks"
+import { useSettingsStore } from "@orahako/plugin-ui/stores"
+import { syncScheduleToWidget, syncExamsToWidget } from "@orahako/plugin-ui/platform"
+import { syncClassAlarmsToNative } from "@orahako/plugin-ui/platform"
+import { compareExamStartTime, isExamCompleted } from "@orahako/plugin-ui/academic"
+import type { ScheduleOccurrence } from "@orahako/plugin-ui/academic"
+import type { ClassPeriod, Course, CurrentWeek, Exam } from "@orahako/plugin-sdk/academic"
+import type { ProviderQueryResult } from "@orahako/plugin-ui/hooks"
+import { useEffectiveSchedule } from "@orahako/plugin-ui/hooks"
+import { useAcademicTime } from "@orahako/plugin-ui/hooks"
 import {
   buildSectionTimeMap,
   courseEndSection,
@@ -24,7 +24,7 @@ import {
   courseWeekDay,
   isCourseActiveInWeek,
   periodIsInUse,
-} from "@ysu/academic"
+} from "@orahako/academic"
 export type OverviewWeekQuery = Omit<ProviderQueryResult<CurrentWeek>, "data" | "mutate"> & {
   data: CurrentWeek | null | undefined
   mutate: () => Promise<unknown>

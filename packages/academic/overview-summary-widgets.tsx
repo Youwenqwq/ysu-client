@@ -1,15 +1,15 @@
 "use client"
 
 import { BarChart3, Calendar, Eye, EyeOff } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { useSettingsStore } from "@ysu/plugin-ui/stores"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useGPAStats } from "@ysu/plugin-ui/hooks"
-import { useIsMobile } from "@ysu/plugin-ui/hooks"
-import { QueryState } from "@ysu/academic"
-import { useOverviewScheduleData } from "@ysu/academic"
-import type { OverviewSchedule } from "@ysu/academic"
+import { Card, CardContent, CardHeader, CardTitle } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { useSettingsStore } from "@orahako/plugin-ui/stores"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useGPAStats } from "@orahako/plugin-ui/hooks"
+import { useIsMobile } from "@orahako/plugin-ui/hooks"
+import { QueryState } from "@orahako/academic"
+import { useOverviewScheduleData } from "@orahako/academic"
+import type { OverviewSchedule } from "@orahako/academic"
 
 function WeekSummary({ data, compact }: { data: OverviewSchedule; compact: boolean }) {
   const { t } = useTranslation()

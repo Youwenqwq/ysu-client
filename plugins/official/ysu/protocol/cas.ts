@@ -22,7 +22,7 @@ import {
   serverConfig,
   type CookieEntry,
   type HttpResponse,
-} from "@ysu/plugin-sdk/host"
+} from "@orahako/plugin-sdk/host"
 import type { YSUMfaMethod } from "../types"
 
 // ─── Constants ────────────────────────────────────────────────────────── //
@@ -44,7 +44,7 @@ const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308]
 // CAS serves different reAuth pages based on User-Agent.
 // The mobile version lacks WeChat MFA (only SMS/Cpdaily/WeChat Work).
 // Use a desktop UA to get the PC reAuth flow with reAuthType=8 (WeChat).
-const DESKTOP_UA = `Mozilla/5.0 (X11; Linux x86_64) ysu-client/${APP_VERSION}`
+const DESKTOP_UA = `Mozilla/5.0 (X11; Linux x86_64) orahako/${APP_VERSION}`
 
 // ─── Types ────────────────────────────────────────────────────────────── //
 

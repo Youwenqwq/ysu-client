@@ -16,18 +16,18 @@ const liveRegistry = registry([
 
 describe("notification deep links", () => {
   it("resolves a semantic host to the live plugin page", () => {
-    expect(notificationDestination("ysuclient://schedule", liveRegistry)).toBe(
+    expect(notificationDestination("orahako://schedule", liveRegistry)).toBe(
       "/dashboard/plugin/?plugin=ysu.schedule&page=index"
     )
-    expect(notificationDestination("ysuclient://grades", liveRegistry)).toBe(
+    expect(notificationDestination("orahako://grades", liveRegistry)).toBe(
       "/dashboard/plugin/?plugin=ysu.grades&page=index"
     )
-    expect(notificationDestination("ysuclient://exams", liveRegistry)).toBe(
+    expect(notificationDestination("orahako://exams", liveRegistry)).toBe(
       "/dashboard/plugin/?plugin=ysu.exams&page=index"
     )
   })
   it("falls back to a core page when the target plugin is missing or lacks capability", () => {
-    expect(notificationDestination("ysuclient://schedule", registry([]))).toBe("/dashboard/me")
+    expect(notificationDestination("orahako://schedule", registry([]))).toBe("/dashboard/me")
     const noCapability: SemanticNavSources = {
       pages: [
         { pluginId: "org.other.schedule", id: "index", route: "schedule", capability: "schedule" },
@@ -35,11 +35,11 @@ describe("notification deep links", () => {
       navigation: [],
       capabilities: { schedule: false } as SemanticNavSources["capabilities"],
     }
-    expect(notificationDestination("ysuclient://schedule", noCapability)).toBe("/dashboard/me")
+    expect(notificationDestination("orahako://schedule", noCapability)).toBe("/dashboard/me")
   })
 
   it("matches the complete plugin destination including query", () => {
-    const destination = notificationDestination("ysuclient://grades", liveRegistry)!
+    const destination = notificationDestination("orahako://grades", liveRegistry)!
     expect(destination).toBe("/dashboard/plugin/?plugin=ysu.grades&page=index")
     expect(
       isCurrentNotificationDestination(
@@ -59,9 +59,9 @@ describe("notification deep links", () => {
   })
 
   it("keeps settings links and rejects unrelated protocols", () => {
-    expect(notificationDestination("ysuclient://settings")).toBe("/dashboard/me/settings")
+    expect(notificationDestination("orahako://settings")).toBe("/dashboard/me/settings")
     expect(notificationDestination("https://grades")).toBeNull()
     // An unmapped host stays ignored rather than forcing a fallback destination.
-    expect(notificationDestination("ysuclient://unknown", liveRegistry)).toBeNull()
+    expect(notificationDestination("orahako://unknown", liveRegistry)).toBeNull()
   })
 })

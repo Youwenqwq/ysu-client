@@ -1,6 +1,6 @@
 import { init as initializeLexer, parse as parseModule } from "es-module-lexer"
 import type { Import as LexerImport } from "es-module-lexer"
-import type { PluginDefinition, PluginManifest } from "@ysu/plugin-sdk"
+import type { PluginDefinition, PluginManifest } from "@orahako/plugin-sdk"
 import type { PluginPackage, PluginPackageFile } from "./plugin-package"
 import { PLUGIN_MANIFEST_PATH } from "./plugin-package"
 import {
@@ -10,9 +10,9 @@ import {
 } from "./package-path"
 
 /** Bare imports served by the host bundle, sharing the host module instances. */
-export { SUPPORTED_HOST_MODULES } from "@ysu/plugin-sdk/host-modules"
+export { SUPPORTED_HOST_MODULES } from "@orahako/plugin-sdk/host-modules"
 
-const HOST_MODULES_GLOBAL = "ysu.plugin.host-modules"
+const HOST_MODULES_GLOBAL = "orahako.plugin.host-modules"
 const IDENTIFIER_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/
 
 const CONTENT_TYPES: Readonly<Record<string, string>> = {

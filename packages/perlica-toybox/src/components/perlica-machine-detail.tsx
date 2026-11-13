@@ -10,10 +10,10 @@ import {
   RefreshCw,
   TriangleAlert,
 } from "lucide-react"
-import { toast } from "@ysu/plugin-sdk/host"
-import { Alert, AlertDescription, AlertTitle } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
+import { toast } from "@orahako/plugin-sdk/host"
+import { Alert, AlertDescription, AlertTitle } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
 import { PerlicaRouteMap } from "./perlica-route-map"
 import type { PerlicaClient } from "../extras/client"
 import type {
@@ -31,9 +31,9 @@ import type {
   PerlicaMachineStatus,
   PerlicaOrder,
 } from "../extras/types"
-import { usePluginTranslation } from "@ysu/plugin-ui/plugin"
+import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
-import { cn } from "@ysu/plugin-ui/components"
+import { cn } from "@orahako/plugin-ui/components"
 
 const MACHINE_POLL_INTERVAL = 20_000
 const ORDER_RECONCILE_DELAYS = [700, 1500]

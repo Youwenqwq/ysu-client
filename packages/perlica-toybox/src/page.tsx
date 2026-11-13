@@ -18,8 +18,8 @@ import {
   UserRound,
   X,
 } from "lucide-react"
-import { Geolocation, toast } from "@ysu/plugin-sdk/host"
-import { pluginPageHref, type PluginPageProps } from "@ysu/plugin-sdk"
+import { Geolocation, toast } from "@orahako/plugin-sdk/host"
+import { pluginPageHref, type PluginPageProps } from "@orahako/plugin-sdk"
 import { PerlicaAccount } from "./components/perlica-account"
 import { PerlicaActiveRide } from "./components/perlica-active-ride"
 import { PerlicaHistory } from "./components/perlica-history"
@@ -30,21 +30,21 @@ import { PerlicaScanner } from "./components/perlica-scanner"
 import { PerlicaSectionNav } from "./components/perlica-section-nav"
 import { PERLICA_PLUGIN_ID, PERLICA_PAGE_SETTINGS } from "./constants"
 import { isPerlicaTab, usePerlicaAppNav } from "./extras/app-nav"
-import { Alert, AlertDescription, AlertTitle } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
+import { Alert, AlertDescription, AlertTitle } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-} from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
 import {
   Sheet,
   SheetClose,
@@ -52,10 +52,10 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@ysu/plugin-ui/components"
-import { ToggleGroup, ToggleGroupItem } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@orahako/plugin-ui/components"
+import { ToggleGroup, ToggleGroupItem } from "@orahako/plugin-ui/components"
 import { readPerlicaSnapshot, writePerlicaSnapshot } from "./extras/cache"
 import { PerlicaError } from "./extras/client"
 import { parsePerlicaCode } from "./extras/scan"
@@ -71,8 +71,8 @@ import type {
   PerlicaStation,
   PerlicaUserInfo,
 } from "./extras/types"
-import { usePluginTranslation } from "@ysu/plugin-ui/plugin"
-import { cn } from "@ysu/plugin-ui/components"
+import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
+import { cn } from "@orahako/plugin-ui/components"
 
 const RADII = [300, 1000, 3000, 5000, 10000]
 const PAGE_SIZE = 10

@@ -3,30 +3,30 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
 import { Bird, Search, Settings, User, Bell, X } from "lucide-react"
-import { pluginPageHref, type PluginPageProps } from "@ysu/plugin-sdk"
-import { cn } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { Input } from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Tabs, TabsList, TabsTrigger } from "@ysu/plugin-ui/components"
+import { pluginPageHref, type PluginPageProps } from "@orahako/plugin-sdk"
+import { cn } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { Input } from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Tabs, TabsList, TabsTrigger } from "@orahako/plugin-ui/components"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useMobileHeaderRight } from "@ysu/plugin-ui/stores"
-import { useBackHandler } from "@ysu/plugin-ui/hooks"
+} from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
+import { useBackHandler } from "@orahako/plugin-ui/hooks"
 import { SkbirdError, SKBIRD_ERRNO_TOKEN_INVALID } from "../client"
 import { getSkbirdClient, useSkbirdStore } from "../store"
 import type { SkbirdCategory, SkbirdThread } from "../types"

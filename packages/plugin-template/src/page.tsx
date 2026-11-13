@@ -1,4 +1,4 @@
-import type { PluginPageProps } from "@ysu/plugin-sdk"
+import type { PluginPageProps } from "@orahako/plugin-sdk"
 
 export function HelloPage({ pluginId }: PluginPageProps) {
   return (

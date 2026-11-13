@@ -202,7 +202,7 @@ export function AboutContent() {
             className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
           >
             <Code className="size-5 shrink-0 text-muted-foreground" />
-            <span className="flex-1 text-sm">Youwenqwq/ysu-client</span>
+            <span className="flex-1 text-sm">Youwenqwq/orahako</span>
             <ExternalLink className="size-4 shrink-0 text-muted-foreground" />
           </a>
 

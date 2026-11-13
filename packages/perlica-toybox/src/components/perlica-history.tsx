@@ -12,24 +12,24 @@ import {
   RefreshCw,
   Route,
 } from "lucide-react"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { Spinner } from "@ysu/plugin-ui/components"
+} from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { Spinner } from "@orahako/plugin-ui/components"
 import { PerlicaRouteMap } from "./perlica-route-map"
 import type { PerlicaClient } from "../extras/client"
 import type {
@@ -39,7 +39,7 @@ import type {
   PerlicaRideDetail,
   PerlicaRideLog,
 } from "../extras/types"
-import { usePluginTranslation } from "@ysu/plugin-ui/plugin"
+import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
 
 export interface PerlicaHistoryProps {

@@ -1,11 +1,11 @@
-import { validatePluginManifest, type PluginManifest } from "@ysu/plugin-sdk"
+import { validatePluginManifest, type PluginManifest } from "@orahako/plugin-sdk"
 import {
   parsePluginPackage,
   type PluginPackageFile,
   type PluginPackageLimits,
 } from "./plugin-package"
 
-const DEFAULT_DATABASE_NAME = "ysu-plugins"
+const DEFAULT_DATABASE_NAME = "orahako-plugins"
 const DATABASE_VERSION = 1
 const PACKAGE_STORE_NAME = "packages"
 const STORED_RECORD_VERSION = 1

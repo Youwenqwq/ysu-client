@@ -1,9 +1,9 @@
 /**
- * @ysu/plugin-ui/shell — host-aware shell components and runtime hooks.
+ * @orahako/plugin-ui/shell — host-aware shell components and runtime hooks.
  *
  * These read the live plugin provider/host context, so this submodule is kept
  * separate from the pure submodules: `lib/plugins/host.ts` imports
- * `@ysu/plugin-ui` submodules while also importing the official plugin
+ * `@orahako/plugin-ui` submodules while also importing the official plugin
  * registry, whose plugins import those submodules in turn. Any export here
  * that loads `components/plugin-provider` (directly or via
  * `lib/navigation/use-semantic-navigation`) must stay on this submodule.

@@ -1,5 +1,5 @@
 {
-  "name": "@ysu/plugin-sdk",
+  "name": "@orahako/plugin-sdk",
   "version": "1.0.0",
   "private": true,
   "type": "module",

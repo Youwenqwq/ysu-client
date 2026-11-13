@@ -2,15 +2,15 @@
 
 import Link from "next/link"
 import { CreditCard, RefreshCw } from "lucide-react"
-import { Button } from "@ysu/plugin-ui/components"
-import { Card, CardContent, CardHeader, CardTitle } from "@ysu/plugin-ui/components"
-import { Empty, EmptyDescription, EmptyHeader } from "@ysu/plugin-ui/components"
-import { Skeleton } from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { cn } from "@ysu/plugin-ui/components"
-import { useIsMobile } from "@ysu/plugin-ui/hooks"
-import { useEcardBalance } from "@ysu/plugin-ui/hooks"
-import { pluginPageHref } from "@ysu/plugin-sdk"
+import { Button } from "@orahako/plugin-ui/components"
+import { Card, CardContent, CardHeader, CardTitle } from "@orahako/plugin-ui/components"
+import { Empty, EmptyDescription, EmptyHeader } from "@orahako/plugin-ui/components"
+import { Skeleton } from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { cn } from "@orahako/plugin-ui/components"
+import { useIsMobile } from "@orahako/plugin-ui/hooks"
+import { useEcardBalance } from "@orahako/plugin-ui/hooks"
+import { pluginPageHref } from "@orahako/plugin-sdk"
 
 function EcardSummary({ compact }: { compact: boolean }) {
   const { t, locale } = useTranslation()

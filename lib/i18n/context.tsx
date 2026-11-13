@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
-import { getLocalStorageItemWithFallback, STORAGE_KEYS } from "../storage/keys"
+import { STORAGE_KEYS } from "../storage/keys"
 import { zh, en } from "./dict"
 import type { Locale, Dictionary } from "./dict"
 
@@ -20,9 +20,7 @@ const I18nContext = createContext<I18nContextValue>({
 })
 
 const STORAGE_KEY = STORAGE_KEYS.locale
-const LEGACY_STORAGE_KEY = STORAGE_KEYS.legacyLocale
 const MANUAL_KEY = STORAGE_KEYS.localeManual
-const LEGACY_MANUAL_KEY = STORAGE_KEYS.legacyLocaleManual
 
 function resolveLocale(raw: string): Locale {
   return raw.toLowerCase().startsWith("zh") ? "zh" : "en"
@@ -38,8 +36,8 @@ function detectSystemLocale(): Locale {
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
     if (typeof window === "undefined") return "zh"
-    if (getLocalStorageItemWithFallback(MANUAL_KEY, LEGACY_MANUAL_KEY)) {
-      return (getLocalStorageItemWithFallback(STORAGE_KEY, LEGACY_STORAGE_KEY) as Locale) || "zh"
+    if (localStorage.getItem(MANUAL_KEY)) {
+      return (localStorage.getItem(STORAGE_KEY) as Locale) || "zh"
     }
     return detectSystemLocale()
   })
@@ -48,7 +46,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   // and fall back to browser navigator.language
   useEffect(() => {
     if (typeof window === "undefined") return
-    if (getLocalStorageItemWithFallback(MANUAL_KEY, LEGACY_MANUAL_KEY)) return
+    if (localStorage.getItem(MANUAL_KEY)) return
 
     let cancelled = false
 
@@ -77,8 +75,6 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, l)
       localStorage.setItem(MANUAL_KEY, "1")
-      localStorage.removeItem(LEGACY_STORAGE_KEY)
-      localStorage.removeItem(LEGACY_MANUAL_KEY)
     }
   }, [])
 

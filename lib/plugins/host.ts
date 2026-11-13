@@ -6,17 +6,17 @@ import * as NextLink from "next/link"
 import * as NextImage from "next/image"
 import * as NextNavigation from "next/navigation"
 import * as Sonner from "sonner"
-import * as PluginSDK from "@ysu/plugin-sdk"
-import * as Academic from "@ysu/academic"
-import * as PluginComponents from "@ysu/plugin-ui/components"
-import * as PluginHooks from "@ysu/plugin-ui/hooks"
-import * as PluginStores from "@ysu/plugin-ui/stores"
-import * as PluginAcademic from "@ysu/plugin-ui/academic"
-import * as PluginPlatform from "@ysu/plugin-ui/platform"
-import * as PluginRuntimeUI from "@ysu/plugin-ui/plugin"
-import * as PluginShellRuntime from "@ysu/plugin-ui/shell"
-import * as PluginAssets from "@ysu/plugin-ui/assets"
-import type { PluginManifest } from "@ysu/plugin-sdk"
+import * as PluginSDK from "@orahako/plugin-sdk"
+import * as Academic from "@orahako/academic"
+import * as PluginComponents from "@orahako/plugin-ui/components"
+import * as PluginHooks from "@orahako/plugin-ui/hooks"
+import * as PluginStores from "@orahako/plugin-ui/stores"
+import * as PluginAcademic from "@orahako/plugin-ui/academic"
+import * as PluginPlatform from "@orahako/plugin-ui/platform"
+import * as PluginRuntimeUI from "@orahako/plugin-ui/plugin"
+import * as PluginShellRuntime from "@orahako/plugin-ui/shell"
+import * as PluginAssets from "@orahako/plugin-ui/assets"
+import type { PluginManifest } from "@orahako/plugin-sdk"
 import { OFFICIAL_PLUGINS } from "@/plugins/official/registry"
 import { PluginRuntime } from "./runtime"
 import { PluginUIRegistry } from "./ui-registry"
@@ -274,18 +274,18 @@ export class PluginHost {
         "next/image": typeof NextImage === "function" ? { default: NextImage } : NextImage,
         "next/navigation": NextNavigation,
         sonner: Sonner,
-        "@ysu/academic": Academic,
-        "@ysu/plugin-ui/components": PluginComponents,
-        "@ysu/plugin-ui/hooks": PluginHooks,
-        "@ysu/plugin-ui/stores": PluginStores,
-        "@ysu/plugin-ui/academic": PluginAcademic,
-        "@ysu/plugin-ui/platform": PluginPlatform,
-        "@ysu/plugin-ui/plugin": PluginRuntimeUI,
-        "@ysu/plugin-ui/shell": PluginShellRuntime,
-        "@ysu/plugin-ui/assets": PluginAssets,
+        "@orahako/academic": Academic,
+        "@orahako/plugin-ui/components": PluginComponents,
+        "@orahako/plugin-ui/hooks": PluginHooks,
+        "@orahako/plugin-ui/stores": PluginStores,
+        "@orahako/plugin-ui/academic": PluginAcademic,
+        "@orahako/plugin-ui/platform": PluginPlatform,
+        "@orahako/plugin-ui/plugin": PluginRuntimeUI,
+        "@orahako/plugin-ui/shell": PluginShellRuntime,
+        "@orahako/plugin-ui/assets": PluginAssets,
       }
       for (const specifier of SUPPORTED_HOST_MODULES) {
-        if (specifier.startsWith("@ysu/plugin-sdk")) modules[specifier] = PluginSDK
+        if (specifier.startsWith("@orahako/plugin-sdk")) modules[specifier] = PluginSDK
       }
       this.hostModules = createHostModuleRegistry(modules)
     }

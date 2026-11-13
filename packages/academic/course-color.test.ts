@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { buildCourseColorMap, COURSE_PALETTE_SIZE, courseBgClass } from "./course-color"
-import type { Course } from "@ysu/plugin-sdk/academic"
+import type { Course } from "@orahako/plugin-sdk/academic"
 
 function course(code: string, name = `课程${code}`): Course {
   return {

@@ -6,7 +6,7 @@ import type {
   PluginSettingDefinition,
   PluginShellDefinition,
   PluginUIService,
-} from "@ysu/plugin-sdk"
+} from "@orahako/plugin-sdk"
 import type { PluginServiceFactory } from "./runtime"
 import { trackPluginRegistration } from "./track-registration"
 

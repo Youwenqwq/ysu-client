@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@ysu/plugin-ui/components"
-import { Badge } from "@ysu/plugin-ui/components"
-import { Button } from "@ysu/plugin-ui/components"
-import { useTranslation } from "@ysu/plugin-ui/hooks"
-import { useSettingsStore } from "@ysu/plugin-ui/stores"
-import type { GPAStats } from "@ysu/plugin-sdk"
+import { Card, CardContent, CardHeader, CardTitle } from "@orahako/plugin-ui/components"
+import { Badge } from "@orahako/plugin-ui/components"
+import { Button } from "@orahako/plugin-ui/components"
+import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useSettingsStore } from "@orahako/plugin-ui/stores"
+import type { GPAStats } from "@orahako/plugin-sdk"
 import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react"
 
 /** 燕大满绩（2024 版成绩评定说明：A+ = 4.5）。 */

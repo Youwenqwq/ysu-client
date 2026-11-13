@@ -35,7 +35,7 @@ export const usePluginPreferences = create<PluginPreferencesState>()(
         })),
     }),
     {
-      name: "academic-client-plugins",
+      name: "orahako-plugins",
       storage: createJSONStorage(() => localStorageAdapter),
       partialize: (state) => ({
         activeTheme: state.activeTheme,

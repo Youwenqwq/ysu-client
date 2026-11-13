@@ -1,5 +1,5 @@
 import { Bike } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { PerlicaPage } from "./page"
 import { PerlicaSettingsPage } from "./settings-page"
 import { perlicaTranslations } from "./i18n"

@@ -4,8 +4,8 @@
  * 与 elpay 同模式：复用教务 CAS 会话，用 authorize() 免密换取 ehall 会话
  * （service = /publicapp/sys/myyktzd/index.do），再调余额接口。
  */
-import type { EcardBalance, EcardSessionStatus } from "@ysu/plugin-sdk/academic"
-import { SimpleCookieJar, fetchWithJar, type HttpResponse } from "@ysu/plugin-sdk/host"
+import type { EcardBalance, EcardSessionStatus } from "@orahako/plugin-sdk/academic"
+import { SimpleCookieJar, fetchWithJar, type HttpResponse } from "@orahako/plugin-sdk/host"
 import { parseLooseJson } from "./parse-json"
 import { authorize, getCredentialApplied } from "./cas"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"

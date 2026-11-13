@@ -92,7 +92,7 @@ for (const fixed of [
 }
 
 // Pack layout, gzipped as a whole:
-//   [4B magic "YSPK"][u32le version=1][u32le headerLength][header JSON][body]
+//   [4B magic "OHPK"][u32le version=1][u32le headerLength][header JSON][body]
 // header JSON: { "files": [{ "p": key, "o": offset, "l": length, "t": contentType }] }
 // offsets are relative to the start of the body.
 const files = [];
@@ -107,7 +107,7 @@ for (const [key, file] of [...entries.entries()].sort(([a], [b]) => a.localeComp
 
 const header = Buffer.from(JSON.stringify({ files }), "utf8");
 const head = Buffer.alloc(12);
-head.write("YSPK", 0, "ascii");
+head.write("OHPK", 0, "ascii");
 head.writeUInt32LE(1, 4);
 head.writeUInt32LE(header.length, 8);
 const payload = Buffer.concat([head, header, ...chunks]);

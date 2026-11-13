@@ -1,6 +1,6 @@
-import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
-import { unregisterSchoolConfig } from "@ysu/plugin-sdk/host"
-import type { SchoolConfig } from "@ysu/plugin-sdk/provider-school"
+import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
+import { unregisterSchoolConfig } from "@orahako/plugin-sdk/host"
+import type { SchoolConfig } from "@orahako/plugin-sdk/provider-school"
 import ysuConfig from "./ysu.json"
 import { YSUProvider } from "./ysu-provider"
 

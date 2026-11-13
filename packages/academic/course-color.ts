@@ -1,4 +1,4 @@
-import type { Course } from "@ysu/plugin-sdk/academic"
+import type { Course } from "@orahako/plugin-sdk/academic"
 
 export const COURSE_PALETTE_SIZE = 8
 

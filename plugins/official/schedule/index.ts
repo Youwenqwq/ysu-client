@@ -1,7 +1,7 @@
 import { BookOpen, Calendar, Clock } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@ysu/plugin-sdk"
+import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { SchedulePage } from "./page"
-import { CourseProgressWidget, TodayCoursesWidget } from "@ysu/academic"
+import { CourseProgressWidget, TodayCoursesWidget } from "@orahako/academic"
 
 export const manifest: PluginManifest = {
   id: "ysu.schedule",

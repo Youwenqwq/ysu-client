@@ -1,4 +1,4 @@
-import type { Course, ClassPeriod, CurrentWeek } from "@ysu/plugin-sdk/academic"
+import type { Course, ClassPeriod, CurrentWeek } from "@orahako/plugin-sdk/academic"
 
 export type ScheduleCourse = Course
 export type ScheduleClassPeriod = ClassPeriod

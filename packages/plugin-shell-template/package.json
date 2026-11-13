@@ -1,12 +1,12 @@
 {
-  "name": "@ysu/plugin-shell-template",
+  "name": "@orahako/plugin-shell-template",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "dependencies": {
     "@cordisjs/core": "3.18.1",
-    "@ysu/plugin-sdk": "workspace:*",
-    "@ysu/plugin-ui": "workspace:*",
+    "@orahako/plugin-sdk": "workspace:*",
+    "@orahako/plugin-ui": "workspace:*",
     "react": "^19.2.6"
   }
 }

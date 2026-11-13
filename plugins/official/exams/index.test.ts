@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { validatePluginManifest } from "@ysu/plugin-sdk"
+import { validatePluginManifest } from "@orahako/plugin-sdk"
 import { PluginRuntime } from "@/lib/plugins/runtime"
 import { PluginUIRegistry } from "@/lib/plugins/ui-registry"
 

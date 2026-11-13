@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
-import { secureStorage } from "@ysu/plugin-sdk/host"
+import { secureStorage } from "@orahako/plugin-sdk/host"
 import { PerlicaClient, type PerlicaConfig } from "./client"
 import type { PerlicaCoords } from "./types"
 

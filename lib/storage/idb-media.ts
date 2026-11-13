@@ -10,7 +10,7 @@
  * 页面卸载后浏览器自动回收，跨会话不残留。
  */
 
-const DB_NAME = "ysu-media"
+const DB_NAME = "orahako-media"
 const STORE = "files"
 
 const blobUrlCache = new Map<string, string>()

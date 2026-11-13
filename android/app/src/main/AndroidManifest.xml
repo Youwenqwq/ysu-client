@@ -43,10 +43,10 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="ysuclient" android:host="schedule" />
-                <data android:scheme="ysuclient" android:host="exams" />
-                <data android:scheme="ysuclient" android:host="grades" />
-                <data android:scheme="ysuclient" android:host="settings" />
+                <data android:scheme="orahako" android:host="schedule" />
+                <data android:scheme="orahako" android:host="exams" />
+                <data android:scheme="orahako" android:host="grades" />
+                <data android:scheme="orahako" android:host="settings" />
             </intent-filter>
         </activity>
 
