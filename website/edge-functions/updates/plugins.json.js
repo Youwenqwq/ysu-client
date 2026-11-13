@@ -22,7 +22,7 @@ const DEFAULT_INDEX = {
   }, {
     id: 'community.perlica-toybox',
     name: 'Perlica 佩黎卡',
-    summary: '地图找车、扫码或车辆号解锁、骑行控制、历史记录与账户管理。首个完整外部社区功能插件。',
+    summary: '地图找车、扫码或车辆号解锁、骑行控制、历史记录与账户管理。首个完整外部社区功能插件。credit: @TowelWang',
     author: 'Youwenqwq / Orahako community',
     homepage: 'https://github.com/Youwenqwq/ysu-client',
     categories: ['toybox', 'transport'],

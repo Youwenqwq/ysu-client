@@ -13,6 +13,7 @@ import type {
   GradeQueryOptions,
   LoginStep1Input,
   LoginStep1Result,
+  ProviderGPAScale,
   ScheduleQueryOptions,
   StudentInfo,
   TermCalendar,
@@ -24,6 +25,7 @@ import { ProviderError, ProviderErrorCode } from "@orahako/plugin-sdk/provider-e
 import { clearAllCache, useAuthStore, useRefreshStore } from "@orahako/plugin-sdk/host"
 import { currentWeekFromContext } from "./protocol/mappers"
 import { ZMUClient } from "./protocol/client"
+import { ZMU_GPA_SCALE } from "./grade-scale"
 
 const capabilities: AcademicCapabilities = {
   auth: true,
@@ -64,6 +66,7 @@ export class ZMUProvider extends BaseProvider {
   readonly id = "zmu"
   readonly name = "遵义医科大学"
   readonly capabilities = capabilities
+  readonly gpaScale: ProviderGPAScale = ZMU_GPA_SCALE
   readonly supportedPlugins = [
     "orahako.overview",
     "orahako.schedule",

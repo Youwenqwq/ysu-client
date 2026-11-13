@@ -4,13 +4,11 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@orahako/plugin-ui/components"
 import { Badge } from "@orahako/plugin-ui/components"
 import { Button } from "@orahako/plugin-ui/components"
-import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useProvider, useTranslation } from "@orahako/plugin-ui/hooks"
 import { useSettingsStore } from "@orahako/plugin-ui/stores"
-import type { GPAStats } from "@orahako/plugin-sdk"
+import type { GPAStats, ProviderGPAScale } from "@orahako/plugin-sdk"
 import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react"
-
-/** 燕大满绩（2024 版成绩评定说明：A+ = 4.5）。 */
-const GPA_MAX = 4.5
+import { gpaBandIndex } from "./gpa-band"
 
 function toNum(value?: string): number | null {
   if (!value) return null
@@ -18,42 +16,16 @@ function toNum(value?: string): number | null {
   return Number.isNaN(n) ? null : n
 }
 
-/**
- * 燕大 2024 版成绩评定：百分制 - 等级 - 绩点对应表（2024 秋季起）。
- * 平均绩点按同一刻度换算“相当于某档”为客户端诠释，非官方定级。
- */
-const GPA_BANDS = [
-  { min: 0, letter: "F" },
-  { min: 1.2, letter: "D" },
-  { min: 1.8, letter: "C-" },
-  { min: 2.2, letter: "C" },
-  { min: 2.6, letter: "C+" },
-  { min: 3.0, letter: "B-" },
-  { min: 3.4, letter: "B" },
-  { min: 3.8, letter: "B+" },
-  { min: 4.0, letter: "A-" },
-  { min: 4.3, letter: "A" },
-  { min: 4.5, letter: "A+" },
-] as const
-
-function bandOf(gpa: number) {
-  let idx = 0
-  for (let i = 0; i < GPA_BANDS.length; i++) {
-    if (gpa >= GPA_BANDS[i]!.min) idx = i
-  }
-  return idx
-}
-
-/** 等级标尺：尺子按绩点档分段，当前档高亮，指针落在精确位置。 */
-function GpaBandRuler({ value }: { value: number }) {
+/** 等级标尺：尺子按学校绩点档分段，当前档高亮，指针落在精确位置。 */
+function GpaBandRuler({ value, scale }: { value: number; scale: ProviderGPAScale }) {
   const { t } = useTranslation()
-  const pct = Math.min(100, Math.max(0, (value / GPA_MAX) * 100))
-  const current = bandOf(value)
-  const next = current + 1 < GPA_BANDS.length ? GPA_BANDS[current + 1]! : null
+  const pct = Math.min(100, Math.max(0, (value / scale.max) * 100))
+  const current = gpaBandIndex(value, scale.bands)
+  const next = current + 1 < scale.bands.length ? scale.bands[current + 1]! : null
 
-  const segments = GPA_BANDS.slice(0, -1).map((band, i) => ({
+  const segments = scale.bands.slice(0, -1).map((band, i) => ({
     letter: band.letter,
-    widthPct: ((GPA_BANDS[i + 1]!.min - band.min) / GPA_MAX) * 100,
+    widthPct: ((scale.bands[i + 1]!.min - band.min) / scale.max) * 100,
     current: i === current,
   }))
 
@@ -75,7 +47,7 @@ function GpaBandRuler({ value }: { value: number }) {
         />
       </div>
       <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
-        <span>{t("gpa.bandEquivalent", { letter: GPA_BANDS[current]!.letter })}</span>
+        <span>{t("gpa.bandEquivalent", { letter: scale.bands[current]!.letter })}</span>
         {next ? (
           <span className="tabular-nums">
             {t("gpa.toNextBand", {
@@ -114,6 +86,7 @@ export function GpaSummary({
   termWeightedGpa: string | null
 }) {
   const { t } = useTranslation()
+  const gpaScale = useProvider().gpaScale
   const [expanded, setExpanded] = useState(false)
   const gpaVisible = useSettingsStore((s) => s.gpaVisible)
   const setGpaVisible = useSettingsStore((s) => s.setGpaVisible)
@@ -144,17 +117,17 @@ export function GpaSummary({
   const failedCredits = toNum(gpa?.requiredCreditFailed) ?? 0
 
   const gpaValue = toNum(gpa?.gpaInitial)
-  const bandIdx = gpaValue === null ? null : bandOf(gpaValue)
-  const encourageKey =
-    bandIdx === null
-      ? null
-      : bandIdx >= 8
-        ? "gpa.encourageA"
-        : bandIdx >= 5
-          ? "gpa.encourageB"
-          : bandIdx >= 2
-            ? "gpa.encourageC"
-            : "gpa.encourageLow"
+  const band =
+    gpaValue === null || !gpaScale ? null : gpaScale.bands[gpaBandIndex(gpaValue, gpaScale.bands)]!
+  const encourageKey = !band
+    ? null
+    : band.letter.startsWith("A")
+      ? "gpa.encourageA"
+      : band.letter.startsWith("B")
+        ? "gpa.encourageB"
+        : band.letter.startsWith("C")
+          ? "gpa.encourageC"
+          : "gpa.encourageLow"
 
   return (
     <Card>
@@ -189,14 +162,16 @@ export function GpaSummary({
               {gpaVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </div>
-          {gpaVisible && bandIdx !== null && (
+          {gpaVisible && band && (
             <Badge variant="secondary" className="mb-1">
-              {GPA_BANDS[bandIdx]!.letter}
+              {band.letter}
             </Badge>
           )}
         </div>
 
-        {gpaVisible && gpaValue !== null && <GpaBandRuler value={gpaValue} />}
+        {gpaVisible && gpaValue !== null && gpaScale && (
+          <GpaBandRuler value={gpaValue} scale={gpaScale} />
+        )}
 
         {gpaVisible && encourageKey && (
           <p className="text-sm text-muted-foreground">{t(encourageKey)}</p>

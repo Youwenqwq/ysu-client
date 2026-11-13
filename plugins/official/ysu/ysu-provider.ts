@@ -67,6 +67,7 @@ import type {
   ProviderMobile,
   ProviderEcard,
   ProviderEpay,
+  ProviderGPAScale,
   ProviderGradeScale,
   ScheduleQueryOptions,
   SchoolClassInfo,
@@ -158,7 +159,7 @@ import { ysuNativeNotification } from "./native-notification"
 import { reloginYSU } from "./relogin"
 import { fetchEcardBalance } from "./ecard-access"
 import { fetchEpayPayments } from "./epay-access"
-import { letterOfGradeLevel, letterOfScore } from "./grade-letters"
+import { letterOfGradeLevel, letterOfScore, YSU_GPA_SCALE } from "./grade-letters"
 import { getYSUMfaMethods, isYSUMfaMethod } from "./types"
 
 function ysuCapabilities(): AcademicCapabilities {
@@ -360,6 +361,7 @@ export class YSUProvider extends BaseProvider {
     recordStatus: toRecordStatus,
   }
   readonly gradeScale: ProviderGradeScale = { letterOfScore, letterOfGradeLevel }
+  readonly gpaScale: ProviderGPAScale = YSU_GPA_SCALE
 
   protected async onInitialize(): Promise<void> {
     await initializeSession()

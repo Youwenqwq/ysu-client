@@ -1083,6 +1083,19 @@ export type GradeLetter =
   | "F"
   | "F-"
 
+export interface GPAGradeBand {
+  /** Inclusive lower bound for this band. */
+  readonly min: number
+  readonly letter: GradeLetter
+}
+
+/** School-specific interpretation of an average GPA. */
+export interface ProviderGPAScale {
+  readonly max: number
+  /** Ascending, non-overlapping bands covering the scale from zero. */
+  readonly bands: readonly [GPAGradeBand, ...GPAGradeBand[]]
+}
+
 /** School grade policy: numeric/level scores to grade letters. */
 export interface ProviderGradeScale {
   letterOfScore(score: number, semester?: string): GradeLetter
@@ -1112,4 +1125,6 @@ export interface AcademicProvider
   readonly ecard?: ProviderEcard
   readonly epay?: ProviderEpay
   readonly gradeScale?: ProviderGradeScale
+  /** Required to show GPA ratings; omitted when the school has no such interpretation. */
+  readonly gpaScale?: ProviderGPAScale
 }

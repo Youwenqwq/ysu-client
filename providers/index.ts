@@ -66,6 +66,8 @@ export type {
   ProviderEcard,
   ProviderEpay,
   ProviderGradeScale,
+  ProviderGPAScale,
+  GPAGradeBand,
   GradeLetter,
 } from "./types"
 

@@ -117,6 +117,8 @@ ctx.slots.register({
 
 Provider 插件通过 `ctx.providers.registerSchool({ config, providerFactory })` 同时注册学校配置与实现工厂。实现应继承 `BaseProvider`，只覆盖已声明能力的对应方法；认证核心方法必须实现。学校停用后，注册会随插件作用域自动撤销。`supportedPlugins` 可进一步按插件 ID 限定该学校支持的功能运行状态、页面、导航和总览挂件；缺省保持兼容，不限制插件。
 
+成绩字母换算由 `gradeScale` 提供。支持 GPA 评级的学校还应提供 `gpaScale: ProviderGPAScale`，其中 `max` 是满绩，`bands` 是从 0 开始、按 `min` 升序排列的评级档位；每档的 `min` 是闭下界。共享成绩 UI 只使用当前 Provider 的刻度，不应用其他学校的默认评级。未声明 `gpaScale` 时仅显示 GPA 数值，不显示评级和档位标尺。
+
 `plugins/market/zmu-provider` 是非 EMAP 教务系统的最小参考：本地验证码密码登录、CookieJar 会话恢复、学籍、全学期课表、成绩/GPA 和考试均只使用公共 SDK。需要与 CookieJar 绑定的验证码图片时，Provider 应通过 `fetchWithJar` 读取图片并返回 data URL，不能把远端图片 URL 当作可携带会话的普通 `<img>` 地址。
 
 公共 `@orahako/plugin-sdk/crypto` 子路径提供 AES-128-ECB/PKCS7 与 Base64 工具，供确有该协议要求的 Provider 使用。Web 端新增学校域名仍须加入部署侧代理白名单；插件注册本身不能绕过该网络安全边界。
