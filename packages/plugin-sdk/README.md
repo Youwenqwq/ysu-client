@@ -1,4 +1,4 @@
-# 燕大终端插件 SDK
+# 酸橙盒插件 SDK
 
 插件是运行在应用主上下文中的完整 JavaScript / React 模块。插件与应用拥有相同能力；使用者负责判断侧载来源是否可信。
 
@@ -32,7 +32,7 @@ my-plugin/
 ## 开发入口
 
 ```tsx
-import { definePlugin } from "@ysu/plugin-sdk"
+import { definePlugin } from "@orahako/plugin-sdk"
 import { ExamplePage } from "./page"
 import { ExampleIcon } from "./icon"
 import "./style.css"
@@ -109,7 +109,7 @@ ctx.slots.register({
 - `ctx.native`：原生平台检测、图片保存及通知、精确闹钟、电池优化权限申请。
 - `ctx.assets.url(path)`：外部插件包内资源的 Blob URL。
 - `ctx.i18n`：插件字典注册与文本查询。
-- `@ysu/plugin-sdk/host`：Provider 所需的完整宿主协议、认证和会话门面。
+- `@orahako/plugin-sdk/host`：Provider 所需的完整宿主协议、认证和会话门面。
 
 完整信任插件仍可使用标准浏览器与 Capacitor API；SDK 服务用于减少重复实现，不构成权限边界。
 
@@ -136,9 +136,9 @@ pnpm plugin pack packages/plugin-template
 - `react-dom/client`
 - `react/jsx-runtime`
 - `next/link` / `next/image` / `next/navigation`
-- `@ysu/academic`
-- `@ysu/plugin-ui/components` / `hooks` / `stores` / `academic` / `platform` / `plugin` / `shell` / `assets`
-- `@ysu/plugin-sdk`
+- `@orahako/academic`
+- `@orahako/plugin-ui/components` / `hooks` / `stores` / `academic` / `platform` / `plugin` / `shell` / `assets`
+- `@orahako/plugin-sdk`
 
 其他依赖会正常打包。命令输出 ZIP 路径、大小和 SHA-256；市场索引必须记录同一个哈希。
 

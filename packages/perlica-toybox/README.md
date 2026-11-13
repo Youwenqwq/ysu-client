@@ -12,7 +12,7 @@ pnpm plugin pack packages/perlica-toybox
 
 ## 宿主能力
 
-- HTTP：`@ysu/plugin-sdk/host` 的 `fetchStateless`；Web 通过 EdgeOne 代理访问 `client3.uqbike.cn`，目标 URL 使用 `x-proxy-target`，避免 Token 进入代理请求 URL。
+- HTTP：`@orahako/plugin-sdk/host` 的 `fetchStateless`；Web 通过 EdgeOne 代理访问 `client3.uqbike.cn`，目标 URL 使用 `x-proxy-target`，避免 Token 进入代理请求 URL。
 - 凭据：包自己的 Zustand persist 命名空间和宿主 `secureStorage`。
 - 定位：公共 Capacitor Geolocation 桥。Android 宿主声明定位权限；首次定位由系统询问授权。
 - 扫码：`html5-qrcode` 使用相机/相册；Android 宿主声明相机权限，实际访问仍由用户操作触发。

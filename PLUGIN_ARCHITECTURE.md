@@ -1,6 +1,6 @@
 # 插件组合架构
 
-燕大终端是一个由插件组合的应用，而不是一组由固定页面控制的功能开关。本文定义运行时边界与公共扩展契约。
+酸橙盒（Orahako）是一个由插件组合的应用，而不是一组由固定页面控制的功能开关。本文定义运行时边界与公共扩展契约。
 
 ## 目标与非目标
 
@@ -33,17 +33,17 @@
 
 ### 公共 SDK
 
-`@ysu/plugin-sdk` 提供稳定契约：清单、领域模型、Provider、Shell、Slot、i18n、存储、HTTP、原生与资源服务。
+`@orahako/plugin-sdk` 提供稳定契约：清单、领域模型、Provider、Shell、Slot、i18n、存储、HTTP、原生与资源服务。
 
-`@ysu/plugin-ui` 是可选的官方 React UI Kit 和应用 hooks。默认功能插件与社区插件均可使用；替代 Shell 可以不使用它。包按 `components/hooks/stores/academic/platform/plugin/shell/assets` 子路径隔离副作用，根入口不聚合实现，避免宿主与官方插件之间的模块求值环。
+`@orahako/plugin-ui` 是可选的官方 React UI Kit 和应用 hooks。默认功能插件与社区插件均可使用；替代 Shell 可以不使用它。包按 `components/hooks/stores/academic/platform/plugin/shell/assets` 子路径隔离副作用，根入口不聚合实现，避免宿主与官方插件之间的模块求值环。
 
-React、实际使用的 Next 入口、`@ysu/academic` 和 UI Kit 子路径均由宿主共享同一模块实例。外部插件不能通过私下打包 Next 模块获得另一套 Router Context。
+React、实际使用的 Next 入口、`@orahako/academic` 和 UI Kit 子路径均由宿主共享同一模块实例。外部插件不能通过私下打包 Next 模块获得另一套 Router Context。
 
-`@ysu/plugin-sdk/host` 暴露完整信任的高级宿主能力。它是公共 API，不是权限边界。稳定 API 与内部实现的边界由模块导出决定，而不是由“官方/外部”身份决定。
+`@orahako/plugin-sdk/host` 暴露完整信任的高级宿主能力。它是公共 API，不是权限边界。稳定 API 与内部实现的边界由模块导出决定，而不是由“官方/外部”身份决定。
 
 ### 官方插件
 
-- `ysu.shell`：默认登录、Dashboard、设置、导航和全局弹窗组合。
+- `orahako.shell`：默认登录、Dashboard、设置、导航和全局弹窗组合。
 - `orahako.onboarding`：通过 `shell.overlay` 提供首次学校选择、权限配置和市场 Provider 安装；既有设置经迁移后不再显示。
 - `ysu.provider`：YSU CAS/JWXT Provider，也是唯一内置的学校 Provider；其他学校由市场包注册。
 - Provider 可用 `supportedPlugins` 声明学校支持的功能插件；该列表与 capabilities 共同约束功能启停、页面、导航、深链和总览挂件。
@@ -57,7 +57,7 @@ React、实际使用的 Next 入口、`@ysu/academic` 和 UI Kit 子路径均由
 
 Shell 是完整应用根组件，通过 `ctx.ui.registerShell()` 注册。内核只向它传递当前 Next.js 路由内容；Shell 可以组合、包装或完全忽略这些内容并自行渲染页面。
 
-用户选择以 `pluginId:shellId` 持久化。未选择时使用 `ysu.shell:default`。选中的 Shell 停用、卸载或渲染失败时，回到默认 Shell；默认 Shell 也失败时，由内核显示重新加载界面。
+用户选择以 `pluginId:shellId` 持久化。未选择时使用 `orahako.shell:default`。选中的 Shell 停用、卸载或渲染失败时，回到默认 Shell；默认 Shell 也失败时，由内核显示重新加载界面。
 
 `kind: "shell"` 是市场和插件管理使用的元数据，不构成权限差异。
 
@@ -84,7 +84,7 @@ Slot 所有者通过 `ctx.slots.declare()` 声明名称与形态。贡献者通�
 - `settings.notificationContent`：原生轮询的监听内容选项。
 - `settings.widgets`：可添加的原生小组件卡片。
 
-Overview 挂件由实际功能插件注册，而不是由 `ysu.overview` 代注册。公共组件与数据 Provider 位于 `@ysu/academic`；`order` 决定默认布局顺序，Cordis 在功能停用时移除其挂件。已有用户布局继续按稳定挂件 ID 归一化。
+Overview 挂件由实际功能插件注册，而不是由 `orahako.overview` 代注册。公共组件与数据 Provider 位于 `@orahako/academic`；`order` 决定默认布局顺序，Cordis 在功能停用时移除其挂件。已有用户布局继续按稳定挂件 ID 归一化。
 
 Slot 是默认 Shell 的公开视觉契约。替代 Shell 可以声明自己的 Slot；面向特定 Shell 的插件应记录该依赖。
 
