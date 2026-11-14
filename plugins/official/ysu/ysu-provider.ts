@@ -1083,9 +1083,10 @@ export class YSUProvider extends BaseProvider {
 
   async getEvaluationTasks(options?: TermQueryOptions): Promise<EvaluationTask[]> {
     const types = await this.getEvaluationTypes(options)
-    const typeCodes = types.map((type) => type.code).filter((code): code is string => !!code)
     const taskGroups = await Promise.all(
-      typeCodes.map((code) => this.getPendingEvaluations(code, options))
+      types
+        .filter((type) => type.code && type.count > 0)
+        .map((type) => this.getPendingEvaluations(type.code!, options))
     )
     return taskGroups.flat()
   }

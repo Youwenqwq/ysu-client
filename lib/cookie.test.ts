@@ -113,6 +113,81 @@ describe("Web 代理传输", () => {
     )
   })
 
+  it("请求级 cookie 覆盖同名 jar 值且不会回写共享会话", async () => {
+    const jar = new SimpleCookieJar()
+    await jar.setCookie("_WEU=shared; Path=/", "https://jwxt.ysu.edu.cn/")
+    await jar.setCookie("SESSION=abc; Path=/", "https://jwxt.ysu.edu.cn/")
+    const setCookie = btoa(JSON.stringify(["_WEU=response; Path=/", "route=updated; Path=/"]))
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      return new Response("", {
+        status: 200,
+        headers: { "x-proxy-status": "200", "x-proxy-set-cookie": setCookie },
+      })
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await fetchWithJar(jar, {
+      method: "GET",
+      url: "https://jwxt.ysu.edu.cn/jwapp/sys/wdkb/current.do",
+      redirect: "manual",
+      cookies: [
+        {
+          name: "_WEU",
+          value: "app-a",
+          domain: ".ysu.edu.cn",
+          path: "/jwapp/",
+          secure: true,
+          expires: null,
+        },
+      ],
+    })
+
+    const headers = new Headers(fetchMock.mock.calls[0]![1]?.headers)
+    expect(headers.get("x-proxy-cookie")).toBe("SESSION=abc; _WEU=app-a")
+    expect(await jar.getCookieString("https://jwxt.ysu.edu.cn/jwapp/")).toBe(
+      "_WEU=shared; SESSION=abc; route=updated"
+    )
+  })
+
+  it("请求级 cookie 不会泄漏到不匹配的重定向主机", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("", {
+          status: 200,
+          headers: {
+            "x-proxy-status": "302",
+            location: "https://cer.ysu.edu.cn/authserver/login",
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response("", { status: 200, headers: { "x-proxy-status": "200" } })
+      )
+    vi.stubGlobal("fetch", fetchMock)
+
+    await fetchWithJar(new SimpleCookieJar(), {
+      method: "GET",
+      url: "https://jwxt.ysu.edu.cn/jwapp/sys/wdkb/current.do",
+      redirect: "follow",
+      cookies: [
+        {
+          name: "_WEU",
+          value: "app-a",
+          domain: "jwxt.ysu.edu.cn",
+          path: "/",
+          secure: true,
+          expires: null,
+        },
+      ],
+    })
+
+    expect(new Headers(fetchMock.mock.calls[0]![1]?.headers).get("x-proxy-cookie")).toBe(
+      "_WEU=app-a"
+    )
+    expect(new Headers(fetchMock.mock.calls[1]![1]?.headers).get("x-proxy-cookie")).toBeNull()
+  })
+
   it("上游 URL 的 fragment 不会进入代理请求（jwmobile 登录跳转 #/?token=）", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL) => {
       return new Response("", { status: 200, headers: { "x-proxy-status": "200" } })

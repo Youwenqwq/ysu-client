@@ -2,7 +2,6 @@ import {
   initializeSession as initializeProviderSession,
   resetSession as resetProviderSession,
 } from "../session"
-import { warmupWEU } from "../protocol/jwxt"
 import { ensureMobileAuthorized } from "../protocol/jwmobile"
 import { isFeatureAvailable } from "@orahako/plugin-sdk/host"
 
@@ -11,7 +10,6 @@ export async function initializeSession(): Promise<void> {
 }
 
 export async function warmupSession(): Promise<void> {
-  await warmupWEU()
   if (isFeatureAvailable("hasMobile")) {
     ensureMobileAuthorized(true).catch(() => {})
   }

@@ -495,59 +495,6 @@ let hydrationDone: Promise<void> = Promise.resolve()
 /** Per-app WEU cookie entries, keyed by appId value. */
 const weuStore = new Map<string, CookieEntry>()
 
-/**
- * Keeps the process-wide native _WEU cookie pinned to one app while allowing
- * requests for that app to run concurrently. Queued apps are served in order.
- */
-class WeuRequestGate {
-  private activeKey: string | null = null
-  private activeCount = 0
-  private queue: Array<{ key: string; resolve: () => void }> = []
-
-  async acquire(key: string): Promise<void> {
-    if (this.activeKey === null) {
-      this.activeKey = key
-      this.activeCount = 1
-      return
-    }
-
-    // Once another app is waiting, queue all arrivals to prevent starvation.
-    if (this.activeKey === key && this.queue.length === 0) {
-      this.activeCount += 1
-      return
-    }
-
-    return new Promise<void>((resolve) => {
-      this.queue.push({ key, resolve })
-    })
-  }
-
-  release(key: string): void {
-    if (this.activeKey !== key || this.activeCount === 0) {
-      throw new Error(`cannot release inactive WEU request gate key: ${key}`)
-    }
-
-    this.activeCount -= 1
-    if (this.activeCount > 0) return
-
-    const first = this.queue.shift()
-    if (!first) {
-      this.activeKey = null
-      return
-    }
-
-    const nextBatch = [first]
-    while (this.queue[0]?.key === first.key) {
-      nextBatch.push(this.queue.shift()!)
-    }
-    this.activeKey = first.key
-    this.activeCount = nextBatch.length
-    for (const waiter of nextBatch) waiter.resolve()
-  }
-}
-
-const weuRequestGate = new WeuRequestGate()
-
 export function getJar(): SimpleCookieJar {
   return jwxtJar
 }
@@ -847,11 +794,13 @@ async function emapPost(
   appId?: string,
   referer?: string
 ): Promise<Record<string, unknown>> {
+  const weu = appId ? weuStore.get(appId) : undefined
   const doRequest = async (): Promise<Awaited<ReturnType<typeof fetchWithJar>>> => {
     try {
       return await fetchWithJar(jwxtJar, {
         method: "POST",
         url,
+        cookies: weu ? [weu] : undefined,
         body: new URLSearchParams(data),
         headers: {
           "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -869,46 +818,19 @@ async function emapPost(
 
   let resp: Awaited<ReturnType<typeof fetchWithJar>>
 
-  if (appId) {
-    // Pin the shared native _WEU cookie to this app for the full request cycle.
-    await weuRequestGate.acquire(appId)
-    try {
-      const entry = weuStore.get(appId)
-      if (entry) {
-        // Remove any existing _WEU cookie(s) from the jar.
-        const allCookies = await jwxtJar.getAllCookies()
-        for (const c of allCookies) {
-          if (c.name === "_WEU") {
-            await jwxtJar.removeCookie(c.domain, c.path, "_WEU")
-          }
-        }
-        // Install the correct per-app _WEU.
-        const host = entry.domain.replace(/^\./, "") || "localhost"
-        await jwxtJar.setCookie(
-          `_WEU=${entry.value}; Domain=${entry.domain}; Path=${entry.path}`,
-          `https://${host}${entry.path}`,
-          { ignoreError: true }
-        )
-      }
+  resp = await doRequest()
+  // Retry pjapp 404 with a known-good route cookie.
+  if (appId === _appIds.pjapp && resp.status === 404) {
+    const goodRoute = getSchoolConfig().jwxt.pjappGoodRoute
+    if (goodRoute) {
+      const domain = new URL(serverConfig.jwxtBaseUrl).hostname
+      await jwxtJar.setCookie(
+        `route=${goodRoute}; Domain=.${domain}; Path=/`,
+        serverConfig.jwxtBaseUrl,
+        { ignoreError: true }
+      )
       resp = await doRequest()
-      // Retry pjapp 404 with a known-good route cookie.
-      if (resp.status === 404 && appId === _appIds.pjapp) {
-        const goodRoute = getSchoolConfig().jwxt.pjappGoodRoute
-        if (goodRoute) {
-          const domain = new URL(serverConfig.jwxtBaseUrl).hostname
-          await jwxtJar.setCookie(
-            `route=${goodRoute}; Domain=.${domain}; Path=/`,
-            serverConfig.jwxtBaseUrl,
-            { ignoreError: true }
-          )
-          resp = await doRequest()
-        }
-      }
-    } finally {
-      weuRequestGate.release(appId)
     }
-  } else {
-    resp = await doRequest()
   }
 
   if (resp.status === 401 || resp.status === 403) {
@@ -1081,21 +1003,6 @@ async function ensureWeu(appId: string): Promise<void> {
   } finally {
     if (inflightWeu.get(appId) === promise) inflightWeu.delete(appId)
   }
-}
-
-/** 并行预热常用 EMAP 应用的 WEU，避免首次 API 调用时被 appShow.do 阻塞。 */
-export async function warmupWEU(): Promise<void> {
-  const apps = [
-    _appIds.xsjbxxgl,
-    _appIds.wdkb,
-    _appIds.studentWdksapApp,
-    _appIds.cjcx,
-    _appIds.pjapp,
-    _appIds.bkbl,
-    _appIds.kcbcx,
-  ]
-  if (_appIds.wdkb_sy) apps.push(_appIds.wdkb_sy)
-  await Promise.all(apps.map((id) => ensureWeu(id).catch(() => {})))
 }
 
 async function post(

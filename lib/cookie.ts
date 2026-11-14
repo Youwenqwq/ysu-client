@@ -300,6 +300,12 @@ export interface HttpRequest {
   readonly method: "GET" | "POST"
   readonly url: string
   readonly headers?: Readonly<Record<string, string>>
+  /**
+   * Request-scoped cookies matched by the usual domain/path/secure rules.
+   * Matching names override the jar for outgoing requests and are not copied
+   * back from responses or the process-wide native cookie store.
+   */
+  readonly cookies?: readonly CookieEntry[]
   readonly body?: string | URLSearchParams
   readonly redirect: "manual" | "follow"
   readonly timeoutMs?: number
@@ -325,6 +331,42 @@ export interface HttpResponse {
 
 const DEFAULT_TIMEOUT_MS = 30_000
 const MAX_REDIRECTS = 10
+
+async function getRequestCookieString(jar: SimpleCookieJar, req: HttpRequest): Promise<string> {
+  const jarCookieString = await jar.getCookieString(req.url)
+  if (!req.cookies?.length) return jarCookieString
+
+  const parsedUrl = safeParseUrl(req.url)
+  const host = parsedUrl?.hostname ?? ""
+  const pathname = parsedUrl?.pathname ?? "/"
+  const now = Math.floor(Date.now() / 1000)
+  const matched = req.cookies
+    .filter(
+      (cookie) =>
+        cookie.value !== "" &&
+        (cookie.expires === null || cookie.expires >= now) &&
+        domainMatches(cookie.domain, host) &&
+        pathMatches(cookie.path, pathname) &&
+        secureMatches(cookie, req.url)
+    )
+    .sort((a, b) => b.path.length - a.path.length)
+  const scoped = new Map<string, string>()
+  for (const cookie of matched) {
+    if (!scoped.has(cookie.name)) scoped.set(cookie.name, cookie.value)
+  }
+  if (scoped.size === 0) return jarCookieString
+
+  const jarParts = jarCookieString
+    .split("; ")
+    .filter((part) => part && !scoped.has(part.slice(0, part.indexOf("="))))
+  return [...jarParts, ...Array.from(scoped, ([name, value]) => `${name}=${value}`)].join("; ")
+}
+
+function isRequestScopedCookie(req: HttpRequest, cookie: string): boolean {
+  const equals = cookie.indexOf("=")
+  const name = (equals === -1 ? cookie : cookie.slice(0, equals)).trim()
+  return req.cookies?.some((entry) => entry.name === name) ?? false
+}
 
 export async function fetchWithJar(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
   const finish = beginRequest(req.url, req.method)
@@ -442,7 +484,7 @@ async function proxyHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<Ht
   if (!headers.has("accept-language")) {
     headers.set("accept-language", "zh-CN,zh;q=0.9,en;q=0.8")
   }
-  const cookieHeader = await jar.getCookieString(req.url)
+  const cookieHeader = await getRequestCookieString(jar, req)
   if (cookieHeader) {
     headers.set("x-proxy-cookie", cookieHeader)
   }
@@ -494,7 +536,9 @@ async function proxyHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<Ht
       if (Array.isArray(setCookies)) {
         parsedSetCookies = setCookies.filter((s): s is string => typeof s === "string")
         for (const sc of parsedSetCookies) {
-          await jar.setCookie(sc, req.url, { ignoreError: true })
+          if (!isRequestScopedCookie(req, sc)) {
+            await jar.setCookie(sc, req.url, { ignoreError: true })
+          }
         }
       }
     } catch {
@@ -558,6 +602,12 @@ async function capacitorHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promis
   }
 
   const headers: Record<string, string> = { ...(req.headers ?? {}) }
+  const cookieHeader = await getRequestCookieString(jar, req)
+  if (cookieHeader && !hasHeader(headers, "Cookie")) {
+    // HttpURLConnection gives an explicit Cookie header precedence over its
+    // process-wide CookieHandler, keeping request-scoped cookies isolated.
+    headers["Cookie"] = cookieHeader
+  }
   if (!hasHeader(headers, "User-Agent")) {
     headers["User-Agent"] = getCustomUserAgent()
   }
@@ -597,7 +647,9 @@ async function capacitorHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promis
   if (setCookieRaw) {
     const cookies = Array.isArray(setCookieRaw) ? setCookieRaw : splitSetCookie(setCookieRaw)
     for (const sc of cookies) {
-      await jar.setCookie(sc, req.url, { ignoreError: true })
+      if (!isRequestScopedCookie(req, sc)) {
+        await jar.setCookie(sc, req.url, { ignoreError: true })
+      }
     }
   }
 
@@ -613,7 +665,9 @@ async function capacitorHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promis
       const jarAll = await jar.getAllCookies()
       const jarNames = new Set(jarAll.filter((c) => c.value).map((c) => c.name))
       for (const [name, value] of Object.entries(nativeCookies)) {
-        if (!value || jarNames.has(name)) continue
+        if (!value || jarNames.has(name) || req.cookies?.some((cookie) => cookie.name === name)) {
+          continue
+        }
         // Cookie exists in native store but not in our jar — add it.
         // We lack domain/path info; set with request URL's domain as hint.
         const parsedUrl = safeParseUrl(req.url)
@@ -670,6 +724,7 @@ async function followRedirects(jar: SimpleCookieJar, req: HttpRequest): Promise<
       method: currentMethod,
       url: currentUrl,
       headers: currentHeaders,
+      cookies: req.cookies,
       body: currentBody,
       redirect: "manual",
       timeoutMs: req.timeoutMs,
