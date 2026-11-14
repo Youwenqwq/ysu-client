@@ -1,6 +1,6 @@
 const DEFAULT_INDEX = {
   schemaVersion: 1,
-  updatedAt: '2026-11-14T07:59:54Z',
+  updatedAt: '2026-11-14T18:33:10Z',
   plugins: [{
     id: 'community.theme.yuna',
     name: 'YUNA 三皮肤主题',
@@ -45,6 +45,16 @@ const DEFAULT_INDEX = {
     homepage: 'https://github.com/Youwenqwq/ysu-client',
     categories: ['toybox', 'transport'],
     versions: [{
+      version: '1.1.0',
+      apiVersion: 1,
+      minAppVersion: '0.15.0',
+      platforms: ['web', 'android'],
+      zipUrl: '/plugins/community.perlica-toybox/1.1.0.zip',
+      sha256: '9d0ce27323f4f254e5f94640841aacce204d959736f267f011c940cc1f04b4f4',
+      size: 207422,
+      publishedAt: '2026-11-14T18:33:10Z',
+      changelog: '新增插件作用域移动底部导航；主功能标签同步至 URL；地图改为全内容区背景布局。',
+    }, {
       version: '1.0.2',
       apiVersion: 1,
       minAppVersion: '0.15.0',
@@ -91,6 +101,16 @@ const DEFAULT_INDEX = {
     homepage: 'https://github.com/Youwenqwq/ysu-client',
     categories: ['toybox'],
     versions: [{
+      version: '1.1.0',
+      apiVersion: 1,
+      minAppVersion: '0.15.0',
+      platforms: ['web', 'android'],
+      zipUrl: '/plugins/orahako.skbird/1.1.0.zip',
+      sha256: '9bd3a9e9c3c65def9a6594c044e791bb8fe4e0ac018b54ba8e7dd14d8e6fd8cc',
+      size: 20373,
+      publishedAt: '2026-11-14T18:33:10Z',
+      changelog: '新增插件作用域移动底部导航，将消息、我的与设置移入底部栏，并保留消息未读提示。',
+    }, {
       version: '1.0.1',
       apiVersion: 1,
       minAppVersion: '0.15.0',

@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest"
 import {
   CORE_DASHBOARD_FALLBACK_HREF,
   landingPreferenceHref,
+  navigationForScope,
+  resolveActivePluginNavigation,
+  resolveMobileNavigation,
   resolvePrimaryTarget,
   resolveSemanticTarget,
   semanticTargetHref,
@@ -74,6 +77,21 @@ describe("semantic target resolution", () => {
     expect(resolveSemanticTarget("schedule", noSchedule)).toBeUndefined()
   })
 
+  it("ignores plugin-scoped navigation when resolving global routes", () => {
+    const local = sources({
+      pages: [{ pluginId: "org.example.app", id: "messages" }],
+      navigation: [
+        {
+          pluginId: "org.example.app",
+          id: "messages",
+          page: "messages",
+          scope: "plugin",
+        },
+      ],
+    })
+    expect(resolveSemanticTarget("messages", local)).toBeUndefined()
+  })
+
   it("picks deterministically when several plugins claim one semantic id", () => {
     const contested = sources({
       ...defaultSources,
@@ -119,6 +137,108 @@ describe("primary target resolution", () => {
 
   it("yields nothing with an empty registry", () => {
     expect(resolvePrimaryTarget(sources())).toBeUndefined()
+  })
+})
+
+describe("scoped navigation", () => {
+  const navigation: SemanticNavSources["navigation"] = [
+    { pluginId: "org.example.app", id: "app", page: "index", order: 20, primary: true },
+    {
+      pluginId: "org.example.app",
+      id: "later",
+      page: "later",
+      scope: "plugin",
+      order: 20,
+    },
+    {
+      pluginId: "org.example.app",
+      id: "first",
+      page: "index",
+      scope: "plugin",
+      order: 10,
+    },
+    {
+      pluginId: "org.example.other",
+      id: "other",
+      page: "index",
+      scope: "plugin",
+      order: 0,
+    },
+  ]
+
+  it("filters by scope and owner and sorts deterministically", () => {
+    expect(
+      navigationForScope(navigation, "plugin", {}, "org.example.app").map((x) => x.id)
+    ).toEqual(["first", "later"])
+    expect(navigationForScope(navigation, "app", {}).map((x) => x.id)).toEqual(["app"])
+  })
+
+  it("uses available local tabs, otherwise global primary tabs", () => {
+    expect(
+      resolveMobileNavigation(navigation, "org.example.app", {}).items.map((item) => item.id)
+    ).toEqual(["first", "later"])
+    expect(resolveMobileNavigation(navigation, "org.example.missing", {})).toEqual({
+      scope: "app",
+      items: [navigation[0]],
+    })
+    expect(
+      resolveMobileNavigation(navigation, "org.example.app", {
+        supportedPlugins: ["org.example.other"],
+      }).items.map((item) => item.id)
+    ).toEqual([])
+  })
+
+  it("matches page parameters and inherits parent tabs for detail pages", () => {
+    const items: SemanticNavSources["navigation"] = [
+      {
+        pluginId: "org.example.app",
+        id: "map",
+        page: "index",
+        params: { tab: "map" },
+        scope: "plugin",
+        order: 0,
+      },
+      {
+        pluginId: "org.example.app",
+        id: "ride",
+        page: "index",
+        params: { tab: "ride" },
+        scope: "plugin",
+        order: 10,
+      },
+      {
+        pluginId: "org.example.app",
+        id: "messages",
+        page: "messages",
+        scope: "plugin",
+        order: 20,
+      },
+    ]
+    const pages: SemanticNavSources["pages"] = [
+      { pluginId: "org.example.app", id: "index" },
+      { pluginId: "org.example.app", id: "messages", parent: "index" },
+      { pluginId: "org.example.app", id: "settings", parent: "index" },
+      { pluginId: "org.example.app", id: "thread", parent: "index" },
+    ]
+    const location = (pageId: string, tab?: string) => ({
+      pluginId: "org.example.app",
+      pageId,
+      params: new URLSearchParams(tab ? { tab } : {}),
+    })
+    expect(resolveActivePluginNavigation(items, pages, location("index", "ride"))).toBe("ride")
+    expect(resolveActivePluginNavigation(items, pages, location("settings", "ride"))).toBe("ride")
+    expect(resolveActivePluginNavigation(items, pages, location("messages"))).toBe("messages")
+    expect(resolveActivePluginNavigation(items, pages, location("thread"))).toBe("map")
+  })
+
+  it("terminates when page parent metadata contains a cycle", () => {
+    const pages: SemanticNavSources["pages"] = [
+      { pluginId: "org.example.app", id: "a", parent: "b" },
+      { pluginId: "org.example.app", id: "b", parent: "a" },
+    ]
+    expect(
+      resolveActivePluginNavigation([], pages, { pluginId: "org.example.app", pageId: "a" })
+    ).toBeUndefined()
   })
 })
 

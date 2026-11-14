@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { Check, LogOut } from "lucide-react"
 import { toast } from "@orahako/plugin-sdk/host"
-import { pluginPageHref } from "@orahako/plugin-sdk"
+import { pluginPageHref, type PluginPageProps } from "@orahako/plugin-sdk"
 import { PERLICA_PLUGIN_ID, PERLICA_PAGE_INDEX } from "./constants"
-import { usePerlicaAppNav } from "./extras/app-nav"
+import { perlicaTab } from "./extras/app-nav"
 import {
   Button,
   Card,
@@ -28,9 +28,9 @@ import { usePerlicaStore } from "./extras/store"
 import { parsePerlicaToken } from "./extras/types"
 import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 
-export function PerlicaSettingsPage() {
+export function PerlicaSettingsPage({ params }: PluginPageProps) {
   const { t } = usePluginTranslation(PERLICA_PLUGIN_ID)
-  const activeTab = usePerlicaAppNav((state) => state.tab)
+  const activeTab = perlicaTab(params)
   const token = usePerlicaStore((state) => state.token)
   const accountId = usePerlicaStore((state) => state.accountId)
   const adAccountId = usePerlicaStore((state) => state.adAccountId)

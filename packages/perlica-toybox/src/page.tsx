@@ -25,8 +25,8 @@ import { PerlicaMachineDetail } from "./components/perlica-machine-detail"
 import { PerlicaMap } from "./components/perlica-map"
 import { PerlicaNearbyList } from "./components/perlica-nearby-list"
 import { PerlicaScanner } from "./components/perlica-scanner"
-import { PERLICA_PLUGIN_ID, PERLICA_PAGE_SETTINGS } from "./constants"
-import { isPerlicaTab, usePerlicaAppNav } from "./extras/app-nav"
+import { PERLICA_PLUGIN_ID, PERLICA_PAGE_INDEX, PERLICA_PAGE_SETTINGS } from "./constants"
+import { isPerlicaTab, perlicaTab, type PerlicaTab } from "./extras/app-nav"
 import { Alert, AlertDescription, AlertTitle } from "@orahako/plugin-ui/components"
 import { Button } from "@orahako/plugin-ui/components"
 import {
@@ -103,8 +103,11 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
 
   const session = useMemo(() => ({ accountId, token }), [accountId, token])
   const client = useMemo(() => (token && accountId ? getPerlicaClient() : null), [accountId, token])
-  const activeTab = usePerlicaAppNav((state) => state.tab)
-  const setActiveTab = usePerlicaAppNav((state) => state.setTab)
+  const activeTab = perlicaTab(params)
+  const setActiveTab = useCallback(
+    (tab: PerlicaTab) => navigate(PERLICA_PAGE_INDEX, { tab }),
+    [navigate]
+  )
   const [scannerOpen, setScannerOpen] = useState(false)
   const [manualCode, setManualCode] = useState("")
   const [selectedCode, setSelectedCode] = useState("")
@@ -514,13 +517,11 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
   ])
 
   useEffect(() => {
-    const initialTab = params.get("tab")
-    setActiveTab(isPerlicaTab(initialTab) ? initialTab : "map")
     const deepLinkedCode = parsePerlicaCode(params.toString())
     if (deepLinkedCode && /^\d{8,9}$/.test(deepLinkedCode)) {
       setSelectedCode(deepLinkedCode)
       setManualCode(deepLinkedCode)
-      setActiveTab("map")
+      if (activeTab !== "map") setActiveTab("map")
     }
     // Deep links are delivered once per mount through the plugin page params.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -676,9 +677,18 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <Tabs value={activeTab} onValueChange={selectAppTab} className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+    <div
+      className={cn(
+        "flex flex-col",
+        activeTab === "map" ? "min-h-0 flex-1 max-md:-m-4 md:-m-8" : "gap-4 p-4"
+      )}
+    >
+      <Tabs
+        value={activeTab}
+        onValueChange={selectAppTab}
+        className={cn("flex flex-col", activeTab === "map" ? "min-h-0 flex-1 gap-0" : "gap-4")}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 max-sm:hidden">
           <TabsList aria-label={t("perlica.nav")} className="w-full justify-start sm:w-auto">
             <TabsTrigger value="map">{t("perlica.tabMap")}</TabsTrigger>
             <TabsTrigger value="ride">{t("perlica.tabRide")}</TabsTrigger>
@@ -691,7 +701,6 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
             size="sm"
             onClick={() => void refreshAll()}
             disabled={refreshing}
-            className="max-sm:hidden"
           >
             <RefreshCw data-icon="inline-start" className={cn(refreshing && "animate-spin")} />
             {t("perlica.refresh")}
@@ -702,9 +711,9 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
           value="map"
           id="perlica-panel-map"
           forceMount
-          className="m-0 data-[state=inactive]:hidden"
+          className="m-0 min-h-0 flex-1 data-[state=inactive]:hidden"
         >
-          <div className="relative h-[60vh] min-h-[22rem] overflow-hidden rounded-xl border bg-card">
+          <div className="relative h-full min-h-0 overflow-hidden bg-card">
             <PerlicaMap
               className="absolute inset-0 h-full w-full"
               showBadge={false}

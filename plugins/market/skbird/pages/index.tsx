@@ -25,10 +25,9 @@ import {
   EmptyTitle,
 } from "@orahako/plugin-ui/components"
 import { useTranslation } from "@orahako/plugin-ui/hooks"
-import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
 import { useBackHandler } from "@orahako/plugin-ui/hooks"
 import { SkbirdError, SKBIRD_ERRNO_TOKEN_INVALID } from "../client"
-import { getSkbirdClient, useSkbirdStore } from "../store"
+import { getSkbirdClient, useSkbirdStore, useSkbirdUnreadCount } from "../store"
 import type { SkbirdCategory, SkbirdThread } from "../types"
 import {
   readSkbirdFeedSnapshot,
@@ -70,7 +69,7 @@ export function SkbirdIndexPage({ pluginId, navigate }: PluginPageProps) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [unread, setUnread] = useState(0)
+  const unread = useSkbirdUnreadCount()
   const [range, setRange] = useState("all")
   const [searchOpen, setSearchOpen] = useState(false)
   const mobileSearch = useSyncExternalStore(
@@ -292,7 +291,7 @@ export function SkbirdIndexPage({ pluginId, navigate }: PluginPageProps) {
     void fetchPage(false)
   }, [hasHydrated, token, feedStateReady, fetchPage])
 
-  // 分类列表与未读数：进入页面后各拉一次，失败静默
+  // 分类列表：进入页面后拉取一次，失败静默
   useEffect(() => {
     const client = getSkbirdClient()
     if (!hasHydrated || !client) return
@@ -300,47 +299,12 @@ export function SkbirdIndexPage({ pluginId, navigate }: PluginPageProps) {
       .categories()
       .then(setCategories)
       .catch(() => {})
-    client
-      .unreadNum()
-      .then((u) => setUnread(u.count + u.imCount))
-      .catch(() => {})
   }, [hasHydrated, token])
 
   const canLoadMore = ((CURSOR_TABS[tab] && !submittedWd) || !!submittedWd) && hasMore
   const sentinelRef = useLoadMoreSentinel(
     () => void fetchPage(true),
     canLoadMore && !loading && !error
-  )
-
-  // 移动端功能入口注入顶栏右侧（与成绩/日程页同一模式）；桌面端仍走工具栏内按钮
-  useMobileHeaderRight(
-    <div className="flex items-center gap-0.5">
-      <Button
-        asChild
-        size="icon-sm"
-        variant="ghost"
-        aria-label={t("skbird.messagesTitle")}
-        className="relative"
-      >
-        <Link href={pluginPageHref(pluginId, "messages")}>
-          <Bell className="size-4" />
-          {unread > 0 ? (
-            <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-destructive" />
-          ) : null}
-        </Link>
-      </Button>
-      <Button asChild size="icon-sm" variant="ghost" aria-label={t("skbird.meTitle")}>
-        <Link href={pluginPageHref(pluginId, "me")}>
-          <User className="size-4" />
-        </Link>
-      </Button>
-      <Button asChild size="icon-sm" variant="ghost" aria-label={t("skbird.settingsTitle")}>
-        <Link href={pluginPageHref(pluginId, "settings")}>
-          <Settings className="size-4" />
-        </Link>
-      </Button>
-    </div>,
-    [unread, t, pluginId]
   )
 
   if (hasHydrated && !token) {
@@ -461,7 +425,7 @@ export function SkbirdIndexPage({ pluginId, navigate }: PluginPageProps) {
           </Button>
         </form>
 
-        {/* 功能入口：桌面端显示；移动端已注入顶栏 */}
+        {/* 功能入口：桌面端显示；移动端由插件作用域底部导航提供 */}
         <div className="flex items-center max-sm:hidden">
           <Button
             asChild

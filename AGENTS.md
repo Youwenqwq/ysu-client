@@ -61,7 +61,7 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 - 外部 ZIP 经 `lib/plugins/package-store.ts` 存入 IndexedDB（`orahako-plugins`），由 `lib/plugins/external-loader.ts` 以 Blob 模块加载；React、Next 入口、`@orahako/plugin-sdk`、`@orahako/plugin-ui/*`、`@orahako/academic` 由宿主共享实例，清单见 `packages/plugin-sdk/host-modules.ts`。
 - 安装、更新、回滚、重复崩溃安全模式和插件状态分别在 `host.ts`、`runtime.ts`、`recovery.ts` 中处理。外部包校验 SHA-256、`apiVersion`、平台和 `minAppVersion`；市场推荐组合包会先完整预检再执行。
 - 页面与导航通过 `ctx.ui.registerPage()` / `registerNavigation()` 注册。静态导出不能为外部插件新增 Next.js 文件路由，统一页面宿主是 `app/dashboard/plugin/page.tsx`：
-  `/dashboard/plugin/?plugin=<id>&page=<id>`。跨插件稳定语义使用 `route` / 导航 ID，由 `lib/plugins/navigation.ts` 解析，核心不按官方插件 ID 定位功能。
+  `/dashboard/plugin/?plugin=<id>&page=<id>`。跨插件稳定语义使用 `route` / 导航 ID，由 `lib/plugins/navigation.ts` 解析，核心不按官方插件 ID 定位功能。导航默认为 `scope: "app"`；`scope: "plugin"` 声明插件内部主功能，默认 Shell 在对应插件活动时以其替换移动端底部导航，可用 `params` 指向同页功能区。
 - Slot 通过 `ctx.slots.declare()` / `register()` 组合；支持 `single`、`list`、`keyed`，贡献随 Cordis 作用域释放。默认 Shell 的 Slot 集合定义在 `plugins/official/shell/index.tsx`。
 - 登录后任务使用 `ctx.hostLifecycle.onProviderReady()`；不要恢复已删除的私有启动注册表。停用插件时必须同时停止其后台上传、轮询、闹钟和旧小组件数据。
 - 插件与应用同权，可读取凭据、会话、网络和原生能力；不构成权限沙箱。侧载与更新只应面向可信来源。

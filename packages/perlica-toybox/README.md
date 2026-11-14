@@ -8,7 +8,7 @@
 pnpm plugin pack packages/perlica-toybox
 ```
 
-将生成的 `perlica-toybox-1.0.2.zip` 通过「我的 → 插件 → 安装 ZIP」安装。本包不加入官方插件注册表，也不需要宿主提供 Perlica 专用页面或 Store。
+将生成的 `perlica-toybox-1.1.0.zip` 通过「我的 → 插件 → 安装 ZIP」安装。本包不加入官方插件注册表，也不需要宿主提供 Perlica 专用页面或 Store。
 
 ## 宿主能力
 
@@ -20,7 +20,7 @@ pnpm plugin pack packages/perlica-toybox
 
 ## 适配边界
 
-- 页面、设置、移动子导航和中英文案均由包内注册，不使用宿主 Next 文件路由或全局词典。
+- 页面、设置、插件作用域移动导航和中英文案均由包内注册，不使用宿主 Next 文件路由或全局词典；主功能标签由 `tab` URL 参数标识，地图标签使用占满内容区的背景式布局。
 - 仅依赖公开 SDK、UI Kit 与共享 Next/Sonner 模块；无 `@/` 私有导入。
 - 插件与应用同权。Token 只应在用户验证并保存后写入凭据存储；调试快照会继续脱敏。
 - 真实骑行、支付相关操作和系统授权需要在 Android 真机上由用户验收。

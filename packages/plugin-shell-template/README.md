@@ -1,6 +1,6 @@
 # 社区 Shell 模板
 
-这是一个不导入宿主私有模块的完整 UI 替换示例。它忽略默认 Next.js 页面树，直接通过公共 UI 快照组合插件页面和导航。
+这是一个不导入宿主私有模块的完整 UI 替换示例。它忽略默认 Next.js 页面树，直接通过公共 UI 快照组合插件页面和导航；`navigationForScope()` 分离应用级与插件内部导航，替代 Shell 可复用相同的作用域、过滤和排序语义。
 
 ```bash
 pnpm plugin pack packages/plugin-shell-template

@@ -26,17 +26,39 @@ export interface PluginPageDefinition {
 
 export type PluginNavigationGroup = string
 
-export interface PluginNavigationDefinition {
+export type PluginNavigationParams = Record<string, string | number>
+
+interface PluginNavigationBase {
   id: string
   title: string
   titleKey?: string
   page: string
+  /** Query parameters identifying a section within the target page. */
+  params?: PluginNavigationParams
   icon: PluginIcon
-  group: PluginNavigationGroup
+  /** Optional plugin-owned indicator, such as an unread count. */
+  badge?: ComponentType
   order?: number
-  primary?: boolean
   capability?: string
 }
+
+export interface PluginAppNavigationDefinition extends PluginNavigationBase {
+  /** Application navigation participates in global routes and the dashboard home. */
+  scope?: "app"
+  group: PluginNavigationGroup
+  primary?: boolean
+}
+
+export interface PluginScopedNavigationDefinition extends PluginNavigationBase {
+  /** Plugin navigation replaces mobile primary tabs while this plugin is active. */
+  scope: "plugin"
+  group?: never
+  primary?: never
+}
+
+export type PluginNavigationDefinition =
+  | PluginAppNavigationDefinition
+  | PluginScopedNavigationDefinition
 
 export interface PluginOverviewWidgetDefinition {
   id: string

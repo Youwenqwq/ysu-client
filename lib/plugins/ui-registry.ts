@@ -14,9 +14,7 @@ export interface RegisteredPluginPage extends PluginPageDefinition {
   pluginId: string
 }
 
-export interface RegisteredPluginNavigation extends PluginNavigationDefinition {
-  pluginId: string
-}
+export type RegisteredPluginNavigation = PluginNavigationDefinition & { pluginId: string }
 
 export interface RegisteredPluginOverviewWidget extends PluginOverviewWidgetDefinition {
   pluginId: string

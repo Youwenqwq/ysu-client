@@ -17,6 +17,7 @@ export function SkbirdMessagesPage({ navigate }: PluginPageProps) {
   const { t } = useTranslation()
   const hasHydrated = useSkbirdStore((s) => s.hasHydrated)
   const token = useSkbirdStore((s) => s.token)
+  const setUnreadCount = useSkbirdStore((s) => s.setUnreadCount)
 
   const [messages, setMessages] = useState<SkbirdMessage[]>([])
   const [unread, setUnread] = useState<SkbirdUnread | null>(null)
@@ -65,9 +66,12 @@ export function SkbirdMessagesPage({ navigate }: PluginPageProps) {
     void load(false)
     client
       .unreadNum()
-      .then(setUnread)
+      .then((value) => {
+        setUnread(value)
+        setUnreadCount(value.count + value.imCount)
+      })
       .catch(() => {})
-  }, [hasHydrated, token, load])
+  }, [hasHydrated, token, load, setUnreadCount])
 
   if (hasHydrated && !token) {
     return (

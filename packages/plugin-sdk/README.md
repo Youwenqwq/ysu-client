@@ -63,6 +63,21 @@ export default definePlugin((ctx) => {
 
 注册函数返回清理函数；插件停用或卸载时 Cordis 也会自动清理页面、导航、主题、设置、挂件、翻译和 Provider 注册。
 
+导航默认使用 `scope: "app"`，参与应用侧边栏、全局首页和语义路由解析。插件内部主功能使用 `scope: "plugin"`；默认 Shell 会在该插件处于活动状态时，用这些项目替换移动端底部应用导航，无可用项目时自动回退。内部导航不使用 `group` 或 `primary`，可通过 `params` 指向同页功能区，通过可选 `badge` 组件提供未读等状态：
+
+```tsx
+ctx.ui.registerNavigation({
+  id: "messages",
+  title: "Messages",
+  titleKey: "example.messages",
+  page: "messages",
+  icon: MessageIcon,
+  badge: MessagesBadge,
+  scope: "plugin",
+  order: 10,
+})
+```
+
 ## Shell 与 UI Slot
 
 完整应用界面通过 `ctx.ui.registerShell()` 注册，组件接收 `children` 和 `selectShell()`。Shell 可以包装或完全忽略默认 Next.js 内容；应提供恢复默认界面的入口。纯外部示例见 `packages/plugin-shell-template`。

@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
 import { SkbirdClient, generateDeviceId } from "./client"
@@ -13,8 +14,10 @@ interface SkbirdState {
   /** 校区别名（多租户），默认 ysu */
   alias: string
   hasHydrated: boolean
+  unreadCount: number
   setConfig: (config: { token: string; deviceId: string; alias: string }) => void
   setHasHydrated: (v: boolean) => void
+  setUnreadCount: (count: number) => void
 }
 
 export const useSkbirdStore = create<SkbirdState>()(
@@ -24,13 +27,16 @@ export const useSkbirdStore = create<SkbirdState>()(
       deviceId: generateDeviceId(),
       alias: "ysu",
       hasHydrated: false,
+      unreadCount: 0,
       setConfig: ({ token, deviceId, alias }) =>
         set({
           token: token.trim(),
           deviceId: deviceId.trim() || generateDeviceId(),
           alias: alias.trim() || "ysu",
+          unreadCount: 0,
         }),
       setHasHydrated: (v) => set({ hasHydrated: v }),
+      setUnreadCount: (unreadCount) => set({ unreadCount }),
     }),
     {
       name: STORAGE_KEYS.skbird,
@@ -52,4 +58,46 @@ export function getSkbirdClient(): SkbirdClient | null {
   const { token, deviceId, alias } = useSkbirdStore.getState()
   if (!token) return null
   return new SkbirdClient({ token, deviceId, alias })
+}
+
+let unreadRequest: Promise<void> | undefined
+
+function refreshUnread() {
+  if (unreadRequest) return unreadRequest
+  const config = useSkbirdStore.getState()
+  const client = getSkbirdClient()
+  if (!client) {
+    config.setUnreadCount(0)
+    return Promise.resolve()
+  }
+  const request = client
+    .unreadNum()
+    .then((unread) => {
+      const current = useSkbirdStore.getState()
+      if (
+        current.token === config.token &&
+        current.deviceId === config.deviceId &&
+        current.alias === config.alias
+      ) {
+        current.setUnreadCount(unread.count + unread.imCount)
+      }
+    })
+    .catch(() => {})
+  unreadRequest = request
+  void request.finally(() => {
+    if (unreadRequest === request) unreadRequest = undefined
+  })
+  return request
+}
+
+/** Share one unread snapshot between page actions and the mobile navigation badge. */
+export function useSkbirdUnreadCount(): number {
+  const token = useSkbirdStore((state) => state.token)
+  const deviceId = useSkbirdStore((state) => state.deviceId)
+  const alias = useSkbirdStore((state) => state.alias)
+  const hasHydrated = useSkbirdStore((state) => state.hasHydrated)
+  useEffect(() => {
+    if (hasHydrated) void refreshUnread()
+  }, [alias, deviceId, hasHydrated, token])
+  return useSkbirdStore((state) => state.unreadCount)
 }

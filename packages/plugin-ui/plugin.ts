@@ -10,6 +10,10 @@ export { usePluginTranslation } from "@/lib/plugins/use-plugin-translation"
 export { usePluginRouteStore, type ActivePluginRoute } from "@/lib/stores/plugin-route"
 export {
   hasPluginCapability,
+  isAppNavigation,
+  navigationForScope,
+  resolveMobileNavigation,
+  resolveActivePluginNavigation,
   resolveSemanticTarget,
   resolvePrimaryTarget,
   semanticTargetHref,
@@ -17,6 +21,8 @@ export {
   CORE_DASHBOARD_FALLBACK_HREF,
   type SemanticPageInput,
   type SemanticNavigationInput,
+  type PluginNavigationLocation,
+  type PluginNavigationScope,
   type SemanticNavSources,
   type SemanticNavTarget,
 } from "@/lib/plugins/navigation"

@@ -46,9 +46,9 @@ import { useStoredMediaUrl } from "@orahako/plugin-ui/hooks"
 import { loadAvatarImage } from "@orahako/plugin-ui/stores"
 import { usePluginHost } from "@orahako/plugin-ui/shell"
 import { usePluginUI } from "@orahako/plugin-ui/plugin"
-import { PluginSlot, pluginPageHref, supportsPlugin, type PluginIcon } from "@orahako/plugin-sdk"
+import { PluginSlot, pluginPageHref, type PluginIcon } from "@orahako/plugin-sdk"
 import { usePluginRouteStore } from "@orahako/plugin-ui/plugin"
-import { hasPluginCapability } from "@orahako/plugin-ui/plugin"
+import { navigationForScope } from "@orahako/plugin-ui/plugin"
 const SIDEBAR_WIDTH_KEY = "dashboard-sidebar-width"
 const DEFAULT_SIDEBAR_WIDTH = 288 // 18rem
 const MIN_SIDEBAR_WIDTH = 208 // 13rem
@@ -217,11 +217,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const supportedPlugins = useSupportedPlugins()
   const { host } = usePluginHost()
   const { navigation: pluginNavigation } = usePluginUI(host.ui)
-  const availableNavigation = pluginNavigation.filter(
-    (item) =>
-      supportsPlugin(supportedPlugins, item.pluginId) &&
-      hasPluginCapability(capabilities, item.capability)
-  )
+  const availableNavigation = navigationForScope(pluginNavigation, "app", {
+    capabilities,
+    supportedPlugins,
+  })
   const knownGroupOrder = ["main", "academic", "platform", "fees", "extras", "plugins"]
   const groupLabels: Record<string, string> = {
     main: t("app.nav"),
@@ -246,7 +245,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         title: item.titleKey
           ? host.i18n.translate(item.pluginId, item.titleKey, locale)
           : item.title,
-        url: pluginPageHref(item.pluginId, item.page),
+        url: pluginPageHref(item.pluginId, item.page, item.params),
         icon: item.icon,
         pluginId: item.pluginId,
       })),

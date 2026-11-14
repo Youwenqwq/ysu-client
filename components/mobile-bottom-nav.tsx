@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/lib/i18n/use-translation"
@@ -10,16 +10,17 @@ import { useSettingsStore } from "@/lib/stores/settings"
 import { useProviderCapabilities, useSupportedPlugins } from "@/providers/use-provider"
 import { usePluginHost } from "@/components/plugin-provider"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
-import { pluginPageHref, supportsPlugin } from "@orahako/plugin-sdk"
+import { pluginPageHref } from "@orahako/plugin-sdk"
 import { usePluginRouteStore } from "@/lib/stores/plugin-route"
-import { hasPluginCapability } from "@/lib/plugins/navigation"
+import { resolveActivePluginNavigation, resolveMobileNavigation } from "@/lib/plugins/navigation"
 
 export function MobileBottomNav() {
   const rawPathname = usePathname()
   const pathname = rawPathname.replace(/\/$/, "")
+  const searchParams = useSearchParams()
   const { t, locale } = useTranslation()
   const { host } = usePluginHost()
-  const { navigation } = usePluginUI(host.ui)
+  const { pages, navigation } = usePluginUI(host.ui)
   const pluginRoute = usePluginRouteStore((state) => state.current)
   const hasBackground = useSettingsStore((s) => !!s.backgroundImage)
   const navRef = useRef<HTMLElement>(null)
@@ -44,25 +45,38 @@ export function MobileBottomNav() {
 
   const capabilities = useProviderCapabilities()
   const supportedPlugins = useSupportedPlugins()
-  const tabs = [
-    ...navigation
-      .filter((item) => item.primary)
-      .map((item) => ({
-        href: pluginPageHref(item.pluginId, item.page),
-        label: item.titleKey
-          ? host.i18n.translate(item.pluginId, item.titleKey, locale)
-          : item.title,
-        icon: item.icon,
-        capability: item.capability,
-        pluginId: item.pluginId,
-      })),
-    { href: "/dashboard/me", label: t("app.me"), icon: User },
-  ].filter((tab) => {
-    if (!hasPluginCapability(capabilities, "capability" in tab ? tab.capability : undefined)) {
-      return false
-    }
-    return !("pluginId" in tab) || supportsPlugin(supportedPlugins, tab.pluginId)
+  const isPluginPage = pathname === "/dashboard/plugin"
+  const activePluginId = isPluginPage
+    ? (searchParams.get("plugin") ?? pluginRoute?.pluginId)
+    : undefined
+  const activePageId = isPluginPage
+    ? (searchParams.get("page") ?? pluginRoute?.pageId ?? "index")
+    : undefined
+  const selected = resolveMobileNavigation(navigation, activePluginId, {
+    capabilities,
+    supportedPlugins,
   })
+  const activePluginNavigation =
+    selected.scope === "plugin" && activePluginId && activePageId
+      ? resolveActivePluginNavigation(selected.items, pages, {
+          pluginId: activePluginId,
+          pageId: activePageId,
+          params: searchParams,
+        })
+      : undefined
+  const tabs = [
+    ...selected.items.map((item) => ({
+      id: item.id,
+      href: pluginPageHref(item.pluginId, item.page, item.params),
+      label: item.titleKey ? host.i18n.translate(item.pluginId, item.titleKey, locale) : item.title,
+      icon: item.icon,
+      badge: item.badge,
+      pluginId: item.pluginId,
+    })),
+    ...(selected.scope === "app"
+      ? [{ id: "me", href: "/dashboard/me", label: t("app.me"), icon: User }]
+      : []),
+  ]
 
   return (
     <nav
@@ -78,10 +92,13 @@ export function MobileBottomNav() {
     >
       {tabs.map((tab) => {
         const isActive =
-          "pluginId" in tab && tab.pluginId
-            ? pluginRoute?.pluginId === tab.pluginId
-            : pathname === tab.href || pathname.startsWith(`${tab.href}/`)
+          selected.scope === "plugin"
+            ? tab.id === activePluginNavigation
+            : "pluginId" in tab && tab.pluginId
+              ? activePluginId === tab.pluginId
+              : pathname === tab.href || pathname.startsWith(`${tab.href}/`)
         const Icon = tab.icon
+        const Badge = "badge" in tab ? tab.badge : undefined
         return (
           <Link
             key={tab.href}
@@ -92,7 +109,10 @@ export function MobileBottomNav() {
             )}
             aria-current={isActive ? "page" : undefined}
           >
-            <Icon className="size-5" />
+            <span className="relative">
+              <Icon className="size-5" />
+              {Badge ? <Badge /> : null}
+            </span>
             <span>{tab.label}</span>
           </Link>
         )

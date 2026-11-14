@@ -1,5 +1,3 @@
-import { create } from "zustand"
-
 export const PERLICA_TABS = ["map", "ride", "history", "account"] as const
 
 export type PerlicaTab = (typeof PERLICA_TABS)[number]
@@ -10,17 +8,7 @@ export function isPerlicaTab(value: string | null | undefined): value is Perlica
   )
 }
 
-interface PerlicaAppNavState {
-  tab: PerlicaTab
-  setTab: (tab: PerlicaTab) => void
+export function perlicaTab(params: Pick<URLSearchParams, "get">): PerlicaTab {
+  const tab = params.get("tab")
+  return isPerlicaTab(tab) ? tab : "map"
 }
-
-/**
- * Section state shared by the main page and Settings. It is intentionally not
- * persisted: it only bridges the two plugin pages while the host keeps them
- * mounted, and always starts on the map for a fresh session.
- */
-export const usePerlicaAppNav = create<PerlicaAppNavState>((set) => ({
-  tab: "map",
-  setTab: (tab) => set({ tab }),
-}))

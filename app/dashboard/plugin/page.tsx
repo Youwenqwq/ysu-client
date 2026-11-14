@@ -10,7 +10,11 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { pluginPageHref, supportsPlugin, type PluginPageProps } from "@orahako/plugin-sdk"
 import { usePluginRouteStore } from "@/lib/stores/plugin-route"
 import { useProviderCapabilities, useSupportedPlugins } from "@/providers/use-provider"
-import { hasPluginCapability, resolveSemanticTarget } from "@/lib/plugins/navigation"
+import {
+  hasPluginCapability,
+  isAppNavigation,
+  resolveSemanticTarget,
+} from "@/lib/plugins/navigation"
 import { useTranslation } from "@/lib/i18n/use-translation"
 
 class PluginPageBoundary extends Component<{ children: ReactNode }, { error?: Error }> {
@@ -133,7 +137,11 @@ function ActivePluginRoute({
   const primary =
     page.primary ||
     navigation.some(
-      (item) => item.pluginId === page.pluginId && item.page === page.id && item.primary
+      (item) =>
+        isAppNavigation(item) &&
+        item.pluginId === page.pluginId &&
+        item.page === page.id &&
+        item.primary
     )
   useEffect(() => {
     setCurrent({

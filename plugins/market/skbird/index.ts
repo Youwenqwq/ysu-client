@@ -1,4 +1,4 @@
-import { Bird } from "lucide-react"
+import { Bell, Bird, Settings, User } from "lucide-react"
 import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { skbirdTranslations } from "./i18n"
 import { SkbirdIndexPage } from "./pages/index"
@@ -6,11 +6,12 @@ import { SkbirdThreadPage } from "./pages/thread"
 import { SkbirdMessagesPage } from "./pages/messages"
 import { SkbirdMePage } from "./pages/me"
 import { SkbirdSettingsPage } from "./pages/settings"
+import { SkbirdMessagesBadge } from "./navigation"
 
 export const manifest: PluginManifest = {
   id: "orahako.skbird",
   name: "森空鸟",
-  version: "1.0.1",
+  version: "1.1.0",
   apiVersion: 1,
   kind: "feature",
   categories: ["toybox"],
@@ -27,6 +28,44 @@ export const definition = definePlugin((ctx) => {
     page: "index",
     icon: Bird,
     group: "extras",
+  })
+
+  ctx.ui.registerNavigation({
+    id: "home",
+    title: "森空鸟",
+    titleKey: "skbird.nav",
+    page: "index",
+    icon: Bird,
+    scope: "plugin",
+    order: 0,
+  })
+  ctx.ui.registerNavigation({
+    id: "messages",
+    title: "消息",
+    titleKey: "skbird.messagesTitle",
+    page: "messages",
+    icon: Bell,
+    badge: SkbirdMessagesBadge,
+    scope: "plugin",
+    order: 10,
+  })
+  ctx.ui.registerNavigation({
+    id: "me",
+    title: "我的",
+    titleKey: "skbird.meTitle",
+    page: "me",
+    icon: User,
+    scope: "plugin",
+    order: 20,
+  })
+  ctx.ui.registerNavigation({
+    id: "settings",
+    title: "设置",
+    titleKey: "skbird.settingsTitle",
+    page: "settings",
+    icon: Settings,
+    scope: "plugin",
+    order: 30,
   })
 
   ctx.ui.registerPage({

@@ -15,16 +15,21 @@ export interface SemanticPageInput {
   id: string
   /** Stable semantic route (e.g. `schedule`) declared by the plugin. */
   route?: string
+  parent?: string
   primary?: boolean
   root?: boolean
   capability?: string
 }
 
-/** A registered plugin navigation entry, reduced to what semantic navigation needs. */
+export type PluginNavigationScope = "app" | "plugin"
+
+/** A registered plugin navigation entry, reduced to what navigation resolution needs. */
 export interface SemanticNavigationInput {
   pluginId: string
   id: string
   page: string
+  params?: Record<string, string | number>
+  scope?: PluginNavigationScope
   title?: string
   order?: number
   primary?: boolean
@@ -45,6 +50,109 @@ export interface SemanticNavTarget {
   pageId: string
 }
 
+export interface PluginNavigationLocation {
+  pluginId: string
+  pageId: string
+  params?: Pick<URLSearchParams, "get">
+}
+
+export function isAppNavigation(item: Pick<SemanticNavigationInput, "scope">): boolean {
+  return (item.scope ?? "app") === "app"
+}
+
+/** Filter and order navigation without coupling shells to registry storage details. */
+export function navigationForScope<T extends SemanticNavigationInput>(
+  navigation: readonly T[],
+  scope: "app",
+  sources: Pick<SemanticNavSources, "capabilities" | "supportedPlugins">,
+  pluginId?: string
+): Exclude<T, { scope: "plugin" }>[]
+export function navigationForScope<T extends SemanticNavigationInput>(
+  navigation: readonly T[],
+  scope: "plugin",
+  sources: Pick<SemanticNavSources, "capabilities" | "supportedPlugins">,
+  pluginId?: string
+): T[]
+export function navigationForScope<T extends SemanticNavigationInput>(
+  navigation: readonly T[],
+  scope: PluginNavigationScope,
+  sources: Pick<SemanticNavSources, "capabilities" | "supportedPlugins">,
+  pluginId?: string
+): T[] {
+  return navigation
+    .filter(
+      (item) =>
+        (item.scope ?? "app") === scope &&
+        (scope === "app" || item.pluginId === pluginId) &&
+        supportsPlugin(sources.supportedPlugins, item.pluginId) &&
+        hasPluginCapability(sources.capabilities, item.capability)
+    )
+    .sort(
+      (a, b) =>
+        (a.order ?? Number.POSITIVE_INFINITY) - (b.order ?? Number.POSITIVE_INFINITY) ||
+        a.id.localeCompare(b.id)
+    )
+}
+
+/** Local tabs replace global primary tabs only when the active plugin provides them. */
+export function resolveMobileNavigation<T extends SemanticNavigationInput>(
+  navigation: readonly T[],
+  activePluginId: string | undefined,
+  sources: Pick<SemanticNavSources, "capabilities" | "supportedPlugins">
+): { scope: PluginNavigationScope; items: T[] } {
+  const pluginItems = activePluginId
+    ? navigationForScope(navigation, "plugin", sources, activePluginId)
+    : []
+  if (pluginItems.length > 0) return { scope: "plugin", items: pluginItems }
+  return {
+    scope: "app",
+    items: navigationForScope(navigation, "app", sources).filter((item) => item.primary),
+  }
+}
+
+function navigationParamsMatch(
+  item: Pick<SemanticNavigationInput, "params">,
+  params: PluginNavigationLocation["params"]
+): boolean {
+  if (!item.params) return true
+  if (!params) return false
+  return Object.entries(item.params).every(([key, value]) => params.get(key) === String(value))
+}
+
+/**
+ * Select an exact page/parameter target first. An unmatched target defaults to the
+ * first item for that page; detail pages inherit the nearest matching parent tab.
+ */
+export function resolveActivePluginNavigation(
+  navigation: readonly SemanticNavigationInput[],
+  pages: readonly SemanticPageInput[],
+  location: PluginNavigationLocation
+): string | undefined {
+  const items = navigation.filter(
+    (item) => item.pluginId === location.pluginId && !isAppNavigation(item)
+  )
+  const select = (pageId: string) => {
+    const candidates = items.filter((item) => item.page === pageId)
+    return (
+      candidates.find((item) => navigationParamsMatch(item, location.params)) ?? candidates[0]
+    )?.id
+  }
+
+  const direct = select(location.pageId)
+  if (direct) return direct
+  const visited = new Set<string>([location.pageId])
+  let page = pages.find(
+    (item) => item.pluginId === location.pluginId && item.id === location.pageId
+  )
+  while (page?.parent && !visited.has(page.parent)) {
+    const parent = select(page.parent)
+    if (parent) return parent
+    visited.add(page.parent)
+    page = pages.find((item) => item.pluginId === location.pluginId && item.id === page?.parent)
+  }
+  return undefined
+}
+
 /** A core-owned page that always exists; used when no plugin page resolves. */
 export const CORE_DASHBOARD_FALLBACK_HREF = "/dashboard/me"
 
@@ -55,7 +163,9 @@ function pageKey(entry: { pluginId: string; id?: string; page?: string; pageId?:
 function navRank(
   sources: SemanticNavSources
 ): (page: SemanticPageInput) => [number, string, string, string] {
-  const navByKey = new Map(sources.navigation.map((item) => [pageKey(item), item]))
+  const navByKey = new Map(
+    sources.navigation.filter(isAppNavigation).map((item) => [pageKey(item), item])
+  )
   return (page) => {
     const nav = navByKey.get(pageKey(page))
     return [nav?.order ?? Number.POSITIVE_INFINITY, nav?.title ?? "", page.pluginId, page.id]
@@ -74,7 +184,9 @@ function compareRank(
 function pageAvailable(sources: SemanticNavSources, page: SemanticPageInput): boolean {
   if (!supportsPlugin(sources.supportedPlugins, page.pluginId)) return false
   if (!hasPluginCapability(sources.capabilities, page.capability)) return false
-  const declared = sources.navigation.find((item) => pageKey(item) === pageKey(page))
+  const declared = sources.navigation.find(
+    (item) => isAppNavigation(item) && pageKey(item) === pageKey(page)
+  )
   return !declared || hasPluginCapability(sources.capabilities, declared.capability)
 }
 
@@ -93,12 +205,14 @@ export function resolveSemanticTarget(
     const pick = [...byRoute].sort((a, b) => compareRank(rank(a), rank(b)))[0]
     return { pluginId: pick.pluginId, pageId: pick.id }
   }
-  const byNav = [...sources.navigation.filter((item) => item.id === id)].sort((a, b) =>
-    compareRank(
-      [a.order ?? Number.POSITIVE_INFINITY, a.title ?? "", a.pluginId, a.page],
-      [b.order ?? Number.POSITIVE_INFINITY, b.title ?? "", b.pluginId, b.page]
+  const byNav = sources.navigation
+    .filter((item) => isAppNavigation(item) && item.id === id)
+    .sort((a, b) =>
+      compareRank(
+        [a.order ?? Number.POSITIVE_INFINITY, a.title ?? "", a.pluginId, a.page],
+        [b.order ?? Number.POSITIVE_INFINITY, b.title ?? "", b.pluginId, b.page]
+      )
     )
-  )
   for (const item of byNav) {
     if (!supportsPlugin(sources.supportedPlugins, item.pluginId)) continue
     if (!hasPluginCapability(sources.capabilities, item.capability)) continue
@@ -119,11 +233,16 @@ export function resolvePrimaryTarget(sources: SemanticNavSources): SemanticNavTa
   const primary = available.filter(
     (page) =>
       page.primary ||
-      sources.navigation.some((item) => pageKey(item) === pageKey(page) && item.primary)
+      sources.navigation.some(
+        (item) => isAppNavigation(item) && pageKey(item) === pageKey(page) && item.primary
+      )
   )
   const root = available.filter(
     (page) =>
-      page.root || sources.navigation.some((item) => pageKey(item) === pageKey(page) && item.root)
+      page.root ||
+      sources.navigation.some(
+        (item) => isAppNavigation(item) && pageKey(item) === pageKey(page) && item.root
+      )
   )
   const candidates = primary.length > 0 ? primary : root
   const pick = candidates
