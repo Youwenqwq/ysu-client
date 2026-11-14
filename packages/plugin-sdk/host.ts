@@ -106,15 +106,7 @@ export {
 
 // ─── Version information ─────────────────────────────────────────────────── //
 
-export {
-  APP_BUILD,
-  APP_COPYRIGHT,
-  APP_LICENSE,
-  APP_OPEN_SOURCE,
-  APP_PEOPLE,
-  APP_REPO,
-  APP_VERSION,
-} from "@/lib/version"
+export { APP_BUILD, APP_COPYRIGHT, APP_LICENSE, APP_REPO, APP_VERSION } from "@/lib/version"
 
 // ─── Native lifecycle helpers ────────────────────────────────────────────── //
 

@@ -36,12 +36,4 @@ export {
   formatRetryDuration,
   rateLimitMessage,
 } from "@/lib/rate-limit"
-export {
-  APP_VERSION,
-  APP_BUILD,
-  APP_COPYRIGHT,
-  APP_LICENSE,
-  APP_OPEN_SOURCE,
-  APP_PEOPLE,
-  APP_REPO,
-} from "@/lib/version"
+export { APP_VERSION, APP_BUILD, APP_COPYRIGHT, APP_LICENSE, APP_REPO } from "@/lib/version"

@@ -13,12 +13,6 @@ import {
   AlertCircle,
   Settings,
 } from "lucide-react"
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
 import { InstallAppButton } from "@/components/install-app-button"
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
@@ -39,15 +33,7 @@ import { blurActiveElement } from "@/lib/utils"
 import { useSettingsStore } from "@/lib/stores/settings"
 import { useUpdateStore } from "@/lib/stores/update"
 import { useLongPress } from "@/hooks/use-long-press"
-import {
-  APP_VERSION,
-  APP_BUILD,
-  APP_COPYRIGHT,
-  APP_LICENSE,
-  APP_REPO,
-  APP_OPEN_SOURCE,
-  APP_PEOPLE,
-} from "@/lib/version"
+import { APP_VERSION, APP_BUILD, APP_COPYRIGHT, APP_LICENSE, APP_REPO } from "@/lib/version"
 import { UPDATE_MIRRORS, type UpdateChannel } from "@/lib/updater"
 
 type UpdateState = "idle" | "checking" | "up-to-date" | "error"
@@ -224,67 +210,12 @@ export function AboutContent() {
               t={t}
             />
           )}
-
-          <Separator />
-
-          <Accordion type="single" collapsible>
-            <AccordionItem value="openSource">
-              <AccordionTrigger className="py-3 text-sm hover:no-underline">
-                {t("about.openSource")}
-              </AccordionTrigger>
-              <AccordionContent>
-                <ul className="flex flex-col gap-2">
-                  {APP_OPEN_SOURCE.map((c) => (
-                    <li key={c.name}>
-                      <a
-                        href={c.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                      >
-                        {c.name}
-                        <ExternalLink className="size-3" />
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-
-          <Separator />
-
-          <div className="flex flex-col gap-2 py-3">
-            <h3 className="text-sm font-medium">{t("about.credits")}</h3>
-            <ul className="flex flex-col gap-2">
-              {APP_PEOPLE.map((c) => (
-                <li key={c.name} className="text-sm">
-                  {c.url ? (
-                    <a
-                      href={c.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-primary underline underline-offset-3"
-                    >
-                      {c.name}
-                    </a>
-                  ) : (
-                    <span className="font-medium">{c.name}</span>
-                  )}
-                  {c.contribution && (
-                    <span className="text-muted-foreground">: {c.contribution}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
       </div>
 
       <div className="flex-1" />
 
       <div className="flex flex-col gap-1 pt-4 text-center text-xs leading-relaxed text-muted-foreground">
-        <p>{t("about.disclaimerText")}</p>
         <p>
           <span>{APP_LICENSE}</span>
           <span className="mx-1.5">&middot;</span>
