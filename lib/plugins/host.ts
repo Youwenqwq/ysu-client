@@ -266,12 +266,15 @@ export class PluginHost {
   }
 
   async enable(id: string): Promise<void> {
-    usePluginPreferences.getState().setPluginDisabled(id, false)
     const state = this.runtime.get(id)
-    if (state?.source === "external" && !this.external.has(id)) await this.load(id, false)
+    // Disabled external packages are deliberately not registered at boot.
+    if (!state || (state.source === "external" && !this.external.has(id))) {
+      await this.load(id, false)
+    }
     markPluginStarted(id)
     await this.runtime.startAndWait(id)
     this.applyStyles(id)
+    usePluginPreferences.getState().setPluginDisabled(id, false)
   }
 
   private async rollback(
