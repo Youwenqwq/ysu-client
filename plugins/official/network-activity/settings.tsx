@@ -11,6 +11,7 @@ import {
 import { useTranslation } from "@orahako/plugin-ui/hooks"
 import {
   DENSITY_STORAGE_KEY,
+  LONG_MASCOTS_STORAGE_KEY,
   MASCOTS_STORAGE_KEY,
   TIMING_STORAGE_KEY,
   isActivityDensity,
@@ -47,6 +48,8 @@ export function NetworkActivitySettings({ storage }: { storage: PluginKeyValueSt
   const setShowTiming = useActivitySettings((state) => state.setShowTiming)
   const showMascots = useActivitySettings((state) => state.showMascots)
   const setShowMascots = useActivitySettings((state) => state.setShowMascots)
+  const longMascots = useActivitySettings((state) => state.longMascots)
+  const setLongMascots = useActivitySettings((state) => state.setLongMascots)
 
   function handleDensityChange(value: string) {
     if (!isActivityDensity(value)) return
@@ -62,6 +65,11 @@ export function NetworkActivitySettings({ storage }: { storage: PluginKeyValueSt
   function handleMascotsChange(enabled: boolean) {
     setShowMascots(enabled)
     void storage.setItem(MASCOTS_STORAGE_KEY, String(enabled)).catch(() => {})
+  }
+
+  function handleLongMascotsChange(enabled: boolean) {
+    setLongMascots(enabled)
+    void storage.setItem(LONG_MASCOTS_STORAGE_KEY, String(enabled)).catch(() => {})
   }
 
   return (
@@ -105,6 +113,22 @@ export function NetworkActivitySettings({ storage }: { storage: PluginKeyValueSt
           checked={showMascots}
           onCheckedChange={handleMascotsChange}
         />
+        {showMascots && (
+          <SettingSwitch
+            label={t(
+              longMascots
+                ? "networkActivity.settings.longMascotsOn"
+                : "networkActivity.settings.longMascotsOff"
+            )}
+            description={t(
+              longMascots
+                ? "networkActivity.settings.longMascotsDescriptionOn"
+                : "networkActivity.settings.longMascotsDescriptionOff"
+            )}
+            checked={longMascots}
+            onCheckedChange={handleLongMascotsChange}
+          />
+        )}
       </CardContent>
     </Card>
   )

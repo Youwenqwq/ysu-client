@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import type { PluginKeyValueStorage } from "@orahako/plugin-sdk"
 import {
   DENSITY_STORAGE_KEY,
+  LONG_MASCOTS_STORAGE_KEY,
   MASCOTS_STORAGE_KEY,
   TIMING_STORAGE_KEY,
   isActivityDensity,
@@ -18,7 +19,12 @@ function storageWith(values: Record<string, string>): PluginKeyValueStorage {
 }
 
 beforeEach(() => {
-  useActivitySettings.setState({ density: "compact", showTiming: false, showMascots: true })
+  useActivitySettings.setState({
+    density: "compact",
+    showTiming: false,
+    showMascots: true,
+    longMascots: false,
+  })
 })
 
 describe("activity settings", () => {
@@ -36,12 +42,14 @@ describe("activity settings", () => {
         [DENSITY_STORAGE_KEY]: "debug",
         [TIMING_STORAGE_KEY]: "true",
         [MASCOTS_STORAGE_KEY]: "false",
+        [LONG_MASCOTS_STORAGE_KEY]: "true",
       })
     )
     expect(useActivitySettings.getState()).toMatchObject({
       density: "debug",
       showTiming: true,
       showMascots: false,
+      longMascots: true,
     })
   })
 
@@ -56,6 +64,7 @@ describe("activity settings", () => {
       density: "compact",
       showTiming: false,
       showMascots: true,
+      longMascots: false,
     })
   })
 })

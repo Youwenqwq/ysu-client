@@ -7,7 +7,8 @@ import { cn } from "@orahako/plugin-ui/components"
 import { HeixiuMascot } from "./mascot"
 import { useActivitySettings } from "./state"
 
-const MAX_MASCOTS = 12
+const DEFAULT_MAX_MASCOTS = 3
+const LONG_MAX_MASCOTS = 12
 const COUNT_DEBOUNCE_MS = 200
 const ENTRY_ANIMATION_MS = 520
 const EXIT_ANIMATION_MS = 220
@@ -30,8 +31,11 @@ function sizeClass(index: number): string {
   return "hx-small h-[0.6rem] w-[0.6rem]"
 }
 
-function useMascotCount(target: number): { count: number; exitingFrom: number | null } {
-  const clamped = Math.min(target, MAX_MASCOTS)
+function useMascotCount(
+  target: number,
+  max: number
+): { count: number; exitingFrom: number | null } {
+  const clamped = Math.min(target, max)
   const [debounced, setDebounced] = useState(0)
   const [count, setCount] = useState(0)
   const [exitingFrom, setExitingFrom] = useState<number | null>(null)
@@ -94,8 +98,9 @@ export function ActivityMascots({ activity }: { activity: PluginHttpActivityServ
   const pathname = usePathname()
   const snapshot = useSyncExternalStore(activity.subscribe, activity.getSnapshot, getServerSnapshot)
   const showMascots = useActivitySettings((state) => state.showMascots)
-  const { count, exitingFrom } = useMascotCount(snapshot.active.length)
-  const hidden = Math.max(0, snapshot.active.length - MAX_MASCOTS)
+  const longMascots = useActivitySettings((state) => state.longMascots)
+  const maxMascots = longMascots ? LONG_MAX_MASCOTS : DEFAULT_MAX_MASCOTS
+  const { count, exitingFrom } = useMascotCount(snapshot.active.length, maxMascots)
 
   if (!showMascots || !pathname.startsWith("/dashboard") || count === 0) return null
 
@@ -144,11 +149,6 @@ export function ActivityMascots({ activity }: { activity: PluginHttpActivityServ
             </div>
           </div>
         ))}
-        {hidden > 0 && (
-          <span className="mb-0.5 shrink-0 rounded-full bg-background/70 px-1 py-0.5 text-[9px] text-muted-foreground backdrop-blur">
-            +{hidden}
-          </span>
-        )}
       </div>
     </>
   )
