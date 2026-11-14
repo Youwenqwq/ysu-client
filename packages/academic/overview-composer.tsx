@@ -93,7 +93,7 @@ import {
   type OverviewLayout,
   type OverviewRegion,
   type OverviewWidgetId,
-} from "./layout-config"
+} from "@/lib/plugins/overview-layout"
 
 type WidgetIcon = ComponentType<{ className?: string }>
 

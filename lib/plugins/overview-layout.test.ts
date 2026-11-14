@@ -4,7 +4,7 @@ import {
   moveOverviewWidget,
   normalizeOverviewLayout,
   type DynamicOverviewWidget,
-} from "./layout-config"
+} from "./overview-layout"
 
 const installedWidgets: DynamicOverviewWidget[] = [
   { id: "plugin:demo:summary-card", region: "summary", defaultVisible: true },
@@ -125,34 +125,6 @@ describe("overview layout plugin widgets", () => {
     expect(layout.items).toContainEqual({ id: "plugin:demo:content-b", visible: false })
     // A plugin ID from an uninstalled plugin keeps its slot through repeated normalization.
     expect(normalizeOverviewLayout(JSON.parse(JSON.stringify(layout)))).toEqual(layout)
-  })
-
-  it("migrates IDs saved before widgets moved into plugins", () => {
-    const overviewWidgets: DynamicOverviewWidget[] = [
-      { id: "plugin:org.hub:week", region: "summary", defaultVisible: true },
-      { id: "plugin:org.hub:gpa", region: "summary", defaultVisible: false },
-      { id: "plugin:org.hub:today-courses", region: "content", defaultVisible: true },
-    ]
-    const layout = normalizeOverviewLayout(
-      {
-        version: 1,
-        items: [
-          { id: "week", visible: true },
-          { id: "gpa", visible: true },
-          { id: "today-courses", visible: false },
-          // A legacy ID whose contribution is not installed stays readable for later.
-          { id: "ecard", visible: true },
-        ],
-      },
-      overviewWidgets
-    )
-    expect(layout.items).toEqual([
-      { id: "plugin:org.hub:week", visible: true },
-      { id: "plugin:org.hub:gpa", visible: true },
-      { id: "plugin:org.hub:today-courses", visible: false },
-      { id: "ecard", visible: true },
-    ])
-    expect(normalizeOverviewLayout(layout, overviewWidgets)).toEqual(layout)
   })
 
   it("keeps a saved plugin widget visibility when the plugin is reinstalled", () => {

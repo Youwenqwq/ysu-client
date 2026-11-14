@@ -1,19 +1,6 @@
 /** Dynamic widgets contributed by plugins: `plugin:<pluginId>:<widgetId>`. */
 export type PluginOverviewWidgetId = `plugin:${string}:${string}`
-/**
- * IDs written by the overview before its widgets moved into plugins. They stay readable so
- * a persisted layout is migrated once the contributing plugin is registered again.
- */
-export type LegacyOverviewWidgetId =
-  | "week"
-  | "ecard"
-  | "gpa"
-  | "evaluation"
-  | "course-progress"
-  | "today-courses"
-  | "upcoming-exams"
-  | "evaluation-tasks"
-export type OverviewWidgetId = PluginOverviewWidgetId | LegacyOverviewWidgetId
+export type OverviewWidgetId = PluginOverviewWidgetId
 export type OverviewRegion = "summary" | "content"
 
 /** The subset of a registered plugin widget the layout algorithms need. */
@@ -31,17 +18,6 @@ export interface OverviewLayout {
 
 const PLUGIN_WIDGET_ID = /^plugin:[^:]+:.+$/
 
-const LEGACY_WIDGET_IDS: readonly LegacyOverviewWidgetId[] = [
-  "week",
-  "ecard",
-  "gpa",
-  "evaluation",
-  "course-progress",
-  "today-courses",
-  "upcoming-exams",
-  "evaluation-tasks",
-]
-
 export function pluginOverviewWidgetId(pluginId: string, widgetId: string): PluginOverviewWidgetId {
   return `plugin:${pluginId}:${widgetId}` as PluginOverviewWidgetId
 }
@@ -50,34 +26,15 @@ export function isPluginOverviewWidgetId(value: unknown): value is PluginOvervie
   return typeof value === "string" && PLUGIN_WIDGET_ID.test(value)
 }
 
-export function isLegacyOverviewWidgetId(value: unknown): value is LegacyOverviewWidgetId {
-  return typeof value === "string" && (LEGACY_WIDGET_IDS as readonly string[]).includes(value)
-}
-
 export function isOverviewWidgetId(value: unknown): value is OverviewWidgetId {
-  return isPluginOverviewWidgetId(value) || isLegacyOverviewWidgetId(value)
-}
-
-function contributedWidgetId(id: PluginOverviewWidgetId): string {
-  // `plugin:<pluginId>:<widgetId>`; the widget ID may itself contain colons.
-  return id.split(":").slice(2).join(":")
-}
-
-function resolveWidgetId(
-  id: OverviewWidgetId,
-  dynamicWidgets: readonly DynamicOverviewWidget[]
-): OverviewWidgetId {
-  if (!isLegacyOverviewWidgetId(id)) return id
-  const contribution = dynamicWidgets.find((widget) => contributedWidgetId(widget.id) === id)
-  return contribution?.id ?? id
+  return isPluginOverviewWidgetId(value)
 }
 
 export function getOverviewWidgetRegion(
   id: OverviewWidgetId,
   dynamicWidgets: readonly DynamicOverviewWidget[] = []
 ): OverviewRegion | undefined {
-  const resolved = resolveWidgetId(id, dynamicWidgets)
-  return dynamicWidgets.find((widget) => widget.id === resolved)?.region
+  return dynamicWidgets.find((widget) => widget.id === id)?.region
 }
 
 export function createDefaultOverviewLayout(
@@ -114,11 +71,9 @@ export function normalizeOverviewLayout(
     if (typeof item !== "object" || item === null) continue
     const id: unknown = "id" in item ? item.id : undefined
     if (!isOverviewWidgetId(id)) continue
-    // Saved pre-plugin IDs migrate to the contribution that now owns the widget.
-    const resolved = resolveWidgetId(id, dynamicWidgets)
-    if (seen.has(resolved)) continue
-    seen.add(resolved)
-    items.push({ id: resolved, visible: "visible" in item && item.visible === true })
+    if (seen.has(id)) continue
+    seen.add(id)
+    items.push({ id, visible: "visible" in item && item.visible === true })
   }
   // Installed plugins announce their own initial visibility, so a missing contribution
   // follows its declared default while an existing entry keeps the user's choice.

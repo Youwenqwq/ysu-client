@@ -7,7 +7,7 @@ import {
   createDefaultOverviewLayout,
   normalizeOverviewLayout,
   type OverviewLayout,
-} from "@/app/dashboard/overview/layout-config"
+} from "@/lib/plugins/overview-layout"
 
 export type CardStyle = "solid" | "translucent" | "glass"
 export type BackgroundStyle = "overlay" | "blur-overlay"

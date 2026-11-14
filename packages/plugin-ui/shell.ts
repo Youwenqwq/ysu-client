@@ -30,6 +30,3 @@ export { UpdateDialog } from "@/components/update-dialog"
 export { usePluginTranslation } from "@/lib/plugins/use-plugin-translation"
 export { usePluginHost } from "@/components/plugin-context"
 
-// Dashboard overview composer (host dashboard component reused by the
-// overview plugin and the settings page).
-export { OverviewComposer, OverviewEditor } from "@/app/dashboard/overview/overview-composer"

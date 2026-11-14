@@ -90,7 +90,7 @@ Slot 所有者通过 `ctx.slots.declare()` 声明名称与形态。贡献者通�
 
 `orahako.notifications` 拥有通知分类的单卡片面板和原生通知运行时，并声明 `settings.notifications.content`（轮询内容选项）、`settings.notifications.reminders`（原生提醒分节）与 `settings.notifications.appReminders`（应用内提醒分节）。功能插件保留各自设置 UI，同时通过 `ctx.notifications.register()` 注册 `grades`、`exams` 或 `schedule` 运行时渠道。界面贡献和渠道都随 Cordis 作用域释放；运行时消费渠道快照，不按插件 ID 推断能力。
 
-Overview 挂件由实际功能插件注册，而不是由 `orahako.overview` 代注册。公共组件与数据 Provider 位于 `@orahako/academic`；`order` 决定默认布局顺序，Cordis 在功能停用时移除其挂件。已有用户布局继续按稳定挂件 ID 归一化。
+Overview 挂件由实际功能插件注册，而不是由 `orahako.overview` 代注册。公共挂件、组合器、编辑器与数据 Provider 位于 `@orahako/academic`，布局算法位于 `lib/plugins/overview-layout.ts`。`orahako.overview` 通过 `ctx.settings.registerCategory()` 直接注册编辑器，不拥有专用 Next.js 设置路由。`order` 决定默认布局顺序，Cordis 在功能停用时移除其挂件；布局按稳定的插件挂件 ID 归一化，未安装插件的槽位保留。
 
 Slot 是默认 Shell 的公开视觉契约。替代 Shell 可以声明自己的 Slot；面向特定 Shell 的插件应记录该依赖。
 
