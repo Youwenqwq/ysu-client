@@ -46,6 +46,7 @@ function OfficialShell({ children }: { children: ReactNode }) {
 
 export const definition = definePlugin((ctx) => {
   ctx.slots.declare({ name: "shell.overlay", kind: "list" })
+  ctx.slots.declare({ name: "shell.activity", kind: "list" })
   ctx.slots.declare({ name: "dashboard.header.actions", kind: "list" })
   ctx.slots.declare({ name: "settings.startupOptions", kind: "list" })
   ctx.slots.declare({ name: "settings.widgets", kind: "list" })

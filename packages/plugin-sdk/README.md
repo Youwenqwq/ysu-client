@@ -27,7 +27,7 @@ my-plugin/
 }
 ```
 
-`kind` 为 `provider`、`feature`、`theme` 或 `shell`。ID 使用小写点分格式；版本使用 SemVer。`entry` 和 `styles` 必须引用包内文件。`requires` 可声明必须先处于运行状态的插件 ID。
+`kind` 为 `provider`、`feature`、`theme` 或 `shell`。ID 使用小写点分格式；版本使用 SemVer。`entry` 和 `styles` 必须引用包内文件。`requires` 可声明必须先处于运行状态的插件 ID。`providerIndependent: true` 标记不依赖当前 Provider 的全局功能插件，使其运行时不因学校 `supportedPlugins` 列表被停用。
 
 ## 开发入口
 
@@ -107,6 +107,7 @@ ctx.slots.register({
 - `ctx.plugins`：按插件 ID 安装与当前应用和平台兼容的市场版本。
 - `ctx.storage.local` / `ctx.storage.secure`：按插件 ID 命名空间的字符串存储。
 - `ctx.http.fetch`：应用网络栈。
+- `ctx.http.activity`：只读网络活动快照与订阅。只暴露分类、方法、单调时间与失败计数，不暴露 URL、域名、请求头、body 或 cookie；订阅与 `registerLabeler()` 随插件作用域释放。Provider 可通过 labeler 返回本插件注册的 i18n key，为成绩、课表、评教等接口提供细粒度名称；URL 只在该回调内使用，不会进入快照。`shell.activity` Slot 用于在默认 Shell 顶栏下方组合活动条。
 - `ctx.native`：原生平台检测、图片保存及通知、精确闹钟、电池优化权限申请。
 - `ctx.notifications`：注册通知运行时渠道并读取可订阅快照；渠道随插件作用域自动撤销。
 - `ctx.assets.url(path)`：外部插件包内资源的 Blob URL。

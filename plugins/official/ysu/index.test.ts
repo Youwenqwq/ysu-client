@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { getSchoolConfigOrNull } from "@orahako/plugin-sdk/host"
+import { pluginI18nRegistry } from "@/lib/plugins/i18n-registry"
+import { createPluginPlatformServices } from "@/lib/plugins/platform-service"
 import { PluginRuntime } from "@/lib/plugins/runtime"
 import { ProviderPluginRegistry } from "@/providers/provider-registry"
 import { definition, manifest } from "./index"
@@ -13,6 +15,8 @@ describe("YSU provider plugin", () => {
     const providers = new ProviderPluginRegistry()
     const runtime = new PluginRuntime((ctx, plugin) => {
       providers.createService(ctx, plugin)
+      pluginI18nRegistry.createService(ctx, plugin)
+      createPluginPlatformServices(ctx, plugin)
     })
     runtime.register(manifest, definition, "builtin")
     runtime.start(manifest.id)

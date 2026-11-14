@@ -115,7 +115,7 @@ export class PluginHost {
     for (const state of this.runtime.getSnapshot()) {
       if (revision !== this.supportRevision) return
       const { manifest } = state
-      if (manifest.kind !== "feature" || manifest.required) continue
+      if (manifest.kind !== "feature" || manifest.required || manifest.providerIndependent) continue
       const id = manifest.id
       if (!supportsPlugin(supportedPlugins, id)) {
         if (state.status !== "disabled") {
@@ -224,6 +224,7 @@ export class PluginHost {
       if (
         manifest?.kind === "feature" &&
         !manifest.required &&
+        !manifest.providerIndependent &&
         !supportsPlugin(this.activeSupportedPlugins, id)
       ) {
         throw new Error(`Plugin not supported by the active school: ${id}`)

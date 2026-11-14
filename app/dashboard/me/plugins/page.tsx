@@ -150,6 +150,7 @@ export default function PluginsPage() {
       supported:
         state.manifest.kind !== "feature" ||
         state.manifest.required ||
+        state.manifest.providerIndependent ||
         supportsPlugin(supportedPlugins, state.manifest.id),
       status: state.status,
       error: state.error ?? host.loadErrors.get(state.manifest.id),
@@ -167,6 +168,7 @@ export default function PluginsPage() {
       supported:
         pkg.manifest.kind !== "feature" ||
         pkg.manifest.required ||
+        pkg.manifest.providerIndependent ||
         supportsPlugin(supportedPlugins, pkg.manifest.id),
       status: "disabled" as const,
       error: host.loadErrors.get(pkg.manifest.id),

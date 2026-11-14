@@ -441,51 +441,56 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </AlertTitle>
           </Alert>
         )}
-        <header className="hidden items-center justify-between gap-4 border-b px-6 py-4 md:flex">
-          <div className="flex items-center gap-3">
-            <SidebarTrigger aria-label={t("app.toggleSidebar")} title={t("app.toggleSidebar")} />
-            <h1 className="animate-in text-lg font-semibold duration-300 fade-in slide-in-from-left-2">
-              {pageTitle}
-            </h1>
-            <RefreshIndicator />
-            <StaleIndicator />
+        <header className="relative hidden border-b px-6 py-4 md:block">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <SidebarTrigger aria-label={t("app.toggleSidebar")} title={t("app.toggleSidebar")} />
+              <h1 className="animate-in text-lg font-semibold duration-300 fade-in slide-in-from-left-2">
+                {pageTitle}
+              </h1>
+              <RefreshIndicator />
+              <StaleIndicator />
+            </div>
+            <div className="flex items-center gap-3">
+              <PluginSlot name="dashboard.header.actions" />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => router.push("/dashboard/me/settings")}
+                aria-label={t("app.settings")}
+              >
+                <Settings className="size-4" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative size-8 rounded-full">
+                    <Avatar className="size-8">
+                      {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
+                      <AvatarFallback className="text-xs">
+                        {username?.slice(-2) || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[10rem]">
+                  <DropdownMenuItem disabled className="flex flex-col items-start gap-0.5">
+                    <span className="font-medium text-foreground">
+                      {username || t("app.login")}
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleRelogin}>
+                    <LogIn />
+                    {t("app.relogin")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut />
+                    {t("app.logout")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <PluginSlot name="dashboard.header.actions" />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => router.push("/dashboard/me/settings")}
-              aria-label={t("app.settings")}
-            >
-              <Settings className="size-4" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative size-8 rounded-full">
-                  <Avatar className="size-8">
-                    {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
-                    <AvatarFallback className="text-xs">
-                      {username?.slice(-2) || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[10rem]">
-                <DropdownMenuItem disabled className="flex flex-col items-start gap-0.5">
-                  <span className="font-medium text-foreground">{username || t("app.login")}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleRelogin}>
-                  <LogIn />
-                  {t("app.relogin")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut />
-                  {t("app.logout")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <PluginSlot name="shell.activity" />
         </header>
         <Suspense fallback={null}>
           <RouteTransition fullscreen={mobileFullscreen}>{children}</RouteTransition>

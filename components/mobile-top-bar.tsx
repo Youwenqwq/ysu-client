@@ -3,6 +3,7 @@
 import { requestBack } from "@/lib/navigation/back"
 import { useState } from "react"
 import { ArrowLeft, History } from "lucide-react"
+import { PluginSlot } from "@orahako/plugin-sdk/slots"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useMobileHeaderStore } from "@/lib/stores/mobile-header"
@@ -48,6 +49,7 @@ export function MobileTopBar({ title, showBack }: Props) {
         <StaleIndicator />
       </div>
       <div className="flex items-center gap-1">{rightSlot}</div>
+      <PluginSlot name="shell.activity" />
     </header>
   )
 }

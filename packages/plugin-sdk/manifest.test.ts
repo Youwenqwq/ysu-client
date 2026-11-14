@@ -35,6 +35,14 @@ describe("validatePluginManifest", () => {
     )
   })
 
+  it("accepts provider-independent feature manifests", () => {
+    const feature = { ...valid, kind: "feature", providerIndependent: true }
+    expect(validatePluginManifest(feature)).toEqual(feature)
+    expect(() => validatePluginManifest({ ...valid, providerIndependent: "yes" })).toThrow(
+      "providerIndependent must be a boolean"
+    )
+  })
+
   it("rejects non-SemVer package and app versions", () => {
     expect(() => validatePluginManifest({ ...valid, version: "latest" })).toThrow(
       "version must be a valid SemVer"

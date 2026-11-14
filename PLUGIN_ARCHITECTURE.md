@@ -33,7 +33,7 @@
 
 ### 公共 SDK
 
-`@orahako/plugin-sdk` 提供稳定契约：清单、领域模型、Provider、Shell、Slot、i18n、存储、HTTP、原生与资源服务。
+`@orahako/plugin-sdk` 提供稳定契约：清单、领域模型、Provider、Shell、Slot、i18n、存储、HTTP、原生与资源服务。HTTP 服务同时提供只读的 `ctx.http.activity` 网络活动快照；它只暴露分类与耗时，不暴露 URL 或请求内容。Provider 可通过 `registerLabeler()` 贡献细粒度 i18n 名称，URL 只在同步回调内使用。
 
 `@orahako/plugin-ui` 是可选的官方 React UI Kit 和应用 hooks。默认功能插件与社区插件均可使用；替代 Shell 可以不使用它。包按 `components/hooks/stores/academic/platform/plugin/shell/assets` 子路径隔离副作用，根入口不聚合实现，避免宿主与官方插件之间的模块求值环。
 
@@ -46,7 +46,7 @@ React、实际使用的 Next 入口、`@orahako/academic` 和 UI Kit 子路径�
 - `orahako.shell`：默认登录、Dashboard、设置、导航和全局弹窗组合。
 - `orahako.onboarding`：通过 `shell.overlay` 提供首次学校选择、权限配置和市场 Provider 安装；既有设置经迁移后不再显示。
 - `ysu.provider`：YSU CAS/JWXT Provider，也是唯一内置的学校 Provider；其他学校由市场包注册。
-- Provider 可用 `supportedPlugins` 声明学校支持的功能插件；该列表与 capabilities 共同约束功能启停、页面、导航、深链和总览挂件。
+- Provider 可用 `supportedPlugins` 声明学校支持的功能插件；该列表与 capabilities 共同约束功能启停、页面、导航、深链和总览挂件。全局 UI/工具插件可设置 `providerIndependent: true` 跳过运行时启停约束。
 - 功能插件：课表、成绩、考试、总览、费用等；森空鸟等玩具箱功能由官方市场提供，不进入内置运行时。
 - 市场可通过 `bundles` 为学校声明推荐插件组合；插件管理页负责分类展示，宿主统一预检并安装或启用组合内容。
 - 主题插件：向主题注册表贡献 CSS。

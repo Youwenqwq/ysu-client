@@ -295,6 +295,22 @@ describe("Provider-scoped plugin lifecycle", () => {
     }
   })
 
+  it("keeps provider-independent features active", async () => {
+    const host = new PluginHost()
+    const manifest: PluginManifest = {
+      ...lifecycleManifest("test.global"),
+      providerIndependent: true,
+    }
+    try {
+      host.runtime.register(manifest, () => {}, "builtin")
+      host.runtime.start(manifest.id)
+      await host.reconcileProviderSupport([])
+      expect(host.runtime.get(manifest.id)?.status).toBe("active")
+    } finally {
+      host.runtime.dispose()
+    }
+  })
+
   it("does not restore a plugin the user disabled while its provider was inactive", async () => {
     const host = new PluginHost()
     const manifest = lifecycleManifest("test.user-disabled")

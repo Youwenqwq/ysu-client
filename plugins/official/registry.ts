@@ -1,5 +1,9 @@
 import type { PluginDefinition, PluginManifest } from "@orahako/plugin-sdk"
 import { definition as officialShell, manifest as officialShellManifest } from "./shell"
+import {
+  definition as networkActivity,
+  manifest as networkActivityManifest,
+} from "./network-activity"
 import { definition as onboarding, manifest as onboardingManifest } from "./onboarding"
 import { definition as ysuProvider, manifest as ysuProviderManifest } from "./ysu"
 import { definition as defaultTheme, manifest as defaultThemeManifest } from "./theme-default"
@@ -27,6 +31,7 @@ export interface OfficialPlugin {
 
 export const OFFICIAL_PLUGINS: readonly OfficialPlugin[] = [
   { manifest: officialShellManifest, definition: officialShell },
+  { manifest: networkActivityManifest, definition: networkActivity },
   { manifest: onboardingManifest, definition: onboarding },
   { manifest: ysuProviderManifest, definition: ysuProvider },
   { manifest: notificationsManifest, definition: notifications },

@@ -1,12 +1,21 @@
 import type { PluginHttpService, PluginNativeService } from "@orahako/plugin-sdk"
 import { isCapacitor } from "@/lib/native/platform"
+import { networkActivity, registerActivityLabeler } from "@/lib/net/activity"
 import { OrahakoFile } from "@/lib/native/orahako-file"
 import { NotifyPlugin } from "@/lib/native/notify-plugin"
+import { trackPluginRegistration } from "./track-registration"
 import type { PluginServiceFactory } from "./runtime"
 
 export const createPluginPlatformServices: PluginServiceFactory = (ctx) => {
   const http: PluginHttpService = {
     fetch: (input, init) => fetch(input, init),
+    activity: {
+      getSnapshot: networkActivity.getSnapshot,
+      subscribe: (listener) =>
+        trackPluginRegistration(ctx, () => networkActivity.subscribe(listener)),
+      registerLabeler: (labeler) =>
+        trackPluginRegistration(ctx, () => registerActivityLabeler(labeler)),
+    },
   }
   const native: PluginNativeService = {
     isNative: isCapacitor(),

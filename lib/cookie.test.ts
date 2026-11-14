@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { SimpleCookieJar, fetchWithJar } from "@/lib/cookie"
+import { networkActivity, resetNetworkActivity } from "@/lib/net/activity"
 
 describe("SimpleCookieJar cookie matching", () => {
   it("发送 Path 以 / 结尾的 cookie 到嵌套路径（RFC 6265 前缀匹配）", async () => {
@@ -71,6 +72,25 @@ describe("SimpleCookieJar deletion & empty-value cookies", () => {
 describe("Web 代理传输", () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    resetNetworkActivity()
+  })
+
+  it("记录请求分类与耗时但不保留 URL", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response("", { status: 200, headers: { "x-proxy-status": "200" } })
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await fetchWithJar(new SimpleCookieJar(), {
+      method: "POST",
+      url: "https://jwxt.ysu.edu.cn/jwapp/sys/cjcx/modules/cjcx/xscjcx.do?ticket=secret",
+      redirect: "manual",
+    })
+
+    const snapshot = networkActivity.getSnapshot()
+    expect(snapshot.active).toHaveLength(0)
+    expect(snapshot.session).toMatchObject({ count: 1, failed: 0, slowestCategory: "academic" })
+    expect(JSON.stringify(snapshot)).not.toContain("secret")
   })
 
   it("可将含凭据的上游 URL 放入请求头而非代理 URL", async () => {

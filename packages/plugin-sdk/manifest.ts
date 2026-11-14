@@ -23,6 +23,11 @@ export interface PluginManifest {
   requires?: string[]
   /** Core providers can be replaced but not disabled from the plugin manager. */
   required?: boolean
+  /**
+   * Feature plugins that are global UI/tools rather than provider features.
+   * They stay active regardless of the provider's `supportedPlugins` list.
+   */
+  providerIndependent?: boolean
 }
 
 const PLUGIN_ID_PATTERN = /^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)*$/
@@ -64,6 +69,9 @@ export function validatePluginManifest(input: unknown): PluginManifest {
   }
   if (value.required !== undefined && typeof value.required !== "boolean") {
     issues.push("required must be a boolean")
+  }
+  if (value.providerIndependent !== undefined && typeof value.providerIndependent !== "boolean") {
+    issues.push("providerIndependent must be a boolean")
   }
   if (value.apiVersion !== PLUGIN_API_VERSION) {
     issues.push(`apiVersion must be ${PLUGIN_API_VERSION}`)

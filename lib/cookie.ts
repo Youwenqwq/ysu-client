@@ -327,10 +327,16 @@ const DEFAULT_TIMEOUT_MS = 30_000
 const MAX_REDIRECTS = 10
 
 export async function fetchWithJar(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
-  if (req.redirect === "manual") {
-    return send(jar, req)
+  const finish = beginRequest(req.url, req.method)
+  try {
+    const response =
+      req.redirect === "manual" ? await send(jar, req) : await followRedirects(jar, req)
+    finish("ok")
+    return response
+  } catch (error) {
+    finish(error instanceof Error && error.name === "AbortError" ? "aborted" : "error")
+    throw error
   }
-  return followRedirects(jar, req)
 }
 
 /**
@@ -345,6 +351,7 @@ export async function fetchStateless(req: HttpRequest): Promise<HttpResponse> {
 import { isCapacitor } from "./native/platform"
 import { getCustomUserAgent } from "./custom-user-agent"
 import { useActivationStore } from "./stores/activation"
+import { beginRequest } from "./net/activity"
 
 // Cache Capacitor core module to avoid dynamic import overhead on every request.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
