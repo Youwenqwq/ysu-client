@@ -162,6 +162,18 @@ pnpm plugin pack packages/plugin-template
 
 其他依赖会正常打包。命令输出 ZIP 路径、大小和 SHA-256；市场索引必须记录同一个哈希。
 
+### 样式契约
+
+插件样式完全由插件包提供，宿主不会为外部插件补 Tailwind 工具类。打包器会扫描插件源码中的 Tailwind 类，编译成 `dist/tailwind.css`，写入 ZIP 并自动追加到包内 `manifest.styles`：
+
+- 只包含主题变量、工具类及 Tailwind 为工具类生成的属性回退，不重复注入 preflight 或宿主全局规则。
+- 工具类通过 `@theme inline` 映射到宿主 CSS 变量（`--background`、`--muted-foreground`、`--radius` 等），因此颜色、圆角和 `dark:` 变体跟随宿主明暗主题，插件不需要自带调色板或暗色覆盖。
+- 插件自己 `import "./style.css"` 的 CSS（Leaflet、自定义 `@keyframes`、第三方面板样式等）仍由 esbuild 打包进 `dist/index.css`，与生成的工具类各自成文件、互不覆盖。
+- 插件未声明 `styles` 且使用了 Tailwind 类时，打包器会新增 `dist/tailwind.css` 到 ZIP 内的清单；源码 `manifest.json` 不需要手动登记。未使用任何工具类时不会生成该文件，清单保持原样。
+- 安装到未重新构建的旧宿主同样生效：宿主只按 `manifest.styles` 注入插件包自带的 CSS。`@orahako/plugin-ui` 等共享组件仍由宿主提供，插件只额外传入自己的类名。
+
+不要为插件单独引入 Tailwind 构建或 preflight/`@import "tailwindcss"`：宿主已经加载这些全局规则，重复注入会污染其他插件的样式。需要宿主未提供的值时使用任意值语法，例如 `grid-cols-[repeat(auto-fit,minmax(0,1fr))]`。生成的样式随包内容变化，重新打包后 ZIP 的 SHA-256 和市场索引必须同步更新。
+
 ## 市场索引
 
 客户端读取 `https://ysu.welain.com/updates/plugins.json`，协议类型见 `market.ts`。每个 release 必须声明 `apiVersion`、平台、ZIP URL、字节大小与 SHA-256，可选 `minAppVersion`。索引可通过可选 `bundles` 声明学校推荐组合包；每项包含 `id`、`name`、`schoolId` 和 `pluginIds`。组合包执行前会预检所有插件的来源、平台兼容性和 Provider 支持范围，再安装缺失插件或启用已有插件。客户端只展示兼容当前 API、应用版本与平台的最高版本；网络失败时使用本地缓存并标记为过期。

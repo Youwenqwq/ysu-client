@@ -14,7 +14,6 @@
 - **包管理**：pnpm workspace，工作区包含 `packages/*`。
 - **格式**：Prettier 无分号、双引号、100 列、Tailwind 类排序；格式化改动与功能改动分开提交。
 
-
 ## 命令
 
 ```bash
@@ -26,7 +25,7 @@ pnpm run lint
 pnpm run test             # Vitest
 pnpm run format
 
-pnpm plugin pack <plugin-dir> [output.zip]   # esbuild + ZIP，输出 SHA-256
+pnpm plugin pack <plugin-dir> [output.zip]   # esbuild + Tailwind CSS + ZIP，输出 SHA-256
 npx cap sync              # 构建后同步 dist/ 到 android/
 npx cap open android
 
@@ -37,22 +36,22 @@ scripts/deploy-website.sh # 构建 APP_BASE_PATH=/app 并部署 EdgeOne Pages
 pnpm run release          # 预检、创建草稿、编辑 notes、发布
 ```
 
-`pnpm run build` 之后才能得到完整的静态产物；`scripts/plugin.ts` 依赖 `--experimental-transform-types`，通过 `pnpm plugin` 调用。
+`pnpm run build` 之后才能得到完整的静态产物；`scripts/plugin.ts` 是 CLI，打包实现与插件 Tailwind CSS 编译在 `scripts/plugin-build.ts`，两者依赖 `--experimental-transform-types`，通过 `pnpm plugin` 调用。
 
 ## 架构
 
 ### 分层
 
-| 层 | 位置 | 职责 |
-|---|---|---|
-| 内核 | `lib/plugins/`、`app/` | Cordis 生命周期、ZIP 安装、页面宿主、崩溃恢复 |
-| 公共 SDK | `packages/plugin-sdk/` | 清单、Provider 契约、Slot / UI / 服务类型、市场协议 |
-| UI Kit | `packages/plugin-ui/`、`packages/academic/` | 官方 React 组件、hooks、stores 与共享教务 UI |
-| 官方插件 | `plugins/official/` | Shell、初始化向导、YSU Provider、教务功能、默认主题 |
-| 市场插件 | `plugins/market/` | 森空鸟、明日方舟主题、遵义医科大学 Provider 等 |
-| Provider 运行时 | `providers/` | 当前 Provider 上下文、Provider 服务、缓存查询 hooks |
-| 传输 / 原生 | `lib/cookie.ts`、`lib/native/`、`android/` | Cookie jar、边缘代理、通知、Live Update、小组件 |
-| 站点 | `website/` | EdgeOne Pages、Web PWA 注入、边缘 API、插件市场 |
+| 层              | 位置                                        | 职责                                                |
+| --------------- | ------------------------------------------- | --------------------------------------------------- |
+| 内核            | `lib/plugins/`、`app/`                      | Cordis 生命周期、ZIP 安装、页面宿主、崩溃恢复       |
+| 公共 SDK        | `packages/plugin-sdk/`                      | 清单、Provider 契约、Slot / UI / 服务类型、市场协议 |
+| UI Kit          | `packages/plugin-ui/`、`packages/academic/` | 官方 React 组件、hooks、stores 与共享教务 UI        |
+| 官方插件        | `plugins/official/`                         | Shell、初始化向导、YSU Provider、教务功能、默认主题 |
+| 市场插件        | `plugins/market/`                           | 森空鸟、明日方舟主题、遵义医科大学 Provider 等      |
+| Provider 运行时 | `providers/`                                | 当前 Provider 上下文、Provider 服务、缓存查询 hooks |
+| 传输 / 原生     | `lib/cookie.ts`、`lib/native/`、`android/`  | Cookie jar、边缘代理、通知、Live Update、小组件     |
+| 站点            | `website/`                                  | EdgeOne Pages、Web PWA 注入、边缘 API、插件市场     |
 
 ### 插件内核
 
@@ -89,6 +88,7 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 - 功能插件通过 `ctx.settings.registerCategory()` 注册分类面板，通过 `settings.*` Slot 贡献启动页选项、通知子节和小组件入口；不要把分类面板重新散落到主设置页。总览挂件由实际功能插件注册，不得由一个聚合插件代注册。停用插件后对应 UI 必须自动消失。
 - `orahako.notifications` 拥有唯一通知设置分组与原生运行时；功能插件通过 `settings.notifications.*` 贡献自己的 UI，并用 `ctx.notifications.register()` 注册运行时渠道。不要在 Shell、YSU 或设置页恢复按插件 ID 硬编码的通知协调。
 - 外部插件只能导入公共模块：`@orahako/plugin-sdk*`、`@orahako/plugin-ui/*`、`@orahako/academic`、共享的 React / Next / Sonner。禁止 `@/` 私有导入。
+- 外部插件的 Tailwind 工具类由 `pnpm plugin pack` 编译进插件 ZIP 的 `dist/tailwind.css`；宿主只提供 `app/globals.css` 的 `@theme inline` token 映射、preflight 和共享组件样式。`app/globals.css` 用 `source(none)` 只扫描宿主目录，不要恢复对 `packages/*` 外部插件或 `plugins/market` 的扫描；否则插件漏带样式会被宿主掩盖。
 - 已移除的旧聚合层（`lib/dashboard-nav.*`、`lib/dashboard-features.*`、`lib/extras/`、`lib/fees/` 注册表、`lib/api.ts`、`lib/types.ts`、`lib/use-cached-data.ts`）不要恢复；对应能力应落到插件注册中。
 
 ### 存储 / 原生 / PWA
@@ -132,12 +132,15 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 ## 更新说明
 
 ### 新功能
+
 - **标题加粗**：描述功能是什么、用户如何使用
 
 ### Bug 修复
+
 - **标题加粗**：详细描述问题原因和修复方案
 
 ### 改进
+
 - **标题加粗**：描述改动了什么、带来了什么好处
 
 **Full Changelog**: https://github.com/Youwenqwq/ysu-client/compare/v{PREV}...v{CURR}

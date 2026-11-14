@@ -37,6 +37,8 @@
 
 `@orahako/plugin-ui` 是可选的官方 React UI Kit 和应用 hooks。默认功能插件与社区插件均可使用；替代 Shell 可以不使用它。包按 `components/hooks/stores/academic/platform/plugin/shell/assets` 子路径隔离副作用，根入口不聚合实现，避免宿主与官方插件之间的模块求值环。
 
+样式同样属于插件包：`pnpm plugin pack` 在打包时为每个插件编译其源码使用的 Tailwind 工具类，生成 `dist/tailwind.css` 并写入 ZIP 清单，与插件自己 `import` 的 CSS 一并注入。宿主只提供设计 token、preflight、共享组件样式和注入/卸载生命周期；宿主构建不再扫描外部插件源码，因此插件漏带样式不会被宿主样式表掩盖。生成的工具类只映射宿主 CSS 变量，不含 preflight 或宿主全局规则，颜色、圆角与 `dark:` 变体跟随宿主主题。
+
 React、实际使用的 Next 入口、`@orahako/academic` 和 UI Kit 子路径均由宿主共享同一模块实例。外部插件不能通过私下打包 Next 模块获得另一套 Router Context。
 
 `@orahako/plugin-sdk/host` 暴露完整信任的高级宿主能力。它是公共 API，不是权限边界。稳定 API 与内部实现的边界由模块导出决定，而不是由“官方/外部”身份决定。
