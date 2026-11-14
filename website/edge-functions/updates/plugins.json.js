@@ -1,7 +1,25 @@
 const DEFAULT_INDEX = {
   schemaVersion: 1,
-  updatedAt: '2026-11-13T13:33:23Z',
+  updatedAt: '2026-11-14T04:55:00Z',
   plugins: [{
+    id: 'community.theme.yuna',
+    name: 'YUNA 三皮肤主题',
+    summary: '102 编辑海报、明日方舟工程终端、红魔馆典雅档案；三套均支持浅色、深色与跟随系统。',
+    author: 'QS-Ling',
+    homepage: 'https://github.com/Youwenqwq/ysu-client/tree/refactor/cordis/plugins/market/theme-yuna',
+    categories: ['theme'],
+    versions: [{
+      version: '1.0.0',
+      apiVersion: 1,
+      minAppVersion: '0.15.0',
+      platforms: ['web', 'android'],
+      zipUrl: '/plugins/community.theme.yuna/1.0.0.zip',
+      sha256: 'bae1dc19b63bc6402d343cdb0f50ac9ac1b6e69e2df777cf0f92ae60623fd724',
+      size: 87359,
+      publishedAt: '2026-11-14T04:55:00Z',
+      changelog: '新增基于 YUNA 2026-11-14 规范的三套主题，使用公共主题注册与包内离线字体。',
+    }],
+  }, {
     id: 'community.theme.arknights',
     name: '明日方舟 × 新粗野主义',
     summary: '罗德岛终端视觉体系：石墨画布、2px 墨边、零圆角、硬偏移阴影、工程网格与青色信号。',

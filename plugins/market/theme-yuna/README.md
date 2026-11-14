@@ -1,0 +1,33 @@
+# YUNA 三皮肤主题插件
+
+基于 [YUNA 前端设计规范](https://102.yuna.team/index/design-system/)（2026-11-14）的 Orahako 主题插件。一个 ZIP 注册三个可独立选择的主题：
+
+| 主题 | 视觉 |
+| --- | --- |
+| YUNA · 102 | 蓝紫与粉色、直角卡片、22px 点阵、偏移阴影 |
+| YUNA · 明日方舟 | 石墨与青蓝、48px 工程网格、窄体标题、功能色边条 |
+| YUNA · 红魔馆 | 暖纸 / 酒红、古金双框、衬线标题、适量圆角 |
+
+三套均支持浅色、深色和跟随系统。配色来源及 CSS 哈希见 `tokens.json`，红魔馆浅色遵循最新线上规范。
+
+## 安装与使用
+
+需要带 Cordis 插件系统的 Orahako 0.15.0+（当前上游 `refactor/cordis` 分支，旧 `main` 不能安装）。
+
+在插件管理中导入 `community.theme.yuna` ZIP 并启用，在同页主题区域选择 `YUNA · 102`、`YUNA · 明日方舟` 或 `YUNA · 红魔馆`。明暗继续使用应用设置。停用插件或切回默认主题即可恢复原样；插件不自行写入主题偏好。
+
+这是一份主题贡献，只通过公共 `ctx.ui.registerTheme()` 提供 CSS 与包内字体，不替换 Shell、不改写教务状态或登录流程，不与已有 `community.theme.arknights` 冲突。应用品牌与布局由当前 Shell 提供；旧版源码改造中的海报登录页不属于本插件，避免用 CSS 伪造业务内容。默认 Shell 及使用相同语义 Token / `data-slot` 的组件均可继承样式。
+
+已适配卡片、导航、表格、表单、弹层、焦点与减少动态效果；粗指针下默认表单控件和常用按钮至少 44px 高。课程分类、图表与危险操作保留宿主语义。无粒子循环或远程字体请求。
+
+## 构建
+
+```sh
+pnpm plugin pack plugins/market/theme-yuna
+```
+
+市场发布包位于 `website/public/plugins/community.theme.yuna/1.0.0.zip`，索引记录实际大小及 SHA-256。源码入口、清单和样式均在本目录，依赖公共 SDK，不导入宿主私有模块。
+
+本地拉丁字形 Archivo 与 Barlow Condensed 来自规范参考包，许可证随字体放在 `assets/fonts/`（SIL OFL）。中文使用可用的 Noto Sans SC / 系统字体；红魔馆使用系统衬线回退。没有附带角色或第三方品牌图片。
+
+测试覆盖真实 Cordis 运行时注册、停用 / 重启清理、CSS 解析、六组明暗选择器、离线字体路径和市场 ZIP 完整性。真实教务账号与 Android 真机仍需发布前验收。
