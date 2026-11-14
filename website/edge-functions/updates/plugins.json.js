@@ -5,7 +5,7 @@
 
 const DEFAULT_INDEX = {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-14T22:34:25Z",
+  "updatedAt": "2026-11-14T23:59:19Z",
   "plugins": [
     {
       "id": "community.theme.yuna",
@@ -179,6 +179,20 @@ const DEFAULT_INDEX = {
         "toybox"
       ],
       "versions": [
+        {
+          "version": "1.1.1",
+          "apiVersion": 1,
+          "minAppVersion": "0.15.0",
+          "platforms": [
+            "web",
+            "android"
+          ],
+          "zipUrl": "/plugins/orahako.skbird/1.1.1.zip",
+          "sha256": "45a6f48f1650485370d22aceff15d81e5c661ca8ee131bdb982b24a3d5ba8a95",
+          "size": 24806,
+          "publishedAt": "2026-11-14T23:59:19Z",
+          "changelog": "修复宿主移除旧存储键后启动时凭据持久化键为空的问题；存储键改由插件包持有。"
+        },
         {
           "version": "1.1.0",
           "apiVersion": 1,
