@@ -1,4 +1,4 @@
-import { casUrls, getSchoolConfig, loadCASTGC, serverConfig } from "@orahako/plugin-sdk/host"
+import { getSchoolConfig, loadCASTGC, serverConfig } from "@orahako/plugin-sdk/host"
 import type { ProviderNativeNotification } from "@orahako/plugin-sdk/academic"
 
 export interface NativeFieldMappings {
@@ -82,5 +82,4 @@ export function buildNativeServerConfig(): NativeServerConfig {
 export const ysuNativeNotification: ProviderNativeNotification = {
   getServerConfig: buildNativeServerConfig,
   getAuthToken: loadCASTGC,
-  getAuthCookieUrl: () => casUrls.authLogin,
 }

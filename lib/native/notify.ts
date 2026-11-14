@@ -75,33 +75,11 @@ async function syncProviderToNative(
 async function readCastgc(
   nativeNotification: ProviderNativeNotification
 ): Promise<string | undefined> {
-  let castgc: string | undefined
-
-  // 1. 优先由当前 provider 提供认证 token。
   try {
-    const token = await nativeNotification.getAuthToken()
-    if (token) castgc = token
+    return (await nativeNotification.getAuthToken()) ?? undefined
   } catch {
-    // ignore
+    return undefined
   }
-
-  // 2. fallback：从 CapacitorHttp cookie store 读取。
-  if (!castgc) {
-    const authCookieUrl = nativeNotification.getAuthCookieUrl?.()
-    if (authCookieUrl) {
-      try {
-        const { CapacitorCookies } = await import("@capacitor/core")
-        const cookies = await CapacitorCookies.getCookies({
-          url: authCookieUrl,
-        })
-        castgc = cookies?.CASTGC
-      } catch {
-        // ignore
-      }
-    }
-  }
-
-  return castgc
 }
 
 /** Bind the single control source; React cleanup only removes subscriptions. */

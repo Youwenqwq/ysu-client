@@ -1,7 +1,6 @@
 import type { ProviderDiagnosticCookie, ProviderDiagnostics } from "@orahako/plugin-sdk/academic"
 import { getJar as getCasJar, isAuthenticated as checkCASAuth } from "./protocol/cas"
 import { getJar as getJwxtJar, resetJWXT } from "./protocol/jwxt"
-import { casUrls } from "@orahako/plugin-sdk/host"
 import { ensureMobileAuthorized } from "./protocol/jwmobile"
 
 async function getJarCookies(
@@ -25,7 +24,6 @@ export const ysuDiagnostics: ProviderDiagnostics = {
   },
   getAuthCookies: () => getJarCookies(getCasJar),
   getAcademicCookies: () => getJarCookies(getJwxtJar),
-  getAuthCookieUrl: () => casUrls.authLogin,
   checkAuth: checkCASAuth,
   resetAcademicSession: resetJWXT,
   ensureMobileAuthorized,

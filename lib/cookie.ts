@@ -187,15 +187,6 @@ function secureMatches(cookie: SimpleCookie, url: string): boolean {
 
 export class SimpleCookieJar {
   private cookies: SimpleCookie[] = []
-  private _dirty = true
-
-  isDirty(): boolean {
-    return this._dirty
-  }
-
-  markClean(): void {
-    this._dirty = false
-  }
 
   async setCookie(
     cookieStr: string,
@@ -212,14 +203,12 @@ export class SimpleCookieJar {
         this.cookies = this.cookies.filter(
           (c) => !(c.name === parsed.name && c.domain === parsed.domain && c.path === parsed.path)
         )
-        this._dirty = true
         return
       }
       this.cookies = this.cookies.filter(
         (c) => !(c.name === parsed.name && c.domain === parsed.domain && c.path === parsed.path)
       )
       this.cookies.push(parsed)
-      this._dirty = true
     } catch (e) {
       if (!options?.ignoreError) throw e
     }
@@ -259,7 +248,6 @@ export class SimpleCookieJar {
     this.cookies = this.cookies.filter(
       (c) => !(c.domain === domain && c.path === path && c.name === key)
     )
-    this._dirty = true
   }
 
   toJSON(): string {
@@ -303,7 +291,7 @@ export interface HttpRequest {
   /**
    * Request-scoped cookies matched by the usual domain/path/secure rules.
    * Matching names override the jar for outgoing requests and are not copied
-   * back from responses or the process-wide native cookie store.
+   * back from responses.
    */
   readonly cookies?: readonly CookieEntry[]
   readonly body?: string | URLSearchParams
@@ -571,7 +559,6 @@ async function proxyHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<Ht
 async function capacitorHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promise<HttpResponse> {
   const capCore = await getCapacitorCore()
   const CapacitorHttp = capCore?.CapacitorHttp
-  const CapacitorCookies = capCore?.CapacitorCookies
   if (!CapacitorHttp?.request) {
     throw new Error("CapacitorHttp not available")
   }
@@ -580,34 +567,12 @@ async function capacitorHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promis
     throw new DOMException("The operation was aborted.", "AbortError")
   }
 
-  // Push jar cookies → native store so HttpURLConnection sends them.
-  // Only push when jar is dirty (cookies changed since last push).
-  if (jar.isDirty()) {
-    const jarCookies = await jar.getAllCookies()
-    for (const c of jarCookies) {
-      if (!c.value) continue
-      try {
-        const host = c.domain.replace(/^\./, "") || "localhost"
-        await CapacitorCookies?.setCookie?.({
-          url: `https://${host}${c.path}`,
-          key: c.name,
-          value: c.value,
-          path: c.path,
-        })
-      } catch {
-        /* ignore individual failures */
-      }
-    }
-    jar.markClean()
-  }
-
   const headers: Record<string, string> = { ...(req.headers ?? {}) }
-  const cookieHeader = await getRequestCookieString(jar, req)
-  if (cookieHeader && !hasHeader(headers, "Cookie")) {
-    // HttpURLConnection gives an explicit Cookie header precedence over its
-    // process-wide CookieHandler, keeping request-scoped cookies isolated.
-    headers["Cookie"] = cookieHeader
+  for (const name of Object.keys(headers)) {
+    if (name.toLowerCase() === "cookie") delete headers[name]
   }
+  const cookieHeader = await getRequestCookieString(jar, req)
+  if (cookieHeader) headers["Cookie"] = cookieHeader
   if (!hasHeader(headers, "User-Agent")) {
     headers["User-Agent"] = getCustomUserAgent()
   }
@@ -651,35 +616,6 @@ async function capacitorHttpSend(jar: SimpleCookieJar, req: HttpRequest): Promis
         await jar.setCookie(sc, req.url, { ignoreError: true })
       }
     }
-  }
-
-  // Read back cookies from the native CookieManager.
-  // When HttpURLConnection auto-follows redirects, it captures Set-Cookie headers
-  // (e.g. GS_SESSIONID from JWXT) in its native store. These are NOT exposed in
-  // the response headers JS sees. Sync them back into our jar.
-  try {
-    const nativeCookies: Record<string, string> = await CapacitorCookies?.getCookies?.({
-      url: req.url,
-    })
-    if (nativeCookies && typeof nativeCookies === "object") {
-      const jarAll = await jar.getAllCookies()
-      const jarNames = new Set(jarAll.filter((c) => c.value).map((c) => c.name))
-      for (const [name, value] of Object.entries(nativeCookies)) {
-        if (!value || jarNames.has(name) || req.cookies?.some((cookie) => cookie.name === name)) {
-          continue
-        }
-        // Cookie exists in native store but not in our jar — add it.
-        // We lack domain/path info; set with request URL's domain as hint.
-        const parsedUrl = safeParseUrl(req.url)
-        const domain = parsedUrl?.hostname ?? ""
-        const path = parsedUrl?.pathname ?? "/"
-        await jar.setCookie(`${name}=${value}; Domain=${domain}; Path=${path}`, req.url, {
-          ignoreError: true,
-        })
-      }
-    }
-  } catch {
-    // Not on Capacitor or getCookies not available
   }
 
   const isBase64 =

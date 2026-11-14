@@ -1005,7 +1005,6 @@ export interface ProviderDiagnostics {
   readonly labels: ProviderDiagnosticLabels
   getAuthCookies(): Promise<ProviderDiagnosticCookie[]>
   getAcademicCookies(): Promise<ProviderDiagnosticCookie[]>
-  getAuthCookieUrl?(): string
   checkAuth(): Promise<boolean>
   resetAcademicSession(): void
   ensureMobileAuthorized?(): Promise<void>
@@ -1014,7 +1013,6 @@ export interface ProviderDiagnostics {
 export interface ProviderNativeNotification {
   getServerConfig(): object
   getAuthToken(): Promise<string | null>
-  getAuthCookieUrl?(): string
 }
 
 // ─── School-specific platform capabilities ─────────────────────────────── //

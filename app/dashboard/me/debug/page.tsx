@@ -359,12 +359,6 @@ export default function DebugPage() {
         `provider auth token (${diagnosticLabels.authToken}): ${providerToken ? "存在" : "无"}`
       )
 
-      // 诊断：从 CapacitorCookies 读取
-      const { CapacitorCookies } = await import("@capacitor/core")
-      const authCookieUrl = provider.diagnostics?.getAuthCookieUrl?.()
-      const cookies = authCookieUrl ? await CapacitorCookies.getCookies({ url: authCookieUrl }) : {}
-      logNative(`CapacitorCookies: ${JSON.stringify(cookies)}`)
-
       // 诊断：从 JS cookie jar 读取
       const authCookies = provider.diagnostics ? await provider.diagnostics.getAuthCookies() : []
       const cookieToken = authCookies.find((c) => c.value)?.value

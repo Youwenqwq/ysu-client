@@ -345,37 +345,6 @@ export async function saveCASTGC(): Promise<void> {
 }
 
 /**
- * Restore CASTGC from secure storage into the CapacitorHttp system cookie store.
- * Must be called on startup before any CAS requests.
- */
-export async function restoreCASCookies(): Promise<void> {
-  const tgc = await loadCASTGC()
-  if (!tgc) return
-
-  const capCore = await getCapacitorCore()
-  if (!capCore) return
-
-  const CapacitorCookies = (capCore as Record<string, unknown>)["CapacitorCookies"] as
-    | {
-        setCookie?: (opts: {
-          url: string
-          key: string
-          value: string
-          path?: string
-        }) => Promise<void>
-      }
-    | undefined
-  if (CapacitorCookies?.setCookie) {
-    await CapacitorCookies.setCookie({
-      url: serverConfig.cerBaseUrl,
-      key: "CASTGC",
-      value: tgc,
-      path: "/authserver",
-    })
-  }
-}
-
-/**
  * Logout CAS server session with CASTGC.
  */
 export async function logoutCAS(): Promise<void> {

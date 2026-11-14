@@ -7,7 +7,6 @@ import {
   CASCredential,
   restoreCredential,
   resetCAS,
-  restoreCASCookies,
   logoutCAS,
   getJar as getCasJar,
 } from "./protocol/cas"
@@ -56,9 +55,6 @@ export async function initializeSession(): Promise<void> {
     localStorage.removeItem(STORAGE_KEYS.otaCleanup)
     cleanOtaArtifacts()
   }
-  // Restore CASTGC to CapacitorHttp system cookie store (for native platforms)
-  await restoreCASCookies()
-
   const { credential, jwxtSession, mobileSession } = useAuthStore.getState()
   if (credential) {
     const casCredential = CASCredential.fromJSON(credential)
