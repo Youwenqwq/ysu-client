@@ -1,6 +1,6 @@
 const DEFAULT_INDEX = {
   schemaVersion: 1,
-  updatedAt: '2026-11-14T04:55:00Z',
+  updatedAt: '2026-11-14T07:59:54Z',
   plugins: [{
     id: 'community.theme.yuna',
     name: 'YUNA 三皮肤主题',
@@ -14,9 +14,9 @@ const DEFAULT_INDEX = {
       minAppVersion: '0.15.0',
       platforms: ['web', 'android'],
       zipUrl: '/plugins/community.theme.yuna/1.0.0.zip',
-      sha256: 'bae1dc19b63bc6402d343cdb0f50ac9ac1b6e69e2df777cf0f92ae60623fd724',
-      size: 87359,
-      publishedAt: '2026-11-14T04:55:00Z',
+      sha256: 'c09b6832b759fff94445b932a0fb279c88cb1a83bf17177e0cdb60357f7bd7f9',
+      size: 87275,
+      publishedAt: '2026-11-14T07:59:54Z',
       changelog: '新增基于 YUNA 2026-11-14 规范的三套主题，使用公共主题注册与包内离线字体。',
     }],
   }, {
