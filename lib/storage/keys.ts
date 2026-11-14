@@ -15,7 +15,6 @@ export const STORAGE_KEYS = {
   lastDismissedAnnouncementId: `${APP_PREFIX}-last-dismissed-announcement-id`,
   gradeGacha: `${APP_PREFIX}-grade-gacha`,
   schedulePatches: `${APP_PREFIX}-schedule-patches`,
-  skbird: `${APP_PREFIX}-skbird`,
   secureAuthToken: `${APP_PREFIX}-auth-token`,
   secureRememberedCredentials: `${APP_PREFIX}-remember-me`,
 } as const

@@ -44,7 +44,6 @@ describe("PluginUIRegistry", () => {
           region: "content",
           defaultVisible: true,
         })
-        ctx.ui.registerSetting({ id: "settings", title: "Settings", page: "index", icon: Icon })
         ctx.ui.registerTheme({ id: "dark", name: "Dark", css: ":root { --background: black }" })
         ctx.ui.registerShell({ id: "default", name: "Shell", component: Page })
       },
@@ -59,7 +58,6 @@ describe("PluginUIRegistry", () => {
       pages: [],
       navigation: [],
       themes: [],
-      settings: [],
       overviewWidgets: [],
       shells: [],
     })

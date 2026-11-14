@@ -34,7 +34,7 @@ export default function MePage() {
   const nav = useSemanticNavigation()
   // The profile card links to the student-info page via its stable semantic route;
   // when the contributing plugin is missing or disabled the entry hides entirely.
-  const { navigation: pluginNavigation, settings: pluginSettings } = usePluginUI(host.ui)
+  const { navigation: pluginNavigation } = usePluginUI(host.ui)
   const studentInfoHref = nav.href("student-info")
 
   const student = useStudentInfo()
@@ -175,16 +175,6 @@ export default function MePage() {
               label: t("plugins.title"),
               icon: Puzzle,
             },
-            ...pluginSettings
-              .filter((setting) => supportsPlugin(supportedPlugins, setting.pluginId))
-              .filter((setting) => hasPluginCapability(capabilities, setting.capability))
-              .map((setting) => ({
-                href: pluginPageHref(setting.pluginId, setting.page),
-                label: setting.titleKey
-                  ? host.i18n.translate(setting.pluginId, setting.titleKey, locale)
-                  : setting.title,
-                icon: setting.icon,
-              })),
           ]}
         />
       </Section>

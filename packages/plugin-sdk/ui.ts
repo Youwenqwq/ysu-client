@@ -73,16 +73,6 @@ export interface PluginOverviewWidgetDefinition {
   order?: number
 }
 
-export interface PluginSettingDefinition {
-  id: string
-  title: string
-  titleKey?: string
-  page: string
-  icon: PluginIcon
-  order?: number
-  capability?: string
-}
-
 export interface PluginThemeDefinition {
   id: string
   name: string
@@ -119,7 +109,6 @@ export interface PluginUIService {
   registerPage(page: PluginPageDefinition): () => void
   registerNavigation(item: PluginNavigationDefinition): () => void
   registerOverviewWidget(widget: PluginOverviewWidgetDefinition): () => void
-  registerSetting(setting: PluginSettingDefinition): () => void
   registerTheme(theme: PluginThemeDefinition): () => void
   registerShell(shell: PluginShellDefinition): () => void
 }

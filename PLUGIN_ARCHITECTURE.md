@@ -47,6 +47,8 @@ React、实际使用的 Next 入口、`@orahako/academic` 和 UI Kit 子路径�
 
 - `orahako.shell`：默认登录、Dashboard、设置、导航和全局弹窗组合。
 - `orahako.onboarding`：通过 `shell.overlay` 提供首次学校选择、权限配置和市场 Provider 安装；既有设置经迁移后不再显示。
+- `orahako.network-activity`：提供只读网络活动快照、`shell.activity` 活动指示和显示密度设置。
+- `orahako.notifications`：拥有通知设置分类、原生通知运行时和功能插件通知渠道协调。
 - `ysu.provider`：YSU CAS/JWXT Provider，也是唯一内置的学校 Provider；其他学校由市场包注册。
 - Provider 可用 `supportedPlugins` 声明学校支持的功能插件；该列表与 capabilities 共同约束功能启停、页面、导航、深链和总览挂件。全局 UI/工具插件可设置 `providerIndependent: true` 跳过运行时启停约束。
 - 功能插件：课表、成绩、考试、总览、费用等；森空鸟等玩具箱功能由官方市场提供，不进入内置运行时。可选官方插件源码统一位于 `Youwenqwq/orahako-official-plugins`，市场元数据由 `Youwenqwq/orahako-plugin-registry` 维护。

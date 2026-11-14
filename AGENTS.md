@@ -69,6 +69,7 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 
 - Provider 契约位于 `packages/plugin-sdk/academic.ts`，学校配置位于 `provider-school.ts`；实现通常继承 `BaseProvider`。Provider 插件通过 `ctx.providers.registerSchool({ config, providerFactory })` 同时注册学校和工厂，作用域释放时自动撤销。
 - `providers/provider-context.tsx`、`providers/provider-service.ts` 管理当前 Provider 的初始化、重登录和退出；UI 数据统一走 `providers/hooks/`，中心缓存路径是 `providers/hooks/use-provider-query.ts`。
+- `ProviderPluginRegistry` 保存学校 Provider 工厂；`lib/school-configs/` 只保存 Provider 注册的 `SchoolConfig` 运行时目录，不内置学校 JSON；`lib/server-config.ts` 持有当前学校配置并派生 URL。三者不是多套 Provider 实现。
 - YSU 的 CAS / JWXT / 移动端 / 缴费协议与会话生命周期都在 `plugins/official/ysu/`。YSU CAS 可能落到 reAuth / MFA 页面，未确认 `isAuthenticated()` 不得视为登录成功；JWXT 重新授权暴露的 `NotAuthenticatedError` 应保持 `AUTH_SESSION_EXPIRED`。
 - 外部 Provider 参考 `Youwenqwq/orahako-official-plugins` 的 `plugins/zmu-provider`，只使用公共 SDK。新增学校域名还必须加入 `website/edge-functions/api/proxy.js` 的 `ALLOWED_HOSTS`，插件注册本身不能绕过 Web 代理白名单。
 - Provider 的 `capabilities` 与 `supportedPlugins` 共同决定功能是否可用：`supportedPlugins === undefined` 表示全部允许；否则只允许列出的功能插件。`lib/plugins/host.ts` 的 `reconcileProviderSupport()` 会停止不支持的功能插件，并在切回时仅恢复由 Provider 停用的项。
@@ -110,7 +111,7 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 
 ### 测试
 
-- `vitest.config.ts` 使用 Node 环境，覆盖 `providers/`、`lib/`、`app/`、`packages/`、`plugins/`；路径别名直接指向源码。
+- `vitest.config.ts` 使用 Node 环境，覆盖 `providers/`、`lib/`、`app/`、`packages/`、`plugins/`、`scripts/`；路径别名直接指向源码。
 - 测试显式从 `vitest` 导入，不使用全局变量。
 - 修改插件运行时、Provider 查询语义或清单校验时，先跑对应测试；完成前至少运行 `pnpm run typecheck` 和受影响的 `pnpm run test`。
 

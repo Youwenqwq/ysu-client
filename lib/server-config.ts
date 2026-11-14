@@ -10,8 +10,8 @@ import {
   DEFAULT_SCHOOL_ID,
   getSchoolConfigById,
   getVisibleSchoolConfigs,
-  registerSchoolConfig as registerBundledSchoolConfig,
-  unregisterSchoolConfig as unregisterBundledSchoolConfig,
+  registerSchoolConfig as registerCatalogSchoolConfig,
+  unregisterSchoolConfig as unregisterCatalogSchoolConfig,
 } from "./school-configs"
 import type { SchoolConfig } from "./school-configs/types"
 
@@ -137,7 +137,7 @@ export function getSchoolConfigScope(): string {
 }
 
 export function registerSchoolConfig(config: SchoolConfig): void {
-  registerBundledSchoolConfig(config)
+  registerCatalogSchoolConfig(config)
   if (config.id === currentSchoolId) {
     currentSchoolConfig = config
     onSchoolConfigChanged()
@@ -156,7 +156,7 @@ export function unregisterSchoolConfig(config: SchoolConfig | string): void {
   const registered = getSchoolConfigById(schoolId)
   if (!registered) return
   if (typeof config !== "string" && registered !== config) return
-  unregisterBundledSchoolConfig(schoolId)
+  unregisterCatalogSchoolConfig(schoolId)
 
   if (currentSchoolId !== schoolId) return
   if (typeof config !== "string" && currentSchoolConfig !== config) return

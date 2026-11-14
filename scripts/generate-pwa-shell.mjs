@@ -34,7 +34,7 @@ function isExcluded(segments) {
   return segments.some((segment) => excludedSegments.has(segment));
 }
 
-// key: scope-relative URL ("./dashboard/grades/"); file: absolute path in dist
+// key: scope-relative URL ("./dashboard/plugin/"); file: absolute path in dist
 const entries = new Map();
 
 function addEntry(key, file) {

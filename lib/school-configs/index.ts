@@ -1,15 +1,10 @@
-import nbuConfig from "./nbu.json"
 import type { SchoolConfig } from "./types"
 
 export const DEFAULT_SCHOOL_ID = "ysu"
 
-// YSU ships with its provider plugin and registers itself through the plugin
-// host. The core only bundles configs that have no provider-owned home.
-const bundledSchoolConfigs = [nbuConfig as SchoolConfig] as const
-
-const schoolConfigs: Record<string, SchoolConfig> = Object.fromEntries(
-  bundledSchoolConfigs.map((config) => [config.id, config])
-)
+// Provider plugins populate this runtime catalog through registerSchool().
+// The core does not bundle school-owned configuration.
+const schoolConfigs: Record<string, SchoolConfig> = {}
 
 export function registerSchoolConfig(config: SchoolConfig): void {
   schoolConfigs[config.id] = config

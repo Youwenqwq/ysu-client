@@ -3,7 +3,6 @@ import type {
   PluginOverviewWidgetDefinition,
   PluginPageDefinition,
   PluginThemeDefinition,
-  PluginSettingDefinition,
   PluginShellDefinition,
   PluginUIService,
 } from "@orahako/plugin-sdk"
@@ -20,10 +19,6 @@ export interface RegisteredPluginOverviewWidget extends PluginOverviewWidgetDefi
   pluginId: string
 }
 
-export interface RegisteredPluginSetting extends PluginSettingDefinition {
-  pluginId: string
-}
-
 export interface RegisteredPluginTheme extends PluginThemeDefinition {
   pluginId: string
 }
@@ -36,7 +31,6 @@ export interface PluginUISnapshot {
   pages: readonly RegisteredPluginPage[]
   navigation: readonly RegisteredPluginNavigation[]
   themes: readonly RegisteredPluginTheme[]
-  settings: readonly RegisteredPluginSetting[]
   overviewWidgets: readonly RegisteredPluginOverviewWidget[]
   shells: readonly RegisteredPluginShell[]
 }
@@ -45,7 +39,6 @@ export class PluginUIRegistry {
   private readonly pages = new Map<string, RegisteredPluginPage>()
   private readonly navigation = new Map<string, RegisteredPluginNavigation>()
   private readonly themes = new Map<string, RegisteredPluginTheme>()
-  private readonly settings = new Map<string, RegisteredPluginSetting>()
   private readonly overviewWidgets = new Map<string, RegisteredPluginOverviewWidget>()
   private readonly shells = new Map<string, RegisteredPluginShell>()
   private readonly listeners = new Set<() => void>()
@@ -53,7 +46,6 @@ export class PluginUIRegistry {
     pages: [],
     navigation: [],
     themes: [],
-    settings: [],
     overviewWidgets: [],
     shells: [],
   }
@@ -85,13 +77,6 @@ export class PluginUIRegistry {
         track(() =>
           this.register(this.overviewWidgets, `${manifest.id}:${widget.id}`, {
             ...widget,
-            pluginId: manifest.id,
-          })
-        ),
-      registerSetting: (setting) =>
-        track(() =>
-          this.register(this.settings, `${manifest.id}:${setting.id}`, {
-            ...setting,
             pluginId: manifest.id,
           })
         ),
@@ -142,7 +127,6 @@ export class PluginUIRegistry {
         (a, b) => (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title)
       ),
       themes: Array.from(this.themes.values()),
-      settings: Array.from(this.settings.values()).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
       overviewWidgets: Array.from(this.overviewWidgets.values()).sort(
         (a, b) => (a.order ?? 100) - (b.order ?? 100) || a.id.localeCompare(b.id)
       ),
