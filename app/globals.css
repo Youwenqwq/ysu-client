@@ -5,8 +5,8 @@
 /*
  * Only host-owned sources are scanned. External plugins are packaged with their
  * own utility CSS (see scripts/plugin-build.ts and the plugin SDK docs), so
- * scanning `packages/*` plugins or `plugins/market` here would silently mask a
- * plugin that forgot to ship its stylesheet.
+ * scanning external plugin sources here would silently mask a plugin that
+ * forgot to ship its stylesheet.
  */
 @source "../app";
 @source "../components";

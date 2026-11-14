@@ -137,7 +137,7 @@ Provider 插件通过 `ctx.providers.registerSchool({ config, providerFactory })
 
 成绩字母换算由 `gradeScale` 提供。支持 GPA 评级的学校还应提供 `gpaScale: ProviderGPAScale`，其中 `max` 是满绩，`bands` 是从 0 开始、按 `min` 升序排列的评级档位；每档的 `min` 是闭下界。共享成绩 UI 只使用当前 Provider 的刻度，不应用其他学校的默认评级。未声明 `gpaScale` 时仅显示 GPA 数值，不显示评级和档位标尺。
 
-`plugins/market/zmu-provider` 是非 EMAP 教务系统的最小参考：本地验证码密码登录、CookieJar 会话恢复、学籍、全学期课表、成绩/GPA 和考试均只使用公共 SDK。需要与 CookieJar 绑定的验证码图片时，Provider 应通过 `fetchWithJar` 读取图片并返回 data URL，不能把远端图片 URL 当作可携带会话的普通 `<img>` 地址。
+[`orahako-official-plugins/plugins/zmu-provider`](https://github.com/Youwenqwq/orahako-official-plugins/tree/main/plugins/zmu-provider) 是非 EMAP 教务系统的最小参考：本地验证码密码登录、CookieJar 会话恢复、学籍、全学期课表、成绩/GPA 和考试均只使用公共 SDK。需要与 CookieJar 绑定的验证码图片时，Provider 应通过 `fetchWithJar` 读取图片并返回 data URL，不能把远端图片 URL 当作可携带会话的普通 `<img>` 地址。
 
 公共 `@orahako/plugin-sdk/crypto` 子路径提供 AES-128-ECB/PKCS7 与 Base64 工具，供确有该协议要求的 Provider 使用。Web 端新增学校域名仍须加入部署侧代理白名单；插件注册本身不能绕过该网络安全边界。
 
@@ -176,4 +176,4 @@ pnpm plugin pack packages/plugin-template
 
 ## 市场索引
 
-客户端读取 `https://ysu.welain.com/updates/plugins.json`，协议类型见 `market.ts`。每个 release 必须声明 `apiVersion`、平台、ZIP URL、字节大小与 SHA-256，可选 `minAppVersion`。索引可通过可选 `bundles` 声明学校推荐组合包；每项包含 `id`、`name`、`schoolId` 和 `pluginIds`。组合包执行前会预检所有插件的来源、平台兼容性和 Provider 支持范围，再安装缺失插件或启用已有插件。客户端只展示兼容当前 API、应用版本与平台的最高版本；网络失败时使用本地缓存并标记为过期。
+客户端读取 `https://ysu.welain.com/updates/plugins.json`，协议类型见 `market.ts`。索引元数据由 `Youwenqwq/orahako-plugin-registry` 维护，公开边缘函数只保存同步生成的分发快照。每个 release 必须声明 `apiVersion`、平台、ZIP URL、字节大小与 SHA-256，可选 `minAppVersion`。索引可通过可选 `bundles` 声明学校推荐组合包；每项包含 `id`、`name`、`schoolId` 和 `pluginIds`。组合包执行前会预检所有插件的来源、平台兼容性和 Provider 支持范围，再安装缺失插件或启用已有插件。客户端只展示兼容当前 API、应用版本与平台的最高版本；网络失败时使用本地缓存并标记为过期。

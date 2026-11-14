@@ -34,7 +34,7 @@ Web 端为同一代码库的静态导出 PWA；原生端通过 Capacitor 打包�
 - 架构边界：[PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md)
 - 包格式与 API：[packages/plugin-sdk](packages/plugin-sdk/README.md)
 - 起步模板：[功能插件](packages/plugin-template) · [完整 Shell](packages/plugin-shell-template)
-- 完整示例：[Perlica 社区插件](packages/perlica-toybox)
+- 完整示例：[Perlica 社区插件](https://github.com/Youwenqwq/orahako-official-plugins/tree/main/plugins/perlica-toybox)
 
 ## 数据与安全
 

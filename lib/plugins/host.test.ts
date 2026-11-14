@@ -1,11 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import type { MarketplaceIndex, PluginManifest } from "@orahako/plugin-sdk"
+import { definePlugin, type MarketplaceIndex, type PluginManifest } from "@orahako/plugin-sdk"
 import { createMarketPluginInstaller, PluginHost } from "./host"
 import { PLUGIN_MARKET_URL } from "./market"
-import arknightsDefinition, {
-  manifest as arknightsManifest,
-} from "@/plugins/market/theme-arknights"
 import { usePluginPreferences } from "@/lib/stores/plugin-preferences"
+
+const externalThemeManifest: PluginManifest = {
+  id: "test.theme.external",
+  name: "External test theme",
+  version: "1.0.0",
+  apiVersion: 1,
+  kind: "theme",
+  entry: "index.js",
+}
+const externalThemeDefinition = definePlugin((ctx) => {
+  ctx.ui.registerTheme({ id: "external", name: "External", css: "" })
+})
 
 const installedManifest: PluginManifest = {
   id: "zmu.provider",
@@ -445,7 +454,7 @@ describe("PluginHost.enable after restarting with a disabled external theme", ()
   it("loads the saved package before starting an unregistered external theme", async () => {
     const host = new PluginHost()
     const previousDisabled = usePluginPreferences.getState().disabledPluginIds
-    usePluginPreferences.getState().setPluginDisabled(arknightsManifest.id, true)
+    usePluginPreferences.getState().setPluginDisabled(externalThemeManifest.id, true)
     const load = vi
       .spyOn(
         host as unknown as {
@@ -454,21 +463,21 @@ describe("PluginHost.enable after restarting with a disabled external theme", ()
         "load"
       )
       .mockImplementation(async () => {
-        host.runtime.register(arknightsManifest, arknightsDefinition, "external")
+        host.runtime.register(externalThemeManifest, externalThemeDefinition, "external")
       })
     try {
-      expect(host.runtime.get(arknightsManifest.id)).toBeUndefined()
-      await host.enable(arknightsManifest.id)
-      expect(load).toHaveBeenCalledWith(arknightsManifest.id, false, false)
-      expect(host.runtime.get(arknightsManifest.id)?.status).toBe("active")
+      expect(host.runtime.get(externalThemeManifest.id)).toBeUndefined()
+      await host.enable(externalThemeManifest.id)
+      expect(load).toHaveBeenCalledWith(externalThemeManifest.id, false, false)
+      expect(host.runtime.get(externalThemeManifest.id)?.status).toBe("active")
       expect(
         host.ui
           .getSnapshot()
           .themes.some(
-            (theme) => theme.pluginId === arknightsManifest.id && theme.id === "arknights"
+            (theme) => theme.pluginId === externalThemeManifest.id && theme.id === "external"
           )
       ).toBe(true)
-      expect(usePluginPreferences.getState().disabledPluginIds).not.toContain(arknightsManifest.id)
+      expect(usePluginPreferences.getState().disabledPluginIds).not.toContain(externalThemeManifest.id)
     } finally {
       host.runtime.dispose()
       usePluginPreferences.setState({ disabledPluginIds: previousDisabled })
@@ -478,7 +487,7 @@ describe("PluginHost.enable after restarting with a disabled external theme", ()
   it("retains the disabled preference when the saved package fails to load", async () => {
     const host = new PluginHost()
     const previousDisabled = usePluginPreferences.getState().disabledPluginIds
-    usePluginPreferences.getState().setPluginDisabled(arknightsManifest.id, true)
+    usePluginPreferences.getState().setPluginDisabled(externalThemeManifest.id, true)
     vi.spyOn(
       host as unknown as {
         load(id: string, replaceActive: boolean): Promise<void>
@@ -486,8 +495,8 @@ describe("PluginHost.enable after restarting with a disabled external theme", ()
       "load"
     ).mockRejectedValue(new Error("Cannot load saved ZIP"))
     try {
-      await expect(host.enable(arknightsManifest.id)).rejects.toThrow("Cannot load saved ZIP")
-      expect(usePluginPreferences.getState().disabledPluginIds).toContain(arknightsManifest.id)
+      await expect(host.enable(externalThemeManifest.id)).rejects.toThrow("Cannot load saved ZIP")
+      expect(usePluginPreferences.getState().disabledPluginIds).toContain(externalThemeManifest.id)
     } finally {
       host.runtime.dispose()
       usePluginPreferences.setState({ disabledPluginIds: previousDisabled })

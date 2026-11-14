@@ -48,7 +48,7 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 | 公共 SDK        | `packages/plugin-sdk/`                      | 清单、Provider 契约、Slot / UI / 服务类型、市场协议 |
 | UI Kit          | `packages/plugin-ui/`、`packages/academic/` | 官方 React 组件、hooks、stores 与共享教务 UI        |
 | 官方插件        | `plugins/official/`                         | Shell、初始化向导、YSU Provider、教务功能、默认主题 |
-| 市场插件        | `plugins/market/`                           | 森空鸟、明日方舟主题、遵义医科大学 Provider 等      |
+| 可选官方插件    | `Youwenqwq/orahako-official-plugins`        | 森空鸟、主题、学校 Provider 与完整外部功能插件      |
 | Provider 运行时 | `providers/`                                | 当前 Provider 上下文、Provider 服务、缓存查询 hooks |
 | 传输 / 原生     | `lib/cookie.ts`、`lib/native/`、`android/`  | Cookie jar、边缘代理、通知、Live Update、小组件     |
 | 站点            | `website/`                                  | EdgeOne Pages、Web PWA 注入、边缘 API、插件市场     |
@@ -70,7 +70,7 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 - Provider 契约位于 `packages/plugin-sdk/academic.ts`，学校配置位于 `provider-school.ts`；实现通常继承 `BaseProvider`。Provider 插件通过 `ctx.providers.registerSchool({ config, providerFactory })` 同时注册学校和工厂，作用域释放时自动撤销。
 - `providers/provider-context.tsx`、`providers/provider-service.ts` 管理当前 Provider 的初始化、重登录和退出；UI 数据统一走 `providers/hooks/`，中心缓存路径是 `providers/hooks/use-provider-query.ts`。
 - YSU 的 CAS / JWXT / 移动端 / 缴费协议与会话生命周期都在 `plugins/official/ysu/`。YSU CAS 可能落到 reAuth / MFA 页面，未确认 `isAuthenticated()` 不得视为登录成功；JWXT 重新授权暴露的 `NotAuthenticatedError` 应保持 `AUTH_SESSION_EXPIRED`。
-- 外部 Provider 参考 `plugins/market/zmu-provider`，只使用公共 SDK。新增学校域名还必须加入 `website/edge-functions/api/proxy.js` 的 `ALLOWED_HOSTS`，插件注册本身不能绕过 Web 代理白名单。
+- 外部 Provider 参考 `Youwenqwq/orahako-official-plugins` 的 `plugins/zmu-provider`，只使用公共 SDK。新增学校域名还必须加入 `website/edge-functions/api/proxy.js` 的 `ALLOWED_HOSTS`，插件注册本身不能绕过 Web 代理白名单。
 - Provider 的 `capabilities` 与 `supportedPlugins` 共同决定功能是否可用：`supportedPlugins === undefined` 表示全部允许；否则只允许列出的功能插件。`lib/plugins/host.ts` 的 `reconcileProviderSupport()` 会停止不支持的功能插件，并在切回时仅恢复由 Provider 停用的项。
 - `isAuthenticated` 与 `sessionExpired` 必须分开。会话过期时保留 `isAuthenticated=true`，由 `sessionExpired` 驱动提示；`components/sdk-provider.tsx` 不得因确认过期而退出登录或强制跳转。
 
@@ -88,7 +88,7 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 - 功能插件通过 `ctx.settings.registerCategory()` 注册分类面板，通过 `settings.*` Slot 贡献启动页选项、通知子节和小组件入口；不要把分类面板重新散落到主设置页。总览挂件由实际功能插件注册，不得由一个聚合插件代注册。停用插件后对应 UI 必须自动消失。
 - `orahako.notifications` 拥有唯一通知设置分组与原生运行时；功能插件通过 `settings.notifications.*` 贡献自己的 UI，并用 `ctx.notifications.register()` 注册运行时渠道。不要在 Shell、YSU 或设置页恢复按插件 ID 硬编码的通知协调。
 - 外部插件只能导入公共模块：`@orahako/plugin-sdk*`、`@orahako/plugin-ui/*`、`@orahako/academic`、共享的 React / Next / Sonner。禁止 `@/` 私有导入。
-- 外部插件的 Tailwind 工具类由 `pnpm plugin pack` 编译进插件 ZIP 的 `dist/tailwind.css`；宿主只提供 `app/globals.css` 的 `@theme inline` token 映射、preflight 和共享组件样式。`app/globals.css` 用 `source(none)` 只扫描宿主目录，不要恢复对 `packages/*` 外部插件或 `plugins/market` 的扫描；否则插件漏带样式会被宿主掩盖。
+- 外部插件的 Tailwind 工具类由 `pnpm plugin pack` 编译进插件 ZIP 的 `dist/tailwind.css`；宿主只提供 `app/globals.css` 的 `@theme inline` token 映射、preflight 和共享组件样式。`app/globals.css` 用 `source(none)` 只扫描宿主目录，不要恢复对外部插件源码的扫描；否则插件漏带样式会被宿主掩盖。
 - 已移除的旧聚合层（`lib/dashboard-nav.*`、`lib/dashboard-features.*`、`lib/extras/`、`lib/fees/` 注册表、`lib/api.ts`、`lib/types.ts`、`lib/use-cached-data.ts`）不要恢复；对应能力应落到插件注册中。
 
 ### 存储 / 原生 / PWA
@@ -104,7 +104,7 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 - `website/` 是 Astro 6 服务承载站点：`/` 跳转 `www.welain.com`，`/faq` 内联 WebView 兼容性文档，`/admin` 提供统计与公告管理；Web PWA 位于 `/app`。
 - 边缘函数：`api/proxy.js`（教务代理）、`api/activate.js`、`api/stats.js`、`api/announcement.js`、`api/admin.js`、`updates/announcement.json.js`、`updates/plugins.json.js`。
 - 代理按 `ALLOWED_HOSTS` 和 `ALLOWED_ORIGINS` 白名单转发；带凭据的上游 URL 使用 `x-proxy-target`，避免进入代理请求日志。配置 `ACTIVATION_TOKEN` 后，代理强制校验激活凭证，客户端 `ActivationGate` 只是体验层。
-- 插件市场索引由 `website/edge-functions/updates/plugins.json.js` 提供，客户端地址是 `https://ysu.welain.com/updates/plugins.json`；ZIP 位于 `website/public/plugins/<id>/<version>.zip`。索引中的 `sha256`、`size`、`apiVersion`、平台和 `minAppVersion` 必须与实际包一致。
+- 插件市场的唯一元数据来源是 Private 仓库 `Youwenqwq/orahako-plugin-registry`。`website/edge-functions/updates/plugins.json.js` 是由该仓库 `pnpm run sync:website` 生成的公开分发快照，不要手工编辑；客户端地址是 `https://ysu.welain.com/updates/plugins.json`。ZIP 位于 `website/public/plugins/<id>/<version>.zip`，索引中的 `sha256`、`size`、`apiVersion`、平台和 `minAppVersion` 必须与实际包一致。
 - `scripts/deploy-website.sh` 以 `APP_BASE_PATH=/app` 构建并注入 `website/public/app/`，再在 `website/` 下执行 `edgeone makers deploy`。
 - 不提交生成产物：`dist/`、`packages/*/dist/`、`plugins/**/dist/`、`plugins/**/*.zip`、`website/dist/`、`website/.edgeone/`、`website/public/app/`、`website/public/updates/`。`website/public/plugins/` 下的市场 ZIP 是发布资产，需要提交并让索引哈希与之匹配。
 
