@@ -2,6 +2,7 @@ import { createElement } from "react"
 import { Activity } from "lucide-react"
 import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/plugin-sdk"
 import { NetworkActivitySettings } from "./settings"
+import { ActivityMascots } from "./mascots"
 import { loadActivitySettings } from "./state"
 import { NetworkActivityIndicator } from "./strip"
 
@@ -44,6 +45,8 @@ export const definition = definePlugin((ctx) => {
           showTiming: "简洁模式显示计时",
           showTimingDescription:
             "在简洁模式下显示当前加载条目的实时耗时；详细和调试模式始终显示计时。",
+          showMascots: "显示嘿咻",
+          showMascotsDescription: "嘿咻！",
           compact: "简洁",
           detailed: "详细",
           debug: "调试",
@@ -86,6 +89,8 @@ export const definition = definePlugin((ctx) => {
           showTiming: "Show timing in compact mode",
           showTimingDescription:
             "Show the live duration of the current item in compact mode. Detailed and debug modes always show timing.",
+          showMascots: "Show Heixiu",
+          showMascotsDescription: "Heixiu!",
           compact: "Compact",
           detailed: "Detailed",
           debug: "Debug",
@@ -122,5 +127,12 @@ export const definition = definePlugin((ctx) => {
     id: "activity-strip",
     slot: "shell.activity",
     component: () => createElement(NetworkActivityIndicator, { activity: ctx.http.activity }),
+  })
+
+  ctx.slots.register({
+    id: "activity-mascots",
+    slot: "shell.overlay",
+    order: 20,
+    component: () => createElement(ActivityMascots, { activity: ctx.http.activity }),
   })
 })

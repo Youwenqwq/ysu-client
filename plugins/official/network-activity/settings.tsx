@@ -11,10 +11,33 @@ import {
 import { useTranslation } from "@orahako/plugin-ui/hooks"
 import {
   DENSITY_STORAGE_KEY,
+  MASCOTS_STORAGE_KEY,
   TIMING_STORAGE_KEY,
   isActivityDensity,
   useActivitySettings,
 } from "./state"
+
+function SettingSwitch({
+  label,
+  description,
+  checked,
+  onCheckedChange,
+}: {
+  label: string
+  description: string
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-t border-border/40 pt-3">
+      <div className="flex flex-col gap-1">
+        <span className="text-sm">{label}</span>
+        <span className="text-xs text-muted-foreground">{description}</span>
+      </div>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={label} />
+    </div>
+  )
+}
 
 export function NetworkActivitySettings({ storage }: { storage: PluginKeyValueStorage }) {
   const { t } = useTranslation()
@@ -22,6 +45,8 @@ export function NetworkActivitySettings({ storage }: { storage: PluginKeyValueSt
   const setDensity = useActivitySettings((state) => state.setDensity)
   const showTiming = useActivitySettings((state) => state.showTiming)
   const setShowTiming = useActivitySettings((state) => state.setShowTiming)
+  const showMascots = useActivitySettings((state) => state.showMascots)
+  const setShowMascots = useActivitySettings((state) => state.setShowMascots)
 
   function handleDensityChange(value: string) {
     if (!isActivityDensity(value)) return
@@ -32,6 +57,11 @@ export function NetworkActivitySettings({ storage }: { storage: PluginKeyValueSt
   function handleTimingChange(enabled: boolean) {
     setShowTiming(enabled)
     void storage.setItem(TIMING_STORAGE_KEY, String(enabled)).catch(() => {})
+  }
+
+  function handleMascotsChange(enabled: boolean) {
+    setShowMascots(enabled)
+    void storage.setItem(MASCOTS_STORAGE_KEY, String(enabled)).catch(() => {})
   }
 
   return (
@@ -63,19 +93,18 @@ export function NetworkActivitySettings({ storage }: { storage: PluginKeyValueSt
         <p className="text-xs text-muted-foreground">
           {t(`networkActivity.settings.${density}Description`)}
         </p>
-        <div className="flex items-center justify-between gap-4 border-t border-border/40 pt-3">
-          <div className="flex flex-col gap-1">
-            <span className="text-sm">{t("networkActivity.settings.showTiming")}</span>
-            <span className="text-xs text-muted-foreground">
-              {t("networkActivity.settings.showTimingDescription")}
-            </span>
-          </div>
-          <Switch
-            checked={showTiming}
-            onCheckedChange={handleTimingChange}
-            aria-label={t("networkActivity.settings.showTiming")}
-          />
-        </div>
+        <SettingSwitch
+          label={t("networkActivity.settings.showTiming")}
+          description={t("networkActivity.settings.showTimingDescription")}
+          checked={showTiming}
+          onCheckedChange={handleTimingChange}
+        />
+        <SettingSwitch
+          label={t("networkActivity.settings.showMascots")}
+          description={t("networkActivity.settings.showMascotsDescription")}
+          checked={showMascots}
+          onCheckedChange={handleMascotsChange}
+        />
       </CardContent>
     </Card>
   )
