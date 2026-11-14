@@ -97,8 +97,6 @@ export function PerlicaNearbyList({ machines, selectedCode, loading = false, onS
                 )}
               </span>
               <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                {machine.machineNo || t("perlica.noMachineNo")}
-                {" · "}
                 {t("perlica.distanceMeters", { distance: Math.round(machine.distance) })}
               </span>
               {machine.address ? (

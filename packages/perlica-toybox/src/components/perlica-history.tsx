@@ -2,22 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
-import { ChevronRight, CircleAlert, Clock3, Flag, History, MapPin, Route } from "lucide-react"
+import { ChevronRight, CircleAlert, Flag, History, MapPin, Route } from "lucide-react"
 import { Badge } from "@orahako/plugin-ui/components"
 import { Button } from "@orahako/plugin-ui/components"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@orahako/plugin-ui/components"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  ResponsiveModal,
+  ResponsiveModalBody,
+  ResponsiveModalContent,
+  ResponsiveModalDescription,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
 } from "@orahako/plugin-ui/components"
 import {
   Empty,
@@ -49,8 +43,6 @@ export interface PerlicaHistoryProps {
   onLoadMore: () => void
   reportError: (error: unknown) => void
 }
-
-type DeductionValue = string | number | boolean
 
 function cleanText(value: unknown): string {
   if (typeof value !== "string" && typeof value !== "number") return ""
@@ -123,22 +115,17 @@ function recoverStartPoint(points: PerlicaParkPoint[], name: string) {
   return match ? validPoint(match.lat, match.lng) : null
 }
 
-function isCardDeductionKey(key: string): boolean {
-  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "")
-  if (normalized.includes("card") && /deduct|discount|fee|amount|money/.test(normalized)) {
-    return true
+function cardDeduction(raw: PerlicaRaw): number | null {
+  for (const key of [
+    "cardDeductionMoney",
+    "rideCardDeductionMoney",
+    "giftCardDeductionMoney",
+    "rideDiscountActivityMoney",
+  ]) {
+    const value = Number(raw[key])
+    if (Number.isFinite(value) && value > 0) return value
   }
-  return /^(?:ride)?(?:deduct|deduction|discount)(?:fee|amount|money)?$/.test(normalized)
-}
-
-function cardDeductions(raw: PerlicaRaw): Array<[string, DeductionValue]> {
-  return Object.entries(raw).filter((entry): entry is [string, DeductionValue] => {
-    const [key, value] = entry
-    if (!isCardDeductionKey(key)) return false
-    if (typeof value === "number") return Number.isFinite(value)
-    if (typeof value === "boolean") return true
-    return typeof value === "string" && cleanText(value) !== ""
-  })
+  return null
 }
 
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
@@ -213,8 +200,18 @@ export function PerlicaHistory({
       }
 
       try {
-        const nextDetail = await client.rideDetail(log.orderNo)
+        let nextDetail = await client.rideDetail(log.orderNo)
         if (requestRef.current !== requestId) return
+
+        try {
+          const route = await client.rideRoute(nextDetail)
+          if (requestRef.current !== requestId) return
+          nextDetail = { ...nextDetail, route }
+        } catch (error) {
+          if (requestRef.current !== requestId) return
+          // Start/end markers remain useful when the optional track is unavailable.
+          reportError(error)
+        }
 
         let nextRecoveredStart: PerlicaCoords | null = null
         const nextStartName = startName(nextDetail)
@@ -245,6 +242,12 @@ export function PerlicaHistory({
 
   const formatFee = (fee: number) =>
     Number.isFinite(fee) ? currencyFormatter.format(fee) : t("perlica.historyUnknown")
+
+  const formatStatus = (ride: PerlicaRideLog) => {
+    if (ride.status === "paid") return t("perlica.historyStatusPaid")
+    if (ride.status === "unpaid") return t("perlica.historyStatusUnpaid")
+    return ride.status || t("perlica.historyUnknown")
+  }
 
   const formatDistance = (distance: number) => {
     if (!Number.isFinite(distance) || distance < 0) return t("perlica.historyUnknown")
@@ -277,17 +280,6 @@ export function PerlicaHistory({
     return t("perlica.historyDurationSeconds", { value: seconds })
   }
 
-  const formatDeduction = (value: DeductionValue) => {
-    if (typeof value === "number") return formatFee(value)
-    if (typeof value === "boolean") {
-      return value ? t("perlica.historyYes") : t("perlica.historyNo")
-    }
-    const numericValue = Number(value)
-    return value.trim() !== "" && Number.isFinite(numericValue)
-      ? currencyFormatter.format(numericValue)
-      : value
-  }
-
   const detailStartName = detail ? startName(detail) : ""
   const detailEndName = detail ? endName(detail) : ""
   const start = useMemo(
@@ -295,96 +287,124 @@ export function PerlicaHistory({
     [detail]
   )
   const end = useMemo(() => (detail ? validPoint(detail.endLat, detail.endLng) : null), [detail])
-  const deductions = useMemo(() => (detail ? cardDeductions(detail.raw) : []), [detail])
+  const deduction = detail ? cardDeduction(detail.raw) : null
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("perlica.historyTitle")}</CardTitle>
-          <CardDescription>{t("perlica.historyDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div aria-busy={loading}>
-            {loading && logs.length === 0 ? (
-              <div className="space-y-2" aria-label={t("perlica.historyLoading")}>
-                {[0, 1, 2].map((item) => (
-                  <Skeleton key={item} className="h-20 w-full" />
-                ))}
-              </div>
-            ) : logs.length === 0 ? (
-              <Empty className="py-10">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <History />
-                  </EmptyMedia>
-                  <EmptyTitle>{t("perlica.historyEmptyTitle")}</EmptyTitle>
-                  <EmptyDescription>{t("perlica.historyEmptyDescription")}</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : (
-              <ul className="divide-y">
-                {logs.map((log, index) => (
-                  <li key={`${log.orderNo || "ride"}-${index}`}>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-auto w-full justify-start gap-3 rounded-none px-0 py-4 text-left whitespace-normal"
-                      onClick={() => void openDetail(log)}
-                      aria-label={t("perlica.historyOpenDetail", {
-                        time: log.startTime || t("perlica.historyUnknown"),
-                      })}
-                    >
-                      <span className="min-w-0 flex-1 space-y-2">
-                        <span className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="font-medium">
-                            {log.startTime || t("perlica.historyUnknown")}
-                          </span>
-                          <Badge variant="secondary">
-                            {log.status || t("perlica.historyUnknown")}
-                          </Badge>
+      <section className="space-y-4">
+        <div className="px-1">
+          <h2 className="text-lg font-semibold">{t("perlica.historyTitle")}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t("perlica.historyDescription")}</p>
+        </div>
+        <div aria-busy={loading}>
+          {loading && logs.length === 0 ? (
+            <div className="space-y-3" aria-label={t("perlica.historyLoading")}>
+              {[0, 1, 2].map((item) => (
+                <Skeleton key={item} className="h-36 w-full rounded-2xl" />
+              ))}
+            </div>
+          ) : logs.length === 0 ? (
+            <Empty className="min-h-[45dvh] py-10">
+              <EmptyHeader>
+                <EmptyMedia variant="icon" className="size-14 rounded-2xl">
+                  <History />
+                </EmptyMedia>
+                <EmptyTitle>{t("perlica.historyEmptyTitle")}</EmptyTitle>
+                <EmptyDescription>{t("perlica.historyEmptyDescription")}</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <ul className="space-y-3">
+              {logs.map((log, index) => (
+                <li key={`${log.orderNo || "ride"}-${index}`}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-auto w-full justify-start gap-2 rounded-2xl bg-card p-4 text-left whitespace-normal ring-1 ring-foreground/10 transition hover:bg-card/80 active:scale-[0.99]"
+                    onClick={() => void openDetail(log)}
+                    aria-label={t("perlica.historyOpenDetail", {
+                      time: log.startTime || t("perlica.historyUnknown"),
+                    })}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 truncate text-sm font-medium">
+                          {log.startTime || t("perlica.historyUnknown")}
                         </span>
-                        <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-normal text-muted-foreground">
-                          <span>
-                            {t("perlica.historyVehicle")}:{" "}
-                            {log.machineNo || log.userCode || t("perlica.historyUnknown")}
+                        <Badge variant="secondary">{formatStatus(log)}</Badge>
+                      </span>
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                        {t("perlica.historyVehicle")} ·{" "}
+                        {log.userCode || t("perlica.historyUnknown")}
+                      </span>
+                      <span className="mt-4 grid grid-cols-3 gap-2">
+                        <span>
+                          <span className="block text-[11px] font-normal text-muted-foreground">
+                            {t("perlica.historyDuration")}
                           </span>
-                          <span>{formatDuration(log.duration)}</span>
-                          <span>{formatDistance(log.distance)}</span>
-                          <span className="font-medium text-foreground">{formatFee(log.fee)}</span>
+                          <span className="mt-1 block text-sm font-medium">
+                            {formatDuration(log.duration)}
+                          </span>
+                        </span>
+                        <span>
+                          <span className="block text-[11px] font-normal text-muted-foreground">
+                            {t("perlica.historyDistance")}
+                          </span>
+                          <span className="mt-1 block text-sm font-medium">
+                            {formatDistance(log.distance)}
+                          </span>
+                        </span>
+                        <span className="text-right">
+                          <span className="block text-[11px] font-normal text-muted-foreground">
+                            {t("perlica.historyFee")}
+                          </span>
+                          <span className="mt-1 block text-sm font-semibold">
+                            {formatFee(log.fee)}
+                          </span>
                         </span>
                       </span>
-                      <ChevronRight className="self-center text-muted-foreground" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 self-center text-muted-foreground" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {hasMore ? (
+          <div className="flex justify-center pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full rounded-xl"
+              onClick={onLoadMore}
+              disabled={loading}
+            >
+              {loading ? <Spinner /> : null}
+              {loading ? t("perlica.historyLoading") : t("perlica.historyLoadMore")}
+            </Button>
           </div>
+        ) : logs.length > 0 ? (
+          <p className="pt-2 text-center text-xs text-muted-foreground">
+            {t("perlica.historyEnd")}
+          </p>
+        ) : null}
+      </section>
 
-          {hasMore ? (
-            <div className="flex justify-center pt-4">
-              <Button type="button" variant="outline" onClick={onLoadMore} disabled={loading}>
-                {loading ? <Spinner /> : null}
-                {loading ? t("perlica.historyLoading") : t("perlica.historyLoadMore")}
-              </Button>
-            </div>
-          ) : logs.length > 0 ? (
-            <p className="pt-4 text-center text-xs text-muted-foreground">
-              {t("perlica.historyEnd")}
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
+      <ResponsiveModal open={selected !== null} onOpenChange={(open) => !open && closeDetail()}>
+        <ResponsiveModalContent
+          className="flex max-h-[90vh] flex-col sm:max-w-2xl"
+          drawerClassName="gap-0"
+        >
+          <ResponsiveModalHeader className="text-left">
+            <ResponsiveModalTitle>{t("perlica.historyDetailTitle")}</ResponsiveModalTitle>
+            <ResponsiveModalDescription>
+              {t("perlica.historyDetailDescription")}
+            </ResponsiveModalDescription>
+          </ResponsiveModalHeader>
 
-      <Dialog open={selected !== null} onOpenChange={(open) => !open && closeDetail()}>
-        <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{t("perlica.historyDetailTitle")}</DialogTitle>
-            <DialogDescription>{t("perlica.historyDetailDescription")}</DialogDescription>
-          </DialogHeader>
-
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <ResponsiveModalBody className="min-h-0 flex-1 overflow-y-auto" data-vaul-no-drag>
             {detailLoading ? (
               <div className="space-y-4 py-2" role="status">
                 <span className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -412,8 +432,22 @@ export function PerlicaHistory({
                 </EmptyHeader>
               </Empty>
             ) : detail ? (
-              <div className="space-y-5 pb-1">
-                <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="space-y-5 pb-2">
+                <section className="space-y-2" aria-label={t("perlica.historyRoute")}>
+                  <h3 className="flex items-center gap-1.5 text-sm font-medium">
+                    <Route className="size-4" />
+                    {t("perlica.historyRoute")}
+                  </h3>
+                  <PerlicaRouteMap
+                    route={detail.route}
+                    start={start ?? recoveredStart}
+                    end={end}
+                    startName={detailStartName || undefined}
+                    endName={detailEndName || undefined}
+                  />
+                </section>
+
+                <dl className="grid grid-cols-2 gap-x-3 rounded-2xl bg-muted/50 px-3 py-2 sm:grid-cols-4">
                   <DetailRow label={t("perlica.historyFee")}>{formatFee(detail.fee)}</DetailRow>
                   <DetailRow label={t("perlica.historyDistance")}>
                     {formatDistance(detail.distance)}
@@ -421,65 +455,56 @@ export function PerlicaHistory({
                   <DetailRow label={t("perlica.historyDuration")}>
                     {formatDuration(detail.duration)}
                   </DetailRow>
-                  <DetailRow label={t("perlica.historyStatus")}>
-                    {detail.status || t("perlica.historyUnknown")}
-                  </DetailRow>
+                  <DetailRow label={t("perlica.historyStatus")}>{formatStatus(detail)}</DetailRow>
                 </dl>
 
-                {deductions.length > 0 ? (
-                  <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {deductions.map(([key, value]) => (
-                      <DetailRow key={key} label={t("perlica.historyCardDeduction")}>
-                        {formatDeduction(value)}
-                      </DetailRow>
-                    ))}
+                {deduction !== null ? (
+                  <dl className="rounded-xl border px-3">
+                    <DetailRow label={t("perlica.historyCardDeduction")}>
+                      {formatFee(deduction / 100)}
+                    </DetailRow>
                   </dl>
                 ) : null}
 
-                <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <DetailRow label={t("perlica.historyStartAddress")}>
-                    <span className="flex items-start gap-1.5">
-                      <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <span>{detailStartName || t("perlica.historyUnknown")}</span>
+                <ol className="relative space-y-5 before:absolute before:top-5 before:bottom-5 before:left-[7px] before:w-px before:bg-border">
+                  <li className="relative flex items-start gap-3">
+                    <span className="z-10 mt-1 flex size-4 shrink-0 items-center justify-center rounded-full bg-background">
+                      <MapPin className="size-4 text-primary" />
                     </span>
-                  </DetailRow>
-                  <DetailRow label={t("perlica.historyEndAddress")}>
-                    <span className="flex items-start gap-1.5">
-                      <Flag className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <span>{detailEndName || t("perlica.historyUnknown")}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                        <h4 className="text-sm font-medium">{t("perlica.historyStartAddress")}</h4>
+                        <time className="text-xs text-muted-foreground">
+                          {detail.startTime || t("perlica.historyUnknown")}
+                        </time>
+                      </div>
+                      <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                        {detailStartName || t("perlica.historyUnknown")}
+                      </p>
+                    </div>
+                  </li>
+                  <li className="relative flex items-start gap-3">
+                    <span className="z-10 mt-1 flex size-4 shrink-0 items-center justify-center rounded-full bg-background">
+                      <Flag className="size-4 text-destructive" />
                     </span>
-                  </DetailRow>
-                  <DetailRow label={t("perlica.historyStartTime")}>
-                    <span className="flex items-start gap-1.5">
-                      <Clock3 className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <span>{detail.startTime || t("perlica.historyUnknown")}</span>
-                    </span>
-                  </DetailRow>
-                  <DetailRow label={t("perlica.historyEndTime")}>
-                    <span className="flex items-start gap-1.5">
-                      <Clock3 className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <span>{detail.endTime || t("perlica.historyUnknown")}</span>
-                    </span>
-                  </DetailRow>
-                </dl>
-
-                <section className="space-y-2" aria-label={t("perlica.historyRoute")}>
-                  <h3 className="flex items-center gap-1.5 text-sm font-medium">
-                    <Route className="size-4" />
-                    {t("perlica.historyRoute")}
-                  </h3>
-                  <PerlicaRouteMap
-                    start={start ?? recoveredStart}
-                    end={end}
-                    startName={detailStartName || undefined}
-                    endName={detailEndName || undefined}
-                  />
-                </section>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                        <h4 className="text-sm font-medium">{t("perlica.historyEndAddress")}</h4>
+                        <time className="text-xs text-muted-foreground">
+                          {detail.endTime || t("perlica.historyUnknown")}
+                        </time>
+                      </div>
+                      <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                        {detailEndName || t("perlica.historyUnknown")}
+                      </p>
+                    </div>
+                  </li>
+                </ol>
               </div>
             ) : null}
-          </div>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveModalBody>
+        </ResponsiveModalContent>
+      </ResponsiveModal>
     </>
   )
 }

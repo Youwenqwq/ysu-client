@@ -25,9 +25,9 @@ export interface PerlicaUserInfo {
 }
 
 export interface PerlicaMachine {
-  /** Eight-digit code required by status, fee, and riding operations. */
+  /** Eight-digit ID printed on the vehicle and returned by its QR machineNO parameter. */
   userCode: string
-  /** Nine-digit number printed on the vehicle and used by the ring command. */
+  /** Nine-digit internal number used by the ring command; not shown in normal UI. */
   machineNo: string
   name: string
   address: string
@@ -56,6 +56,7 @@ export interface PerlicaRideLog extends PerlicaOrder {
 }
 
 export interface PerlicaMachineStatus {
+  userCode: string
   machineNo: string
   status: string
   battery: number
@@ -83,6 +84,7 @@ export interface PerlicaReturnCheck {
 
 export interface PerlicaDispatchOption {
   type: number
+  /** Dispatch fee in yuan; the service returns money fields in cents. */
   money: number
 }
 
@@ -116,6 +118,8 @@ export interface PerlicaParkPoint {
   lat: number
   lng: number
   distance: number
+  /** WGS-84 polygon vertices supplied by the parking-point endpoint. */
+  area: PerlicaCoords[]
   raw: PerlicaRaw
 }
 
@@ -147,6 +151,8 @@ export interface PerlicaRideDetail extends PerlicaRideLog {
   startLng: number
   endLat: number
   endLng: number
+  /** Chronological WGS-84 GPS points recorded during the ride. */
+  route: PerlicaCoords[]
 }
 
 const UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
@@ -232,6 +238,69 @@ function rawBoolean(...values: unknown[]): boolean {
   return false
 }
 
+function rawOptionalBoolean(...values: unknown[]): boolean | null {
+  for (const value of values) {
+    if (value === true || value === 1 || value === "1" || value === "true") return true
+    if (value === false || value === 0 || value === "0" || value === "false") return false
+  }
+  return null
+}
+
+function rawOptionalNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") continue
+    const number = Number(value)
+    if (Number.isFinite(number)) return number
+  }
+  return null
+}
+
+/** Naive service timestamps are China Standard Time, not the device's local zone. */
+function serviceTimestamp(value: unknown): number | null {
+  if (typeof value === "number" || (typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value))) {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return null
+    return Math.abs(numeric) < 1_000_000_000_000 ? numeric * 1000 : numeric
+  }
+  const text = rawString(value).trim()
+  if (!text) return null
+  const normalized = text.replace(" ", "T")
+  const withZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized) ? normalized : `${normalized}+08:00`
+  const timestamp = Date.parse(withZone)
+  return Number.isFinite(timestamp) ? timestamp : null
+}
+
+function durationBetween(startTime: string, endTime: string): number | null {
+  const start = serviceTimestamp(startTime)
+  const end = serviceTimestamp(endTime)
+  if (start === null || end === null || end < start) return null
+  return Math.floor((end - start) / 1000)
+}
+
+function lonLat(value: unknown): PerlicaCoords | null {
+  if (typeof value !== "string") return null
+  const [lng, lat, ...rest] = value.split(",").map((part) => Number(part.trim()))
+  if (rest.length > 0 || lng === undefined || lat === undefined) return null
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    Math.abs(lat) > 90 ||
+    Math.abs(lng) > 180 ||
+    (lat === 0 && lng === 0)
+  ) {
+    return null
+  }
+  return { lat, lng }
+}
+
+function coordinateList(value: unknown): PerlicaCoords[] {
+  if (typeof value !== "string") return []
+  return value
+    .split(";")
+    .map(lonLat)
+    .filter((point): point is PerlicaCoords => point !== null)
+}
+
 function machineNo(record: PerlicaRaw): string {
   return rawString(record.machineNo, record.machineNO, record.machine_no, record.code)
 }
@@ -285,8 +354,14 @@ export function toPerlicaOrder(data: unknown): PerlicaOrder {
     orderNo: orderNo(raw),
     userCode: userCode(raw),
     machineNo: machineNo(raw),
-    startTime: rawString(raw.startTime, raw.borrowTime, raw.beginTime, raw.createTime),
-    endTime: rawString(raw.endTime, raw.returnTime, raw.finishTime),
+    startTime: rawString(
+      raw.startTime,
+      raw.orderStartTime,
+      raw.borrowTime,
+      raw.beginTime,
+      raw.createTime
+    ),
+    endTime: rawString(raw.endTime, raw.orderEndTime, raw.returnTime, raw.finishTime),
     status: rawString(raw.status, raw.orderStatus, raw.state),
     fee: rawNumber(raw.fee, raw.totalFee, raw.totalAmount, raw.amount),
     raw,
@@ -312,30 +387,59 @@ export function toPerlicaCurrentOrder(data: unknown): PerlicaOrder | null {
 
 export function toPerlicaRideLog(data: unknown): PerlicaRideLog {
   const order = toPerlicaOrder(data)
+  const explicitDuration = rawOptionalNumber(
+    order.raw.duration,
+    order.raw.rideDuration,
+    order.raw.rideTime,
+    order.raw.useTime
+  )
+  const cents = rawOptionalNumber(order.raw.actualPayMoney, order.raw.money)
+  const payStatus = rawOptionalNumber(order.raw.payStatus)
+  const status =
+    order.status || (payStatus === 1 ? "paid" : payStatus === 0 ? "unpaid" : order.status)
   return {
     ...order,
-    duration: rawNumber(
-      order.raw.duration,
-      order.raw.rideDuration,
-      order.raw.rideTime,
-      order.raw.useTime
-    ),
+    status,
+    fee: cents === null ? order.fee : cents / 100,
+    duration: explicitDuration ?? durationBetween(order.startTime, order.endTime) ?? 0,
     distance: rawNumber(order.raw.distance, order.raw.rideDistance, order.raw.mileage),
   }
 }
 
 export function toPerlicaRideLogs(data: unknown): PerlicaRideLog[] {
-  return listRecords(data).map(toPerlicaRideLog)
+  return listRecords(data).map((value) => {
+    const log = toPerlicaRideLog(value)
+    const kilometers = rawOptionalNumber(log.raw.mileage)
+    // queryPage returns kilometers; rideLogDetails returns the same field in meters.
+    return kilometers === null ? log : { ...log, distance: kilometers * 1000 }
+  })
 }
+
+const ONLINE_HEARTBEAT_MS = 10 * 60 * 1000
+const ALLOWED_CLOCK_SKEW_MS = 5 * 60 * 1000
 
 export function toPerlicaMachineStatus(data: unknown): PerlicaMachineStatus {
   const raw = unwrapRecord(data, ["machineStatus", "machine"]) ?? {}
   const status = rawString(raw.status, raw.machineStatus, raw.state)
+  const explicitOnline = rawOptionalBoolean(raw.online, raw.isOnline)
+  const statusOnline =
+    status.toLowerCase() === "online" ? true : status.toLowerCase() === "offline" ? false : null
+  const heartbeat = serviceTimestamp(
+    rawString(raw.batDt, raw.heartbeatTime, raw.lastHeartbeat, raw.posDt)
+  )
+  const heartbeatAge = heartbeat === null ? null : Date.now() - heartbeat
+  const heartbeatOnline =
+    heartbeatAge === null
+      ? null
+      : heartbeatAge >= -ALLOWED_CLOCK_SKEW_MS && heartbeatAge <= ONLINE_HEARTBEAT_MS
+  const rawMachineNo = machineNo(raw)
+  const rawUserCode = userCode(raw) || (rawMachineNo.length === 8 ? rawMachineNo : "")
   return {
-    machineNo: machineNo(raw),
+    userCode: rawUserCode,
+    machineNo: rawMachineNo.length === 9 ? rawMachineNo : "",
     status,
     battery: rawNumber(raw.battery, raw.socPercent, raw.electricity, raw.power, raw.soc),
-    online: rawBoolean(raw.online, raw.isOnline) || status.toLowerCase() === "online",
+    online: explicitOnline ?? statusOnline ?? heartbeatOnline ?? false,
     lat: rawNumber(raw.lat, raw.la, raw.latitude),
     lng: rawNumber(raw.lng, raw.lo, raw.lon, raw.longitude),
     raw,
@@ -344,10 +448,11 @@ export function toPerlicaMachineStatus(data: unknown): PerlicaMachineStatus {
 
 export function toPerlicaMachineFee(data: unknown): PerlicaMachineFee {
   const raw = unwrapRecord(data, ["accountFee", "feeInfo"]) ?? {}
+  const baseFee = rawOptionalNumber(raw.baseTimeFee)
   return {
     machineNo: machineNo(raw),
-    fee: rawNumber(raw.fee, raw.totalFee, raw.amount, raw.price),
-    price: rawNumber(raw.price, raw.unitPrice, raw.fee),
+    fee: baseFee === null ? rawNumber(raw.fee, raw.totalFee, raw.amount, raw.price) : baseFee / 100,
+    price: baseFee === null ? rawNumber(raw.price, raw.unitPrice, raw.fee) : baseFee / 100,
     unit: rawString(raw.unit, raw.timeUnit, raw.feeUnit),
     description: rawString(raw.description, raw.desc, raw.feeDesc, raw.remark),
     raw,
@@ -376,7 +481,7 @@ export function toPerlicaDispatchCheck(data: unknown): PerlicaDispatchCheck {
   const options = Array.isArray(rawOptions)
     ? rawOptions.map((value) => {
         const raw = asRecord(value) ?? {}
-        return { type: rawNumber(raw.type), money: rawNumber(raw.money) }
+        return { type: rawNumber(raw.type), money: rawNumber(raw.money) / 100 }
       })
     : []
   return {
@@ -418,6 +523,7 @@ export function toPerlicaParkPoint(data: unknown): PerlicaParkPoint {
     lat: rawNumber(raw.lat, raw.la, raw.latitude, raw.y),
     lng: rawNumber(raw.lng, raw.lo, raw.lon, raw.longitude, raw.x),
     distance: rawNumber(raw.distance, raw.distanceMeters),
+    area: coordinateList(raw.points),
     raw,
   }
 }
@@ -459,17 +565,44 @@ export function toPerlicaGeoArea(data: unknown): PerlicaGeoArea {
   }
 }
 
+export function toPerlicaRideRoute(data: unknown): PerlicaCoords[] {
+  if (typeof data === "string") return coordinateList(data)
+  return listRecords(data)
+    .map((value) => {
+      const raw = asRecord(value) ?? {}
+      return {
+        lat: rawNumber(raw.lat, raw.la, raw.latitude, raw.y),
+        lng: rawNumber(raw.lng, raw.lo, raw.lon, raw.longitude, raw.x),
+      }
+    })
+    .filter(
+      (point) =>
+        Number.isFinite(point.lat) &&
+        Number.isFinite(point.lng) &&
+        Math.abs(point.lat) <= 90 &&
+        Math.abs(point.lng) <= 180 &&
+        (point.lat !== 0 || point.lng !== 0)
+    )
+}
+
 export function toPerlicaRideDetail(data: unknown): PerlicaRideDetail {
   const raw = unwrapRecord(data, ["rideDetail", "detail", "order"]) ?? {}
   const log = toPerlicaRideLog(raw)
+  const borrowPoint = lonLat(raw.borrowLonLat)
+  const returnPoint = lonLat(raw.returnLonLat)
   return {
     ...log,
     startAddress: rawString(raw.startAddress, raw.startAddr, raw.borrowAddress, raw.startLocation),
     endAddress: rawString(raw.endAddress, raw.endAddr, raw.returnAddress, raw.endLocation),
-    startLat: rawNumber(raw.startLat, raw.startLa, raw.borrowLat, raw.borrowLa),
-    startLng: rawNumber(raw.startLng, raw.startLo, raw.startLon, raw.borrowLng, raw.borrowLon),
-    endLat: rawNumber(raw.endLat, raw.endLa, raw.returnLat, raw.returnLa),
-    endLng: rawNumber(raw.endLng, raw.endLo, raw.endLon, raw.returnLng, raw.returnLon),
+    startLat: borrowPoint?.lat ?? rawNumber(raw.startLat, raw.startLa, raw.borrowLat, raw.borrowLa),
+    startLng:
+      borrowPoint?.lng ??
+      rawNumber(raw.startLng, raw.startLo, raw.startLon, raw.borrowLng, raw.borrowLon),
+    endLat: returnPoint?.lat ?? rawNumber(raw.endLat, raw.endLa, raw.returnLat, raw.returnLa),
+    endLng:
+      returnPoint?.lng ??
+      rawNumber(raw.endLng, raw.endLo, raw.endLon, raw.returnLng, raw.returnLon),
+    route: toPerlicaRideRoute(raw.route ?? raw.track ?? raw.path),
   }
 }
 

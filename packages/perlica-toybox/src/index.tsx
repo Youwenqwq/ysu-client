@@ -14,7 +14,7 @@ import "./styles/leaflet.css"
 export const manifest: PluginManifest = {
   id: "community.perlica-toybox",
   name: "Perlica",
-  version: "1.1.1",
+  version: "1.3.0",
   apiVersion: 1,
   minAppVersion: "0.15.0",
   kind: "feature",

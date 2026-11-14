@@ -22,6 +22,7 @@ import {
   Skeleton,
   Textarea,
 } from "@orahako/plugin-ui/components"
+import { PerlicaAccountVerification } from "./components/perlica-account"
 import { clearPerlicaSnapshot, readPerlicaSnapshot } from "./extras/cache"
 import { PerlicaClient, PerlicaError } from "./extras/client"
 import { usePerlicaStore } from "./extras/store"
@@ -197,6 +198,17 @@ export function PerlicaSettingsPage({ params }: PluginPageProps) {
           </FieldGroup>
         </CardContent>
       </Card>
+
+      {debugSnapshot?.user ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("perlica.accountInformation")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PerlicaAccountVerification user={debugSnapshot.user} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

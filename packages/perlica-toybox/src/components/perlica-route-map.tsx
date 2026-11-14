@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { DivIcon, Map as LeafletMap, Marker, Polyline } from "leaflet"
 import { isUsableLatLng, wgs84ToGcj02 } from "../extras/geo"
 import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
@@ -9,6 +9,7 @@ import { addAmapTileLayer, type Leaflet } from "./perlica-map-tiles"
 import type { PerlicaMapCenter } from "./perlica-map"
 
 export interface PerlicaRouteMapProps {
+  route?: PerlicaMapCenter[]
   start?: PerlicaMapCenter | null
   end?: PerlicaMapCenter | null
   startName?: string
@@ -59,21 +60,22 @@ function updateMarkerLabel(marker: Marker, label: string) {
   }
 }
 
-export function PerlicaRouteMap({ start, end, startName, endName }: PerlicaRouteMapProps) {
+export function PerlicaRouteMap({ route, start, end, startName, endName }: PerlicaRouteMapProps) {
   const { t } = usePluginTranslation(PERLICA_PLUGIN_ID)
   const validStart = isValidPoint(start) ? start : null
   const validEnd = isValidPoint(end) ? end : null
+  const validRoute = useMemo(() => (route ?? []).filter(isValidPoint), [route])
   const startLat = validStart?.lat ?? null
   const startLng = validStart?.lng ?? null
   const endLat = validEnd?.lat ?? null
   const endLng = validEnd?.lng ?? null
-  const hasPoints = validStart !== null || validEnd !== null
+  const hasPoints = validRoute.length > 0 || validStart !== null || validEnd !== null
   const overlapping = Boolean(
     validStart && validEnd && validStart.lat === validEnd.lat && validStart.lng === validEnd.lng
   )
 
   const containerRef = useRef<HTMLDivElement>(null)
-  const initialPointRef = useRef(validStart ?? validEnd)
+  const initialPointRef = useRef(validRoute[0] ?? validStart ?? validEnd)
   const startMarkerRef = useRef<Marker | null>(null)
   const endMarkerRef = useRef<Marker | null>(null)
   const routeLineRef = useRef<Polyline | null>(null)
@@ -82,8 +84,8 @@ export function PerlicaRouteMap({ start, end, startName, endName }: PerlicaRoute
   const [loadFailed, setLoadFailed] = useState(false)
 
   useEffect(() => {
-    initialPointRef.current = validStart ?? validEnd
-  }, [validEnd, validStart])
+    initialPointRef.current = validRoute[0] ?? validStart ?? validEnd
+  }, [validEnd, validRoute, validStart])
 
   useEffect(() => {
     if (!hasPoints) return
@@ -207,22 +209,37 @@ export function PerlicaRouteMap({ start, end, startName, endName }: PerlicaRoute
       endMarkerRef.current = null
     }
 
-    if (projectedStart && projectedEnd) {
-      const startPosition: [number, number] = [projectedStart.lat, projectedStart.lng]
-      const endPosition: [number, number] = [projectedEnd.lat, projectedEnd.lng]
+    const projectedRoute = validRoute.map((point) => {
+      const projected = wgs84ToGcj02(point.lat, point.lng)
+      return [projected.lat, projected.lng] as [number, number]
+    })
+    const hasTrack = projectedRoute.length >= 2
+    const linePoints =
+      hasTrack || !projectedStart || !projectedEnd
+        ? projectedRoute
+        : [
+            [projectedStart.lat, projectedStart.lng] as [number, number],
+            [projectedEnd.lat, projectedEnd.lng] as [number, number],
+          ]
+
+    if (linePoints.length >= 2) {
       const line = routeLineRef.current
       if (line) {
-        line.setLatLngs([startPosition, endPosition])
+        line.setLatLngs(linePoints)
+        line.setStyle({ dashArray: hasTrack ? "none" : "6,5", weight: hasTrack ? 4 : 3 })
       } else {
-        routeLineRef.current = L.polyline([startPosition, endPosition], {
+        routeLineRef.current = L.polyline(linePoints, {
           color: "#2563eb",
-          dashArray: "6,5",
+          dashArray: hasTrack ? "none" : "6,5",
           interactive: false,
-          opacity: 0.75,
-          weight: 3,
+          opacity: 0.85,
+          weight: hasTrack ? 4 : 3,
         }).addTo(mapInstance)
       }
-      mapInstance.fitBounds(L.latLngBounds(startPosition, endPosition), {
+      const bounds = L.latLngBounds(linePoints)
+      if (projectedStart) bounds.extend([projectedStart.lat, projectedStart.lng])
+      if (projectedEnd) bounds.extend([projectedEnd.lat, projectedEnd.lng])
+      mapInstance.fitBounds(bounds, {
         animate: false,
         maxZoom: 16,
         padding: [48, 48],
@@ -230,10 +247,23 @@ export function PerlicaRouteMap({ start, end, startName, endName }: PerlicaRoute
     } else {
       routeLineRef.current?.remove()
       routeLineRef.current = null
-      const point = projectedStart ?? projectedEnd
+      const point = projectedRoute[0]
+        ? { lat: projectedRoute[0][0], lng: projectedRoute[0][1] }
+        : (projectedStart ?? projectedEnd)
       if (point) mapInstance.setView([point.lat, point.lng], 16, { animate: false })
     }
-  }, [endLat, endLng, endName, mapInstance, overlapping, startLat, startLng, startName, t])
+  }, [
+    endLat,
+    endLng,
+    endName,
+    mapInstance,
+    overlapping,
+    startLat,
+    startLng,
+    startName,
+    t,
+    validRoute,
+  ])
 
   return (
     <div className="relative isolate z-0 h-[280px] w-full overflow-hidden rounded-md bg-muted">

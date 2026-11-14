@@ -16,6 +16,7 @@ const require = createRequire(import.meta.url)
 const HOST_ROOT = fileURLToPath(new URL("..", import.meta.url))
 const HOST_STYLESHEET = path.join(HOST_ROOT, "app/globals.css")
 const TAILWIND_THEME = require.resolve("tailwindcss/theme.css")
+const TAILWIND_ANIMATIONS = path.join(HOST_ROOT, "node_modules/tw-animate-css/dist/tw-animate.css")
 
 /**
  * Stylesheet generated from the plugin's own Tailwind classes and appended to
@@ -110,12 +111,14 @@ export async function packPlugin(pluginDirectory: string, output?: string): Prom
  * radii and the light/dark themes stay aligned with the host.
  */
 async function buildPluginUtilities(directory: string): Promise<string> {
-  const [defaultTheme, hostStyles] = await Promise.all([
+  const [defaultTheme, hostStyles, animations] = await Promise.all([
     readFile(TAILWIND_THEME, "utf8"),
     readFile(HOST_STYLESHEET, "utf8"),
+    readFile(TAILWIND_ANIMATIONS, "utf8"),
   ])
   const input = [
     "@layer theme, base, components, utilities;",
+    animations,
     `@layer theme {\n${defaultTheme}\n}`,
     "@layer utilities {\n@tailwind utilities;\n}",
     "@custom-variant dark (&:is(.dark *));",

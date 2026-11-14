@@ -8,6 +8,7 @@ vi.mock("@orahako/plugin-sdk/host", () => ({
 }))
 
 import { PerlicaClient, PerlicaError } from "./client"
+import { toPerlicaRideDetail } from "./types"
 
 const TOKEN = "TOKEN:10001:20002:00000000-0000-4000-8000-000000000000"
 const CONFIG = { token: TOKEN, accountId: "10001" }
@@ -237,6 +238,15 @@ describe("PerlicaClient request contract", () => {
     })
   })
 
+  it("normalizes the service base ride fee from cents", async () => {
+    sendMock.mockResolvedValue(okResponse({ baseTime: 20, baseTimeFee: 150, overTimeFee: 100 }))
+    await expect(new PerlicaClient(CONFIG).machineFee("12345678")).resolves.toMatchObject({
+      fee: 1.5,
+      price: 1.5,
+      raw: { baseTime: 20 },
+    })
+  })
+
   it("prepares a vehicle in order and only sends a nonempty borrowPosLogId", async () => {
     const client = new PerlicaClient(CONFIG)
     sendMock
@@ -306,7 +316,7 @@ describe("PerlicaClient request contract", () => {
           okResponse({
             studyToReduceDispatch: false,
             type: 1,
-            types: [{ money: "0", type: "1" }],
+            types: [{ money: "1000", type: "1" }],
           })
         )
         .mockResolvedValueOnce(okResponse({}))
@@ -316,7 +326,7 @@ describe("PerlicaClient request contract", () => {
       expect(dispatch).toMatchObject({
         allowed: true,
         dispatchType: 1,
-        options: [{ type: 1, money: 0 }],
+        options: [{ type: 1, money: 10 }],
       })
       await client.returnBike("ORDER-9", COORDS)
 
@@ -471,6 +481,34 @@ describe("PerlicaClient request contract", () => {
     expect(detail.raw.totalFee).toBe("3.5")
     expect(capturedUrl().pathname).toBe("/rideLogDetails/queryByOrderNO.do")
     expect(capturedUrl().searchParams.get("orderNO")).toBe("ORDER-9")
+  })
+
+  it("queries chronological GPS points using the ride machine and time range", async () => {
+    sendMock.mockResolvedValue(
+      okResponse([
+        { dt: "2026-09-09 16:37:13", lat: 39.91452, lon: 119.51166277777777 },
+        { dt: "2026-09-09 16:37:18", lat: 39.91433, lon: 119.511615 },
+        { lat: 0, lon: 0 },
+      ])
+    )
+    const detail = toPerlicaRideDetail({
+      machineId: 7946789,
+      orderStartTime: "2026-09-09 16:36:38",
+      orderEndTime: "2026-09-09 16:50:11",
+    })
+    await expect(new PerlicaClient(CONFIG).rideRoute(detail)).resolves.toEqual([
+      { lat: 39.91452, lng: 119.51166277777777 },
+      { lat: 39.91433, lng: 119.511615 },
+    ])
+    const url = capturedUrl()
+    expect(url.pathname).toBe("/history/query.do")
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      token: TOKEN,
+      mapType: "2",
+      machineId: "7946789",
+      startTime: "2026-09-09 16:36:38",
+      endTime: "2026-09-09 16:50:11",
+    })
   })
 
   it("queries stations and preserves their identity and coordinates", async () => {

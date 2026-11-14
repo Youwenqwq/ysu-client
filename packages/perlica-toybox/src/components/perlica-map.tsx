@@ -30,6 +30,7 @@ export interface PerlicaMapPoint {
   address?: string
   lat: number
   lng: number
+  area?: PerlicaMapCenter[]
 }
 
 export interface PerlicaMapProps {
@@ -80,7 +81,7 @@ function machineColor(socPercent: number | undefined, stale: boolean): string {
 }
 
 function machineTitle(machine: PerlicaMapMachine): string {
-  const details = [machine.machineNO]
+  const details = machine.userCode ? [machine.userCode] : []
   if (machine.socPercent !== undefined) {
     details.push(`${Math.round(machine.socPercent)}%`)
   }
@@ -177,6 +178,50 @@ function syncPointMarkers(
   }
 }
 
+function syncParkingAreas(
+  L: Leaflet,
+  map: LeafletMap,
+  points: PerlicaMapPoint[] | undefined,
+  polygons: Map<string, Polygon>
+) {
+  const nextKeys = new Set<string>()
+  for (const point of points ?? []) {
+    const vertices = (point.area ?? [])
+      .filter((vertex) => isUsableLatLng(vertex.lat, vertex.lng))
+      .map((vertex) => {
+        const projected = wgs84ToGcj02(vertex.lat, vertex.lng)
+        return [projected.lat, projected.lng] as [number, number]
+      })
+    if (vertices.length < 3) continue
+
+    const key = pointKey(point)
+    nextKeys.add(key)
+    const polygon = polygons.get(key)
+    if (polygon) {
+      polygon.setLatLngs(vertices)
+    } else {
+      polygons.set(
+        key,
+        L.polygon(vertices, {
+          color: "#0284c7",
+          fillColor: "#0ea5e9",
+          fillOpacity: 0.12,
+          interactive: false,
+          opacity: 0.8,
+          weight: 1.5,
+        }).addTo(map)
+      )
+    }
+  }
+
+  for (const [key, polygon] of polygons) {
+    if (!nextKeys.has(key)) {
+      polygon.remove()
+      polygons.delete(key)
+    }
+  }
+}
+
 export function PerlicaMap({
   center,
   machines,
@@ -198,6 +243,7 @@ export function PerlicaMap({
   const initialCenterRef = useRef(center)
   const machineMarkersRef = useRef<Map<string, CircleMarker>>(new Map())
   const parkMarkersRef = useRef<Map<string, Marker>>(new Map())
+  const parkAreaPolygonsRef = useRef<Map<string, Polygon>>(new Map())
   const stationMarkersRef = useRef<Map<string, Marker>>(new Map())
   const remandMarkersRef = useRef<Map<string, Marker>>(new Map())
   const radiusCircleRef = useRef<Circle | null>(null)
@@ -219,6 +265,7 @@ export function PerlicaMap({
   useEffect(() => {
     const machineMarkers = machineMarkersRef.current
     const parkMarkers = parkMarkersRef.current
+    const parkAreaPolygons = parkAreaPolygonsRef.current
     const stationMarkers = stationMarkersRef.current
     const remandMarkers = remandMarkersRef.current
     let disposed = false
@@ -288,6 +335,7 @@ export function PerlicaMap({
       geoPolygonRef.current = null
       machineMarkers.clear()
       parkMarkers.clear()
+      parkAreaPolygons.clear()
       stationMarkers.clear()
       remandMarkers.clear()
       leafletRef.current = null
@@ -412,6 +460,7 @@ export function PerlicaMap({
     const L = leafletRef.current
     if (!mapInstance || !L) return
 
+    syncParkingAreas(L, mapInstance, parkPoints, parkAreaPolygonsRef.current)
     syncPointMarkers(L, mapInstance, parkPoints, "park", parkMarkersRef.current)
     syncPointMarkers(L, mapInstance, stations, "station", stationMarkersRef.current)
     syncPointMarkers(L, mapInstance, remandPoints, "remand", remandMarkersRef.current)

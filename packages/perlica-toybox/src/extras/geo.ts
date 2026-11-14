@@ -46,6 +46,17 @@ export function isUsableLatLng(lat: number, lng: number): boolean {
   )
 }
 
+/** Great-circle distance in meters between two WGS-84 coordinates. */
+export function distanceMeters(a: PerlicaLatLng, b: PerlicaLatLng): number {
+  const radians = Math.PI / 180
+  const deltaLat = (b.lat - a.lat) * radians
+  const deltaLng = (b.lng - a.lng) * radians
+  const h =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(a.lat * radians) * Math.cos(b.lat * radians) * Math.sin(deltaLng / 2) ** 2
+  return 6_371_000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
+}
+
 /** Convert a WGS-84 coordinate to GCJ-02 for display on AMap tiles. */
 export function wgs84ToGcj02(lat: number, lng: number): PerlicaLatLng {
   if (!isUsableLatLng(lat, lng) || outOfChina(lat, lng)) return { lat, lng }

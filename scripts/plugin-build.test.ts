@@ -51,7 +51,7 @@ describe("plugin packaging styles", () => {
       {
         "src/index.tsx": [
           'import "./style.css"',
-          'export const layout = "text-muted-foreground rounded-lg bg-background dark:bg-primary/50 grid-cols-[repeat(auto-fit,minmax(0,1fr))]"',
+          'export const layout = "text-muted-foreground rounded-lg bg-background dark:bg-primary/50 grid-cols-[repeat(auto-fit,minmax(0,1fr))] data-[state=active]:animate-in data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2"',
           "export default null",
         ].join("\n"),
         "src/style.css": [
@@ -72,6 +72,10 @@ describe("plugin packaging styles", () => {
     expect(utilities).toMatch(/grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(0,\s*1fr\)\)/)
     expect(utilities).toMatch(/\.dark\\:bg-primary\\\/50/)
     expect(utilities).toContain(":is(.dark *)")
+    expect(utilities).toMatch(/animation:\s*enter/)
+    expect(utilities).toMatch(/--tw-enter-opacity:\s*0/)
+    expect(utilities).toMatch(/--tw-enter-translate-y:/)
+    expect(utilities).toContain('[data-state="active"]')
 
     // The host already ships preflight and global base rules.
     expect(utilities).not.toContain("box-sizing: border-box")

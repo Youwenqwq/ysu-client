@@ -43,12 +43,12 @@ import {
   InputGroupInput,
 } from "@orahako/plugin-ui/components"
 import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
 } from "@orahako/plugin-ui/components"
 import { Skeleton } from "@orahako/plugin-ui/components"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@orahako/plugin-ui/components"
@@ -592,6 +592,16 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
     [setActiveTab]
   )
 
+  const selectRadius = useCallback(
+    (value: string) => {
+      if (!value) return
+      const next = Number(value)
+      setRadius(next)
+      void refreshMapAt(center, next)
+    },
+    [center, refreshMapAt, setRadius]
+  )
+
   useMobileHeaderRight(
     <div className="flex items-center gap-0.5">
       <Button
@@ -686,7 +696,10 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
       <Tabs
         value={activeTab}
         onValueChange={selectAppTab}
-        className={cn("flex flex-col", activeTab === "map" ? "min-h-0 flex-1 gap-0" : "gap-4")}
+        className={cn(
+          "flex flex-col",
+          activeTab === "map" ? "min-h-0 flex-1 gap-0" : "mx-auto w-full max-w-3xl gap-5"
+        )}
       >
         <div className="flex flex-wrap items-center justify-between gap-2 max-sm:hidden">
           <TabsList aria-label={t("perlica.nav")} className="w-full justify-start sm:w-auto">
@@ -711,7 +724,7 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
           value="map"
           id="perlica-panel-map"
           forceMount
-          className="m-0 min-h-0 flex-1 data-[state=inactive]:hidden"
+          className="m-0 min-h-0 flex-1 data-[state=active]:animate-in data-[state=active]:duration-500 data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2 data-[state=inactive]:hidden motion-reduce:animate-none"
         >
           <div className="relative h-full min-h-0 overflow-hidden bg-card md:rounded-xl md:border">
             <PerlicaMap
@@ -798,78 +811,72 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
             <ToggleGroup
               type="single"
               value={String(radius)}
-              onValueChange={(value) => {
-                if (!value) return
-                const next = Number(value)
-                setRadius(next)
-                void refreshMapAt(center, next)
-              }}
+              onValueChange={selectRadius}
               aria-label={t("perlica.searchRadius")}
-              className="absolute inset-x-3 top-[4.5rem] z-20 grid w-auto grid-cols-5 rounded-lg border bg-background p-1 shadow-sm"
+              className="absolute inset-x-3 top-[4.5rem] z-20 hidden w-auto grid-cols-5 rounded-xl border bg-background/95 p-1 shadow-sm sm:grid"
             >
               {RADII.map((value) => (
                 <ToggleGroupItem
                   key={value}
                   value={String(value)}
-                  className="h-8 rounded-md px-0 text-xs data-[state=on]:bg-muted"
+                  className="h-8 rounded-lg px-0 text-xs data-[state=on]:bg-muted"
                 >
                   {formatRadius(value)}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
 
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setListOpen(true)}
-              className="absolute bottom-3 left-3 z-20 h-10 max-w-[62%] rounded-full px-3 shadow-sm"
-            >
-              {mapLoading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : mapError ? (
-                <TriangleAlert className="size-4 text-destructive" />
-              ) : (
-                <Bike className="size-4" />
-              )}
-              <span className="truncate">
-                {mapError
-                  ? t("perlica.nearbyFailedShort")
-                  : t("perlica.machineCount", { count: machines.length })}
-              </span>
-              <ChevronUp className="size-4 opacity-60" />
-            </Button>
-
-            <div className="absolute right-3 bottom-3 z-20 flex flex-col gap-2">
+            <div className="absolute inset-x-3 bottom-3 z-20 mx-auto max-w-md">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setListOpen(true)}
+                  className="h-11 min-w-0 flex-1 justify-start rounded-2xl bg-background/95 px-4 shadow-lg backdrop-blur"
+                >
+                  {mapLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : mapError ? (
+                    <TriangleAlert className="size-4 text-destructive" />
+                  ) : (
+                    <Bike className="size-4" />
+                  )}
+                  <span className="truncate">
+                    {mapError
+                      ? t("perlica.nearbyFailedShort")
+                      : t("perlica.machineCount", { count: machines.length })}
+                  </span>
+                  <ChevronUp className="ml-auto size-4 opacity-60" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="secondary"
+                  onClick={() => {
+                    void requestLocation(true).then((coords) => {
+                      if (coords) void refreshMapAt(coords, radius)
+                    })
+                  }}
+                  disabled={locating}
+                  aria-label={locating ? t("perlica.locating") : t("perlica.locate")}
+                  title={locating ? t("perlica.locating") : t("perlica.locate")}
+                  className="size-11 shrink-0 rounded-2xl bg-background/95 shadow-lg"
+                >
+                  {locating ? (
+                    <Loader2 className="size-5 animate-spin" />
+                  ) : (
+                    <LocateFixed className="size-5" />
+                  )}
+                </Button>
+              </div>
               <Button
                 type="button"
-                size="icon"
-                variant="secondary"
-                onClick={() => {
-                  void requestLocation(true).then((coords) => {
-                    if (coords) void refreshMapAt(coords, radius)
-                  })
-                }}
-                disabled={locating}
-                aria-label={locating ? t("perlica.locating") : t("perlica.locate")}
-                title={locating ? t("perlica.locating") : t("perlica.locate")}
-                className="size-11 rounded-full shadow-sm"
-              >
-                {locating ? (
-                  <Loader2 className="size-5 animate-spin" />
-                ) : (
-                  <LocateFixed className="size-5" />
-                )}
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="secondary"
+                size="lg"
                 onClick={() => setScannerOpen(true)}
-                aria-label={t("perlica.scanCode")}
-                title={t("perlica.scanCode")}
-                className="size-11 rounded-full shadow-sm"
+                className="perlica-scan-button mt-2 w-full rounded-2xl text-base font-semibold shadow-xl active:scale-[0.99]"
               >
                 <ScanLine className="size-5" />
+                {t("perlica.scanCode")}
               </Button>
             </div>
           </div>
@@ -879,7 +886,7 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
           value="ride"
           id="perlica-panel-ride"
           forceMount
-          className="m-0 data-[state=inactive]:hidden"
+          className="m-0 data-[state=active]:animate-in data-[state=active]:duration-500 data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2 data-[state=inactive]:hidden motion-reduce:animate-none"
         >
           <div className="flex flex-col gap-4">
             {order ? (
@@ -892,9 +899,9 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
                 reportError={reportError}
               />
             ) : (
-              <Empty className="py-12">
+              <Empty className="min-h-[55dvh] py-12">
                 <EmptyHeader>
-                  <EmptyMedia variant="icon">
+                  <EmptyMedia variant="icon" className="size-14 rounded-2xl">
                     {orderLoading ? <Loader2 className="animate-spin" /> : <Bike />}
                   </EmptyMedia>
                   <EmptyTitle>
@@ -902,9 +909,20 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
                   </EmptyTitle>
                   <EmptyDescription>{t("perlica.noActiveRideHint")}</EmptyDescription>
                 </EmptyHeader>
-                <Button type="button" variant="outline" onClick={() => selectAppTab("map")}>
-                  {t("perlica.tabMap")}
-                </Button>
+                <div className="flex w-full max-w-xs flex-col gap-2">
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="perlica-scan-button w-full rounded-xl"
+                    onClick={() => setScannerOpen(true)}
+                  >
+                    <ScanLine />
+                    {t("perlica.scanCode")}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => selectAppTab("map")}>
+                    {t("perlica.noActiveRideFindBike")}
+                  </Button>
+                </div>
               </Empty>
             )}
           </div>
@@ -914,7 +932,7 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
           value="history"
           id="perlica-panel-history"
           forceMount
-          className="m-0 data-[state=inactive]:hidden"
+          className="m-0 data-[state=active]:animate-in data-[state=active]:duration-500 data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2 data-[state=inactive]:hidden motion-reduce:animate-none"
         >
           <PerlicaHistory
             key={session.token}
@@ -932,7 +950,7 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
           value="account"
           id="perlica-panel-account"
           forceMount
-          className="m-0 data-[state=inactive]:hidden"
+          className="m-0 data-[state=active]:animate-in data-[state=active]:duration-500 data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2 data-[state=inactive]:hidden motion-reduce:animate-none"
         >
           <PerlicaAccount
             user={user}
@@ -943,18 +961,14 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
         </TabsContent>
       </Tabs>
 
-      <Sheet open={listOpen} onOpenChange={setListOpen}>
-        <SheetContent
-          side="bottom"
-          showCloseButton={false}
-          className="max-h-[70dvh] gap-0 overflow-y-auto p-0"
-        >
-          <SheetHeader className="sticky top-0 z-10 flex-row items-center justify-between gap-3 border-b bg-background px-4 py-3">
+      <Drawer open={listOpen} onOpenChange={setListOpen}>
+        <DrawerContent className="max-h-[70dvh] gap-0 overflow-hidden p-0 [&>div:first-child]:bg-muted-foreground/30">
+          <DrawerHeader className="shrink-0 flex-row items-center justify-between gap-3 border-b bg-transparent px-4 py-3">
             <div className="min-w-0">
-              <SheetTitle>{t("perlica.nearbyMachines")}</SheetTitle>
-              <SheetDescription>
+              <DrawerTitle>{t("perlica.nearbyMachines")}</DrawerTitle>
+              <DrawerDescription>
                 {t("perlica.machineCount", { count: machines.length })}
-              </SheetDescription>
+              </DrawerDescription>
             </div>
             <div className="flex items-center gap-1">
               <Button
@@ -967,7 +981,7 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
               >
                 <RefreshCw className={cn("size-4", mapLoading && "animate-spin")} />
               </Button>
-              <SheetClose asChild>
+              <DrawerClose asChild>
                 <Button
                   type="button"
                   variant="ghost"
@@ -976,116 +990,130 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
                 >
                   <X className="size-4" />
                 </Button>
-              </SheetClose>
+              </DrawerClose>
             </div>
-          </SheetHeader>
+          </DrawerHeader>
 
-          {mapError ? (
-            <div className="border-b px-4 py-4">
-              <Alert variant="destructive">
-                <TriangleAlert />
-                <AlertTitle>{t("perlica.nearbyFailed")}</AlertTitle>
-                <AlertDescription>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="mt-2"
-                    disabled={mapLoading}
-                    onClick={() => void loadNearby(true)}
-                  >
-                    {t("perlica.retry")}
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            </div>
-          ) : null}
+          <div className="shrink-0 border-b px-4 py-3 sm:hidden">
+            <p className="mb-2 text-xs text-muted-foreground">{t("perlica.searchRadius")}</p>
+            <ToggleGroup
+              type="single"
+              value={String(radius)}
+              onValueChange={selectRadius}
+              aria-label={t("perlica.searchRadius")}
+              className="grid w-full grid-cols-5 rounded-xl bg-muted p-1"
+            >
+              {RADII.map((value) => (
+                <ToggleGroupItem
+                  key={value}
+                  value={String(value)}
+                  className="h-8 rounded-lg px-0 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm"
+                >
+                  {formatRadius(value)}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
 
-          {machines.length > 0 || mapLoading ? (
-            <PerlicaNearbyList
-              machines={machines}
-              selectedCode={selectedCode}
-              loading={mapLoading}
-              onSelect={(code) => {
-                setListOpen(false)
-                selectCode(code)
-              }}
-            />
-          ) : mapError ? null : (
-            <Empty className="rounded-none border-0 py-10">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <Bike />
-                </EmptyMedia>
-                <EmptyTitle>{t("perlica.noNearby")}</EmptyTitle>
-                <EmptyDescription>{t("perlica.noNearbyHint")}</EmptyDescription>
-              </EmptyHeader>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={locating}
-                onClick={() => {
-                  if (radius >= 10000) {
-                    void requestLocation(true)
-                    return
-                  }
-                  const next = Math.min(10000, Math.max(radius * 2, 1000))
-                  setRadius(next)
-                  void refreshMapAt(center, next)
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-vaul-no-drag>
+            {mapError ? (
+              <div className="border-b px-4 py-4">
+                <Alert variant="destructive">
+                  <TriangleAlert />
+                  <AlertTitle>{t("perlica.nearbyFailed")}</AlertTitle>
+                  <AlertDescription>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      disabled={mapLoading}
+                      onClick={() => void loadNearby(true)}
+                    >
+                      {t("perlica.retry")}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              </div>
+            ) : null}
+
+            {machines.length > 0 || mapLoading ? (
+              <PerlicaNearbyList
+                machines={machines}
+                selectedCode={selectedCode}
+                loading={mapLoading}
+                onSelect={(code) => {
+                  setListOpen(false)
+                  selectCode(code)
                 }}
-              >
-                {radius >= 10000
-                  ? locating
-                    ? t("perlica.locating")
-                    : t("perlica.locate")
-                  : t("perlica.expandRadius")}
-              </Button>
-            </Empty>
-          )}
-        </SheetContent>
-      </Sheet>
+              />
+            ) : mapError ? null : (
+              <Empty className="rounded-none border-0 py-10">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Bike />
+                  </EmptyMedia>
+                  <EmptyTitle>{t("perlica.noNearby")}</EmptyTitle>
+                  <EmptyDescription>{t("perlica.noNearbyHint")}</EmptyDescription>
+                </EmptyHeader>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={locating}
+                  onClick={() => {
+                    if (radius >= 10000) {
+                      void requestLocation(true)
+                      return
+                    }
+                    const next = Math.min(10000, Math.max(radius * 2, 1000))
+                    setRadius(next)
+                    void refreshMapAt(center, next)
+                  }}
+                >
+                  {radius >= 10000
+                    ? locating
+                      ? t("perlica.locating")
+                      : t("perlica.locate")
+                    : t("perlica.expandRadius")}
+                </Button>
+              </Empty>
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
 
-      <Sheet
+      <Drawer
         open={Boolean(selectedCode)}
         onOpenChange={(open) => {
           if (!open) setSelectedCode("")
         }}
       >
-        <SheetContent
-          side="bottom"
-          showCloseButton={false}
-          className="max-h-[92dvh] gap-0 overflow-y-auto p-0"
-        >
-          <SheetHeader className="sticky top-0 z-10 flex-row items-center justify-between gap-3 border-b bg-background px-4 py-3">
-            <div className="min-w-0">
-              <SheetTitle className="truncate">{t("perlica.machineDetails")}</SheetTitle>
-              <SheetDescription className="truncate">{selectedCode}</SheetDescription>
-            </div>
-            <SheetClose asChild>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label={t("perlica.close")}>
-                <X className="size-4" />
-              </Button>
-            </SheetClose>
-          </SheetHeader>
-          <PerlicaMachineDetail
-            key={session.token}
-            client={client}
-            code={selectedCode}
-            machine={selectedMachine}
-            coords={center}
-            locationConfirmed={locationConfirmed}
-            currentOrder={order}
-            onOrderChange={applyOrder}
-            onBorrowSuccess={showOptimisticOrder}
-            onRequestLocation={() => requestLocation(false)}
-            onShowOrder={() => {
-              setSelectedCode("")
-              setActiveTab("ride")
-            }}
-            reportError={reportError}
-          />
-        </SheetContent>
-      </Sheet>
+        <DrawerContent className="max-h-[92dvh] gap-0 overflow-hidden p-0 [&>div:first-child]:bg-muted-foreground/30">
+          <DrawerHeader className="shrink-0 items-center justify-center border-b bg-transparent px-4 py-3 text-center">
+            <DrawerTitle>{t("perlica.machineDetails")}</DrawerTitle>
+            <DrawerDescription>{t("perlica.machineDetailsDescription")}</DrawerDescription>
+          </DrawerHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-vaul-no-drag>
+            <PerlicaMachineDetail
+              key={session.token}
+              client={client}
+              code={selectedCode}
+              machine={selectedMachine}
+              coords={center}
+              locationConfirmed={locationConfirmed}
+              currentOrder={order}
+              onOrderChange={applyOrder}
+              onBorrowSuccess={showOptimisticOrder}
+              onRequestLocation={() => requestLocation(false)}
+              onShowOrder={() => {
+                setSelectedCode("")
+                setActiveTab("ride")
+              }}
+              reportError={reportError}
+            />
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       <PerlicaScanner open={scannerOpen} onOpenChange={setScannerOpen} onCode={selectCode} />
     </div>

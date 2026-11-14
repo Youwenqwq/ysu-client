@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react"
 import type { ChangeEvent } from "react"
 import type { Html5Qrcode } from "html5-qrcode"
-import { Camera, Image as ImageIcon, Square, Video, X } from "lucide-react"
+import { Image as ImageIcon } from "lucide-react"
 import { Button } from "@orahako/plugin-ui/components"
 import {
   Dialog,
@@ -68,9 +68,7 @@ export function PerlicaScanner({ open, onOpenChange, onCode }: PerlicaScannerPro
   const scannerId = `perlica-scanner-${reactId.replace(/:/g, "")}`
   const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
-  const cameraInputRef = useRef<HTMLInputElement>(null)
   const fileHandlerRef = useRef<((file: File) => Promise<void>) | null>(null)
-  const toggleCameraRef = useRef<(() => Promise<void>) | null>(null)
   const openRef = useRef(open)
   const onOpenChangeRef = useRef(onOpenChange)
   const onCodeRef = useRef(onCode)
@@ -219,19 +217,6 @@ export function PerlicaScanner({ open, onOpenChange, onCode }: PerlicaScannerPro
       }
     }
 
-    toggleCameraRef.current = async () => {
-      if (!scanner || disposed || completed || operationBusy) return
-
-      setOperationBusy(true)
-      setError(null)
-      try {
-        if (cameraRunning) await stopCamera()
-        else await startCamera()
-      } finally {
-        setOperationBusy(false)
-      }
-    }
-
     async function initialize() {
       setReady(false)
       setCameraActive(false)
@@ -260,7 +245,6 @@ export function PerlicaScanner({ open, onOpenChange, onCode }: PerlicaScannerPro
       cameraRequest += 1
       cameraRunning = false
       fileHandlerRef.current = null
-      toggleCameraRef.current = null
       if (scanner) void shutdownScanner(scanner, container)
       else stopVideoTracks(container)
     }
@@ -278,23 +262,9 @@ export function PerlicaScanner({ open, onOpenChange, onCode }: PerlicaScannerPro
         showCloseButton={false}
         className="fixed inset-0! top-0! left-0! flex h-dvh! w-screen! max-w-none! translate-x-0! translate-y-0! flex-col gap-0 rounded-none! border-0 bg-black p-0 text-white sm:max-w-none!"
       >
-        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-white/10 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] text-left">
-          <div className="min-w-0">
-            <DialogTitle>{t("perlica.scannerTitle")}</DialogTitle>
-            <DialogDescription className="mt-0.5 text-xs text-white/60">
-              {t("perlica.scannerDescription")}
-            </DialogDescription>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-11 shrink-0 rounded-full text-white hover:bg-white/10 hover:text-white"
-            onClick={() => onOpenChange(false)}
-            aria-label={t("perlica.close")}
-          >
-            <X className="size-5" />
-          </Button>
+        <DialogHeader className="sr-only">
+          <DialogTitle>{t("perlica.scannerTitle")}</DialogTitle>
+          <DialogDescription>{t("perlica.scannerDescription")}</DialogDescription>
         </DialogHeader>
 
         <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
@@ -314,69 +284,36 @@ export function PerlicaScanner({ open, onOpenChange, onCode }: PerlicaScannerPro
               {t("perlica.scannerStarting")}
             </div>
           ) : null}
-          {ready && !cameraActive && !busy ? (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 px-6 text-center text-sm text-white/80">
-              {t("perlica.scannerStopped")}
-            </div>
-          ) : null}
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-white/10 bg-black px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
-          {error ? (
-            <p role="alert" className="text-sm text-red-300">
-              {t(ERROR_KEYS[error])}
-            </p>
-          ) : null}
-
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileInput}
-          />
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleFileInput}
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
-              disabled={!ready || busy}
-              onClick={() => imageInputRef.current?.click()}
-            >
-              <ImageIcon />
-              {t("perlica.scannerChooseImage")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
-              disabled={!ready || busy}
-              onClick={() => cameraInputRef.current?.click()}
-            >
-              <Camera />
-              {t("perlica.scannerTakePhoto")}
-            </Button>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-10 w-full text-white/75 hover:bg-white/10 hover:text-white"
-            disabled={!ready || busy}
-            onClick={() => void toggleCameraRef.current?.()}
+        {error ? (
+          <p
+            role="alert"
+            className="absolute right-24 bottom-[max(1.5rem,env(safe-area-inset-bottom,0px))] left-4 rounded-lg bg-black/75 px-3 py-2 text-sm text-red-200"
           >
-            {cameraActive ? <Square /> : <Video />}
-            {cameraActive ? t("perlica.scannerStop") : t("perlica.scannerStart")}
-          </Button>
-        </div>
+            {t(ERROR_KEYS[error])}
+          </p>
+        ) : null}
+
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileInput}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="absolute right-5 bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))] size-14 rounded-full border-white/30 bg-black/45 text-white shadow-lg backdrop-blur-md hover:bg-black/65 hover:text-white"
+          disabled={!ready || busy}
+          onClick={() => imageInputRef.current?.click()}
+          aria-label={t("perlica.scannerChooseImage")}
+          title={t("perlica.scannerChooseImage")}
+        >
+          <ImageIcon className="size-6" />
+        </Button>
       </DialogContent>
     </Dialog>
   )

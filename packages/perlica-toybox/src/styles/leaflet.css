@@ -670,6 +670,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
   border-right-color: #fff;
 }
 
+/* Plugin-owned critical controls: external packages cannot rely on host utility rebuilds. */
+
+.perlica-scan-button {
+  height: 56px;
+  min-height: 56px;
+}
+
 /* Printing */
 
 @media print {

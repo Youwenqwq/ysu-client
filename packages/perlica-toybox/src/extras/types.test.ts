@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import {
   parsePerlicaToken,
   toPerlicaCurrentOrder,
   toPerlicaMachineList,
+  toPerlicaMachineStatus,
+  toPerlicaParkPoint,
+  toPerlicaRideDetail,
   toPerlicaRideLogs,
   toPerlicaUserInfo,
 } from "./types"
@@ -117,5 +120,97 @@ describe("Perlica response normalization", () => {
     expect(toPerlicaCurrentOrder({})).toBeNull()
     expect(toPerlicaCurrentOrder({ order: {} })).toBeNull()
     expect(toPerlicaCurrentOrder([{ orderNo: 456 }])?.orderNo).toBe("456")
+  })
+
+  it("normalizes the ride-list field names, units, duration, and payment status", () => {
+    const logs = toPerlicaRideLogs([
+      {
+        orderNO: "202611101071249471",
+        machineNO: "019394061",
+        userCode: "80477465",
+        money: 150,
+        mileage: 2.48,
+        payStatus: 1,
+        startTime: "2026-11-10 18:49:50",
+        endTime: "2026-11-10 19:02:09",
+        stopTime: 171,
+      },
+    ])
+    expect(logs[0]).toMatchObject({
+      orderNo: "202611101071249471",
+      fee: 1.5,
+      distance: 2480,
+      duration: 739,
+      status: "paid",
+      startTime: "2026-11-10 18:49:50",
+      endTime: "2026-11-10 19:02:09",
+    })
+  })
+
+  it("parses detail timestamps and lon/lat pairs without applying list units", () => {
+    const detail = toPerlicaRideDetail({
+      orderId: "202611101071249471",
+      actualPayMoney: 150,
+      mileage: 2484,
+      payStatus: 1,
+      orderStartTime: "2026-11-10 18:49:50",
+      orderEndTime: "2026-11-10 19:02:09",
+      borrowAddress: "Start",
+      returnAddress: "End",
+      borrowLonLat: "119.51713,39.90531277777778",
+      returnLonLat: "119.5288,39.90229",
+    })
+    expect(detail).toMatchObject({
+      fee: 1.5,
+      distance: 2484,
+      duration: 739,
+      status: "paid",
+      startTime: "2026-11-10 18:49:50",
+      endTime: "2026-11-10 19:02:09",
+      startAddress: "Start",
+      endAddress: "End",
+      startLat: 39.90531277777778,
+      startLng: 119.51713,
+      endLat: 39.90229,
+      endLng: 119.5288,
+    })
+  })
+
+  it("parses the parking area polygon from the service coordinate string", () => {
+    const point = toPerlicaParkPoint({
+      parkPointId: 34176,
+      name: "East gate",
+      la: 39.901782,
+      lo: 119.529017,
+      points: "119.529103,39.901875;119.528934,39.901875;119.528927,39.90169;119.529105,39.901689",
+    })
+    expect(point.area).toHaveLength(4)
+    expect(point.area[0]).toEqual({ lat: 39.901875, lng: 119.529103 })
+    expect(point.area[2]).toEqual({ lat: 39.90169, lng: 119.528927 })
+  })
+
+  it("uses the battery heartbeat for online state and preserves the user code", () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date("2026-11-14T19:25:00Z"))
+      const online = toPerlicaMachineStatus({
+        machineNO: "80477421",
+        batDt: "2026-11-15 03:25:06",
+        posDt: "2026-11-15 03:21:03",
+        socPercent: 19,
+      })
+      expect(online).toMatchObject({
+        userCode: "80477421",
+        machineNo: "",
+        online: true,
+        battery: 19,
+      })
+      expect(toPerlicaMachineStatus({ batDt: "2025-04-08 20:12:45" }).online).toBe(false)
+      expect(toPerlicaMachineStatus({ online: false, batDt: "2026-11-15 03:25:06" }).online).toBe(
+        false
+      )
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

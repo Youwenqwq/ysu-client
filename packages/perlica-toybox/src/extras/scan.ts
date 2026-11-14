@@ -1,7 +1,7 @@
 const PERLICA_CODE_PATTERN = /^\d{6,12}$/
-const CODE_QUERY_PATTERN = /(?:^|[?&\s])(?:code|userCode)=([^&#\s]+)/gi
+const CODE_QUERY_PATTERN = /(?:^|[?&\s])(?:code|userCode|machineNO)=([^&#\s]+)/gi
 
-/** Extract a 6–12 digit vehicle code from plain text or a code/userCode query. */
+/** Extract a 6–12 digit vehicle code from plain text or a supported vehicle query. */
 export function parsePerlicaCode(text: string): string | null {
   const value = text.trim()
   if (PERLICA_CODE_PATTERN.test(value)) return value

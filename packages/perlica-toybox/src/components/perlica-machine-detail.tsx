@@ -1,19 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import {
-  BellRing,
-  CheckCircle2,
-  LocateFixed,
-  LockOpen,
-  MapPin,
-  RefreshCw,
-  TriangleAlert,
-} from "lucide-react"
+import { BellRing, LocateFixed, LockOpen, RefreshCw, TriangleAlert } from "lucide-react"
 import { toast } from "@orahako/plugin-sdk/host"
 import { Alert, AlertDescription, AlertTitle } from "@orahako/plugin-ui/components"
 import { Badge } from "@orahako/plugin-ui/components"
 import { Button } from "@orahako/plugin-ui/components"
+import { Progress } from "@orahako/plugin-ui/components"
 import {
   Dialog,
   DialogContent,
@@ -128,6 +121,7 @@ function resolveMachineIds(
       machine?.userCode,
       machine?.raw.userCode,
       machine?.raw.user_code,
+      status?.userCode,
       status?.raw.userCode,
       status?.raw.user_code,
       code.length === 8 ? code : ""
@@ -155,12 +149,6 @@ function normalizedPrice(fee: PerlicaMachineFee): number {
 
 function formatAmount(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2)
-}
-
-function formatDistance(value: number | null): string {
-  if (value === null) return "—"
-  if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(2)} km`
-  return `${formatAmount(value)} m`
 }
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
@@ -415,22 +403,11 @@ export function PerlicaMachineDetail({
       ? { lat: status.lat, lng: status.lng }
       : null
   const battery = firstNumber(status?.battery, selectedMachine?.battery)
-  const distance = firstNumber(selectedMachine?.distance, status?.raw.distance)
   const surplusMileage = firstText(
     status?.raw.surplusMileage,
     status?.raw.remainingMileage,
     selectedMachine?.raw.surplusMileage,
     selectedMachine?.raw.remainingMileage
-  )
-  const positionTime = firstText(
-    status?.raw.posDt,
-    status?.raw.positionTime,
-    status?.raw.posTime,
-    status?.raw.gpsTime,
-    status?.raw.lastPositionTime,
-    status?.raw.updateTime,
-    selectedMachine?.raw.posDt,
-    selectedMachine?.raw.positionTime
   )
   const address = firstText(
     status?.raw.address,
@@ -444,6 +421,17 @@ export function PerlicaMachineDetail({
   )
   const feeDescription = safeText(fee?.description)
   const feeAmount = fee ? (firstNumber(fee.fee, fee.price) ?? 0) : null
+  const baseTime = firstNumber(fee?.raw.baseTime)
+  const feeText = fee
+    ? feeDescription ||
+      `${formatAmount(feeAmount ?? 0)} ￥${
+        baseTime
+          ? ` / ${t("perlica.feeDurationMinutes", { value: baseTime })}`
+          : fee.unit
+            ? ` ${fee.unit}`
+            : ""
+      }`
+    : t("perlica.notLoaded")
 
   function refreshAll() {
     if (!normalizedCode) return
@@ -636,13 +624,10 @@ export function PerlicaMachineDetail({
 
   return (
     <>
-      <div className="flex flex-col gap-6 p-4">
+      <div className="flex flex-col gap-5 p-4 pb-6">
         <div className="flex items-center justify-between gap-3">
-          <p className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="size-4 shrink-0" />
-            <span className="truncate">
-              {t("perlica.selectedMachine", { machineNo: ids.machineNo || normalizedCode })}
-            </span>
+          <p className="text-sm font-medium">
+            {t("perlica.vehicleNumber", { id: displayText(ids.userCode) })}
           </p>
           {status ? (
             <Badge variant={status.online ? "secondary" : "outline"} className="shrink-0">
@@ -669,29 +654,31 @@ export function PerlicaMachineDetail({
           </Alert>
         ) : null}
 
-        <div className="grid gap-x-8 gap-y-4 border-t pt-4 sm:grid-cols-2">
-          <DetailRow label={t("perlica.userCode")} value={displayText(ids.userCode)} />
-          <DetailRow label={t("perlica.machineNo")} value={displayText(ids.machineNo)} />
-          <DetailRow
-            label={t("perlica.status")}
-            value={status ? displayText(status.status) : t("perlica.notLoaded")}
-          />
-          <DetailRow label={t("perlica.battery")} value={battery === null ? "—" : `${battery}%`} />
-          <DetailRow label={t("perlica.distance")} value={formatDistance(distance)} />
-          <DetailRow label={t("perlica.surplusMileage")} value={displayText(surplusMileage)} />
-          <DetailRow
-            label={t("perlica.fee")}
-            value={
-              fee
-                ? feeDescription ||
-                  `${formatAmount(feeAmount ?? 0)}${fee.unit ? ` ${fee.unit}` : ""}`
-                : t("perlica.notLoaded")
-            }
-          />
-          <DetailRow label={t("perlica.positionTime")} value={displayText(positionTime)} />
-        </div>
-        <div className="border-b pb-4">
-          <DetailRow label={t("perlica.address")} value={displayText(address)} />
+        <section className="rounded-2xl bg-muted/55 p-4" aria-label={t("perlica.machineDetails")}>
+          <div className="grid grid-cols-2 gap-2 text-center">
+            <div>
+              <p className="text-2xl font-semibold tabular-nums">
+                {battery === null ? "—" : `${battery}%`}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("perlica.battery")}</p>
+            </div>
+            <div className="border-l">
+              <p className="text-2xl font-semibold tabular-nums">{displayText(surplusMileage)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("perlica.surplusMileage")}</p>
+            </div>
+          </div>
+          {battery !== null ? (
+            <Progress
+              className="mt-4 h-1.5"
+              value={Math.min(100, Math.max(0, battery))}
+              aria-label={t("perlica.battery")}
+            />
+          ) : null}
+        </section>
+
+        <div className="flex items-center justify-between gap-4 rounded-xl border px-4 py-3">
+          <span className="text-sm text-muted-foreground">{t("perlica.fee")}</span>
+          <span className="text-right text-sm font-medium">{feeText}</span>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -699,7 +686,7 @@ export function PerlicaMachineDetail({
             <Button
               type="button"
               variant="outline"
-              className="min-w-0 px-2 text-xs sm:text-sm"
+              className="h-14 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs"
               onClick={refreshAll}
               disabled={!normalizedCode || machineLoading || orderLoading || preparing || unlocking}
             >
@@ -712,7 +699,7 @@ export function PerlicaMachineDetail({
             <Button
               type="button"
               variant="outline"
-              className="min-w-0 px-2 text-xs sm:text-sm"
+              className="h-14 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs"
               onClick={() => void handleLocate()}
               disabled={locating || preparing || unlocking}
             >
@@ -724,7 +711,7 @@ export function PerlicaMachineDetail({
             <Button
               type="button"
               variant="outline"
-              className="min-w-0 px-2 text-xs sm:text-sm"
+              className="h-14 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs"
               onClick={() => void handleRing()}
               disabled={ringing || preparing || unlocking || !hasConfirmedCoords || !ids.userCode}
             >
@@ -735,6 +722,7 @@ export function PerlicaMachineDetail({
           <Button
             type="button"
             size="lg"
+            className="h-12 rounded-xl text-base"
             onClick={() => void handlePrepare()}
             disabled={
               !normalizedCode ||
@@ -750,17 +738,15 @@ export function PerlicaMachineDetail({
             {preparing ? t("perlica.preparing") : t("perlica.unlock")}
           </Button>
         </div>
-        {!hasConfirmedCoords ? (
-          <p className="text-sm text-muted-foreground">{t("perlica.locationRequired")}</p>
-        ) : null}
-
-        <section className="flex flex-col gap-3 border-t pt-6">
+        <section className="flex flex-col gap-3 border-t pt-5">
           <h3 className="text-sm font-medium">{t("perlica.position")}</h3>
           {position ? (
-            <PerlicaRouteMap
-              start={position}
-              startName={safeText(address) || displayText(ids.machineNo)}
-            />
+            <div className="[&>div]:h-52">
+              <PerlicaRouteMap
+                start={position}
+                startName={safeText(address) || displayText(ids.userCode)}
+              />
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">{t("perlica.noStatusPosition")}</p>
           )}
@@ -780,15 +766,6 @@ export function PerlicaMachineDetail({
           </DialogHeader>
           {candidate ? (
             <div className="flex flex-col gap-3">
-              <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-sm">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-                <div>
-                  <div className="font-medium">{t("perlica.preparationComplete")}</div>
-                  <p className="mt-1 text-muted-foreground">
-                    {t("perlica.preparationStepDescription")}
-                  </p>
-                </div>
-              </div>
               {candidate.warnings.length > 0 ? (
                 <Alert variant="destructive">
                   <TriangleAlert />
@@ -803,13 +780,18 @@ export function PerlicaMachineDetail({
                 </Alert>
               ) : null}
               <DetailRow label={t("perlica.userCode")} value={displayText(candidate.userCode)} />
-              <DetailRow label={t("perlica.machineNo")} value={displayText(candidate.machineNo)} />
-              <DetailRow label={t("perlica.status")} value={displayText(candidate.status.status)} />
+              <DetailRow
+                label={t("perlica.status")}
+                value={
+                  candidate.status.status ||
+                  t(candidate.status.online ? "perlica.online" : "perlica.offline")
+                }
+              />
               <DetailRow
                 label={t("perlica.fee")}
                 value={
                   safeText(candidate.fee.description) ||
-                  `${formatAmount(normalizedPrice(candidate.fee))}${
+                  `${formatAmount(normalizedPrice(candidate.fee))} ￥${
                     candidate.fee.unit ? ` ${candidate.fee.unit}` : ""
                   }`
                 }

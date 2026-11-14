@@ -1,27 +1,28 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Bike, Clock3, Pause, Play, RotateCcw } from "lucide-react"
+import { Bike, CheckCircle2, Clock3, MapPin, Pause, Play, RotateCcw } from "lucide-react"
 import { toast } from "@orahako/plugin-sdk/host"
 import { Badge } from "@orahako/plugin-ui/components"
 import { Button } from "@orahako/plugin-ui/components"
+import { Card, CardContent } from "@orahako/plugin-ui/components"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@orahako/plugin-ui/components"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  ResponsiveModal,
+  ResponsiveModalBody,
+  ResponsiveModalContent,
+  ResponsiveModalDescription,
+  ResponsiveModalFooter,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
 } from "@orahako/plugin-ui/components"
 import type { PerlicaClient } from "../extras/client"
-import type { PerlicaCoords, PerlicaDispatchCheck, PerlicaOrder } from "../extras/types"
+import { PARK_POINT_SEARCH_RADIUS_METERS, selectParkingPoints } from "../extras/parking"
+import type {
+  PerlicaCoords,
+  PerlicaDispatchCheck,
+  PerlicaOrder,
+  PerlicaParkPoint,
+} from "../extras/types"
 import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
 
@@ -44,7 +45,9 @@ type ReturnCandidate = {
   orderNo: string
   userCode: string
   coords: PerlicaCoords
-  fee: number | string | null
+  fee: number | null
+  parkPoints: PerlicaParkPoint[]
+  parkPoint: PerlicaParkPoint | null
 }
 
 export interface PerlicaActiveRideProps {
@@ -137,14 +140,15 @@ function parkedStatus(order: PerlicaOrder): boolean | null {
   return false
 }
 
-function fallbackDispatchFee(dispatch: PerlicaDispatchCheck): number | string | null {
+function fallbackDispatchFee(dispatch: PerlicaDispatchCheck): number | null {
   const optionFee = dispatch.options.find((option) => option.type === DISPATCH_TYPE)?.money
   if (optionFee !== undefined) return optionFee
 
   for (const key of ["dispatchFee", "fee", "dispatchPrice", "amount", "price", "money"]) {
-    const value = dispatch.raw[key]
-    if (typeof value === "number" && Number.isFinite(value)) return value
-    if (typeof value === "string" && value.trim()) return value
+    const raw = dispatch.raw[key]
+    if (raw === null || raw === undefined || raw === "") continue
+    const value = Number(raw)
+    if (Number.isFinite(value)) return value / 100
   }
   return null
 }
@@ -393,14 +397,26 @@ export function PerlicaActiveRide({
       if (!freshCoords || !actionIsCurrent(operation)) return
 
       setActionStep(operation, "check")
-      const check = await client.returnCheck(snapshot.userCode)
+      const [checkResult, pointsResult] = await Promise.allSettled([
+        client.returnCheck(snapshot.userCode),
+        client.parkPoints(freshCoords, PARK_POINT_SEARCH_RADIUS_METERS),
+      ])
       if (!actionIsCurrent(operation)) return
-      if (!check.allowed) {
+      if (checkResult.status === "rejected") throw checkResult.reason
+      if (pointsResult.status === "rejected") reportErrorRef.current(pointsResult.reason)
+      if (!checkResult.value.allowed) {
         toast.error(t("perlica.activeRideReturnCheckFailed"))
         return
       }
 
-      const dispatch = await client.dispatchCheck(snapshot.orderNo, freshCoords)
+      const parking = selectParkingPoints(
+        pointsResult.status === "fulfilled" ? pointsResult.value : [],
+        freshCoords
+      )
+      const selectedCoords = parking.snapped
+        ? { lat: parking.snapped.lat, lng: parking.snapped.lng }
+        : freshCoords
+      const dispatch = await client.dispatchCheck(snapshot.orderNo, selectedCoords)
       if (!actionIsCurrent(operation)) return
       if (!dispatch.allowed) {
         toast.error(t("perlica.activeRideReturnCheckFailed"))
@@ -411,8 +427,10 @@ export function PerlicaActiveRide({
         orderKey: operation.orderKey,
         orderNo: snapshot.orderNo,
         userCode: snapshot.userCode,
-        coords: freshCoords,
+        coords: selectedCoords,
         fee: fallbackDispatchFee(dispatch),
+        parkPoints: parking.points,
+        parkPoint: parking.snapped,
       })
     } catch (error) {
       if (actionIsCurrent(operation)) reportErrorRef.current(error)
@@ -420,6 +438,40 @@ export function PerlicaActiveRide({
       finishAction(operation)
     }
   }, [actionIsCurrent, beginAction, client, finishAction, setActionStep, t])
+
+  const handleSelectParkPoint = useCallback(
+    async (point: PerlicaParkPoint) => {
+      const candidate = returnCandidate
+      if (!candidate || candidate.parkPoint === point) return
+      const operation = beginAction("return-check")
+      if (!operation || candidate.orderKey !== operation.orderKey) {
+        if (operation) finishAction(operation)
+        return
+      }
+
+      const coords = { lat: point.lat, lng: point.lng }
+      setActionStep(operation, "check")
+      try {
+        const dispatch = await client.dispatchCheck(candidate.orderNo, coords)
+        if (!actionIsCurrent(operation)) return
+        if (!dispatch.allowed) {
+          toast.error(t("perlica.activeRideReturnCheckFailed"))
+          return
+        }
+        setReturnCandidate({
+          ...candidate,
+          coords,
+          parkPoint: point,
+          fee: fallbackDispatchFee(dispatch),
+        })
+      } catch (error) {
+        if (actionIsCurrent(operation)) reportErrorRef.current(error)
+      } finally {
+        finishAction(operation)
+      }
+    },
+    [actionIsCurrent, beginAction, client, finishAction, returnCandidate, setActionStep, t]
+  )
 
   const handleReturn = useCallback(async () => {
     const candidate = returnCandidate
@@ -470,83 +522,60 @@ export function PerlicaActiveRide({
   const fee =
     returnCandidate?.fee === null || returnCandidate?.fee === undefined
       ? t("perlica.activeRideFeeUnavailable")
-      : `¥${returnCandidate.fee}`
+      : `¥${returnCandidate.fee.toFixed(2)}`
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex-row items-start justify-between gap-3">
-          <div className="flex flex-col gap-1.5">
-            <CardTitle className="flex items-center gap-2">
+      <Card className="gap-0 rounded-2xl py-0">
+        <div className="bg-primary/[0.06] p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
               <Bike className="size-4" />
               {t("perlica.activeRideTitle")}
-            </CardTitle>
-            <CardDescription>
-              {order.status ||
-                t(isParked ? "perlica.activeRideParked" : "perlica.activeRideRiding")}
-            </CardDescription>
+            </div>
+            <Badge variant={isParked ? "secondary" : "outline"} className="bg-background/70">
+              {isParked ? <Pause data-icon="inline-start" /> : <Bike data-icon="inline-start" />}
+              {t(isParked ? "perlica.activeRideParked" : "perlica.activeRideRiding")}
+            </Badge>
           </div>
-          <Badge variant={isParked ? "secondary" : "outline"}>
-            {isParked ? <Pause data-icon="inline-start" /> : <Bike data-icon="inline-start" />}
-            {t(isParked ? "perlica.activeRideParked" : "perlica.activeRideRiding")}
-          </Badge>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-6">
-          <div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock3 className="size-4" />
+          <div className="mt-7 text-center">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <Clock3 className="size-3.5" />
               {t("perlica.activeRideElapsed")}
             </div>
-            <div className="mt-2 font-mono text-4xl font-semibold tabular-nums">
+            <div className="mt-2 font-mono text-5xl font-semibold tracking-tight tabular-nums sm:text-6xl">
               {elapsed === null ? t("perlica.activeRideUnknownTime") : elapsedText(elapsed)}
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("perlica.activeRideStartTime")}: {order.startTime || "—"}
+            <p className="mt-3 text-xs text-muted-foreground">
+              {t("perlica.activeRideStartTime")} · {order.startTime || "—"}
             </p>
           </div>
-
-          <dl className="grid gap-6 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs text-muted-foreground">{t("perlica.activeRideUserCode")}</dt>
-              <dd className="mt-1.5 font-mono text-lg font-semibold break-all">
-                {order.userCode || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">{t("perlica.activeRideMachineNo")}</dt>
-              <dd className="mt-1.5 font-mono text-lg font-semibold break-all">
-                {order.machineNo || "—"}
-              </dd>
-            </div>
+        </div>
+        <CardContent className="flex flex-col gap-5 p-4">
+          <dl className="rounded-xl bg-muted/50 px-4 py-3">
+            <dt className="text-xs text-muted-foreground">{t("perlica.activeRideUserCode")}</dt>
+            <dd className="mt-1 font-mono text-base font-semibold break-all">
+              {order.userCode || "—"}
+            </dd>
           </dl>
 
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
             <Button
               variant="secondary"
               size="lg"
-              onClick={() => void handleParkCommand("park")}
+              className="h-12 rounded-xl"
+              onClick={() => void handleParkCommand(isParked ? "continue" : "park")}
               disabled={busy || !order.orderNo || !order.userCode}
             >
-              <Pause data-icon="inline-start" />
-              {action?.kind === "park" && currentActionMessage
+              {isParked ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
+              {action?.kind === (isParked ? "continue" : "park") && currentActionMessage
                 ? currentActionMessage
-                : t("perlica.activeRidePark")}
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => void handleParkCommand("continue")}
-              disabled={busy || !order.orderNo || !order.userCode}
-            >
-              <Play data-icon="inline-start" />
-              {action?.kind === "continue" && currentActionMessage
-                ? currentActionMessage
-                : t("perlica.activeRideContinue")}
+                : t(isParked ? "perlica.activeRideContinue" : "perlica.activeRidePark")}
             </Button>
             <Button
               variant="destructive"
               size="lg"
-              className="sm:col-span-2"
+              className="h-12 rounded-xl"
               onClick={() => void handleReturnCheck()}
               disabled={busy || !order.orderNo || !order.userCode}
             >
@@ -558,44 +587,124 @@ export function PerlicaActiveRide({
             </Button>
           </div>
 
-          <div aria-live="polite" role="status" className="min-h-5 text-sm text-muted-foreground">
-            {currentActionMessage}
-          </div>
+          {currentActionMessage ? (
+            <div
+              aria-live="polite"
+              role="status"
+              className="text-center text-sm text-muted-foreground"
+            >
+              {currentActionMessage}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
-      <Dialog
+      <ResponsiveModal
         open={returnCandidate !== null}
         onOpenChange={(open) => {
-          if (!open && action?.kind !== "return") setReturnCandidate(null)
+          if (!open && !busy) setReturnCandidate(null)
         }}
       >
-        <DialogContent showCloseButton={action?.kind !== "return"}>
-          <DialogHeader>
-            <DialogTitle>{t("perlica.activeRideReturnDialogTitle")}</DialogTitle>
-            <DialogDescription>{t("perlica.activeRideReturnDialogDescription")}</DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/50 p-3 text-sm">
-            <span className="text-muted-foreground">{t("perlica.activeRideDispatchType")}</span>
-            <span className="text-right font-mono font-medium">{DISPATCH_TYPE}</span>
-            <span className="text-muted-foreground">{t("perlica.activeRideDispatchFee")}</span>
-            <span className="text-right font-medium">{fee}</span>
-          </div>
-          {action?.kind === "return" && currentActionMessage ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              {currentActionMessage}
-            </p>
-          ) : null}
-          <DialogFooter>
+        <ResponsiveModalContent className="sm:max-w-lg" drawerClassName="gap-0">
+          <ResponsiveModalHeader className="text-left">
+            <ResponsiveModalTitle>{t("perlica.activeRideReturnDialogTitle")}</ResponsiveModalTitle>
+            <ResponsiveModalDescription>
+              {t("perlica.activeRideReturnDialogDescription")}
+            </ResponsiveModalDescription>
+          </ResponsiveModalHeader>
+          <ResponsiveModalBody className="space-y-4" data-vaul-no-drag>
+            {returnCandidate ? (
+              <>
+                {returnCandidate.parkPoint ? (
+                  <div className="flex items-start gap-2 rounded-xl bg-primary/[0.07] p-3 text-sm">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                    <div>
+                      <p className="font-medium">{t("perlica.activeRideAutoSnapped")}</p>
+                      <p className="mt-0.5 text-muted-foreground">
+                        {returnCandidate.parkPoint.name || returnCandidate.parkPoint.address}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="rounded-xl bg-muted/50 p-3 text-sm text-muted-foreground">
+                    {t("perlica.activeRideUsingCurrentLocation")}
+                  </p>
+                )}
+
+                {returnCandidate.parkPoints.length > 0 ? (
+                  <section className="space-y-2">
+                    <h3 className="text-sm font-medium">{t("perlica.activeRideParkingPoint")}</h3>
+                    <div
+                      role="radiogroup"
+                      aria-label={t("perlica.activeRideParkingPoint")}
+                      className="max-h-56 space-y-2 overflow-y-auto"
+                    >
+                      {returnCandidate.parkPoints.map((point) => {
+                        const selected = returnCandidate.parkPoint === point
+                        return (
+                          <Button
+                            key={point.id || `${point.lat},${point.lng}`}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => void handleSelectParkPoint(point)}
+                            className={`h-auto w-full justify-start gap-3 rounded-xl px-3 py-3 text-left whitespace-normal ${
+                              selected ? "border-primary bg-primary/[0.06]" : ""
+                            }`}
+                          >
+                            <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-medium">
+                                {point.name || point.address || t("perlica.activeRideParkingPoint")}
+                              </span>
+                              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                {t("perlica.activeRideParkingPointDistance", {
+                                  distance: Math.round(point.distance),
+                                })}
+                              </span>
+                            </span>
+                            {selected ? (
+                              <CheckCircle2 className="size-4 shrink-0 text-primary" />
+                            ) : null}
+                          </Button>
+                        )
+                      })}
+                    </div>
+                  </section>
+                ) : null}
+
+                <div className="grid grid-cols-2 gap-3 rounded-xl bg-muted/50 p-3 text-sm">
+                  <span className="text-muted-foreground">
+                    {t("perlica.activeRideDispatchType")}
+                  </span>
+                  <span className="text-right font-mono font-medium">{DISPATCH_TYPE}</span>
+                  <span className="text-muted-foreground">
+                    {t("perlica.activeRideDispatchFee")}
+                  </span>
+                  <span className="text-right font-medium">{fee}</span>
+                </div>
+                {currentActionMessage ? (
+                  <p role="status" className="text-sm text-muted-foreground">
+                    {currentActionMessage}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+          </ResponsiveModalBody>
+          <ResponsiveModalFooter className="flex-row" drawerClassName="flex-row">
             <Button
               variant="outline"
+              className="flex-1"
               onClick={() => setReturnCandidate(null)}
-              disabled={action?.kind === "return"}
+              disabled={busy}
             >
               {t("perlica.activeRideCancel")}
             </Button>
             <Button
               variant="destructive"
+              className="flex-1"
               onClick={() => void handleReturn()}
               disabled={busy || !returnCandidate}
             >
@@ -604,9 +713,9 @@ export function PerlicaActiveRide({
                 ? currentActionMessage
                 : t("perlica.activeRideConfirmReturn")}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveModalFooter>
+        </ResponsiveModalContent>
+      </ResponsiveModal>
     </>
   )
 }

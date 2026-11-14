@@ -1,14 +1,8 @@
 "use client"
 
 import type { ReactNode } from "react"
-import {
-  Badge,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Skeleton,
-} from "@orahako/plugin-ui/components"
+import { Bell, CalendarDays, ChevronDown, UserRound } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage, Badge, Skeleton } from "@orahako/plugin-ui/components"
 import type { PerlicaRaw, PerlicaRideCard, PerlicaUserInfo } from "../extras/types"
 import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
@@ -159,10 +153,10 @@ function Detail({ label, value }: { label: string; value: ReactNode }) {
 
 function AccountSkeleton() {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
-      {Array.from({ length: 9 }, (_, index) => (
-        <Skeleton key={index} className="h-16" />
-      ))}
+    <div className="space-y-4" aria-hidden="true">
+      <Skeleton className="h-44 rounded-2xl" />
+      <Skeleton className="h-32 rounded-2xl" />
+      <Skeleton className="h-20 rounded-2xl" />
     </div>
   )
 }
@@ -173,116 +167,152 @@ function RideCardDetails({ card, index }: { card: PerlicaRideCard; index: number
   const description = card.name && card.feeName ? card.feeName : null
 
   return (
-    <div className="py-4 first:pt-0 last:pb-0">
+    <article className="rounded-2xl bg-card p-4 ring-1 ring-foreground/10">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h4 className="text-sm font-semibold break-words">{title}</h4>
+          <h3 className="text-sm font-semibold break-words">{title}</h3>
           {description ? (
             <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
           ) : null}
         </div>
         <Badge variant="secondary">{t("perlica.validCard")}</Badge>
       </div>
-      <dl className="mt-2 grid grid-cols-2 gap-x-6 sm:grid-cols-3">
-        <Detail label={t("perlica.cardName")} value={text(card.name)} />
-        <Detail label={t("perlica.feeName")} value={text(card.feeName)} />
-        <Detail label={t("perlica.cardStartDate")} value={text(card.startDate)} />
-        <Detail label={t("perlica.cardDueTime")} value={text(card.dueTime)} />
+      <p className="mt-4 flex items-center gap-2 text-sm">
+        <CalendarDays className="size-4 text-muted-foreground" />
+        <span className="text-muted-foreground">{t("perlica.cardDueTime")}</span>
+        <span className="ml-auto font-medium">{text(card.dueTime)}</span>
+      </p>
+      <dl className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-muted/50 p-3 text-center">
         <Detail label={t("perlica.remainingCount")} value={count(card.remainingCount)} />
-        <Detail label={t("perlica.maxRide")} value={count(card.maxRide)} />
         <Detail label={t("perlica.useCount")} value={count(card.useCount)} />
-        <Detail label={t("perlica.timeCount")} value={count(card.timeCount)} />
-        <Detail label={t("perlica.currentNum")} value={count(card.currentNum)} />
-        <Detail
-          label={t("perlica.isValid")}
-          value={card.isValid ? t("perlica.yes") : t("perlica.no")}
-        />
+        <Detail label={t("perlica.maxRide")} value={count(card.maxRide)} />
       </dl>
-    </div>
+      <details className="group mt-3">
+        <summary className="flex cursor-pointer list-none items-center justify-center gap-1 text-xs text-muted-foreground">
+          {t("perlica.cardMoreDetails")}
+          <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
+        </summary>
+        <dl className="mt-2 grid grid-cols-2 gap-x-4 border-t pt-2">
+          <Detail label={t("perlica.cardStartDate")} value={text(card.startDate)} />
+          <Detail
+            label={t("perlica.timeCount")}
+            value={
+              Number.isFinite(card.timeCount)
+                ? t("perlica.cardFreeDurationMinutes", { value: card.timeCount })
+                : MISSING
+            }
+          />
+        </dl>
+      </details>
+    </article>
   )
 }
+export function PerlicaAccountVerification({ user }: { user: PerlicaUserInfo }) {
+  const { t } = usePluginTranslation(PERLICA_PLUGIN_ID)
+  const redacted = t("perlica.redacted")
+
+  return (
+    <details className="group">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium">
+        {t("perlica.accountInformation")}
+        <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <dl className="mt-2 grid grid-cols-2 gap-x-4 border-t pt-2">
+        <Detail label={t("perlica.userId")} value={text(user.userId)} />
+        <Detail
+          label={t("perlica.realName")}
+          value={rawText(readRawField(user.raw, REAL_NAME_FIELDS), redacted)}
+        />
+        <Detail
+          label={t("perlica.studentCertification")}
+          value={rawText(readRawField(user.raw, STUDENT_CERTIFICATION_FIELDS), redacted)}
+        />
+        <Detail
+          label={t("perlica.arrears")}
+          value={rawText(readRawField(user.raw, ARREARS_FIELDS), redacted)}
+        />
+        <Detail
+          label={t("perlica.debt")}
+          value={rawText(readRawField(user.raw, DEBT_FIELDS), redacted)}
+        />
+      </dl>
+    </details>
+  )
+}
+
 export function PerlicaAccount({ user, cards, unreadCount, loading }: PerlicaAccountProps) {
   const { t } = usePluginTranslation(PERLICA_PLUGIN_ID)
   const validCards = cards.filter((card) => card.isValid)
-  const redacted = t("perlica.redacted")
   const unread =
     unreadCount !== null && Number.isFinite(unreadCount) ? String(unreadCount) : MISSING
 
-  return (
-    <div className="flex flex-col gap-4" aria-label={t("perlica.tabAccount")}>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("perlica.userSection")}</CardTitle>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{t("perlica.unreadCount")}</span>
-            <Badge variant="secondary">{unread}</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {user ? (
-            <dl className="grid gap-x-6 sm:grid-cols-2 xl:grid-cols-3">
-              <Detail label={t("perlica.nickname")} value={text(user.nickname)} />
-              <Detail label={t("perlica.phone")} value={text(user.phone)} />
-              <Detail label={t("perlica.userId")} value={text(user.userId)} />
-              <Detail
-                label={t("perlica.balance")}
-                value={Number.isFinite(user.balance) ? `¥${user.balance.toFixed(2)}` : MISSING}
-              />
-              <Detail
-                label={t("perlica.deposit")}
-                value={Number.isFinite(user.deposit) ? `¥${user.deposit.toFixed(2)}` : MISSING}
-              />
-              <Detail label={t("perlica.monthlyCardExpiry")} value={text(user.rideCardDate)} />
-              <Detail
-                label={t("perlica.realName")}
-                value={rawText(readRawField(user.raw, REAL_NAME_FIELDS), redacted)}
-              />
-              <Detail
-                label={t("perlica.studentCertification")}
-                value={rawText(readRawField(user.raw, STUDENT_CERTIFICATION_FIELDS), redacted)}
-              />
-              <Detail
-                label={t("perlica.arrears")}
-                value={rawText(readRawField(user.raw, ARREARS_FIELDS), redacted)}
-              />
-              <Detail
-                label={t("perlica.debt")}
-                value={rawText(readRawField(user.raw, DEBT_FIELDS), redacted)}
-              />
-            </dl>
-          ) : loading ? (
-            <AccountSkeleton />
-          ) : (
-            <p className="text-sm text-muted-foreground">{t("perlica.notLoaded")}</p>
-          )}
-        </CardContent>
-      </Card>
+  if (!user && loading) return <AccountSkeleton />
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between gap-3">
-          <CardTitle>{t("perlica.rideCards")}</CardTitle>
+  return (
+    <div className="flex flex-col gap-5" aria-label={t("perlica.tabAccount")}>
+      {user ? (
+        <section className="rounded-2xl bg-muted/55 p-5">
+          <div className="flex items-center gap-3">
+            <Avatar className="size-14" aria-label={text(user.nickname)}>
+              {user.avatarUrl ? <AvatarImage src={user.avatarUrl} alt="" /> : null}
+              <AvatarFallback>
+                <UserRound className="size-6" />
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-lg font-semibold">{text(user.nickname)}</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">{text(user.phone)}</p>
+            </div>
+            <Badge variant="outline" className="shrink-0 bg-background/60">
+              <Bell className="size-3.5" />
+              <span className="sr-only">{t("perlica.unreadCount")}</span>
+              {unread}
+            </Badge>
+          </div>
+          <dl className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-background/65 p-3">
+              <dt className="text-xs text-muted-foreground">{t("perlica.balance")}</dt>
+              <dd className="mt-1 text-xl font-semibold tabular-nums">
+                {Number.isFinite(user.balance) ? `¥${user.balance.toFixed(2)}` : MISSING}
+              </dd>
+            </div>
+            <div className="rounded-xl bg-background/65 p-3">
+              <dt className="text-xs text-muted-foreground">{t("perlica.deposit")}</dt>
+              <dd className="mt-1 text-xl font-semibold tabular-nums">
+                {Number.isFinite(user.deposit) ? `¥${user.deposit.toFixed(2)}` : MISSING}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      ) : (
+        <p className="rounded-2xl bg-muted/50 p-6 text-center text-sm text-muted-foreground">
+          {t("perlica.notLoaded")}
+        </p>
+      )}
+
+      <section className="space-y-3" aria-label={t("perlica.rideCards")}>
+        <div className="flex items-center justify-between gap-3 px-1">
+          <h2 className="text-base font-semibold">{t("perlica.rideCards")}</h2>
           {validCards.length > 0 ? (
             <Badge variant="outline">{t("perlica.cardCount", { count: validCards.length })}</Badge>
           ) : null}
-        </CardHeader>
-        <CardContent>
-          {validCards.length > 0 ? (
-            <div className="divide-y">
-              {validCards.map((card, index) => (
-                <RideCardDetails
-                  key={`${card.name}-${card.feeName}-${card.startDate}-${card.dueTime}-${index}`}
-                  card={card}
-                  index={index}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {loading ? t("perlica.userLoading") : t("perlica.noRideCard")}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+        {validCards.length > 0 ? (
+          <div className="space-y-3">
+            {validCards.map((card, index) => (
+              <RideCardDetails
+                key={`${card.name}-${card.feeName}-${card.startDate}-${card.dueTime}-${index}`}
+                card={card}
+                index={index}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+            {loading ? t("perlica.userLoading") : t("perlica.noRideCard")}
+          </p>
+        )}
+      </section>
     </div>
   )
 }

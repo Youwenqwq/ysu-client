@@ -13,6 +13,7 @@ import {
   toPerlicaRideCards,
   toPerlicaRideDetail,
   toPerlicaRideLogs,
+  toPerlicaRideRoute,
   toPerlicaStations,
   toPerlicaUnreadCount,
   toPerlicaUserInfo,
@@ -33,6 +34,7 @@ import {
   type PerlicaStation,
   type PerlicaUserInfo,
 } from "./types"
+import { distanceMeters } from "./geo"
 
 const BASE_URL = "https://client3.uqbike.cn"
 const DEFAULT_AD_ACCOUNT_ID = "11423"
@@ -44,16 +46,6 @@ export interface PerlicaConfig {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
-
-function haversineDistance(a: PerlicaCoords, b: PerlicaCoords): number {
-  const radians = Math.PI / 180
-  const deltaLat = (b.lat - a.lat) * radians
-  const deltaLng = (b.lng - a.lng) * radians
-  const h =
-    Math.sin(deltaLat / 2) ** 2 +
-    Math.cos(a.lat * radians) * Math.cos(b.lat * radians) * Math.sin(deltaLng / 2) ** 2
-  return 6_371_000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
-}
 
 function isStalePosition(value: unknown, now: number): boolean {
   if (value === null || value === undefined || value === "") return false
@@ -154,7 +146,7 @@ export class PerlicaClient {
     const now = Date.now()
     const sorted = machines
       .filter((machine) => machine.battery > 0 && !isStalePosition(machine.raw.posDt, now))
-      .map((machine) => ({ ...machine, distance: haversineDistance(coords, machine) }))
+      .map((machine) => ({ ...machine, distance: distanceMeters(coords, machine) }))
       .sort((a, b) => a.distance - b.distance)
 
     const seen = new Set<string>()
@@ -352,6 +344,24 @@ export class PerlicaClient {
   async rideDetail(orderNo: string): Promise<PerlicaRideDetail> {
     return toPerlicaRideDetail(
       await this.call("/rideLogDetails/queryByOrderNO.do", { orderNO: orderNo })
+    )
+  }
+
+  async rideRoute(detail: PerlicaRideDetail): Promise<PerlicaCoords[]> {
+    if (detail.route.length > 0) return detail.route
+    const rawMachineId = detail.raw.machineId
+    const machineId =
+      typeof rawMachineId === "string" || typeof rawMachineId === "number"
+        ? String(rawMachineId).trim()
+        : ""
+    if (!machineId || !detail.startTime || !detail.endTime) return []
+    return toPerlicaRideRoute(
+      await this.call("/history/query.do", {
+        mapType: 2,
+        machineId,
+        startTime: detail.startTime,
+        endTime: detail.endTime,
+      })
     )
   }
 
