@@ -50,8 +50,24 @@ export interface NetworkActivitySession {
   readonly slowestMs: number
 }
 
+export type NetworkActivityOutcome = "ok" | "error" | "aborted"
+
+export interface NetworkActivityRecord {
+  readonly id: number
+  readonly category: NetworkActivityCategory
+  /** Provider-registered i18n key for a finer request flow. */
+  readonly label?: string
+  readonly method: "GET" | "POST"
+  readonly startedAt: number
+  readonly endedAt: number
+  readonly durationMs: number
+  readonly outcome: NetworkActivityOutcome
+}
+
 export interface NetworkActivitySnapshot {
   readonly active: readonly NetworkActivityEntry[]
+  /** Completed requests for the current burst, oldest first. */
+  readonly history: readonly NetworkActivityRecord[]
   readonly session: NetworkActivitySession | null
   readonly revision: number
 }

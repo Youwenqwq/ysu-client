@@ -45,11 +45,11 @@ export function MobileTopBar({ title, showBack }: Props) {
         )}
         <h1 className="truncate text-base font-semibold">{titleOverride ?? title}</h1>
         {titleHint && <MobileTitleHint key={titleHint} text={titleHint} />}
+        <PluginSlot name="shell.activity" />
         <RefreshIndicator />
         <StaleIndicator />
       </div>
       <div className="flex items-center gap-1">{rightSlot}</div>
-      <PluginSlot name="shell.activity" />
     </header>
   )
 }

@@ -1,6 +1,8 @@
 import type {
   NetworkActivityCategory,
   NetworkActivityEntry,
+  NetworkActivityOutcome,
+  NetworkActivityRecord,
   NetworkActivitySession,
   NetworkActivitySnapshot,
   PluginHttpActivityService,
@@ -16,8 +18,9 @@ import type {
  */
 
 const SESSION_IDLE_MS = 2_000
+const MAX_HISTORY = 100
 
-type FinishRequest = (outcome?: "ok" | "error" | "aborted") => void
+type FinishRequest = (outcome?: NetworkActivityOutcome) => void
 type ActivityLabeler = (url: string) => string | undefined
 
 const active = new Map<number, NetworkActivityEntry>()
@@ -27,7 +30,13 @@ let nextId = 1
 let nextLabelerId = 1
 let revision = 0
 let session: MutableSession | null = null
-let snapshot: NetworkActivitySnapshot = { active: [], session: null, revision: 0 }
+let history: readonly NetworkActivityRecord[] = []
+let snapshot: NetworkActivitySnapshot = {
+  active: [],
+  history: [],
+  session: null,
+  revision: 0,
+}
 
 interface MutableGroup {
   startedAt: number
@@ -117,6 +126,7 @@ function createSession(now: number): MutableSession {
 function ensureSession(now: number): MutableSession {
   if (session && (active.size > 0 || now - session.lastEndedAt <= SESSION_IDLE_MS)) return session
   session = createSession(now)
+  history = []
   return session
 }
 
@@ -124,6 +134,7 @@ function publish(): void {
   revision += 1
   snapshot = {
     active: Array.from(active.values()),
+    history,
     session: session ? snapshotSession(session) : null,
     revision,
   }
@@ -205,6 +216,19 @@ export function beginRequest(url: string, method: "GET" | "POST"): FinishRequest
         if (outcome !== "ok") current.failed += 1
         current.lastEndedAt = endedAt
         current.endedAt = endedAt
+        history = [
+          ...history,
+          {
+            id,
+            category: entry.category,
+            label: entry.label,
+            method: entry.method,
+            startedAt,
+            endedAt,
+            durationMs: Math.max(0, endedAt - startedAt),
+            outcome,
+          },
+        ].slice(-MAX_HISTORY)
         publish()
       } catch {
         // Keep instrumentation failure isolated from the transport.
@@ -232,6 +256,7 @@ export function resetNetworkActivity(): void {
   listeners.clear()
   labelers.clear()
   session = null
+  history = []
   revision = 0
-  snapshot = { active: [], session: null, revision: 0 }
+  snapshot = { active: [], history: [], session: null, revision: 0 }
 }

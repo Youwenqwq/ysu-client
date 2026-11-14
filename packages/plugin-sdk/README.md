@@ -107,7 +107,7 @@ ctx.slots.register({
 - `ctx.plugins`：按插件 ID 安装与当前应用和平台兼容的市场版本。
 - `ctx.storage.local` / `ctx.storage.secure`：按插件 ID 命名空间的字符串存储。
 - `ctx.http.fetch`：应用网络栈。
-- `ctx.http.activity`：只读网络活动快照与订阅。只暴露分类、方法、单调时间与失败计数，不暴露 URL、域名、请求头、body 或 cookie；订阅与 `registerLabeler()` 随插件作用域释放。Provider 可通过 labeler 返回本插件注册的 i18n key，为成绩、课表、评教等接口提供细粒度名称；URL 只在该回调内使用，不会进入快照。`shell.activity` Slot 用于在默认 Shell 顶栏下方组合活动条。
+- `ctx.http.activity`：只读网络活动快照与订阅。快照包含进行中请求、本轮已完成历史和汇总；只暴露分类、方法、单调时间与失败计数，不暴露 URL、域名、请求头、body 或 cookie；订阅与 `registerLabeler()` 随插件作用域释放。Provider 可通过 labeler 返回本插件注册的 i18n key，为成绩、课表、评教等接口提供细粒度名称；URL 只在该回调内使用，不会进入快照。`shell.activity` Slot 用于在默认 Shell 顶栏组合活动提示。
 - `ctx.native`：原生平台检测、图片保存及通知、精确闹钟、电池优化权限申请。
 - `ctx.notifications`：注册通知运行时渠道并读取可订阅快照；渠道随插件作用域自动撤销。
 - `ctx.assets.url(path)`：外部插件包内资源的 Blob URL。

@@ -118,6 +118,13 @@ describe("network activity", () => {
       slowestLabel: "networkActivity.ysu.evaluation",
       slowestMs: 120,
     })
+    expect(snapshot.history).toHaveLength(1)
+    expect(snapshot.history[0]).toMatchObject({
+      category: "academic",
+      label: "networkActivity.ysu.evaluation",
+      durationMs: 120,
+      outcome: "ok",
+    })
     expect(JSON.stringify(snapshot)).not.toContain("secret")
   })
 
@@ -156,6 +163,7 @@ describe("network activity", () => {
     now = 4_101
     third("ok")
     expect(networkActivity.getSnapshot().session).toMatchObject({ count: 1, totalMs: 50 })
+    expect(networkActivity.getSnapshot().history).toHaveLength(1)
   })
 
   it("is idempotent and notifies only active subscribers", () => {

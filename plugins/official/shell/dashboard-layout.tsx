@@ -448,6 +448,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <h1 className="animate-in text-lg font-semibold duration-300 fade-in slide-in-from-left-2">
                 {pageTitle}
               </h1>
+              <PluginSlot name="shell.activity" />
               <RefreshIndicator />
               <StaleIndicator />
             </div>
@@ -490,7 +491,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </DropdownMenu>
             </div>
           </div>
-          <PluginSlot name="shell.activity" />
         </header>
         <Suspense fallback={null}>
           <RouteTransition fullscreen={mobileFullscreen}>{children}</RouteTransition>
