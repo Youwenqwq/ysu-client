@@ -1,7 +1,7 @@
 {
   "id": "community.theme.yuna",
   "name": "YUNA 三皮肤主题",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "apiVersion": 1,
   "kind": "theme",
   "entry": "dist/index.js",

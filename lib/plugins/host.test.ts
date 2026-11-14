@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import type { MarketplaceIndex, PluginManifest } from "@orahako/plugin-sdk"
 import { createMarketPluginInstaller, PluginHost } from "./host"
 import { PLUGIN_MARKET_URL } from "./market"
+import arknightsDefinition, {
+  manifest as arknightsManifest,
+} from "@/plugins/market/theme-arknights"
 import { usePluginPreferences } from "@/lib/stores/plugin-preferences"
 
 const installedManifest: PluginManifest = {
@@ -338,7 +341,7 @@ describe("PluginHost.applyPluginBundle", () => {
     }
   })
 
-  it("loads installed packages that the runtime has not registered yet", async () => {
+  it("enables installed packages that the runtime has not registered yet", async () => {
     const host = new PluginHost()
     vi.spyOn(host.packages, "list").mockResolvedValue([
       { manifest: installedManifest, installedAt: 1, fileCount: 1, byteSize: 10 },
@@ -346,18 +349,24 @@ describe("PluginHost.applyPluginBundle", () => {
     const load = vi
       .spyOn(
         host as unknown as {
-          load: (id: string, replaceActive: boolean) => Promise<void>
+          load(id: string, replaceActive: boolean, start?: boolean): Promise<void>
         },
         "load"
       )
-      .mockResolvedValue(undefined)
+      .mockImplementation(async () => {
+        host.runtime.register(installedManifest, () => {}, "external")
+      })
     const installFromUrl = vi.spyOn(host, "installFromUrl")
+    usePluginPreferences.getState().setPluginDisabled(installedManifest.id, true)
     try {
       await host.applyPluginBundle([installedManifest.id], bundleIndex())
 
-      expect(load).toHaveBeenCalledWith(installedManifest.id, true)
+      expect(load).toHaveBeenCalledWith(installedManifest.id, false, false)
+      expect(host.runtime.get(installedManifest.id)?.status).toBe("active")
+      expect(usePluginPreferences.getState().disabledPluginIds).not.toContain(installedManifest.id)
       expect(installFromUrl).not.toHaveBeenCalled()
     } finally {
+      usePluginPreferences.getState().setPluginDisabled(installedManifest.id, false)
       host.runtime.dispose()
     }
   })
@@ -412,6 +421,60 @@ describe("PluginHost.applyPluginBundle", () => {
       expect(installFromUrl).not.toHaveBeenCalled()
     } finally {
       host.runtime.dispose()
+    }
+  })
+})
+
+describe("PluginHost.enable after restarting with a disabled external theme", () => {
+  it("loads the saved package before starting an unregistered external theme", async () => {
+    const host = new PluginHost()
+    const previousDisabled = usePluginPreferences.getState().disabledPluginIds
+    usePluginPreferences.getState().setPluginDisabled(arknightsManifest.id, true)
+    const load = vi
+      .spyOn(
+        host as unknown as {
+          load(id: string, replaceActive: boolean, start?: boolean): Promise<void>
+        },
+        "load"
+      )
+      .mockImplementation(async () => {
+        host.runtime.register(arknightsManifest, arknightsDefinition, "external")
+      })
+    try {
+      expect(host.runtime.get(arknightsManifest.id)).toBeUndefined()
+      await host.enable(arknightsManifest.id)
+      expect(load).toHaveBeenCalledWith(arknightsManifest.id, false, false)
+      expect(host.runtime.get(arknightsManifest.id)?.status).toBe("active")
+      expect(
+        host.ui
+          .getSnapshot()
+          .themes.some(
+            (theme) => theme.pluginId === arknightsManifest.id && theme.id === "arknights"
+          )
+      ).toBe(true)
+      expect(usePluginPreferences.getState().disabledPluginIds).not.toContain(arknightsManifest.id)
+    } finally {
+      host.runtime.dispose()
+      usePluginPreferences.setState({ disabledPluginIds: previousDisabled })
+    }
+  })
+
+  it("retains the disabled preference when the saved package fails to load", async () => {
+    const host = new PluginHost()
+    const previousDisabled = usePluginPreferences.getState().disabledPluginIds
+    usePluginPreferences.getState().setPluginDisabled(arknightsManifest.id, true)
+    vi.spyOn(
+      host as unknown as {
+        load(id: string, replaceActive: boolean): Promise<void>
+      },
+      "load"
+    ).mockRejectedValue(new Error("Cannot load saved ZIP"))
+    try {
+      await expect(host.enable(arknightsManifest.id)).rejects.toThrow("Cannot load saved ZIP")
+      expect(usePluginPreferences.getState().disabledPluginIds).toContain(arknightsManifest.id)
+    } finally {
+      host.runtime.dispose()
+      usePluginPreferences.setState({ disabledPluginIds: previousDisabled })
     }
   })
 })

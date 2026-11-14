@@ -193,7 +193,8 @@ export class PluginHost {
       }
       const release = releases.get(id)
       if (!release) {
-        await this.load(id, true)
+        // Preflight found a saved package; enable() clears its disabled preference.
+        await this.enable(id)
         continue
       }
       await this.installFromUrl(
@@ -266,12 +267,16 @@ export class PluginHost {
   }
 
   async enable(id: string): Promise<void> {
-    usePluginPreferences.getState().setPluginDisabled(id, false)
     const state = this.runtime.get(id)
-    if (state?.source === "external" && !this.external.has(id)) await this.load(id, false)
+    // Disabled external packages are deliberately not registered at boot.
+    // Register without starting so enable() owns the single start and style pass.
+    if (!state || (state.source === "external" && !this.external.has(id))) {
+      await this.load(id, false, false)
+    }
     markPluginStarted(id)
     await this.runtime.startAndWait(id)
     this.applyStyles(id)
+    usePluginPreferences.getState().setPluginDisabled(id, false)
   }
 
   private async rollback(
