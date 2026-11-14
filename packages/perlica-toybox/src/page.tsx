@@ -680,7 +680,7 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
     <div
       className={cn(
         "flex flex-col",
-        activeTab === "map" ? "min-h-0 flex-1 max-md:-m-4 md:-m-8" : "gap-4 p-4"
+        activeTab === "map" ? "min-h-0 flex-1 max-md:-m-4" : "gap-4 p-4"
       )}
     >
       <Tabs
@@ -713,7 +713,7 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
           forceMount
           className="m-0 min-h-0 flex-1 data-[state=inactive]:hidden"
         >
-          <div className="relative h-full min-h-0 overflow-hidden bg-card">
+          <div className="relative h-full min-h-0 overflow-hidden bg-card md:rounded-xl md:border">
             <PerlicaMap
               className="absolute inset-0 h-full w-full"
               showBadge={false}
