@@ -1,6 +1,6 @@
 const DEFAULT_INDEX = {
   schemaVersion: 1,
-  updatedAt: '2026-11-14T18:33:10Z',
+  updatedAt: '2026-11-14T19:03:19Z',
   plugins: [{
     id: 'community.theme.yuna',
     name: 'YUNA 三皮肤主题',
@@ -45,6 +45,16 @@ const DEFAULT_INDEX = {
     homepage: 'https://github.com/Youwenqwq/ysu-client',
     categories: ['toybox', 'transport'],
     versions: [{
+      version: '1.1.1',
+      apiVersion: 1,
+      minAppVersion: '0.15.0',
+      platforms: ['web', 'android'],
+      zipUrl: '/plugins/community.perlica-toybox/1.1.1.zip',
+      sha256: 'b6b00cc31a5df0acb6631771368beb55e04d69624daeeadb98b3cb52c361899a',
+      size: 207434,
+      publishedAt: '2026-11-14T19:03:19Z',
+      changelog: '修复桌面端地图模式的工具栏边距，避免标签与刷新按钮被挤压到页面边缘；保留移动端全屏地图。',
+    }, {
       version: '1.1.0',
       apiVersion: 1,
       minAppVersion: '0.15.0',
