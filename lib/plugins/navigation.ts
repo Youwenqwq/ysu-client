@@ -119,6 +119,20 @@ function navigationParamsMatch(
   return Object.entries(item.params).every(([key, value]) => params.get(key) === String(value))
 }
 
+/** Primary tabs are roots, even when several tabs share a page or declare a parent. */
+export function isPrimaryNavigationLocation(
+  navigation: readonly SemanticNavigationInput[],
+  location: PluginNavigationLocation
+): boolean {
+  return navigation.some(
+    (item) =>
+      item.pluginId === location.pluginId &&
+      item.page === location.pageId &&
+      (isAppNavigation(item) ? item.primary === true : true) &&
+      navigationParamsMatch(item, location.params)
+  )
+}
+
 /**
  * Select an exact page/parameter target first. An unmatched target defaults to the
  * first item for that page; detail pages inherit the nearest matching parent tab.

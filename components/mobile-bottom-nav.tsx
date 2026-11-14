@@ -103,6 +103,7 @@ export function MobileBottomNav() {
           <Link
             key={tab.href}
             href={tab.href}
+            replace
             className={cn(
               "flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
               isActive ? "text-primary" : "text-muted-foreground"

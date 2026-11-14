@@ -7,6 +7,8 @@ import { isCapacitor } from "@/lib/native/platform"
 import { requestBack, setNavigationBackHandler } from "@/lib/navigation/back"
 import { appHistoryDepth, backFallback, installBackHistory } from "@/lib/navigation/back-history"
 import { useSemanticNavigation } from "@/lib/navigation/use-semantic-navigation"
+import { isPrimaryNavigationLocation } from "@/lib/plugins/navigation"
+import { usePluginRouteStore } from "@/lib/stores/plugin-route"
 
 export function BackButtonHandler() {
   const pathname = usePathname()
@@ -18,8 +20,28 @@ export function BackButtonHandler() {
   useLayoutEffect(() => {
     return setNavigationBackHandler((canGoBack) => {
       const path = pathname.replace(/\/+$/, "") || "/"
+      const current = usePluginRouteStore.getState().current
+      const isPrimaryDestination =
+        path === "/dashboard" ||
+        path === "/dashboard/me" ||
+        (path === "/dashboard/plugin" &&
+          Boolean(
+            current &&
+              (current.primary ||
+                isPrimaryNavigationLocation(nav.sources.navigation, {
+                  pluginId: current.pluginId,
+                  pageId: current.pageId,
+                  params: new URLSearchParams(window.location.search),
+                }))
+          ))
+      // Tabs are roots: never walk through another tab's stale detail history.
       // Never return to an authenticated page through the login page after logout.
-      if (path !== "/login" && canGoBack !== false && appHistoryDepth(window.history) > 0) {
+      if (
+        path !== "/login" &&
+        !isPrimaryDestination &&
+        canGoBack !== false &&
+        appHistoryDepth(window.history) > 0
+      ) {
         router.back()
         return
       }

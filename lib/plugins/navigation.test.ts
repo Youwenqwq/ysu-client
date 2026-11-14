@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   CORE_DASHBOARD_FALLBACK_HREF,
+  isPrimaryNavigationLocation,
   landingPreferenceHref,
   navigationForScope,
   resolveActivePluginNavigation,
@@ -229,6 +230,11 @@ describe("scoped navigation", () => {
     expect(resolveActivePluginNavigation(items, pages, location("settings", "ride"))).toBe("ride")
     expect(resolveActivePluginNavigation(items, pages, location("messages"))).toBe("messages")
     expect(resolveActivePluginNavigation(items, pages, location("thread"))).toBe("map")
+
+    expect(isPrimaryNavigationLocation(items, location("index", "ride"))).toBe(true)
+    expect(isPrimaryNavigationLocation(items, location("messages"))).toBe(true)
+    expect(isPrimaryNavigationLocation(items, location("thread"))).toBe(false)
+    expect(isPrimaryNavigationLocation(items, location("settings"))).toBe(false)
   })
 
   it("terminates when page parent metadata contains a cycle", () => {
