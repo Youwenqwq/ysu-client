@@ -23,6 +23,11 @@ export const useMobileHeaderStore = create<MobileHeaderState>((set) => ({
     set({ titleOverride, fullscreen, titleHint }),
 }))
 
+/**
+ * Register a node in the mobile top bar. The node is a snapshot: event handlers inside it
+ * keep reading the values captured while `deps` were unchanged, so either list every value
+ * those handlers read, or render a child component that owns its own state.
+ */
 export function useMobileHeaderRight(node: ReactNode, deps: unknown[] = []) {
   const setRightSlot = useMobileHeaderStore((s) => s.setRightSlot)
   useEffect(() => {

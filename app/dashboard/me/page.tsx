@@ -1,14 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ChevronRight, LogIn, Puzzle, Settings, Sun, Moon } from "lucide-react"
+import { ChevronRight, LogIn, Puzzle, Settings } from "lucide-react"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuthStore } from "@/lib/stores/auth"
 import { useSettingsStore } from "@/lib/stores/settings"
 import { cn } from "@/lib/utils"
@@ -19,7 +18,6 @@ import { loadAvatarImage } from "@/lib/storage/avatar"
 import { logoutActiveProvider, reloginActiveProvider } from "@/providers/provider-service"
 import { useStudentInfo } from "@/providers/hooks"
 import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/lib/rate-limit"
-import { useTheme } from "next-themes"
 import { APP_VERSION, APP_BUILD } from "@/lib/version"
 import { useProviderCapabilities, useSupportedPlugins } from "@/providers/use-provider"
 import { usePluginHost } from "@/components/plugin-provider"
@@ -38,38 +36,10 @@ export default function MePage() {
   // when the contributing plugin is missing or disabled the entry hides entirely.
   const { navigation: pluginNavigation, settings: pluginSettings } = usePluginUI(host.ui)
   const studentInfoHref = nav.href("student-info")
-  const { theme, setTheme, systemTheme } = useTheme()
-
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => setMounted(true), [])
 
   const student = useStudentInfo()
 
-  const isSystem = theme === "system"
-  const effectiveTheme = isSystem ? systemTheme : theme
-
-  function handleThemeToggle() {
-    if (isSystem) {
-      setTheme("light")
-    } else {
-      setTheme(theme === "light" ? "dark" : "light")
-    }
-  }
-
-  useMobileHeaderRight(
-    mounted ? (
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={handleThemeToggle}
-        aria-label={t("app.theme")}
-      >
-        {effectiveTheme === "dark" ? <Moon className="size-4" /> : <Sun className="size-4" />}
-      </Button>
-    ) : null,
-    [mounted, effectiveTheme, t]
-  )
+  useMobileHeaderRight(<ThemeToggle />)
 
   async function handleRelogin() {
     const limit = checkRateLimit()
