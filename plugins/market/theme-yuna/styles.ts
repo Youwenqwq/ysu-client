@@ -34,7 +34,8 @@ function palette(skin: YunaSkin, mode: "light" | "dark") {
     --accent: var(--yuna-surface-2);
     --accent-foreground: var(--yuna-ink);
     --border: var(--yuna-line);
-    --input: var(--yuna-blue-soft);
+    --input: var(--yuna-muted);
+    --yuna-control-border: var(--yuna-muted);
     --ring: var(--yuna-blue);
     --sidebar: var(--yuna-surface);
     --sidebar-foreground: var(--yuna-ink);
@@ -66,6 +67,94 @@ html [data-slot="table-row"]:has(td):hover { background: var(--secondary); }
 html :is(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 html [data-slot="button"][data-variant="default"]:not(:disabled):hover { background: var(--yuna-wine); color: #fff; }
 html [data-slot="input"] { background-color: var(--card); }
+/* --input is also shadcn's unchecked fill. State fills must be explicit so a
+   bright border token cannot make a disabled feature look enabled. */
+html [data-slot="switch"] {
+  --yuna-switch-size: 18px;
+  --yuna-switch-travel: 18px;
+  box-sizing: border-box;
+  width: 44px;
+  height: 26px;
+  padding: 2px;
+  border: 2px solid var(--yuna-control-border);
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--foreground);
+}
+html [data-slot="switch"][data-size="sm"] {
+  --yuna-switch-size: 14px;
+  --yuna-switch-travel: 14px;
+  width: 36px;
+  height: 22px;
+}
+html [data-slot="switch"] [data-slot="switch-thumb"] {
+  width: var(--yuna-switch-size);
+  height: var(--yuna-switch-size);
+  border-radius: 50%;
+  background: var(--foreground);
+  translate: none;
+  transform: translateX(0);
+  box-shadow: 0 1px 2px #0003;
+}
+html [data-slot="switch"]:is([data-state="checked"], [data-checked]) {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+html [data-slot="switch"]:is([data-state="checked"], [data-checked]) [data-slot="switch-thumb"] {
+  background: var(--primary-foreground);
+  transform: translateX(var(--yuna-switch-travel));
+}
+html [data-slot="switch"]:is([data-state="checked"], [data-checked])::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  width: 5px;
+  height: 9px;
+  border-right: 2px solid var(--primary-foreground);
+  border-bottom: 2px solid var(--primary-foreground);
+  transform: translateY(-1px) rotate(45deg);
+  pointer-events: none;
+}
+html[dir="rtl"] [data-slot="switch"]:is([data-state="checked"], [data-checked]) [data-slot="switch-thumb"] {
+  transform: translateX(calc(-1 * var(--yuna-switch-travel)));
+}
+html[dir="rtl"] [data-slot="switch"]::before { left: auto; right: 7px; }
+html :is([data-slot="checkbox"], [data-slot="radio-group-item"]) {
+  border: 2px solid var(--yuna-control-border);
+  background: var(--card);
+  color: var(--foreground);
+}
+html :is([data-slot="checkbox"], [data-slot="radio-group-item"]):is([data-state="checked"], [data-checked]) {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+html [data-slot="button"]:is([data-variant="outline"], [data-variant="secondary"]) {
+  border: 1px solid var(--yuna-control-border);
+  background: var(--card);
+  color: var(--foreground);
+}
+html [data-slot="button"]:is([data-variant="outline"], [data-variant="secondary"]):not(:disabled):hover {
+  border-color: var(--primary);
+  background: var(--secondary);
+  color: var(--primary);
+}
+html [data-slot="button"][data-variant="destructive"] { border: 1px solid currentColor; }
+html :is([data-slot="toggle"], [data-slot="toggle-group-item"], [data-slot="tabs-trigger"]) {
+  border: 1px solid var(--yuna-control-border);
+  background: var(--card);
+  color: var(--foreground);
+}
+html :is([data-slot="toggle"], [data-slot="toggle-group-item"], [data-slot="tabs-trigger"]):is([data-state="on"], [data-state="active"], [aria-pressed="true"]) {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: inset 0 -2px 0 currentColor;
+}
+html :is([data-slot="button"], [data-slot="toggle"], [data-slot="toggle-group-item"], [data-slot="switch"]):is(:disabled, [data-disabled]) {
+  opacity: .45;
+  cursor: not-allowed;
+}
 @media (pointer: coarse) {
   html :is([data-slot="input"], [data-slot="select-trigger"], [data-slot="sidebar-menu-button"]) { min-height: 44px; }
   html [data-slot="button"][data-size="default"], html [data-slot="button"][data-size="lg"] { min-height: 44px; }
@@ -75,6 +164,11 @@ html [data-slot="input"] { background-color: var(--card); }
 }
 @media (forced-colors: active) {
   html [data-slot="sidebar-menu-button"][data-active="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  html [data-slot="switch"] { border-color: ButtonText; background: Canvas; }
+  html [data-slot="switch"] [data-slot="switch-thumb"] { background: ButtonText; }
+  html [data-slot="switch"]:is([data-state="checked"], [data-checked]) { border-color: Highlight; background: Highlight; }
+  html [data-slot="switch"]:is([data-state="checked"], [data-checked]) [data-slot="switch-thumb"] { background: HighlightText; }
+  html [data-slot="switch"]:is([data-state="checked"], [data-checked])::before { border-color: HighlightText; }
 }
 `
 

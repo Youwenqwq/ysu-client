@@ -23,11 +23,15 @@
 ## 构建
 
 ```sh
-pnpm plugin pack plugins/market/theme-yuna
+pnpm plugin pack plugins/market/theme-yuna ../Local-Plugin-Outputs/community.theme.yuna-1.0.1.zip
 ```
 
-市场发布包位于 `website/public/plugins/community.theme.yuna/1.0.0.zip`，索引记录实际大小及 SHA-256。源码入口、清单和样式均在本目录，依赖公共 SDK，不导入宿主私有模块。
+本次为本地 1.0.1 版：ZIP 输出到仓库之外的 `Local-Plugin-Outputs/`，通过插件管理直接导入。源码入口、清单和样式均在本目录，依赖公共 SDK，不导入宿主私有模块。本地更新不新增或修改市场索引，也不将新 ZIP 提交到仓库。上游已存在的历史市场资源保持原样。
+
+将来市场就绪时，可将插件源码独立维护，CI 打包并将 ZIP 与 SHA-256 发布为 Release 资产；由市场服务按发布元数据生成索引，宿主只负责公共插件 API、导入与生命周期。这样不需要每次主题更新都向主应用仓库提交二进制包。
 
 本地拉丁字形 Archivo 与 Barlow Condensed 来自规范参考包，许可证随字体放在 `assets/fonts/`（SIL OFL）。中文使用可用的 Noto Sans SC / 系统字体；红魔馆使用系统衬线回退。没有附带角色或第三方品牌图片。
 
-测试覆盖真实 Cordis 运行时注册、停用 / 重启清理、CSS 解析、六组明暗选择器、离线字体路径和市场 ZIP 完整性。真实教务账号与 Android 真机仍需发布前验收。
+1.0.1 修正开关关闭态、复选 / 单选框、分段选择、标签页和按钮的可辨识度。开关保留滑块位置差异，开启态另带勾形标记，不单靠颜色传达状态。
+
+测试覆盖真实 Cordis 运行时注册、停用 / 重启清理、CSS 解析、六组明暗选择器及离线字体路径；本地安装包单独校验清单、资源和哈希。真实教务账号与 Android 真机仍需发布前验收。
