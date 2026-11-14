@@ -341,7 +341,7 @@ describe("PluginHost.applyPluginBundle", () => {
     }
   })
 
-  it("loads installed packages that the runtime has not registered yet", async () => {
+  it("enables installed packages that the runtime has not registered yet", async () => {
     const host = new PluginHost()
     vi.spyOn(host.packages, "list").mockResolvedValue([
       { manifest: installedManifest, installedAt: 1, fileCount: 1, byteSize: 10 },
@@ -349,18 +349,24 @@ describe("PluginHost.applyPluginBundle", () => {
     const load = vi
       .spyOn(
         host as unknown as {
-          load: (id: string, replaceActive: boolean) => Promise<void>
+          load(id: string, replaceActive: boolean, start?: boolean): Promise<void>
         },
         "load"
       )
-      .mockResolvedValue(undefined)
+      .mockImplementation(async () => {
+        host.runtime.register(installedManifest, () => {}, "external")
+      })
     const installFromUrl = vi.spyOn(host, "installFromUrl")
+    usePluginPreferences.getState().setPluginDisabled(installedManifest.id, true)
     try {
       await host.applyPluginBundle([installedManifest.id], bundleIndex())
 
-      expect(load).toHaveBeenCalledWith(installedManifest.id, true)
+      expect(load).toHaveBeenCalledWith(installedManifest.id, false, false)
+      expect(host.runtime.get(installedManifest.id)?.status).toBe("active")
+      expect(usePluginPreferences.getState().disabledPluginIds).not.toContain(installedManifest.id)
       expect(installFromUrl).not.toHaveBeenCalled()
     } finally {
+      usePluginPreferences.getState().setPluginDisabled(installedManifest.id, false)
       host.runtime.dispose()
     }
   })
@@ -427,7 +433,7 @@ describe("PluginHost.enable after restarting with a disabled external theme", ()
     const load = vi
       .spyOn(
         host as unknown as {
-          load(id: string, replaceActive: boolean): Promise<void>
+          load(id: string, replaceActive: boolean, start?: boolean): Promise<void>
         },
         "load"
       )
@@ -437,7 +443,7 @@ describe("PluginHost.enable after restarting with a disabled external theme", ()
     try {
       expect(host.runtime.get(arknightsManifest.id)).toBeUndefined()
       await host.enable(arknightsManifest.id)
-      expect(load).toHaveBeenCalledWith(arknightsManifest.id, false)
+      expect(load).toHaveBeenCalledWith(arknightsManifest.id, false, false)
       expect(host.runtime.get(arknightsManifest.id)?.status).toBe("active")
       expect(
         host.ui
