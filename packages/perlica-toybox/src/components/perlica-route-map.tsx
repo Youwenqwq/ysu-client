@@ -245,7 +245,7 @@ export function PerlicaRouteMap({ start, end, startName, endName }: PerlicaRoute
         aria-hidden={!hasPoints}
       />
       <a
-        className="absolute right-1 bottom-1 z-[1000] rounded bg-background/80 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:underline"
+        className="absolute right-1 bottom-1 z-[1000] rounded bg-background/80 px-1.5 py-0.5 text-xs text-muted-foreground hover:underline"
         href="https://www.amap.com/"
         target="_blank"
         rel="noreferrer"

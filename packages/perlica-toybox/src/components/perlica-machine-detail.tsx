@@ -636,7 +636,7 @@ export function PerlicaMachineDetail({
 
   return (
     <>
-      <div className="flex flex-col gap-6 px-4 py-5 sm:px-5">
+      <div className="flex flex-col gap-6 p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="size-4 shrink-0" />
@@ -649,7 +649,7 @@ export function PerlicaMachineDetail({
               <span
                 className={cn(
                   "size-1.5 rounded-full",
-                  status.online ? "bg-emerald-500" : "bg-muted-foreground"
+                  status.online ? "bg-primary" : "bg-muted-foreground"
                 )}
               />
               {status.online ? t("perlica.online") : t("perlica.offline")}
@@ -781,7 +781,7 @@ export function PerlicaMachineDetail({
           {candidate ? (
             <div className="flex flex-col gap-3">
               <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-sm">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-600" />
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
                 <div>
                   <div className="font-medium">{t("perlica.preparationComplete")}</div>
                   <p className="mt-1 text-muted-foreground">

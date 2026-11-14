@@ -10,15 +10,15 @@ import {
   PERLICA_ROUTE_SETTINGS,
 } from "./constants"
 import "./styles/leaflet.css"
-import "./style.css"
 
 export const manifest: PluginManifest = {
   id: "community.perlica-toybox",
   name: "Perlica",
-  version: "1.0.0",
+  version: "1.0.2",
   apiVersion: 1,
   minAppVersion: "0.15.0",
   kind: "feature",
+  providerIndependent: true,
   entry: "dist/index.js",
   styles: ["dist/index.css"],
   description: "佩黎卡共享单车：地图找车、扫码解锁、骑行中控制、骑行记录与账户信息。",
@@ -32,7 +32,6 @@ export const definition = definePlugin((ctx) => {
     title: "Perlica",
     titleKey: "perlica.title",
     component: PerlicaPage,
-    fullscreen: true,
   })
   ctx.ui.registerPage({
     id: PERLICA_PAGE_SETTINGS,

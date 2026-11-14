@@ -2,18 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
-import {
-  ChevronRight,
-  CircleAlert,
-  Clock3,
-  Flag,
-  History,
-  MapPin,
-  RefreshCw,
-  Route,
-} from "lucide-react"
+import { ChevronRight, CircleAlert, Clock3, Flag, History, MapPin, Route } from "lucide-react"
 import { Badge } from "@orahako/plugin-ui/components"
 import { Button } from "@orahako/plugin-ui/components"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@orahako/plugin-ui/components"
 import {
   Dialog,
   DialogContent,
@@ -49,7 +47,6 @@ export interface PerlicaHistoryProps {
   loading: boolean
   hasMore: boolean
   onLoadMore: () => void
-  onRefresh: () => void
   reportError: (error: unknown) => void
 }
 
@@ -160,7 +157,6 @@ export function PerlicaHistory({
   loading,
   hasMore,
   onLoadMore,
-  onRefresh,
   reportError,
 }: PerlicaHistoryProps) {
   const { t, locale } = usePluginTranslation(PERLICA_PLUGIN_ID)
@@ -303,90 +299,83 @@ export function PerlicaHistory({
 
   return (
     <>
-      <section className="flex flex-col">
-        <header className="flex items-start justify-between gap-4 pb-6">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">{t("perlica.historyTitle")}</h2>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              {t("perlica.historyDescription")}
-            </p>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("perlica.historyTitle")}</CardTitle>
+          <CardDescription>{t("perlica.historyDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div aria-busy={loading}>
+            {loading && logs.length === 0 ? (
+              <div className="space-y-2" aria-label={t("perlica.historyLoading")}>
+                {[0, 1, 2].map((item) => (
+                  <Skeleton key={item} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : logs.length === 0 ? (
+              <Empty className="py-10">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <History />
+                  </EmptyMedia>
+                  <EmptyTitle>{t("perlica.historyEmptyTitle")}</EmptyTitle>
+                  <EmptyDescription>{t("perlica.historyEmptyDescription")}</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <ul className="divide-y">
+                {logs.map((log, index) => (
+                  <li key={`${log.orderNo || "ride"}-${index}`}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-auto w-full justify-start gap-3 rounded-none px-0 py-4 text-left whitespace-normal"
+                      onClick={() => void openDetail(log)}
+                      aria-label={t("perlica.historyOpenDetail", {
+                        time: log.startTime || t("perlica.historyUnknown"),
+                      })}
+                    >
+                      <span className="min-w-0 flex-1 space-y-2">
+                        <span className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium">
+                            {log.startTime || t("perlica.historyUnknown")}
+                          </span>
+                          <Badge variant="secondary">
+                            {log.status || t("perlica.historyUnknown")}
+                          </Badge>
+                        </span>
+                        <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-normal text-muted-foreground">
+                          <span>
+                            {t("perlica.historyVehicle")}:{" "}
+                            {log.machineNo || log.userCode || t("perlica.historyUnknown")}
+                          </span>
+                          <span>{formatDuration(log.duration)}</span>
+                          <span>{formatDistance(log.distance)}</span>
+                          <span className="font-medium text-foreground">{formatFee(log.fee)}</span>
+                        </span>
+                      </span>
+                      <ChevronRight className="self-center text-muted-foreground" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          <Button type="button" variant="ghost" size="sm" onClick={onRefresh} disabled={loading}>
-            {loading ? <Spinner /> : <RefreshCw data-icon="inline-start" />}
-            {t("perlica.historyRefresh")}
-          </Button>
-        </header>
 
-        <div aria-busy={loading}>
-          {loading && logs.length === 0 ? (
-            <div className="space-y-2 border-t pt-4" aria-label={t("perlica.historyLoading")}>
-              {[0, 1, 2].map((item) => (
-                <Skeleton key={item} className="h-20 w-full" />
-              ))}
+          {hasMore ? (
+            <div className="flex justify-center pt-4">
+              <Button type="button" variant="outline" onClick={onLoadMore} disabled={loading}>
+                {loading ? <Spinner /> : null}
+                {loading ? t("perlica.historyLoading") : t("perlica.historyLoadMore")}
+              </Button>
             </div>
-          ) : logs.length === 0 ? (
-            <Empty className="border-y px-3 py-10">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <History />
-                </EmptyMedia>
-                <EmptyTitle>{t("perlica.historyEmptyTitle")}</EmptyTitle>
-                <EmptyDescription>{t("perlica.historyEmptyDescription")}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <ul className="divide-y border-y">
-              {logs.map((log, index) => (
-                <li key={`${log.orderNo || "ride"}-${index}`}>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-auto w-full justify-start gap-3 rounded-none px-2 py-4 text-left whitespace-normal hover:bg-muted/40"
-                    onClick={() => void openDetail(log)}
-                    aria-label={t("perlica.historyOpenDetail", {
-                      time: log.startTime || t("perlica.historyUnknown"),
-                    })}
-                  >
-                    <span className="min-w-0 flex-1 space-y-2">
-                      <span className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-medium">
-                          {log.startTime || t("perlica.historyUnknown")}
-                        </span>
-                        <Badge variant="secondary">
-                          {log.status || t("perlica.historyUnknown")}
-                        </Badge>
-                      </span>
-                      <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-normal text-muted-foreground">
-                        <span>
-                          {t("perlica.historyVehicle")}:{" "}
-                          {log.machineNo || log.userCode || t("perlica.historyUnknown")}
-                        </span>
-                        <span>{formatDuration(log.duration)}</span>
-                        <span>{formatDistance(log.distance)}</span>
-                        <span className="font-medium text-foreground">{formatFee(log.fee)}</span>
-                      </span>
-                    </span>
-                    <ChevronRight className="self-center text-muted-foreground" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {hasMore ? (
-          <div className="flex justify-center pt-6">
-            <Button type="button" variant="outline" onClick={onLoadMore} disabled={loading}>
-              {loading ? <Spinner /> : null}
-              {loading ? t("perlica.historyLoading") : t("perlica.historyLoadMore")}
-            </Button>
-          </div>
-        ) : logs.length > 0 ? (
-          <p className="pt-6 text-center text-xs text-muted-foreground">
-            {t("perlica.historyEnd")}
-          </p>
-        ) : null}
-      </section>
+          ) : logs.length > 0 ? (
+            <p className="pt-4 text-center text-xs text-muted-foreground">
+              {t("perlica.historyEnd")}
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <Dialog open={selected !== null} onOpenChange={(open) => !open && closeDetail()}>
         <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">

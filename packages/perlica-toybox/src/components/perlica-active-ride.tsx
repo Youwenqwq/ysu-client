@@ -6,6 +6,13 @@ import { toast } from "@orahako/plugin-sdk/host"
 import { Badge } from "@orahako/plugin-ui/components"
 import { Button } from "@orahako/plugin-ui/components"
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@orahako/plugin-ui/components"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -467,37 +474,30 @@ export function PerlicaActiveRide({
 
   return (
     <>
-      <section className="flex flex-col gap-7">
-        <header>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <Bike className="size-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold tracking-tight">
-                  {t("perlica.activeRideTitle")}
-                </h3>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {order.status ||
-                    t(isParked ? "perlica.activeRideParked" : "perlica.activeRideRiding")}
-                </p>
-              </div>
-            </div>
-            <Badge variant={isParked ? "secondary" : "outline"} className="px-2.5 py-1">
-              {isParked ? <Pause data-icon="inline-start" /> : <Bike data-icon="inline-start" />}
-              {t(isParked ? "perlica.activeRideParked" : "perlica.activeRideRiding")}
-            </Badge>
+      <Card>
+        <CardHeader className="flex-row items-start justify-between gap-3">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle className="flex items-center gap-2">
+              <Bike className="size-4" />
+              {t("perlica.activeRideTitle")}
+            </CardTitle>
+            <CardDescription>
+              {order.status ||
+                t(isParked ? "perlica.activeRideParked" : "perlica.activeRideRiding")}
+            </CardDescription>
           </div>
-        </header>
-
-        <div className="flex flex-col gap-7">
-          <div className="border-y py-6">
+          <Badge variant={isParked ? "secondary" : "outline"}>
+            {isParked ? <Pause data-icon="inline-start" /> : <Bike data-icon="inline-start" />}
+            {t(isParked ? "perlica.activeRideParked" : "perlica.activeRideRiding")}
+          </Badge>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-6">
+          <div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock3 className="size-4" />
               {t("perlica.activeRideElapsed")}
             </div>
-            <div className="mt-2 font-mono text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
+            <div className="mt-2 font-mono text-4xl font-semibold tabular-nums">
               {elapsed === null ? t("perlica.activeRideUnknownTime") : elapsedText(elapsed)}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -561,8 +561,8 @@ export function PerlicaActiveRide({
           <div aria-live="polite" role="status" className="min-h-5 text-sm text-muted-foreground">
             {currentActionMessage}
           </div>
-        </div>
-      </section>
+        </CardContent>
+      </Card>
 
       <Dialog
         open={returnCandidate !== null}

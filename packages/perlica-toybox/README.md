@@ -8,7 +8,7 @@
 pnpm plugin pack packages/perlica-toybox
 ```
 
-将生成的 `perlica-toybox-1.0.0.zip` 通过「我的 → 插件 → 安装 ZIP」安装。本包不加入官方插件注册表，也不需要宿主提供 Perlica 专用页面或 Store。
+将生成的 `perlica-toybox-1.0.2.zip` 通过「我的 → 插件 → 安装 ZIP」安装。本包不加入官方插件注册表，也不需要宿主提供 Perlica 专用页面或 Store。
 
 ## 宿主能力
 

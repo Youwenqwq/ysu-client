@@ -45,6 +45,16 @@ const DEFAULT_INDEX = {
     homepage: 'https://github.com/Youwenqwq/ysu-client',
     categories: ['toybox', 'transport'],
     versions: [{
+      version: '1.0.2',
+      apiVersion: 1,
+      minAppVersion: '0.15.0',
+      platforms: ['web', 'android'],
+      zipUrl: '/plugins/community.perlica-toybox/1.0.2.zip',
+      sha256: 'd5dc3cce76e35cf3c0598085567fe27b919c8bc1289bfaa8eea7af55cb5575a9',
+      size: 207152,
+      publishedAt: '2026-11-14T17:45:21Z',
+      changelog: '移除 Perlica 自定义 UI，改用应用统一页面、卡片与 Tabs 样式；标记为不依赖学校 Provider。',
+    }, {
       version: '1.0.1',
       apiVersion: 1,
       minAppVersion: '0.15.0',

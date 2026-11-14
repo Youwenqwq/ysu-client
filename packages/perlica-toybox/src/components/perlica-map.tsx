@@ -500,25 +500,25 @@ export function PerlicaMap({
 
       <div className="pointer-events-none absolute inset-0 z-[900]" aria-hidden="true">
         <svg
-          className="absolute bottom-1/2 left-1/2 -translate-x-1/2 drop-shadow-md"
+          className="absolute bottom-1/2 left-1/2 -translate-x-1/2 text-primary drop-shadow-md"
           width="30"
           height="40"
           viewBox="0 0 30 40"
         >
           <path
             d="M15 38.2C15 38.2 2.6 24.4 2.6 14.2A12.4 12.4 0 0 1 27.4 14.2C27.4 24.4 15 38.2 15 38.2Z"
-            fill="#16a34a"
-            stroke="#ffffff"
+            fill="currentColor"
+            stroke="var(--background)"
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <circle cx="15" cy="14.2" r="4.6" fill="#ffffff" />
+          <circle cx="15" cy="14.2" r="4.6" fill="var(--background)" />
         </svg>
-        <span className="absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-emerald-600" />
+        <span className="absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-primary" />
       </div>
 
       {showBadge ? (
-        <div className="pointer-events-none absolute top-2 left-2 z-[1000] flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg bg-background/90 px-2.5 py-1 text-[11px] text-muted-foreground shadow-md">
+        <div className="pointer-events-none absolute top-2 left-2 z-[1000] flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg bg-background/90 px-2.5 py-1 text-xs text-muted-foreground shadow-sm">
           <span>{t("perlica.machineCount", { count: machines.length })}</span>
           <span className="opacity-60">·</span>
           <span>{t("perlica.mapDragHint")}</span>
@@ -526,7 +526,7 @@ export function PerlicaMap({
       ) : null}
 
       {showLegend && legendAvailable ? (
-        <div className="pointer-events-none absolute bottom-2 left-2 z-[1000] flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-background/90 px-2.5 py-1.5 text-[11px] text-muted-foreground shadow-md">
+        <div className="pointer-events-none absolute bottom-2 left-2 z-[1000] flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-background/90 px-2.5 py-1.5 text-xs text-muted-foreground shadow-sm">
           {hasArea ? (
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-3.5 rounded-sm border border-dashed border-emerald-600 bg-emerald-500/10" />
@@ -561,7 +561,7 @@ export function PerlicaMap({
       ) : null}
 
       <a
-        className="absolute right-1 bottom-1 z-[1000] rounded bg-background/80 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:underline"
+        className="absolute right-1 bottom-1 z-[1000] rounded bg-background/80 px-1.5 py-0.5 text-xs text-muted-foreground hover:underline"
         href="https://www.amap.com/"
         target="_blank"
         rel="noreferrer"

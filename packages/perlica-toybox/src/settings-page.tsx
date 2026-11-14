@@ -1,25 +1,34 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { Bike, Check, LogOut } from "lucide-react"
+import { Check, LogOut } from "lucide-react"
 import { toast } from "@orahako/plugin-sdk/host"
-import { pluginPageHref, type PluginPageProps } from "@orahako/plugin-sdk"
-import { PerlicaSectionNav } from "./components/perlica-section-nav"
+import { pluginPageHref } from "@orahako/plugin-sdk"
 import { PERLICA_PLUGIN_ID, PERLICA_PAGE_INDEX } from "./constants"
-import { usePerlicaAppNav, type PerlicaTab } from "./extras/app-nav"
-import { Button } from "@orahako/plugin-ui/components"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@orahako/plugin-ui/components"
-import { Input } from "@orahako/plugin-ui/components"
-import { Skeleton } from "@orahako/plugin-ui/components"
-import { Textarea } from "@orahako/plugin-ui/components"
+import { usePerlicaAppNav } from "./extras/app-nav"
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  Input,
+  Skeleton,
+  Textarea,
+} from "@orahako/plugin-ui/components"
 import { clearPerlicaSnapshot, readPerlicaSnapshot } from "./extras/cache"
 import { PerlicaClient, PerlicaError } from "./extras/client"
 import { usePerlicaStore } from "./extras/store"
 import { parsePerlicaToken } from "./extras/types"
 import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 
-export function PerlicaSettingsPage({ navigate }: PluginPageProps) {
+export function PerlicaSettingsPage() {
   const { t } = usePluginTranslation(PERLICA_PLUGIN_ID)
   const activeTab = usePerlicaAppNav((state) => state.tab)
   const token = usePerlicaStore((state) => state.token)
@@ -52,13 +61,6 @@ export function PerlicaSettingsPage({ navigate }: PluginPageProps) {
     setInput(token)
     setAdAccountInput(adAccountId || "11423")
   }, [adAccountId, hasHydrated, token])
-
-  const selectAppTab = useCallback(
-    (value: PerlicaTab) => {
-      navigate(PERLICA_PAGE_INDEX, { tab: value })
-    },
-    [navigate]
-  )
 
   const debugSnapshot = useMemo(() => {
     if (!hasHydrated || !accountId) return null
@@ -146,104 +148,91 @@ export function PerlicaSettingsPage({ navigate }: PluginPageProps) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PerlicaSectionNav active="account" onSelect={selectAppTab} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-6 pb-[calc(var(--mobile-bottom-nav-height,5rem)+2rem)] sm:px-6 md:py-10 md:pb-10">
-          <header className="border-b pb-6">
-            <div className="flex items-center gap-2.5">
-              <Bike className="size-5 text-muted-foreground" />
-              <h2 className="text-2xl font-semibold tracking-tight">
-                {t("perlica.settingsTitle")}
-              </h2>
-            </div>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              {t("perlica.settingsDescription")}
-            </p>
-          </header>
-
-          <section className="border-b pb-8">
-            <FieldGroup>
-              <Field>
-                <FieldLabel>{t("perlica.tokenLabel")}</FieldLabel>
-                <Textarea
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  placeholder={t("perlica.tokenPlaceholder")}
-                  rows={5}
-                  autoComplete="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                />
-                <FieldDescription>{t("perlica.tokenHint")}</FieldDescription>
-              </Field>
-              <Field>
-                <FieldLabel>{t("perlica.adAccountLabel")}</FieldLabel>
-                <Input
-                  value={adAccountInput}
-                  onChange={(event) => setAdAccountInput(event.target.value)}
-                  inputMode="numeric"
-                  autoComplete="off"
-                />
-                <FieldDescription>{t("perlica.adAccountHint")}</FieldDescription>
-              </Field>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  onClick={() => void handleValidateAndSave()}
-                  disabled={validating || !input.trim()}
-                >
-                  <Check data-icon="inline-start" />
-                  {validating ? t("perlica.validating") : t("perlica.validateAndSave")}
+    <div className="flex flex-col gap-4 p-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("perlica.settingsTitle")}</CardTitle>
+          <CardDescription>{t("perlica.settingsDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FieldGroup>
+            <Field>
+              <FieldLabel>{t("perlica.tokenLabel")}</FieldLabel>
+              <Textarea
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder={t("perlica.tokenPlaceholder")}
+                rows={5}
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+              />
+              <FieldDescription>{t("perlica.tokenHint")}</FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel>{t("perlica.adAccountLabel")}</FieldLabel>
+              <Input
+                value={adAccountInput}
+                onChange={(event) => setAdAccountInput(event.target.value)}
+                inputMode="numeric"
+                autoComplete="off"
+              />
+              <FieldDescription>{t("perlica.adAccountHint")}</FieldDescription>
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => void handleValidateAndSave()}
+                disabled={validating || !input.trim()}
+              >
+                <Check data-icon="inline-start" />
+                {validating ? t("perlica.validating") : t("perlica.validateAndSave")}
+              </Button>
+              {token ? (
+                <Button variant="outline" onClick={handleLogout} disabled={validating}>
+                  <LogOut data-icon="inline-start" />
+                  {t("perlica.logout")}
                 </Button>
-                {token ? (
-                  <Button variant="outline" onClick={handleLogout} disabled={validating}>
-                    <LogOut data-icon="inline-start" />
-                    {t("perlica.logout")}
-                  </Button>
-                ) : null}
-              </div>
-            </FieldGroup>
-          </section>
-
-          <section>
-            <h3 className="text-sm font-semibold">{t("perlica.debugData")}</h3>
-            <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-              {t("perlica.debugDataHint")}
-            </p>
-            <div className="mt-4">
-              {debugJson ? (
-                <details className="border-y py-3">
-                  <summary className="cursor-pointer text-sm font-medium">
-                    {t("perlica.showDebugData")}
-                  </summary>
-                  <pre className="mt-4 max-h-72 overflow-auto rounded-lg bg-muted/50 p-3 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap">
-                    {debugJson}
-                  </pre>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="mt-3 mb-1"
-                    onClick={() => void handleCopyDebug()}
-                  >
-                    {t("perlica.copyDebugData")}
-                  </Button>
-                </details>
-              ) : (
-                <p className="border-y py-5 text-sm text-muted-foreground">
-                  {t("perlica.debugEmpty")}
-                </p>
-              )}
+              ) : null}
             </div>
-          </section>
+          </FieldGroup>
+        </CardContent>
+      </Card>
 
-          <Button asChild variant="ghost" className="self-start">
-            <Link href={pluginPageHref(PERLICA_PLUGIN_ID, PERLICA_PAGE_INDEX, { tab: activeTab })}>
-              {t("perlica.backToPerlica")}
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("perlica.debugData")}</CardTitle>
+          <CardDescription>{t("perlica.debugDataHint")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {debugJson ? (
+            <details>
+              <summary className="cursor-pointer text-sm font-medium">
+                {t("perlica.showDebugData")}
+              </summary>
+              <pre className="mt-3 max-h-72 overflow-auto rounded-md bg-muted p-3 font-mono text-xs break-all whitespace-pre-wrap">
+                {debugJson}
+              </pre>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-3"
+                onClick={() => void handleCopyDebug()}
+              >
+                {t("perlica.copyDebugData")}
+              </Button>
+            </details>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("perlica.debugEmpty")}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Button asChild variant="ghost" className="self-start">
+        <Link href={pluginPageHref(PERLICA_PLUGIN_ID, PERLICA_PAGE_INDEX, { tab: activeTab })}>
+          {t("perlica.backToPerlica")}
+        </Link>
+      </Button>
     </div>
   )
 }

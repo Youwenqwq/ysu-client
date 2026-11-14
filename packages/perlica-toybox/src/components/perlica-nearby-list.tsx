@@ -28,16 +28,6 @@ function isStalePosition(value: unknown) {
   return Number.isFinite(timestamp) && Date.now() - timestamp > STALE_POSITION_MS
 }
 
-function batteryTone(battery: number): string {
-  if (battery >= 60) {
-    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-  }
-  if (battery >= 25) {
-    return "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-  }
-  return "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
-}
-
 function NearbySkeleton() {
   return (
     <div className="divide-y">
@@ -55,9 +45,8 @@ function NearbySkeleton() {
 }
 
 /**
- * Inset grouped list for nearby bikes. Mirrors the iOS list row anatomy:
- * leading symbol, title with a status badge, secondary detail lines, and a
- * trailing disclosure indicator.
+ * Nearby-bike list rows: leading symbol, code with status badge, secondary
+ * detail lines, and a trailing disclosure indicator.
  */
 export function PerlicaNearbyList({ machines, selectedCode, loading = false, onSelect }: Props) {
   const { t } = usePluginTranslation(PERLICA_PLUGIN_ID)
@@ -100,8 +89,8 @@ export function PerlicaNearbyList({ machines, selectedCode, loading = false, onS
                   </Badge>
                 ) : (
                   <Badge
-                    variant="outline"
-                    className={cn("shrink-0 tabular-nums", batteryTone(machine.battery))}
+                    variant={machine.battery >= 25 ? "secondary" : "destructive"}
+                    className="shrink-0 tabular-nums"
                   >
                     {Math.round(machine.battery)}%
                   </Badge>

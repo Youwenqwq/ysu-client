@@ -92,10 +92,14 @@ function PluginHostContent() {
     )
   }
 
-  if (
-    !supportsPlugin(supportedPlugins, page.pluginId) ||
-    !hasPluginCapability(capabilities, page.capability)
-  ) {
+  const pluginManifest = host.runtime.get(page.pluginId)?.manifest
+  const pageSupported =
+    Boolean(pluginManifest && pluginManifest.kind !== "feature") ||
+    Boolean(pluginManifest?.required) ||
+    Boolean(pluginManifest?.providerIndependent) ||
+    supportsPlugin(supportedPlugins, page.pluginId)
+
+  if (!pageSupported || !hasPluginCapability(capabilities, page.capability)) {
     return (
       <ActivePluginRoute page={page}>
         <PluginMessage

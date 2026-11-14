@@ -1,21 +1,23 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { Bell, CreditCard, RefreshCw, UserRound } from "lucide-react"
-import { Badge } from "@orahako/plugin-ui/components"
-import { Button } from "@orahako/plugin-ui/components"
-import { Skeleton } from "@orahako/plugin-ui/components"
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Skeleton,
+} from "@orahako/plugin-ui/components"
 import type { PerlicaRaw, PerlicaRideCard, PerlicaUserInfo } from "../extras/types"
 import { usePluginTranslation } from "@orahako/plugin-ui/plugin"
 import { PERLICA_PLUGIN_ID } from "../constants"
-import { cn } from "@orahako/plugin-ui/components"
 
 export interface PerlicaAccountProps {
   user: PerlicaUserInfo | null
   cards: PerlicaRideCard[]
   unreadCount: number | null
   loading: boolean
-  onRefresh: () => void
 }
 
 const REAL_NAME_FIELDS = [
@@ -148,9 +150,9 @@ function count(value: number | null | undefined) {
 
 function Detail({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="min-w-0 border-b py-4">
+    <div className="min-w-0 py-2">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-1.5 text-sm font-medium break-words">{value}</dd>
+      <dd className="mt-1 text-sm font-medium break-words">{value}</dd>
     </div>
   )
 }
@@ -171,7 +173,7 @@ function RideCardDetails({ card, index }: { card: PerlicaRideCard; index: number
   const description = card.name && card.feeName ? card.feeName : null
 
   return (
-    <div className="py-6 first:pt-0 last:pb-0">
+    <div className="py-4 first:pt-0 last:pb-0">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h4 className="text-sm font-semibold break-words">{title}</h4>
@@ -199,13 +201,7 @@ function RideCardDetails({ card, index }: { card: PerlicaRideCard; index: number
     </div>
   )
 }
-export function PerlicaAccount({
-  user,
-  cards,
-  unreadCount,
-  loading,
-  onRefresh,
-}: PerlicaAccountProps) {
+export function PerlicaAccount({ user, cards, unreadCount, loading }: PerlicaAccountProps) {
   const { t } = usePluginTranslation(PERLICA_PLUGIN_ID)
   const validCards = cards.filter((card) => card.isValid)
   const redacted = t("perlica.redacted")
@@ -213,28 +209,16 @@ export function PerlicaAccount({
     unreadCount !== null && Number.isFinite(unreadCount) ? String(unreadCount) : MISSING
 
   return (
-    <section className="flex flex-col gap-8" aria-label={t("perlica.tabAccount")}>
-      <header className="flex items-start justify-between gap-4 border-b pb-6">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">{t("perlica.tabAccount")}</h2>
-          <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-            <Bell className="size-4" aria-hidden="true" />
+    <div className="flex flex-col gap-4" aria-label={t("perlica.tabAccount")}>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("perlica.userSection")}</CardTitle>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>{t("perlica.unreadCount")}</span>
             <Badge variant="secondary">{unread}</Badge>
           </div>
-        </div>
-        <Button type="button" variant="ghost" size="sm" onClick={onRefresh} disabled={loading}>
-          <RefreshCw data-icon="inline-start" className={cn(loading && "animate-spin")} />
-          {loading ? t("perlica.userLoading") : t("perlica.refresh")}
-        </Button>
-      </header>
-
-      <section aria-label={t("perlica.userSection")}>
-        <div className="flex items-center gap-2">
-          <UserRound className="size-4 text-muted-foreground" aria-hidden="true" />
-          <h3 className="text-sm font-semibold">{t("perlica.userSection")}</h3>
-        </div>
-        <div className="mt-3">
+        </CardHeader>
+        <CardContent>
           {user ? (
             <dl className="grid gap-x-6 sm:grid-cols-2 xl:grid-cols-3">
               <Detail label={t("perlica.nickname")} value={text(user.nickname)} />
@@ -269,38 +253,36 @@ export function PerlicaAccount({
           ) : loading ? (
             <AccountSkeleton />
           ) : (
-            <p className="border-y py-6 text-sm text-muted-foreground">{t("perlica.notLoaded")}</p>
+            <p className="text-sm text-muted-foreground">{t("perlica.notLoaded")}</p>
           )}
-        </div>
-      </section>
+        </CardContent>
+      </Card>
 
-      <section aria-label={t("perlica.rideCards")}>
-        <div className="flex items-center justify-between gap-3 border-b pb-3">
-          <div className="flex items-center gap-2">
-            <CreditCard className="size-4 text-muted-foreground" aria-hidden="true" />
-            <h3 className="text-sm font-semibold">{t("perlica.rideCards")}</h3>
-          </div>
+      <Card>
+        <CardHeader className="flex-row items-center justify-between gap-3">
+          <CardTitle>{t("perlica.rideCards")}</CardTitle>
           {validCards.length > 0 ? (
             <Badge variant="outline">{t("perlica.cardCount", { count: validCards.length })}</Badge>
           ) : null}
-        </div>
-
-        {validCards.length > 0 ? (
-          <div className="divide-y border-b">
-            {validCards.map((card, index) => (
-              <RideCardDetails
-                key={`${card.name}-${card.feeName}-${card.startDate}-${card.dueTime}-${index}`}
-                card={card}
-                index={index}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="border-b py-6 text-sm text-muted-foreground">
-            {loading ? t("perlica.userLoading") : t("perlica.noRideCard")}
-          </div>
-        )}
-      </section>
-    </section>
+        </CardHeader>
+        <CardContent>
+          {validCards.length > 0 ? (
+            <div className="divide-y">
+              {validCards.map((card, index) => (
+                <RideCardDetails
+                  key={`${card.name}-${card.feeName}-${card.startDate}-${card.dueTime}-${index}`}
+                  card={card}
+                  index={index}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {loading ? t("perlica.userLoading") : t("perlica.noRideCard")}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

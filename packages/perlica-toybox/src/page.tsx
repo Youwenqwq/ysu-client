@@ -6,18 +6,16 @@ import {
   ArrowRight,
   Bike,
   ChevronUp,
-  History,
   Loader2,
   LocateFixed,
-  MapPin,
   RefreshCw,
   ScanLine,
   Search,
   Settings,
   TriangleAlert,
-  UserRound,
   X,
 } from "lucide-react"
+import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
 import { Geolocation, toast } from "@orahako/plugin-sdk/host"
 import { pluginPageHref, type PluginPageProps } from "@orahako/plugin-sdk"
 import { PerlicaAccount } from "./components/perlica-account"
@@ -27,7 +25,6 @@ import { PerlicaMachineDetail } from "./components/perlica-machine-detail"
 import { PerlicaMap } from "./components/perlica-map"
 import { PerlicaNearbyList } from "./components/perlica-nearby-list"
 import { PerlicaScanner } from "./components/perlica-scanner"
-import { PerlicaSectionNav } from "./components/perlica-section-nav"
 import { PERLICA_PLUGIN_ID, PERLICA_PAGE_SETTINGS } from "./constants"
 import { isPerlicaTab, usePerlicaAppNav } from "./extras/app-nav"
 import { Alert, AlertDescription, AlertTitle } from "@orahako/plugin-ui/components"
@@ -594,6 +591,31 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
     [setActiveTab]
   )
 
+  useMobileHeaderRight(
+    <div className="flex items-center gap-0.5">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => void refreshAll()}
+        disabled={refreshing}
+        aria-label={t("perlica.refresh")}
+      >
+        <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => navigate(PERLICA_PAGE_SETTINGS, { tab: activeTab })}
+        aria-label={t("perlica.settingsTitle")}
+      >
+        <Settings className="size-4" />
+      </Button>
+    </div>,
+    [activeTab, navigate, refreshAll, refreshing, t]
+  )
+
   const mapMachines = useMemo(
     () =>
       machines.map((machine) => ({
@@ -654,77 +676,37 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PerlicaSectionNav
-        active={activeTab}
-        onSelect={selectAppTab}
-        onOpenSettings={() => navigate(PERLICA_PAGE_SETTINGS, { tab: activeTab })}
-        onRefresh={() => void refreshAll()}
-        refreshing={refreshing}
-      />
-      <Tabs
-        value={activeTab}
-        onValueChange={selectAppTab}
-        className="flex min-h-0 flex-1 flex-col gap-0 md:flex-row! md:items-stretch"
-      >
-        <div className="hidden w-48 shrink-0 flex-col border-r bg-muted/15 md:flex">
-          <div className="flex items-center gap-2.5 px-5 pt-6 pb-5">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-foreground text-background">
-              <Bike className="size-4" />
-            </span>
-            <span className="text-sm font-semibold tracking-tight">{t("perlica.title")}</span>
-          </div>
-          <TabsList
-            variant="line"
-            aria-label={t("perlica.nav")}
-            className="flex h-auto! w-full flex-col items-stretch gap-1 rounded-none bg-transparent p-3 pt-0"
-          >
-            {(
-              [
-                ["map", MapPin, t("perlica.tabMap")],
-                ["ride", Bike, t("perlica.tabRide")],
-                ["history", History, t("perlica.tabHistory")],
-                ["account", UserRound, t("perlica.tabAccount")],
-              ] as const
-            ).map(([value, Icon, label]) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="h-10 flex-none justify-start gap-3 rounded-lg px-3 text-[13px] text-muted-foreground transition-colors after:hidden hover:bg-muted/60 hover:text-foreground data-active:bg-muted data-active:font-medium data-active:text-foreground dark:data-active:bg-muted"
-              >
-                <Icon className="size-4" />
-                <span>{label}</span>
-              </TabsTrigger>
-            ))}
+    <div className="flex flex-col gap-4 p-4">
+      <Tabs value={activeTab} onValueChange={selectAppTab} className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <TabsList aria-label={t("perlica.nav")} className="w-full justify-start sm:w-auto">
+            <TabsTrigger value="map">{t("perlica.tabMap")}</TabsTrigger>
+            <TabsTrigger value="ride">{t("perlica.tabRide")}</TabsTrigger>
+            <TabsTrigger value="history">{t("perlica.tabHistory")}</TabsTrigger>
+            <TabsTrigger value="account">{t("perlica.tabAccount")}</TabsTrigger>
           </TabsList>
-          <div className="mt-auto flex flex-col gap-1 border-t p-3">
-            <Button
-              variant="ghost"
-              className="justify-start text-muted-foreground"
-              onClick={() => void refreshAll()}
-              disabled={refreshing}
-            >
-              <RefreshCw data-icon="inline-start" className={cn(refreshing && "animate-spin")} />
-              {t("perlica.refresh")}
-            </Button>
-            <Button asChild variant="ghost" className="justify-start text-muted-foreground">
-              <Link href={pluginPageHref(PERLICA_PLUGIN_ID, PERLICA_PAGE_SETTINGS)}>
-                <Settings data-icon="inline-start" />
-                {t("perlica.goSettings")}
-              </Link>
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void refreshAll()}
+            disabled={refreshing}
+            className="max-sm:hidden"
+          >
+            <RefreshCw data-icon="inline-start" className={cn(refreshing && "animate-spin")} />
+            {t("perlica.refresh")}
+          </Button>
         </div>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <TabsContent
-            value="map"
-            id="perlica-panel-map"
-            forceMount
-            className="relative min-h-0 flex-1 overflow-hidden data-[state=active]:animate-in data-[state=active]:duration-200 data-[state=active]:fade-in data-[state=inactive]:hidden"
-          >
+        <TabsContent
+          value="map"
+          id="perlica-panel-map"
+          forceMount
+          className="m-0 data-[state=inactive]:hidden"
+        >
+          <div className="relative h-[60vh] min-h-[22rem] overflow-hidden rounded-xl border bg-card">
             <PerlicaMap
-              className="absolute inset-0 h-full w-full rounded-none"
+              className="absolute inset-0 h-full w-full"
               showBadge={false}
               showLegend={false}
               showZoomControl={false}
@@ -746,14 +728,14 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
             />
 
             <form
-              className="absolute inset-x-3 top-3 z-20 flex items-center gap-2 md:inset-x-auto md:top-5 md:left-5 md:w-[min(32rem,calc(100%-2.5rem))]"
+              className="absolute inset-x-3 top-3 z-20 flex items-center gap-2"
               onSubmit={(event) => {
                 event.preventDefault()
                 selectCode(manualCode.trim())
               }}
             >
-              <div className="toybox-glass relative flex-1 overflow-hidden rounded-2xl backdrop-blur-2xl backdrop-saturate-150">
-                <InputGroup className="h-12 rounded-2xl border-0 bg-transparent shadow-none has-disabled:bg-transparent has-disabled:opacity-100 dark:bg-transparent">
+              <div className="relative flex-1 overflow-hidden rounded-lg border bg-background shadow-sm">
+                <InputGroup className="h-11 rounded-lg border-0 bg-transparent shadow-none has-disabled:bg-transparent has-disabled:opacity-100 dark:bg-transparent">
                   <InputGroupAddon>
                     <Search className="size-4" />
                   </InputGroupAddon>
@@ -792,14 +774,14 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
                 <Button
                   type="button"
                   size="icon"
-                  variant="ghost"
-                  className="toybox-glass relative size-12 shrink-0 rounded-full text-foreground backdrop-blur-2xl backdrop-saturate-150 dark:text-white"
+                  variant="secondary"
+                  className="relative size-11 shrink-0 rounded-full shadow-sm"
                   onClick={() => selectAppTab("ride")}
                   aria-label={t("perlica.activeRideTitle")}
                   title={t("perlica.activeRideTitle")}
                 >
                   <Bike className="size-5" />
-                  <span className="absolute top-2 right-2 size-2 rounded-full bg-emerald-500 ring-2 ring-background" />
+                  <span className="absolute top-2 right-2 size-2 rounded-full bg-primary ring-2 ring-background" />
                 </Button>
               ) : null}
             </form>
@@ -814,13 +796,13 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
                 void refreshMapAt(center, next)
               }}
               aria-label={t("perlica.searchRadius")}
-              className="toybox-glass absolute inset-x-3 top-[4.5rem] z-20 grid w-auto grid-cols-5 rounded-2xl p-1 backdrop-blur-2xl backdrop-saturate-150 md:inset-x-auto md:top-[5.25rem] md:left-5 md:w-[min(30rem,calc(100%-2.5rem))]"
+              className="absolute inset-x-3 top-[4.5rem] z-20 grid w-auto grid-cols-5 rounded-lg border bg-background p-1 shadow-sm"
             >
               {RADII.map((value) => (
                 <ToggleGroupItem
                   key={value}
                   value={String(value)}
-                  className="h-9 rounded-xl px-0 text-xs font-medium data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm dark:data-[state=on]:bg-white/12"
+                  className="h-8 rounded-md px-0 text-xs data-[state=on]:bg-muted"
                 >
                   {formatRadius(value)}
                 </ToggleGroupItem>
@@ -829,9 +811,9 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
 
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
               onClick={() => setListOpen(true)}
-              className="toybox-glass absolute bottom-[calc(var(--mobile-bottom-nav-height,5rem)+0.75rem)] left-3 z-20 h-11 max-w-[62%] rounded-full px-4 text-foreground backdrop-blur-2xl backdrop-saturate-150 md:bottom-5 md:left-5 dark:text-white"
+              className="absolute bottom-3 left-3 z-20 h-10 max-w-[62%] rounded-full px-3 shadow-sm"
             >
               {mapLoading ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -848,11 +830,11 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
               <ChevronUp className="size-4 opacity-60" />
             </Button>
 
-            <div className="absolute right-3 bottom-[calc(var(--mobile-bottom-nav-height,5rem)+0.75rem)] z-20 flex flex-col gap-2 md:right-5 md:bottom-5">
+            <div className="absolute right-3 bottom-3 z-20 flex flex-col gap-2">
               <Button
                 type="button"
                 size="icon"
-                variant="ghost"
+                variant="secondary"
                 onClick={() => {
                   void requestLocation(true).then((coords) => {
                     if (coords) void refreshMapAt(coords, radius)
@@ -861,7 +843,7 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
                 disabled={locating}
                 aria-label={locating ? t("perlica.locating") : t("perlica.locate")}
                 title={locating ? t("perlica.locating") : t("perlica.locate")}
-                className="toybox-glass relative size-12 rounded-full text-foreground backdrop-blur-2xl backdrop-saturate-150 dark:text-white"
+                className="size-11 rounded-full shadow-sm"
               >
                 {locating ? (
                   <Loader2 className="size-5 animate-spin" />
@@ -872,120 +854,93 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
               <Button
                 type="button"
                 size="icon"
-                variant="ghost"
+                variant="secondary"
                 onClick={() => setScannerOpen(true)}
                 aria-label={t("perlica.scanCode")}
                 title={t("perlica.scanCode")}
-                className="toybox-glass relative size-12 rounded-full text-foreground backdrop-blur-2xl backdrop-saturate-150 dark:text-white"
+                className="size-11 rounded-full shadow-sm"
               >
                 <ScanLine className="size-5" />
               </Button>
             </div>
-          </TabsContent>
+          </div>
+        </TabsContent>
 
-          <TabsContent
-            value="ride"
-            id="perlica-panel-ride"
-            forceMount
-            className="min-h-0 flex-1 overflow-y-auto data-[state=active]:animate-in data-[state=active]:duration-200 data-[state=active]:fade-in data-[state=inactive]:hidden"
-          >
-            <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-6 pb-[calc(var(--mobile-bottom-nav-height,5rem)+2rem)] sm:px-6 md:px-10 md:py-10 md:pb-10">
-              <header className="flex items-start justify-between gap-4 border-b pb-6">
-                <div>
-                  <h2 className="text-2xl font-semibold tracking-tight">{t("perlica.tabRide")}</h2>
-                  <p className="mt-1.5 text-sm text-muted-foreground">
-                    {t("perlica.noActiveRideHint")}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void loadOrder()}
-                  disabled={orderLoading}
-                >
-                  <RefreshCw
-                    data-icon="inline-start"
-                    className={cn(orderLoading && "animate-spin")}
-                  />
-                  {t("perlica.refresh")}
-                </Button>
-              </header>
-
-              {order ? (
-                <PerlicaActiveRide
-                  key={session.token}
-                  client={client}
-                  order={order}
-                  onOrderChange={applyOrder}
-                  onRequestLocation={() => requestLocation(false)}
-                  reportError={reportError}
-                />
-              ) : (
-                <Empty className="border-y py-12">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      {orderLoading ? <Loader2 className="animate-spin" /> : <Bike />}
-                    </EmptyMedia>
-                    <EmptyTitle>
-                      {orderLoaded ? t("perlica.noCurrentOrder") : t("perlica.notLoaded")}
-                    </EmptyTitle>
-                    <EmptyDescription>{t("perlica.noActiveRideHint")}</EmptyDescription>
-                  </EmptyHeader>
-                  <Button type="button" variant="outline" onClick={() => selectAppTab("map")}>
-                    {t("perlica.tabMap")}
-                  </Button>
-                </Empty>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent
-            value="history"
-            id="perlica-panel-history"
-            forceMount
-            className="min-h-0 flex-1 overflow-y-auto data-[state=active]:animate-in data-[state=active]:duration-200 data-[state=active]:fade-in data-[state=inactive]:hidden"
-          >
-            <div className="mx-auto w-full max-w-4xl px-4 py-6 pb-[calc(var(--mobile-bottom-nav-height,5rem)+2rem)] sm:px-6 md:px-10 md:py-10 md:pb-10">
-              <PerlicaHistory
+        <TabsContent
+          value="ride"
+          id="perlica-panel-ride"
+          forceMount
+          className="m-0 data-[state=inactive]:hidden"
+        >
+          <div className="flex flex-col gap-4">
+            {order ? (
+              <PerlicaActiveRide
                 key={session.token}
                 client={client}
-                coords={center}
-                logs={logs}
-                loading={logsLoading}
-                hasMore={hasMoreLogs}
-                onLoadMore={() => void loadLogs(logPage + 1, true, true)}
-                onRefresh={() => void loadLogs(1, false, true)}
+                order={order}
+                onOrderChange={applyOrder}
+                onRequestLocation={() => requestLocation(false)}
                 reportError={reportError}
               />
-            </div>
-          </TabsContent>
+            ) : (
+              <Empty className="py-12">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    {orderLoading ? <Loader2 className="animate-spin" /> : <Bike />}
+                  </EmptyMedia>
+                  <EmptyTitle>
+                    {orderLoaded ? t("perlica.noCurrentOrder") : t("perlica.notLoaded")}
+                  </EmptyTitle>
+                  <EmptyDescription>{t("perlica.noActiveRideHint")}</EmptyDescription>
+                </EmptyHeader>
+                <Button type="button" variant="outline" onClick={() => selectAppTab("map")}>
+                  {t("perlica.tabMap")}
+                </Button>
+              </Empty>
+            )}
+          </div>
+        </TabsContent>
 
-          <TabsContent
-            value="account"
-            id="perlica-panel-account"
-            forceMount
-            className="min-h-0 flex-1 overflow-y-auto data-[state=active]:animate-in data-[state=active]:duration-200 data-[state=active]:fade-in data-[state=inactive]:hidden"
-          >
-            <div className="mx-auto w-full max-w-4xl px-4 py-6 pb-[calc(var(--mobile-bottom-nav-height,5rem)+2rem)] sm:px-6 md:px-10 md:py-10 md:pb-10">
-              <PerlicaAccount
-                user={user}
-                cards={cards}
-                unreadCount={unreadCount}
-                loading={accountLoading}
-                onRefresh={() => void loadAccount(true)}
-              />
-            </div>
-          </TabsContent>
-        </div>
+        <TabsContent
+          value="history"
+          id="perlica-panel-history"
+          forceMount
+          className="m-0 data-[state=inactive]:hidden"
+        >
+          <PerlicaHistory
+            key={session.token}
+            client={client}
+            coords={center}
+            logs={logs}
+            loading={logsLoading}
+            hasMore={hasMoreLogs}
+            onLoadMore={() => void loadLogs(logPage + 1, true, true)}
+            reportError={reportError}
+          />
+        </TabsContent>
+
+        <TabsContent
+          value="account"
+          id="perlica-panel-account"
+          forceMount
+          className="m-0 data-[state=inactive]:hidden"
+        >
+          <PerlicaAccount
+            user={user}
+            cards={cards}
+            unreadCount={unreadCount}
+            loading={accountLoading}
+          />
+        </TabsContent>
       </Tabs>
 
       <Sheet open={listOpen} onOpenChange={setListOpen}>
         <SheetContent
           side="bottom"
           showCloseButton={false}
-          className="max-h-[70dvh] gap-0 overflow-y-auto p-0 md:bottom-4 md:mx-auto md:max-w-2xl md:rounded-3xl"
+          className="max-h-[70dvh] gap-0 overflow-y-auto p-0"
         >
-          <SheetHeader className="sticky top-0 z-10 flex-row items-center justify-between gap-3 border-b bg-popover/95 px-4 py-3 backdrop-blur">
+          <SheetHeader className="sticky top-0 z-10 flex-row items-center justify-between gap-3 border-b bg-background px-4 py-3">
             <div className="min-w-0">
               <SheetTitle>{t("perlica.nearbyMachines")}</SheetTitle>
               <SheetDescription>
@@ -1008,7 +963,6 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="size-11"
                   aria-label={t("perlica.close")}
                 >
                   <X className="size-4" />
@@ -1091,21 +1045,15 @@ export function PerlicaPage({ params, navigate }: PluginPageProps) {
         <SheetContent
           side="bottom"
           showCloseButton={false}
-          className="max-h-[92dvh] gap-0 overflow-y-auto p-0 md:top-1/2! md:right-auto! md:bottom-auto! md:left-1/2! md:h-auto md:max-h-[85dvh] md:w-[min(48rem,90vw)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-3xl"
+          className="max-h-[92dvh] gap-0 overflow-y-auto p-0"
         >
-          <SheetHeader className="sticky top-0 z-10 flex-row items-center justify-between gap-3 border-b bg-popover/95 px-4 py-3 backdrop-blur">
+          <SheetHeader className="sticky top-0 z-10 flex-row items-center justify-between gap-3 border-b bg-background px-4 py-3">
             <div className="min-w-0">
               <SheetTitle className="truncate">{t("perlica.machineDetails")}</SheetTitle>
               <SheetDescription className="truncate">{selectedCode}</SheetDescription>
             </div>
             <SheetClose asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="size-11"
-                aria-label={t("perlica.close")}
-              >
+              <Button type="button" variant="ghost" size="icon-sm" aria-label={t("perlica.close")}>
                 <X className="size-4" />
               </Button>
             </SheetClose>
