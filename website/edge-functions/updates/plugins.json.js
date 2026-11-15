@@ -5,7 +5,7 @@
 
 const DEFAULT_INDEX = {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-14T23:59:19Z",
+  "updatedAt": "2026-11-15T00:44:03Z",
   "plugins": [
     {
       "id": "community.theme.yuna",
@@ -179,6 +179,20 @@ const DEFAULT_INDEX = {
         "toybox"
       ],
       "versions": [
+        {
+          "version": "1.2.0",
+          "apiVersion": 1,
+          "minAppVersion": "0.15.0",
+          "platforms": [
+            "web",
+            "android"
+          ],
+          "zipUrl": "/plugins/orahako.skbird/1.2.0.zip",
+          "sha256": "38752ea2867b88f3edcabefffa22e019ac0afd5bf852ec0f22b7c679f301ed61",
+          "size": 24812,
+          "publishedAt": "2026-11-15T00:44:03Z",
+          "changelog": "移动端设置入口移至顶栏，底部导航仅保留消息与我的；重构帖子列表与详情的移动端布局、分隔和图片展示。"
+        },
         {
           "version": "1.1.1",
           "apiVersion": 1,
