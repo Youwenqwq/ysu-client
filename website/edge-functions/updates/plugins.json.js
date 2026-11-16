@@ -30,7 +30,7 @@ const DEFAULT_INDEX = {
             "android"
           ],
           "zipUrl": "/plugins/community.theme.yuna/1.0.1.zip",
-          "sha256": "247de67868f99bd4e7c4bd35571a8f6b947884b3e6c054a962a842ad7635593d",
+          "sha256": "69899e08101eef0d45136a9c087dc08d7a3118d52152aa303eb3eb5f42f9cd58",
           "size": 88971,
           "publishedAt": "2026-11-16T05:49:36Z",
           "changelog": "修正开关关闭态、复选/单选框、分段选择、标签页与按钮的可辨识度；开关保留滑块位置差异，开启态另带勾形标记，不单靠颜色传达状态。"
@@ -59,7 +59,7 @@ const DEFAULT_INDEX = {
             "android"
           ],
           "zipUrl": "/plugins/community.theme.arknights/1.0.1.zip",
-          "sha256": "51ab1ecdff57cd891230a3a1be3562cac28d6601c95a798a426c50dc2e267c1a",
+          "sha256": "0ee5f6250caf671998d94e7a0da491bb8fa40c4441ecabab091dab2345a3d49e",
           "size": 9378,
           "publishedAt": "2026-11-13T10:04:29Z",
           "changelog": "迁移至 Orahako 公共模块。"
@@ -96,7 +96,7 @@ const DEFAULT_INDEX = {
             "android"
           ],
           "zipUrl": "/plugins/community.perlica-toybox/1.3.0.zip",
-          "sha256": "5706dbcfecae28dbd9ddc7c9afa84e6adca99b086d0d2a4d49d2c53db81da1e9",
+          "sha256": "55d447581a4ff9bc3821c572ef2df7bc7f784fef360fc6866b4149836b9b4c5f",
           "size": 218589,
           "publishedAt": "2026-11-16T05:49:36Z",
           "changelog": "还车弹窗显示当前骑行费用，并按骑行卡免费时长与服务器分时计价预估抵扣；计时改用实际耗时（含临时停车），移除未使用的调度费报价流程。"
@@ -128,7 +128,7 @@ const DEFAULT_INDEX = {
             "android"
           ],
           "zipUrl": "/plugins/zmu.provider/1.0.0.zip",
-          "sha256": "345b3fa727db73a4f2ea41b843f95ef086c0cfda7d1832482e9c5acbaba96e5a",
+          "sha256": "da56b9cacc89ae29d354ec3990bac871fba04b46dd890a8675896beab3ee7f69",
           "size": 7717,
           "publishedAt": "2026-11-13T12:53:43Z",
           "changelog": "首个乘方教务 Provider。"
@@ -164,7 +164,7 @@ const DEFAULT_INDEX = {
             "android"
           ],
           "zipUrl": "/plugins/orahako.skbird/1.2.0.zip",
-          "sha256": "07becb9aa37eff06a9c1c83ba1fcd6a624828def556726c68d45e7b19abbfbfe",
+          "sha256": "c843841769e30168d25f7de2a7f7cecaffddea77737d20d0ae89d5f68a8516d0",
           "size": 24952,
           "publishedAt": "2026-11-15T00:44:03Z",
           "changelog": "移动端设置入口移至顶栏，底部导航仅保留消息与我的；重构帖子列表与详情的移动端布局、分隔和图片展示。"
