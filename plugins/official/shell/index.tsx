@@ -14,6 +14,7 @@ import {
   TooltipProvider,
 } from "@orahako/plugin-ui/shell"
 import DashboardLayout from "./dashboard-layout"
+import { PluginThemeManager } from "./components/plugin-theme-manager"
 import { officialShellPages } from "./pages"
 
 export const manifest: PluginManifest = {
@@ -30,6 +31,7 @@ export const manifest: PluginManifest = {
 function OfficialShell({ children, context }: PluginShellProps) {
   return (
     <PluginServicesProvider context={context}>
+      <PluginThemeManager />
       <ProviderProvider>
         <ActivationGate>
           <SDKProvider>

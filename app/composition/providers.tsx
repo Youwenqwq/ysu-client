@@ -8,7 +8,7 @@ import { I18nProvider } from "@/plugins/official/runtime/i18n/context"
 import { usePluginRouteStore } from "@/plugins/official/shell/stores/plugin-route"
 import { PluginProvider, usePluginHost } from "@/components/plugin-provider"
 import { PluginShell } from "@/components/plugin-shell"
-import { PluginThemeManager } from "@/plugins/official/shell/components/plugin-theme-manager"
+
 import { PwaRegister } from "@/plugins/official/shell/components/pwa-register"
 import { PwaUpdatePrompt } from "@/plugins/official/shell/components/pwa-update-prompt"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -90,7 +90,6 @@ export function AppComposition({ children }: { children: ReactNode }) {
         <PwaRegister />
         <PwaUpdatePrompt />
         <ThemeProvider>
-          <PluginThemeManager />
           <PluginShell>{children}</PluginShell>
         </ThemeProvider>
       </CompositionI18nProvider>
