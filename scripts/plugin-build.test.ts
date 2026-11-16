@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { unzipSync } from "fflate"
+import postcss from "postcss"
 import { afterEach, describe, expect, it } from "vitest"
 import type { PluginManifest } from "@orahako/plugin-sdk/manifest"
 import { PLUGIN_TAILWIND_STYLESHEET, packPlugin } from "./plugin-build"
@@ -62,7 +63,7 @@ describe("plugin packaging styles", () => {
       {
         "src/index.tsx": [
           'import "./style.css"',
-          'export const layout = "text-muted-foreground rounded-lg bg-background dark:bg-primary/50 grid-cols-[repeat(auto-fit,minmax(0,1fr))] data-[state=active]:animate-in data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2"',
+          'export const layout = "bg-card/70 rounded-[13px] dark:bg-primary/50 grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] data-[state=active]:animate-in data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2"',
           "export default null",
         ].join("\n"),
         "src/style.css": [
@@ -78,10 +79,12 @@ describe("plugin packaging styles", () => {
     expect(read("dist/index.css")).toContain("@keyframes plugin-pulse")
 
     const utilities = read(PLUGIN_TAILWIND_STYLESHEET)
-    expect(utilities).toMatch(/\.text-muted-foreground\s*\{[^}]*color:\s*var\(--muted-foreground\)/)
-    expect(utilities).toMatch(/\.rounded-lg\s*\{[^}]*border-radius:\s*var\(--radius\)/)
-    expect(utilities).toMatch(/grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(0,\s*1fr\)\)/)
-    expect(utilities).toMatch(/\.dark\\:bg-primary\\\/50/)
+    expect(utilities).toMatch(/\.bg-card\\\/70\s*\{[^}]*var\(--card\)/)
+    expect(utilities).toMatch(/\.rounded-\\\[13px\\\]\s*\{[^}]*border-radius:\s*13px/)
+    expect(utilities).toMatch(
+      /grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(7rem,\s*1fr\)\)/
+    )
+    expect(utilities).toContain(".dark\\:bg-primary\\/50")
     expect(utilities).toContain(":is(.dark *)")
     expect(utilities).toMatch(/animation:\s*enter/)
     expect(utilities).toMatch(/--tw-enter-opacity:\s*0/)
@@ -93,6 +96,52 @@ describe("plugin packaging styles", () => {
     expect(utilities).not.toContain("-webkit-text-size-adjust")
     expect(utilities).not.toContain("::file-selector-button")
     expect(utilities).not.toMatch(/--(?:background|primary|radius)\s*:/)
+  })
+
+  it("leaves utilities the host already declares to the host stylesheet", async () => {
+    const { read } = await packFixture(
+      {},
+      {
+        "src/index.tsx": [
+          'export const layout = "hidden md:flex p-4 text-muted-foreground h-[42px] tracking-[0.31em]"',
+          "export default null",
+        ].join("\n"),
+      }
+    )
+
+    const utilities = read(PLUGIN_TAILWIND_STYLESHEET)
+    // Re-declaring these after the host would override the host's own
+    // responsive variants (`hidden md:flex` → `.hidden` winning over `.md:flex`)
+    // and collapse the desktop shell into its mobile layout.
+    expect(utilities).not.toContain(".hidden {")
+    expect(utilities).not.toContain(".md\\:flex {")
+    expect(utilities).not.toContain(".p-4 {")
+    expect(utilities).not.toContain(".text-muted-foreground {")
+    // Plugin-only classes still ship with their own declarations.
+    expect(utilities).toContain(".h-\\[42px\\] {")
+    expect(utilities).toContain(".tracking-\\[0\\.31em\\] {")
+  })
+
+  it("keeps theme variable defaults in their own layer", async () => {
+    const { read } = await packFixture(
+      {},
+      { "src/index.tsx": 'export const cls = "font-sans text-xs"\nexport default null' }
+    )
+
+    const root = postcss.parse(read(PLUGIN_TAILWIND_STYLESHEET))
+    const themeRule = root.nodes.find(
+      (node) => node.type === "rule" && node.selector === ":root, :host"
+    )
+    expect(themeRule).toBeUndefined()
+    let layerName: string | undefined
+    root.walkRules((rule) => {
+      if (rule.selector !== ":root, :host") return
+      const parent = rule.parent
+      if (parent?.type === "atrule" && parent.name === "layer") layerName = parent.params
+    })
+    // Unlayered `:root` would out-rank the host's own declarations; the host
+    // resolves `--font-sans` from the next/font class on `<html>`.
+    expect(layerName).toBeTypeOf("string")
   })
 
   it("generates and declares a stylesheet when the plugin has none", async () => {

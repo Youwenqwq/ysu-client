@@ -28,6 +28,17 @@ export const PLUGIN_TAILWIND_STYLESHEET = "dist/tailwind.css"
 const STYLE_HEADER =
   "/* Tailwind utilities for this plugin, compiled against the host design tokens. */"
 
+/**
+ * Layer for the theme variables a plugin stylesheet re-declares.
+ *
+ * Tailwind emits used theme variables unlayered. Injected after the host, they
+ * would override `:root` tokens the host resolves otherwise — `font-sans`
+ * in particular, whose variable comes from the next/font class. Layering them
+ * keeps the host's declarations authoritative while still providing defaults
+ * for tokens the host never emits.
+ */
+const PLUGIN_TOKEN_LAYER = "orahako-plugin-tokens"
+
 export interface PackedPlugin {
   id: string
   version: string
@@ -139,7 +150,162 @@ async function buildPluginUtilities(directory: string): Promise<string> {
     from: path.join(directory, "__plugin_tailwind.css"),
   })
   if (!/@layer utilities\s*\{/.test(css)) return ""
-  return `${STYLE_HEADER}\n${css.trimStart()}`
+  return `${STYLE_HEADER}\n${isolatePluginStyles(css.trimStart(), await hostUtilitySelectors())}`
+}
+
+/**
+ * Keep a packaged stylesheet from out-ranking the host's own utilities or
+ * re-declaring its theme variables.
+ *
+ * Both stylesheets live in the `utilities` layer, and the plugin one is
+ * injected last. Repeating a class the host already generates (`.hidden`,
+ * `.p-4`, …) would therefore override every responsive variant of it that the
+ * host emits before it (`.md:flex`, `md:p-8`, …), which turns the desktop
+ * shell into its mobile layout. Dropping rules the host already defines keeps
+ * the host's canonical declaration order; plugin-only classes stay put and
+ * still win over host utilities they intentionally override.
+ */
+function isolatePluginStyles(css: string, hostSelectors: ReadonlySet<string>): string {
+  const root = postcss.parse(css)
+  const rules: postcss.Rule[] = []
+  root.walkRules((rule) => {
+    rules.push(rule)
+  })
+
+  for (const rule of rules) {
+    if (!rule.parent) continue
+    const selectors = splitSelectorList(rule.selector)
+    if (
+      rule.parent === root &&
+      selectors.every((selector) => selector === ":root" || selector === ":host")
+    ) {
+      const layer = postcss.atRule({ name: "layer", params: PLUGIN_TOKEN_LAYER })
+      layer.append(rule.clone())
+      rule.replaceWith(layer)
+      continue
+    }
+    if (!insideUtilitiesLayer(rule)) continue
+    const prefix = nestedSelectorPrefix(rule)
+    const kept = selectors.filter(
+      (selector) =>
+        !hostSelectors.has([...prefix, normalizeSelector(selector)].join(SELECTOR_PATH_SEPARATOR))
+    )
+    if (kept.length === selectors.length) continue
+    if (kept.length === 0) rule.remove()
+    else rule.selector = kept.join(", ")
+  }
+
+  // Nested variants (`&:is(.dark *)`) live inside their utility rule; removing
+  // every nested rule the host also generates must not leave empty shells.
+  const remaining: postcss.Rule[] = []
+  root.walkRules((rule) => {
+    remaining.push(rule)
+  })
+  for (const rule of remaining) {
+    if (!rule.parent || rule.nodes?.length !== 0) continue
+    if (insideUtilitiesLayer(rule)) rule.remove()
+  }
+  return root.toString()
+}
+
+/**
+ * Selector of a rule including every ancestor rule and at-rule condition.
+ *
+ * Two stylesheets can emit identical leaf selectors for different utilities
+ * (`&:is(.dark *)`), so the leaf alone cannot tell whether a rule duplicates
+ * one the host already generates.
+ */
+function nestedSelectorPrefix(rule: postcss.Rule): string[] {
+  const prefix: string[] = []
+  for (
+    let parent = rule.parent as postcss.Container | undefined;
+    parent && parent.type !== "root";
+    parent = parent.parent as postcss.Container | undefined
+  ) {
+    if (parent.type === "rule") {
+      prefix.unshift(`{${normalizeSelector((parent as postcss.Rule).selector)}}`)
+    } else if (parent.type === "atrule") {
+      const atRule = parent as postcss.AtRule
+      if (atRule.name !== "layer") {
+        prefix.unshift(`@${atRule.name} ${normalizeSelector(atRule.params)}`)
+      }
+    }
+  }
+  return prefix
+}
+
+const SELECTOR_PATH_SEPARATOR = "\u0000"
+
+function insideUtilitiesLayer(rule: postcss.Rule): boolean {
+  for (
+    let parent = rule.parent as postcss.Container | undefined;
+    parent;
+    parent = parent.parent as postcss.Container | undefined
+  ) {
+    if (parent.type !== "atrule") continue
+    const atRule = parent as postcss.AtRule
+    if (atRule.name !== "layer") continue
+    if (splitSelectorList(atRule.params).some((layer) => layer.trim() === "utilities")) return true
+  }
+  return false
+}
+
+/** Split a selector list on its top-level commas, ignoring `:is(a, b)` and strings. */
+function splitSelectorList(selector: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let quote: string | undefined
+  let start = 0
+  for (let index = 0; index < selector.length; index += 1) {
+    const char = selector[index]
+    if (quote) {
+      if (char === "\\") index += 1
+      else if (char === quote) quote = undefined
+      continue
+    }
+    if (char === '"' || char === "'") quote = char
+    else if (char === "(" || char === "[") depth += 1
+    else if (char === ")" || char === "]") depth -= 1
+    else if (char === "," && depth === 0) {
+      parts.push(selector.slice(start, index).trim())
+      start = index + 1
+    }
+  }
+  parts.push(selector.slice(start).trim())
+  return parts.filter(Boolean)
+}
+
+function normalizeSelector(selector: string): string {
+  return selector.replace(/\s+/g, " ").trim()
+}
+
+let hostSelectorsPromise: Promise<ReadonlySet<string>> | undefined
+
+/**
+ * Selectors the host's Tailwind build already generates.
+ *
+ * Compiled from `app/globals.css` with its own `@source` set, so it reflects
+ * exactly what the shipped host stylesheet contains. Cached because one pack
+ * run can package several plugins.
+ */
+function hostUtilitySelectors(): Promise<ReadonlySet<string>> {
+  hostSelectorsPromise ??= (async () => {
+    const source = await readFile(HOST_STYLESHEET, "utf8")
+    const { css } = await postcss([tailwindcss({ base: HOST_ROOT })]).process(source, {
+      from: HOST_STYLESHEET,
+    })
+    const root = postcss.parse(css)
+    const selectors = new Set<string>()
+    root.walkRules((rule) => {
+      if (!insideUtilitiesLayer(rule)) return
+      const prefix = nestedSelectorPrefix(rule)
+      for (const selector of splitSelectorList(rule.selector)) {
+        selectors.add([...prefix, normalizeSelector(selector)].join(SELECTOR_PATH_SEPARATOR))
+      }
+    })
+    return selectors
+  })()
+  return hostSelectorsPromise
 }
 
 /** Copy the host `@theme inline` blocks: token mappings only, no global rules. */

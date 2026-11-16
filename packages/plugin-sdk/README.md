@@ -453,6 +453,8 @@ pnpm plugin pack packages/plugin-template
 插件样式完全由插件包提供，宿主不会为外部插件补 Tailwind 工具类。打包器会扫描插件源码中的 Tailwind 类，编译成 `dist/tailwind.css`，写入 ZIP 并自动追加到包内 `manifest.styles`：
 
 - 只包含主题变量、工具类及 Tailwind 为工具类生成的属性回退，不重复注入 preflight 或宿主全局规则。
+- 宿主已生成的工具类不会重复输出：插件样式后于宿主注入，重复声明 `.hidden`、`.p-4` 这类基础类会覆盖宿主同文件的响应式变体（`.md:flex`、`md:p-8`），使桌面布局塌成移动端。宿主没有的类（任意值、插件专属变体）仍然保留，并可正常覆盖宿主组件的基础工具类。
+- 主题变量写在独立级联层（`@layer`）内，不覆盖宿主 `:root` 与 next/font 在 `<html>` 上解析的变量（如 `--font-sans`）；宿主未提供的变量仍由该层兜底。
 - 工具类通过 `@theme inline` 映射到宿主 CSS 变量（`--background`、`--muted-foreground`、`--radius` 等），因此颜色、圆角和 `dark:` 变体跟随宿主明暗主题，插件不需要自带调色板或暗色覆盖。
 - 插件自己 `import "./style.css"` 的 CSS（Leaflet、自定义 `@keyframes`、第三方面板样式等）仍由 esbuild 打包进 `dist/index.css`，与生成的工具类各自成文件、互不覆盖。
 - 插件未声明 `styles` 且使用了 Tailwind 类时，打包器会新增 `dist/tailwind.css` 到 ZIP 内的清单；源码 `manifest.json` 不需要手动登记。未使用任何工具类时不会生成该文件，清单保持原样。
