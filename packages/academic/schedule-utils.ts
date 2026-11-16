@@ -134,13 +134,11 @@ export function isCourseCurrent(
   nowMinutes: number,
   timeMap: Record<number, [number, number]>
 ): boolean {
-  for (let s = courseStartSection(course); s <= courseEndSection(course); s++) {
-    const range = timeMap[s]
-    if (range && nowMinutes >= range[0] && nowMinutes < range[1]) {
-      return true
-    }
-  }
-  return false
+  const startRange = timeMap[courseStartSection(course)]
+  const endRange = timeMap[courseEndSection(course)]
+  return (
+    !!startRange && !!endRange && nowMinutes >= startRange[0] && nowMinutes < endRange[1]
+  )
 }
 
 export function parseWeeks(weeksStr: string): number[] {

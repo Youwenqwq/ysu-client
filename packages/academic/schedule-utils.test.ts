@@ -138,4 +138,13 @@ describe("course time boundaries", () => {
     expect(isCourseCurrent(course, 525, timeMap)).toBe(false)
     expect(isCoursePast(course, 525, timeMap)).toBe(true)
   })
+
+  it("keeps a multi-section course current during the break between its sections", () => {
+    const course: Course = { name: "高等数学", weekDay: 1, startSection: 1, endSection: 2 }
+    const timeMap: Record<number, [number, number]> = { 1: [480, 525], 2: [535, 580] }
+
+    expect(isCourseCurrent(course, 530, timeMap)).toBe(true)
+    expect(isCoursePast(course, 530, timeMap)).toBe(false)
+    expect(isCourseCurrent(course, 580, timeMap)).toBe(false)
+  })
 })

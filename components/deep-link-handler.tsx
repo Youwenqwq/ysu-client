@@ -80,6 +80,8 @@ export function DeepLinkHandler() {
     if (isCurrentNotificationDestination(pathname, window.location.search, pendingDestination)) {
       setPendingDestination(null)
     } else {
+      // Consume before the route commits so a quick manual navigation cannot replay this intent.
+      setPendingDestination(null)
       router.replace(pendingDestination)
     }
   }, [pendingDestination, hasHydrated, settingsHydrated, isAuthenticated, pathname, router])

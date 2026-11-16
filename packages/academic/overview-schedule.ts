@@ -23,6 +23,7 @@ import {
   courseStartSection,
   courseWeekDay,
   isCourseActiveInWeek,
+  isCourseCurrent,
   periodIsInUse,
 } from "@orahako/academic"
 export type OverviewWeekQuery = Omit<ProviderQueryResult<CurrentWeek>, "data" | "mutate"> & {
@@ -142,17 +143,7 @@ export function useOverviewSchedule(): OverviewSchedule {
     [exams.data, now]
   )
   const currentCourse =
-    todayCourses.find((course) => {
-      for (
-        let section = courseStartSection(course);
-        section <= courseEndSection(course);
-        section++
-      ) {
-        const range = timeMap[section]
-        if (range && nowMinutes >= range[0] && nowMinutes < range[1]) return true
-      }
-      return false
-    }) ?? null
+    todayCourses.find((course) => isCourseCurrent(course, nowMinutes, timeMap)) ?? null
   const courseTimeRange = (course: Course): [number, number] | null => {
     const start = timeMap[courseStartSection(course)]
     const end = timeMap[courseEndSection(course)]
