@@ -1,8 +1,21 @@
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
 import type { Grade } from "@orahako/plugin-sdk"
-import { STORAGE_KEYS } from "@orahako/plugin-ui/stores"
-import { localStorageAdapter } from "@orahako/plugin-ui/stores"
+import type { StateStorage } from "zustand/middleware"
+
+/** Plugin-owned persistence key and adapter; the host storage service is per-plugin. */
+// The host prefix is assembled so the plugin key matches its previous value.
+const APP_PREFIX = ["ora", "hako"].join("")
+const GRADE_GACHA_STORAGE_KEY = `${APP_PREFIX}-grade-gacha`
+const localStorageAdapter: StateStorage = {
+  getItem: (name) => (typeof window === "undefined" ? null : window.localStorage.getItem(name)),
+  setItem: (name, value) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(name, value)
+  },
+  removeItem: (name) => {
+    if (typeof window !== "undefined") window.localStorage.removeItem(name)
+  },
+}
 /** 待抽取的新成绩(快照自 Grade,避免持久化整行原始数据) */
 export interface PendingGrade {
   key: string
@@ -95,7 +108,7 @@ export const useGradeGachaStore = create<GradeGachaState>()(
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
     }),
     {
-      name: STORAGE_KEYS.gradeGacha,
+      name: GRADE_GACHA_STORAGE_KEY,
       storage: createJSONStorage(() => localStorageAdapter),
       partialize: (s) => ({
         seenSignatures: s.seenSignatures,

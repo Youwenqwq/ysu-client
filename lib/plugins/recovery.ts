@@ -1,5 +1,3 @@
-import { APP_BUILD } from "@/lib/version"
-
 const RECOVERY_KEY = "orahako-plugin-recovery"
 
 export interface PluginRecoveryState {
@@ -24,7 +22,7 @@ export function nextPluginBootState(
   }
 }
 
-export function beginPluginBoot(build = APP_BUILD): PluginRecoveryState {
+export function beginPluginBoot(build: string): PluginRecoveryState {
   const state = nextPluginBootState(readRecoveryState(), build)
   writeRecoveryState(state)
   return state

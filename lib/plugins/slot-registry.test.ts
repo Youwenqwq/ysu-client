@@ -1,24 +1,26 @@
 import { describe, expect, it, vi } from "vitest"
 import type { PluginManifest, PluginSlotService } from "@orahako/plugin-sdk"
 import { PluginRuntime } from "./runtime"
-import { PluginSlotRegistry } from "./slot-registry"
+import { PluginSlotRegistry } from "@/plugins/official/runtime/registries/slots"
 
 const owner: PluginManifest = {
   id: "example.shell",
   name: "Shell",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: 2,
   kind: "shell",
   entry: "index.js",
+  inject: ["slots"],
 }
 
 const extension: PluginManifest = {
   id: "example.extension",
   name: "Extension",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: 2,
   kind: "feature",
   entry: "index.js",
+  inject: ["slots"],
 }
 
 function Component() {
@@ -27,7 +29,8 @@ function Component() {
 
 function setup() {
   const registry = new PluginSlotRegistry()
-  const runtime = new PluginRuntime(registry.createService)
+  const runtime = new PluginRuntime()
+  runtime.context.set("slots", registry)
   return { registry, runtime }
 }
 
@@ -51,6 +54,10 @@ describe("PluginSlotRegistry", () => {
     runtime.start(extension.id)
 
     expect(registry.getSnapshot().contributions.map((item) => item.id)).toEqual(["first", "later"])
+    expect(registry.getSnapshot().contributions.map((item) => item.pluginId)).toEqual([
+      extension.id,
+      extension.id,
+    ])
     runtime.stop(extension.id)
     expect(registry.getSnapshot().contributions).toEqual([])
     runtime.stop(owner.id)
@@ -104,23 +111,21 @@ describe("PluginSlotRegistry", () => {
 
   it("rejects registrations from a disposed async continuation", async () => {
     const { registry, runtime } = setup()
-    let resume: (() => void) | undefined
+    const resumed = Promise.withResolvers<void>()
     let slots: PluginSlotService | undefined
     runtime.register(owner, (ctx) => ctx.slots.declare({ name: "main", kind: "list" }), "builtin")
     runtime.register(
       extension,
       async (ctx) => {
         slots = ctx.slots
-        await new Promise<void>((resolve) => {
-          resume = resolve
-        })
+        await resumed.promise
       },
       "external"
     )
     runtime.start(owner.id)
     runtime.start(extension.id)
     runtime.stop(extension.id)
-    resume?.()
+    resumed.resolve()
     await Promise.resolve()
     expect(() => slots?.register({ id: "leaked", slot: "main", component: Component })).toThrow()
     expect(registry.getSnapshot().contributions).toEqual([])

@@ -2,7 +2,7 @@
 
 import { Component, createElement, useMemo, useSyncExternalStore, type ReactNode } from "react"
 import { PluginSlotRuntimeContext, type PluginSlotRuntime } from "@orahako/plugin-sdk"
-import type { PluginSlotRegistry } from "@/lib/plugins/slot-registry"
+import type { PluginSlotRegistryService } from "@orahako/plugin-sdk"
 
 class SlotContributionBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
@@ -20,26 +20,29 @@ class SlotContributionBoundary extends Component<{ children: ReactNode }, { fail
   }
 }
 
+const EMPTY_SNAPSHOT = { declarations: [], contributions: [] } as const
+const NOOP_SUBSCRIBE = () => () => {}
+
 export function PluginSlotRuntimeProvider({
   registry,
   children,
 }: {
-  registry: PluginSlotRegistry
+  registry?: PluginSlotRegistryService
   children: ReactNode
 }) {
   const snapshot = useSyncExternalStore(
-    registry.subscribe,
-    registry.getSnapshot,
-    registry.getSnapshot
+    registry?.subscribe ?? NOOP_SUBSCRIBE,
+    registry?.getSnapshot ?? (() => EMPTY_SNAPSHOT),
+    () => EMPTY_SNAPSHOT
   )
   const runtime = useMemo<PluginSlotRuntime>(
     () => ({
       hasContributions(name, itemKey) {
-        return registry.select(name, itemKey).length > 0
+        return (registry?.select(name, itemKey).length ?? 0) > 0
       },
       renderSlot(name, props, itemKey, fallback) {
         if (!snapshot.declarations.some((slot) => slot.name === name)) return fallback
-        const contributions = registry.select(name, itemKey)
+        const contributions = registry?.select(name, itemKey) ?? []
         if (contributions.length === 0) return fallback
         return contributions.map((contribution) => (
           <SlotContributionBoundary

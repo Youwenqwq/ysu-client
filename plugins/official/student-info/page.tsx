@@ -11,7 +11,7 @@ import {
 } from "@orahako/plugin-ui/components"
 import { Skeleton } from "@orahako/plugin-ui/components"
 import { useTranslation } from "@orahako/plugin-ui/hooks"
-import { useStudentInfo } from "@orahako/plugin-ui/hooks"
+import { useStudentInfo } from "@orahako/academic"
 export function StudentInfoPage() {
   const { t } = useTranslation()
   const { data: student, isLoading, isError, error } = useStudentInfo()

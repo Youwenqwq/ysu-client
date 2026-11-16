@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest"
 import type { PluginManifest } from "@orahako/plugin-sdk"
 import { PluginRuntime } from "./runtime"
-import { PluginUIRegistry } from "./ui-registry"
+import { PluginUIRegistry } from "@/plugins/official/runtime/registries/ui"
 
 const manifest: PluginManifest = {
   id: "example.ui",
   name: "UI example",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: 2,
   kind: "feature",
   entry: "index.js",
+  inject: ["ui"],
 }
 
 function Page() {
@@ -20,10 +21,16 @@ function Icon() {
   return null
 }
 
+function setup() {
+  const registry = new PluginUIRegistry()
+  const runtime = new PluginRuntime()
+  runtime.context.set("ui", registry)
+  return { registry, runtime }
+}
+
 describe("PluginUIRegistry", () => {
   it("removes pages, navigation, and themes when their plugin stops", () => {
-    const registry = new PluginUIRegistry()
-    const runtime = new PluginRuntime(registry.createService)
+    const { registry, runtime } = setup()
     runtime.register(
       manifest,
       (ctx) => {
@@ -63,9 +70,26 @@ describe("PluginUIRegistry", () => {
     })
   })
 
+  it("attributes every contribution to the consumer manifest", () => {
+    const { registry, runtime } = setup()
+    runtime.register(
+      manifest,
+      (ctx) => {
+        ctx.ui.registerPage({ id: "index", title: "Home", component: Page })
+        ctx.ui.registerTheme({ id: "dark", name: "Dark", css: "" })
+      },
+      "builtin"
+    )
+    runtime.start(manifest.id)
+
+    expect(registry.getSnapshot()).toMatchObject({
+      pages: [{ pluginId: manifest.id, id: "index" }],
+      themes: [{ pluginId: manifest.id, id: "dark" }],
+    })
+  })
+
   it("rejects duplicate semantic page routes", async () => {
-    const registry = new PluginUIRegistry()
-    const runtime = new PluginRuntime(registry.createService)
+    const { runtime } = setup()
     runtime.register(
       manifest,
       (ctx) => ctx.ui.registerPage({ id: "index", route: "home", title: "One", component: Page }),
@@ -83,8 +107,7 @@ describe("PluginUIRegistry", () => {
   })
 
   it("rejects duplicate contribution IDs", async () => {
-    const registry = new PluginUIRegistry()
-    const runtime = new PluginRuntime(registry.createService)
+    const { runtime } = setup()
     runtime.register(
       manifest,
       (ctx) => {

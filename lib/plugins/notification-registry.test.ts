@@ -1,16 +1,17 @@
 import { describe, expect, it, vi } from "vitest"
 import type { PluginManifest, PluginNotificationService } from "@orahako/plugin-sdk"
 import { PluginRuntime } from "./runtime"
-import { PluginNotificationRegistry } from "./notification-registry"
+import { PluginNotificationRegistry } from "@/plugins/official/runtime/registries/notifications"
 
 function manifest(id: string): PluginManifest {
   return {
     id,
     name: id,
     version: "1.0.0",
-    apiVersion: 1,
+    apiVersion: 2,
     kind: "feature",
     entry: "index.js",
+    inject: ["notifications"],
   }
 }
 
@@ -20,7 +21,8 @@ const schedule = manifest("example.schedule")
 
 function setup() {
   const registry = new PluginNotificationRegistry()
-  const runtime = new PluginRuntime(registry.createService)
+  const runtime = new PluginRuntime()
+  runtime.context.set("notifications", registry)
   return { registry, runtime }
 }
 

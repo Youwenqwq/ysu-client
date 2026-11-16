@@ -1,0 +1,69 @@
+"use client"
+
+import { useEffect, useLayoutEffect } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { App } from "@capacitor/app"
+import { isCapacitor } from "@orahako/plugin-sdk/native"
+import { requestBack, setNavigationBackHandler } from "@orahako/plugin-ui/platform"
+import { appHistoryDepth, backFallback, installBackHistory } from "./back-history"
+import { useSemanticNavigation } from "@orahako/plugin-ui/plugin"
+import { isPrimaryNavigationLocation } from "@/plugins/official/runtime/navigation/resolvers"
+import { usePluginRouteStore } from "@/plugins/official/shell/stores/plugin-route"
+
+export function BackButtonHandler() {
+  const pathname = usePathname()
+  const router = useRouter()
+  const nav = useSemanticNavigation()
+
+  useEffect(() => installBackHistory(window.history), [])
+
+  useLayoutEffect(() => {
+    return setNavigationBackHandler((canGoBack) => {
+      const path = pathname.replace(/\/+$/, "") || "/"
+      const current = usePluginRouteStore.getState().current
+      const isPrimaryDestination =
+        path === "/dashboard" ||
+        path === nav.sources.fallbackHref ||
+        (path === "/dashboard/plugin" &&
+          Boolean(
+            current &&
+              (current.primary ||
+                isPrimaryNavigationLocation(nav.sources.navigation, {
+                  pluginId: current.pluginId,
+                  pageId: current.pageId,
+                  params: new URLSearchParams(window.location.search),
+                }))
+          ))
+      // Tabs are roots: never walk through another tab's stale detail history.
+      // Never return to an authenticated page through the login page after logout.
+      if (
+        path !== "/login" &&
+        !isPrimaryDestination &&
+        canGoBack !== false &&
+        appHistoryDepth(window.history) > 0
+      ) {
+        router.back()
+        return
+      }
+      const fallback = backFallback(path, nav.primaryHref(), nav.href("settings"))
+      if (fallback) router.replace(fallback)
+      else if (isCapacitor()) void App.exitApp()
+    })
+  }, [pathname, nav, router])
+
+  useEffect(() => {
+    if (!isCapacitor()) return
+    let disposed = false
+    let listener: { remove: () => Promise<void> } | undefined
+    void App.addListener("backButton", ({ canGoBack }) => requestBack(canGoBack)).then((handle) => {
+      if (disposed) void handle.remove()
+      else listener = handle
+    })
+    return () => {
+      disposed = true
+      void listener?.remove()
+    }
+  }, [])
+
+  return null
+}

@@ -211,6 +211,9 @@ importers:
       '@orahako/plugin-ui':
         specifier: workspace:*
         version: link:packages/plugin-ui
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       canvas-confetti:
         specifier: ^1.9.4
         version: 1.9.4
@@ -334,6 +337,9 @@ importers:
 
   packages/plugin-sdk:
     dependencies:
+      '@capacitor/core':
+        specifier: ^8.3.4
+        version: 8.3.4
       '@cordisjs/core':
         specifier: 3.18.1
         version: 3.18.1

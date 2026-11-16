@@ -1,0 +1,38 @@
+// Schedule/tomorrow home-screen widget companion: providers, renderer, layouts
+// and the `widgets.schedule` capability. The generic widget host (`:native-widgets`)
+// does not depend on this module.
+
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+def deepLinkScheme = (gradle.ext.find('orahakoDeepLinkScheme') ?: 'orahako').toString()
+def deepLinkHosts = gradle.ext.find('orahakoDeepLinkHosts') ?: [:]
+def scheduleHost = (deepLinkHosts['schedule'] ?: 'schedule').toString()
+
+android {
+    namespace = "me.uwen.orahako.widget.schedule"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        manifestPlaceholders = [
+            orahakoDeepLinkScheme    : deepLinkScheme,
+            orahakoDeepLinkHostSchedule: scheduleHost,
+        ]
+        resValue "string", "orahako_widget_schedule_host", scheduleHost
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+dependencies {
+    implementation project(':native-core')
+    implementation project(':native-widgets')
+    implementation "androidx.core:core:$androidxCoreVersion"
+
+    testImplementation "junit:junit:$junitVersion"
+    testImplementation "org.json:json:20250517"
+}

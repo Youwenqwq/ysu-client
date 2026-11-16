@@ -21,11 +21,12 @@ import { useSettingsStore } from "@orahako/plugin-ui/stores"
 import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
 import { useTranslation } from "@orahako/plugin-ui/hooks"
 import { compareExamStartTime, formatExamTime, isExamCompleted } from "@orahako/plugin-ui/academic"
-import { syncExamsToWidget } from "@orahako/plugin-ui/platform"
-import { useExams } from "@orahako/plugin-ui/hooks"
+import { syncExamWidgets } from "@orahako/academic/widget-snapshots"
+import { useExams } from "@orahako/academic"
 import { CalendarOff, CheckCircle2, Clock, MapPin, Search } from "lucide-react"
+import type { PluginPageProps } from "@orahako/plugin-sdk"
 
-export function ExamsPage() {
+export function ExamsPage({ context }: PluginPageProps) {
   const { t } = useTranslation()
   const [term, setTerm] = useState("")
   const [queriedTerm, setQueriedTerm] = useState("")
@@ -37,8 +38,8 @@ export function ExamsPage() {
 
   useEffect(() => {
     if (queriedTerm || !examsQuery.data) return
-    syncExamsToWidget(examsQuery.data, widgetSyncReminderHours).catch(() => {})
-  }, [queriedTerm, examsQuery.data, widgetSyncReminderHours])
+    syncExamWidgets(context.native, examsQuery.data, widgetSyncReminderHours).catch(() => {})
+  }, [queriedTerm, examsQuery.data, widgetSyncReminderHours, context.native])
 
   useEffect(() => {
     if (!examsQuery.error) return

@@ -19,7 +19,7 @@
 
 ```tsx
 import { Button, Card } from "@orahako/plugin-ui/components"
-import { useGrades } from "@orahako/plugin-ui/hooks"
+import { useGrades } from "@orahako/academic"
 ```
 
 不要恢复根 barrel：宿主同时加载公共模块和官方插件，根汇聚会把无关 Store/Shell 引入模块求值环。子路径同时让测试和社区包只加载实际依赖。

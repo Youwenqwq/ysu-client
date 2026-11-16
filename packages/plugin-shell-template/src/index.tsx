@@ -18,7 +18,6 @@ import {
   type PluginContext,
 } from "@orahako/plugin-sdk"
 import { navigationForScope } from "@orahako/plugin-ui/plugin"
-import { useProviderCapabilities, useSupportedPlugins } from "@orahako/plugin-ui/hooks"
 
 class CommunityPageBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
@@ -39,8 +38,7 @@ function CommunityShell({
   ctx: PluginContext
   selectShell(id?: string): void
 }) {
-  const capabilities = useProviderCapabilities()
-  const supportedPlugins = useSupportedPlugins()
+  const sources = ctx.navigation.sources()
   const { pages, navigation } = useSyncExternalStore(
     ctx.ui.subscribe,
     ctx.ui.getSnapshot,
@@ -50,10 +48,9 @@ function CommunityShell({
   const params = useMemo(() => new URLSearchParams(searchParams.toString()), [searchParams])
   const pluginId = params.get("plugin")
   const pageId = params.get("page") ?? "index"
-  const primaryNavigation = navigationForScope(navigation, "app", {
-    capabilities,
-    supportedPlugins,
-  }).filter((item) => item.primary)[0]
+  const primaryNavigation = navigationForScope(navigation, "app", sources).filter(
+    (item) => item.primary
+  )[0]
   const primaryPage = primaryNavigation
     ? pages.find(
         (item) => item.pluginId === primaryNavigation.pluginId && item.id === primaryNavigation.page
@@ -75,10 +72,8 @@ function CommunityShell({
   }
 
   const Page = page?.component
-  return (
-    <ActivationGate>
-      <ProviderProvider>
-        <SDKProvider>
+  const content = (
+    <>
           <TooltipProvider>
             <BackButtonHandler />
             <DeepLinkHandler />
@@ -152,6 +147,7 @@ function CommunityShell({
                   {page && Page ? (
                     <CommunityPageBoundary key={`${page.pluginId}:${page.id}`}>
                       <Page
+                        context={page.context}
                         pluginId={page.pluginId}
                         pageId={page.id}
                         params={params}
@@ -169,13 +165,23 @@ function CommunityShell({
             <Toaster />
             <MFAModal />
           </TooltipProvider>
-        </SDKProvider>
-      </ProviderProvider>
+    </>
+  )
+  return (
+    <ActivationGate>
+      {ctx.get("provider") ? (
+        <ProviderProvider>
+          <SDKProvider>{content}</SDKProvider>
+        </ProviderProvider>
+      ) : (
+        content
+      )}
     </ActivationGate>
   )
 }
 
 export default definePlugin((ctx) => {
+  ctx.slots.declare({ name: "shell.overlay", kind: "single" })
   ctx.ui.registerShell({
     id: "community",
     name: "Community Shell",

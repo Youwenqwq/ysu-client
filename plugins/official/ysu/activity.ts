@@ -1,5 +1,3 @@
-import { getSchoolId } from "@orahako/plugin-sdk/host"
-
 const SCXT_HOST = "202.206.247.49"
 
 function isYsuHost(host: string): boolean {
@@ -47,8 +45,6 @@ function labelJwmobile(path: string): string {
  * the generic transport category.
  */
 export function labelYsuRequest(url: string): string | undefined {
-  if (getSchoolId() !== "ysu") return undefined
-
   let host: string
   let path: string
   try {
@@ -82,6 +78,44 @@ export function labelYsuRequest(url: string): string | undefined {
     path.includes("/about/unifiedauthenticationlogin")
   ) {
     return "networkActivity.ysu.campusLogin"
+  }
+  return undefined
+}
+
+/** Coarse YSU categories used by the generic transport activity service. */
+export function classifyYsuRequest(url: string): string | undefined {
+  let host: string
+  let path: string
+  try {
+    const parsed = new URL(url)
+    host = parsed.hostname.toLowerCase()
+    path = parsed.pathname.toLowerCase()
+  } catch {
+    return undefined
+  }
+  if (
+    host === "open.weixin.qq.com" ||
+    host === "lp.open.weixin.qq.com" ||
+    host.endsWith(".weixin.qq.com")
+  ) {
+    return "wechat"
+  }
+  if (!isYsuHost(host)) return undefined
+  if (path.startsWith("/authserver")) return "auth"
+  if (path.startsWith("/jwmobile")) return "mobile"
+  if (path.startsWith("/publicapp")) return "one-stop"
+  if (path === "/pay" || path.startsWith("/pay/")) return "payment"
+  if (path.startsWith("/jwapp") || path.startsWith("/jwglxt") || path.startsWith("/jwxt")) {
+    return "academic"
+  }
+  if (
+    path.startsWith("/xsfw") ||
+    path.startsWith("/xuefen") ||
+    path.startsWith("/system") ||
+    path.startsWith("/huodongku") ||
+    path.startsWith("/jingcai")
+  ) {
+    return "campus"
   }
   return undefined
 }

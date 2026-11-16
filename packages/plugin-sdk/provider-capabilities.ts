@@ -5,69 +5,49 @@
 import { ProviderError, ProviderErrorCode } from "./provider-errors"
 import type { AcademicCapabilities, AcademicProvider } from "./academic"
 
-export const ALL_CAPABILITIES: AcademicCapabilities = {
-  auth: true,
-  captcha: true,
-  mfa: true,
-  wechatMfa: true,
-  grades: true,
-  gradeAnalytics: true,
-  schedule: true,
-  labSchedule: true,
-  exams: true,
-  makeupExams: true,
-  laborEducation: true,
-  innovationCredits: true,
-  comprehensiveEval: true,
-  schoolSchedule: true,
-  gpa: true,
-  evaluation: true,
-  evaluationScorePreview: true,
-  trainingPlan: true,
-  studentInfo: true,
-  currentWeek: true,
-  classPeriods: true,
-  termCalendar: true,
-  mobileSignin: true,
-  ecard: true,
-  meter: true,
-  epay: true,
-}
+/** Known built-in capability keys; the provider record itself stays open. */
+const BUILT_IN_CAPABILITIES = [
+  "auth",
+  "captcha",
+  "mfa",
+  "wechatMfa",
+  "grades",
+  "gradeAnalytics",
+  "schedule",
+  "labSchedule",
+  "exams",
+  "makeupExams",
+  "laborEducation",
+  "innovationCredits",
+  "comprehensiveEval",
+  "schoolSchedule",
+  "gpa",
+  "evaluation",
+  "evaluationScorePreview",
+  "trainingPlan",
+  "studentInfo",
+  "currentWeek",
+  "classPeriods",
+  "termCalendar",
+  "mobileSignin",
+  "ecard",
+  "meter",
+  "epay",
+] as const
 
-export const NO_CAPABILITIES: AcademicCapabilities = {
-  auth: false,
-  captcha: false,
-  mfa: false,
-  wechatMfa: false,
-  grades: false,
-  gradeAnalytics: false,
-  schedule: false,
-  labSchedule: false,
-  exams: false,
-  makeupExams: false,
-  laborEducation: false,
-  innovationCredits: false,
-  comprehensiveEval: false,
-  schoolSchedule: false,
-  gpa: false,
-  evaluation: false,
-  evaluationScorePreview: false,
-  trainingPlan: false,
-  studentInfo: false,
-  currentWeek: false,
-  classPeriods: false,
-  termCalendar: false,
-  mobileSignin: false,
-  ecard: false,
-  meter: false,
-  epay: false,
-}
+/** Every built-in capability enabled. Unknown/open keys stay disabled. */
+export const ALL_CAPABILITIES: AcademicCapabilities = Object.fromEntries(
+  BUILT_IN_CAPABILITIES.map((capability) => [capability, true])
+)
+
+/** No capability enabled; absence is the canonical "unsupported" state. */
+export const NO_CAPABILITIES: AcademicCapabilities = {}
 
 export function hasCapability(
-  capabilities: AcademicCapabilities,
-  key: keyof AcademicCapabilities
+  capabilities: AcademicCapabilities | undefined,
+  key: string
 ): boolean {
-  return capabilities[key] === true
+  return capabilities?.[key] === true
 }
 
 /**
@@ -86,7 +66,7 @@ export function supportsPlugin(
 
 export function assertCapability(
   provider: Pick<AcademicProvider, "id" | "capabilities">,
-  key: keyof AcademicCapabilities
+  key: string
 ): void {
   if (!hasCapability(provider.capabilities, key)) {
     throw new ProviderError(
@@ -98,8 +78,47 @@ export function assertCapability(
   }
 }
 
+/** Method names contributed by the optional provider modules. */
+type ProviderMethod = ({
+  [K in keyof AcademicProvider]: NonNullable<AcademicProvider[K]> extends (
+    ...args: never[]
+  ) => unknown
+    ? K
+    : never
+}[keyof AcademicProvider]) &
+  keyof AcademicProvider
+
+/** Whether a provider implements an optional module method at runtime. */
+export function hasProviderMethod<K extends ProviderMethod>(
+  provider: AcademicProvider,
+  method: K
+): boolean {
+  return typeof provider[method] === "function"
+}
+
+/**
+ * Narrows an optional module method to a callable function.
+ *
+ * Consumers that need a module method without a capability gate use this
+ * instead of scattering non-null assertions; missing modules fail with the
+ * same `FEATURE_NOT_SUPPORTED` contract as capability-gated base defaults.
+ */
+export function requireProviderMethod<K extends ProviderMethod>(
+  provider: AcademicProvider,
+  method: K
+): NonNullable<AcademicProvider[K]> {
+  const value = provider[method]
+  if (typeof value !== "function") {
+    throw new ProviderError(
+      ProviderErrorCode.FEATURE_NOT_SUPPORTED,
+      `Provider "${provider.id}" does not implement ${String(method)}()`,
+      undefined,
+      501
+    )
+  }
+  return value as NonNullable<AcademicProvider[K]>
+}
+
 export function getEnabledCapabilities(capabilities: AcademicCapabilities): string[] {
-  return (Object.keys(capabilities) as (keyof AcademicCapabilities)[]).filter(
-    (key) => capabilities[key] === true
-  )
+  return Object.keys(capabilities).filter((key) => capabilities[key] === true)
 }

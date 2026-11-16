@@ -1,5 +1,5 @@
 import { CalendarDays, LayoutDashboard } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
+import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/plugin-sdk"
 import { OverviewPage } from "./page"
 import { OverviewStartupOption } from "./settings"
 import { OverviewEditor, WeekSummaryWidget } from "@orahako/academic"
@@ -8,8 +8,9 @@ export const manifest: PluginManifest = {
   id: "orahako.overview",
   name: "总览",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: PLUGIN_API_VERSION,
   kind: "feature",
+  inject: ["ui", "slots", "settings"],
   entry: "index.js",
 }
 

@@ -5,17 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Puzzle } from "lucide-react"
 import { usePluginHost } from "@/components/plugin-provider"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
-import type { RegisteredPluginPage } from "@/lib/plugins/ui-registry"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { pluginPageHref, supportsPlugin, type PluginPageProps } from "@orahako/plugin-sdk"
-import { usePluginRouteStore } from "@/lib/stores/plugin-route"
-import { useProviderCapabilities, useSupportedPlugins } from "@/providers/use-provider"
 import {
-  hasPluginCapability,
-  isAppNavigation,
-  resolveSemanticTarget,
-} from "@/lib/plugins/navigation"
-import { useTranslation } from "@/lib/i18n/use-translation"
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
+import {
+  pluginPageHref,
+  type PluginNavigationService,
+  type PluginPageProps,
+} from "@orahako/plugin-sdk"
 
 class PluginPageBoundary extends Component<{ children: ReactNode }, { error?: Error }> {
   state: { error?: Error } = {}
@@ -48,25 +49,22 @@ function PluginMessage({ title, description }: { title: string; description: str
 
 function PluginHostContent() {
   const { host, isReady } = usePluginHost()
-  const { pages, navigation } = usePluginUI(host.ui)
+  const { pages } = usePluginUI(host.ui)
   const searchParams = useSearchParams()
   const router = useRouter()
-  const capabilities = useProviderCapabilities()
-  const supportedPlugins = useSupportedPlugins()
-  const { t } = useTranslation()
   const pluginId = searchParams.get("plugin")
   const pageId = searchParams.get("page") ?? "index"
   const semanticRoute = searchParams.get("route")
-  const semanticTarget = semanticRoute
-    ? resolveSemanticTarget(semanticRoute, { pages, navigation, capabilities, supportedPlugins })
-    : undefined
-  const page = semanticTarget
-    ? pages.find(
-        (item) => item.pluginId === semanticTarget.pluginId && item.id === semanticTarget.pageId
-      )
+  const navigation: PluginNavigationService | undefined = host.navigation
+  const semanticTarget = semanticRoute ? navigation?.resolve(semanticRoute) : undefined
+  const requested = semanticTarget
+    ? { pluginId: semanticTarget.pluginId, pageId: semanticTarget.pageId }
     : pluginId
-      ? pages.find((item) => item.pluginId === pluginId && item.id === pageId)
+      ? { pluginId, pageId }
       : undefined
+  const page = requested
+    ? pages.find((item) => item.pluginId === requested.pluginId && item.id === requested.pageId)
+    : undefined
   const params = useMemo(() => new URLSearchParams(searchParams.toString()), [searchParams])
   const navigate = useCallback<PluginPageProps["navigate"]>(
     (nextPage, nextParams) => {
@@ -96,67 +94,18 @@ function PluginHostContent() {
     )
   }
 
-  const pluginManifest = host.runtime.get(page.pluginId)?.manifest
-  const pageSupported =
-    Boolean(pluginManifest && pluginManifest.kind !== "feature") ||
-    Boolean(pluginManifest?.required) ||
-    Boolean(pluginManifest?.providerIndependent) ||
-    supportsPlugin(supportedPlugins, page.pluginId)
-
-  if (!pageSupported || !hasPluginCapability(capabilities, page.capability)) {
-    return (
-      <ActivePluginRoute page={page}>
-        <PluginMessage
-          title={t("app.featureUnavailable")}
-          description={t("app.featureUnavailableDesc")}
-        />
-      </ActivePluginRoute>
-    )
-  }
-
   const Page = page.component
   return (
     <PluginPageBoundary key={`${page.pluginId}:${page.id}`}>
-      <ActivePluginRoute page={page}>
-        <Page pluginId={page.pluginId} pageId={page.id} params={params} navigate={navigate} />
-      </ActivePluginRoute>
+      <Page
+        context={page.context}
+        pluginId={page.pluginId}
+        pageId={page.id}
+        params={params}
+        navigate={navigate}
+      />
     </PluginPageBoundary>
   )
-}
-
-function ActivePluginRoute({
-  page,
-  children,
-}: {
-  page: RegisteredPluginPage
-  children: ReactNode
-}) {
-  const setCurrent = usePluginRouteStore((state) => state.setCurrent)
-  const { host } = usePluginHost()
-  const { navigation } = usePluginUI(host.ui)
-  const primary =
-    page.primary ||
-    navigation.some(
-      (item) =>
-        isAppNavigation(item) &&
-        item.pluginId === page.pluginId &&
-        item.page === page.id &&
-        item.primary
-    )
-  useEffect(() => {
-    setCurrent({
-      pluginId: page.pluginId,
-      pageId: page.id,
-      title: page.title,
-      titleKey: page.titleKey,
-      parent: page.parent,
-      primary,
-      capability: page.capability,
-      fullscreen: page.fullscreen,
-    })
-    return () => setCurrent(undefined)
-  }, [page, primary, setCurrent])
-  return children
 }
 
 export default function PluginHostPage() {

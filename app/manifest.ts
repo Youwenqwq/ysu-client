@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next"
+import { appIdentity } from "./composition/identity"
 
 export const dynamic = "force-static"
 
@@ -23,103 +24,47 @@ export default function manifest(): LocalizedManifest {
 
   return {
     id: `${basePath}/`,
-    name: "酸橙盒",
-    short_name: "酸橙盒",
-    description: "面向燕山大学教务系统的第三方客户端",
+    name: appIdentity.name,
+    short_name: appIdentity.shortName,
+    description: appIdentity.description,
     lang: "zh-CN",
     dir: "ltr",
     name_localized: {
-      en: "Orahako",
+      en: appIdentity.nameEn,
     },
     short_name_localized: {
-      en: "Orahako",
+      en: appIdentity.nameEn,
     },
     description_localized: {
-      en: "A third-party client for the Yanshan University academic system.",
+      en: appIdentity.descriptionEn,
     },
-    shortcuts: [
-      {
-        name: "课程表",
-        short_name: "课表",
-        description: "查看课程表",
-        url: semanticShortcutHref("schedule"),
-        icons: [
-          {
-            src: "icons/icon-192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-        ],
-      },
-      {
-        name: "成绩查询",
-        short_name: "成绩",
-        description: "查询课程成绩",
-        url: semanticShortcutHref("grades"),
-        icons: [
-          {
-            src: "icons/icon-192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-        ],
-      },
-      {
-        name: "考试安排",
-        short_name: "考试",
-        description: "查看考试安排",
-        url: semanticShortcutHref("exams"),
-        icons: [
-          {
-            src: "icons/icon-192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-        ],
-      },
-    ],
-    shortcuts_localized: {
-      en: [
+    shortcuts: appIdentity.shortcuts?.map((shortcut) => ({
+      name: shortcut.name,
+      short_name: shortcut.name,
+      description: shortcut.name,
+      url: semanticShortcutHref(shortcut.id),
+      icons: [
         {
-          name: "Class Schedule",
-          short_name: "Schedule",
-          description: "View your class schedule",
-          url: semanticShortcutHref("schedule"),
-          icons: [
-            {
-              src: "icons/icon-192.png",
-              sizes: "192x192",
-              type: "image/png",
-            },
-          ],
-        },
-        {
-          name: "Grades",
-          short_name: "Grades",
-          description: "View your course grades",
-          url: semanticShortcutHref("grades"),
-          icons: [
-            {
-              src: "icons/icon-192.png",
-              sizes: "192x192",
-              type: "image/png",
-            },
-          ],
-        },
-        {
-          name: "Exams",
-          short_name: "Exams",
-          description: "View your exam schedule",
-          url: semanticShortcutHref("exams"),
-          icons: [
-            {
-              src: "icons/icon-192.png",
-              sizes: "192x192",
-              type: "image/png",
-            },
-          ],
+          src: "icons/icon-192.png",
+          sizes: "192x192",
+          type: "image/png",
         },
       ],
+    })) ?? [],
+    shortcuts_localized: {
+      en: appIdentity.shortcuts?.map((shortcut) => ({
+        name: shortcut.nameEn,
+        short_name: shortcut.nameEn,
+        description: shortcut.nameEn,
+        url: semanticShortcutHref(shortcut.id),
+        icons: [
+          {
+            src: "icons/icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
+          },
+        ],
+      })) ?? [],
     },
     start_url: ".",
     scope: ".",

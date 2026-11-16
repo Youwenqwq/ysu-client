@@ -31,8 +31,9 @@ import {
   ToggleGroup,
 } from "@orahako/plugin-ui/components"
 import { useProvider, useTranslation } from "@orahako/plugin-ui/hooks"
-import { isCapacitor, NotifyPlugin, setNotificationEnabled } from "@orahako/plugin-ui/platform"
+import { isCapacitor } from "@orahako/plugin-ui/platform"
 import { useSettingsStore } from "@orahako/plugin-ui/stores"
+import { usePluginServices } from "@orahako/plugin-ui/plugin"
 
 /**
  * The single notification settings panel: system permissions, general polling
@@ -41,8 +42,10 @@ import { useSettingsStore } from "@orahako/plugin-ui/stores"
  */
 export function NotificationSettingsPanel() {
   const { t } = useTranslation()
+  const services = usePluginServices()
   const provider = useProvider()
   const notifyEnabled = useSettingsStore((s) => s.notifyEnabled)
+  const setNotifyEnabled = useSettingsStore((s) => s.setNotifyEnabled)
   const notifyCheckInterval = useSettingsStore((s) => s.notifyCheckInterval)
   const setNotifyCheckInterval = useSettingsStore((s) => s.setNotifyCheckInterval)
   const notifyGrades = useSettingsStore((s) => s.notifyGrades)
@@ -67,9 +70,10 @@ export function NotificationSettingsPanel() {
     let disposed = false
     let listener: { remove(): void } | undefined
     const refreshBatteryStatus = () => {
-      NotifyPlugin.checkBatteryOptimization()
+      services.native.capabilities
+        .invoke<{ ignored?: boolean }>("notifications.core", "checkBatteryOptimization")
         .then(({ ignored }) => {
-          if (!disposed) setBatteryIgnored(ignored)
+          if (!disposed) setBatteryIgnored(ignored === true)
         })
         .catch(() => {})
     }
@@ -90,7 +94,7 @@ export function NotificationSettingsPanel() {
       disposed = true
       listener?.remove()
     }
-  }, [native])
+  }, [native, services.native.capabilities])
 
   if (!visible) {
     return (
@@ -106,9 +110,15 @@ export function NotificationSettingsPanel() {
   async function handleToggle(enabled: boolean) {
     setPermissionPending(true)
     try {
-      if (!(await setNotificationEnabled("polling", enabled))) {
-        toast.error(t("settings.notificationPermissionDenied"))
+      if (!enabled) {
+        setNotifyEnabled(false)
+        return
       }
+      if (!(await services.native.requestNotificationPermission())) {
+        toast.error(t("settings.notificationPermissionDenied"))
+        return
+      }
+      setNotifyEnabled(true)
     } catch {
       toast.error(t("settings.notificationSyncFailed"))
     } finally {
@@ -130,7 +140,7 @@ export function NotificationSettingsPanel() {
               {/* 电池优化 */}
               <button
                 type="button"
-                onClick={() => NotifyPlugin.requestIgnoreBatteryOptimization()}
+                onClick={() => void services.native.requestBatteryOptimizationExemption()}
                 className="flex items-center gap-3 py-3 text-left transition-colors active:bg-muted/60"
               >
                 <Battery className="size-5 shrink-0 translate-x-0.5 text-muted-foreground" />

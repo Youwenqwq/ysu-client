@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@orahako/plugin-ui/com
 import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@orahako/plugin-ui/components"
 import { formatTimeRange } from "@orahako/plugin-ui/academic"
 import { useTranslation } from "@orahako/plugin-ui/hooks"
-import { useLaborActivities, useLaborRecords, useLaborSummary } from "@orahako/plugin-ui/hooks"
+import { useLaborActivities, useLaborRecords, useLaborSummary } from "@orahako/academic"
 import { cn } from "@orahako/plugin-ui/components"
 import { Clock, MapPin, ScrollText, User } from "lucide-react"
 

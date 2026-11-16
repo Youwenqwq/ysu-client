@@ -12,8 +12,9 @@ export const manifest: PluginManifest = {
   version: "1.0.0",
   apiVersion: PLUGIN_API_VERSION,
   kind: "feature",
+  inject: ["slots", "settings", "i18n", "storage", "http"],
   entry: "index.js",
-  requires: ["orahako.shell"],
+  requires: { "orahako.shell": "^1.0.0" },
   providerIndependent: true,
   description: "在顶栏显示当前网络请求与耗时，可切换简洁、详细和调试模式",
 }

@@ -5,7 +5,7 @@ const valid = {
   id: "org.example.theme",
   name: "Example theme",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: 2,
   kind: "theme",
   entry: "dist/index.js",
   styles: ["dist/index.css"],
@@ -25,14 +25,17 @@ describe("validatePluginManifest", () => {
   })
 
   it("accepts shells with valid plugin dependencies", () => {
-    const shell = { ...valid, kind: "shell", requires: ["ysu.provider"] }
+    const shell = { ...valid, kind: "shell", requires: { "ysu.provider": "^1.0.0" } }
     expect(validatePluginManifest(shell)).toEqual(shell)
-    expect(() => validatePluginManifest({ ...valid, requires: ["../bad"] })).toThrow(
-      "requires must contain valid plugin IDs"
+    expect(() =>
+      validatePluginManifest({ ...valid, nativeCapabilities: ["geolocation"] })
+    ).toThrow("nativeCapabilities must use the <capability-id>@<version> form")
+    expect(() => validatePluginManifest({ ...valid, requires: { "../bad": "*" } })).toThrow(
+      "requires must contain valid plugin IDs and SemVer ranges"
     )
-    expect(() => validatePluginManifest({ ...valid, requires: [valid.id] })).toThrow(
-      "plugin must not depend on itself"
-    )
+    expect(() =>
+      validatePluginManifest({ ...valid, requires: { [valid.id]: "*" } })
+    ).toThrow("plugin must not depend on itself")
   })
 
   it("accepts provider-independent feature manifests", () => {
@@ -53,9 +56,9 @@ describe("validatePluginManifest", () => {
   })
 
   it("reports incompatible API versions", () => {
-    expect(() => validatePluginManifest({ ...valid, apiVersion: 2 })).toThrow(PluginManifestError)
-    expect(() => validatePluginManifest({ ...valid, apiVersion: 2 })).toThrow(
-      "apiVersion must be 1"
+    expect(() => validatePluginManifest({ ...valid, apiVersion: 1 })).toThrow(PluginManifestError)
+    expect(() => validatePluginManifest({ ...valid, apiVersion: 1 })).toThrow(
+      "apiVersion must be 2"
     )
   })
 })

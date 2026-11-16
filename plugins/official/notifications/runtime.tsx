@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useRef, useSyncExternalStore } from "react"
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react"
 import type { PluginNotificationService } from "@orahako/plugin-sdk"
 import { useProvider } from "@orahako/plugin-ui/hooks"
-import { clearWidgetDataFromNative, observeNativeNotifications } from "@orahako/plugin-ui/platform"
+import { usePluginServices } from "@orahako/plugin-ui/plugin"
+import { observeNativeNotifications } from "@/plugins/official/runtime/native/notify"
+import { clearWidgetDataFromNative } from "@/plugins/official/runtime/native/widget-bridge"
 
 /**
  * 启动成绩/考试通知轮询与上课提醒。
@@ -17,6 +19,7 @@ export function NotificationRuntime({
   notifications: PluginNotificationService
 }) {
   const provider = useProvider()
+  const services = usePluginServices()
   const channels = useSyncExternalStore(
     notifications.subscribe,
     notifications.getSnapshot,
@@ -26,8 +29,8 @@ export function NotificationRuntime({
   const grades = channels.includes("grades") && provider.capabilities.grades === true
   const exams = channels.includes("exams") && provider.capabilities.exams === true
   const schedule = channels.includes("schedule") && provider.capabilities.schedule === true
-  const native = { grades, exams, schedule }
-  const previous = useRef({ providerId: provider.id, ...native })
+  const enabledChannels = useMemo(() => ({ grades, exams, schedule }), [grades, exams, schedule])
+  const previous = useRef({ providerId: provider.id, ...enabledChannels })
 
   useEffect(() => {
     const before = previous.current
@@ -37,14 +40,18 @@ export function NotificationRuntime({
       (before.exams && !exams) ||
       (before.schedule && !schedule)
     ) {
-      void clearWidgetDataFromNative()
+      void clearWidgetDataFromNative(services.native)
     }
     previous.current = { providerId: provider.id, grades, exams, schedule }
-  }, [provider.id, grades, exams, schedule])
+  }, [provider.id, grades, exams, schedule, services.native])
 
   useEffect(() => {
-    return observeNativeNotifications(nativeNotification, provider.id, { grades, exams, schedule })
-  }, [nativeNotification, provider.id, grades, exams, schedule])
+    return observeNativeNotifications({
+      provider: nativeNotification,
+      providerId: provider.id,
+      features: enabledChannels,
+    })
+  }, [nativeNotification, provider.id, grades, exams, schedule, enabledChannels])
 
   return null
 }

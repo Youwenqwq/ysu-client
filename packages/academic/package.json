@@ -6,12 +6,18 @@
   "exports": {
     ".": "./index.ts",
     "./schedule-utils": "./schedule-utils.ts",
+    "./schedule-patches": "./schedule-patches.ts",
+    "./academic-time": "./academic-time.ts",
+    "./time": "./time.ts",
+    "./exam-utils": "./exam-utils.ts",
     "./course-color": "./course-color.ts",
     "./exam-blocks": "./exam-blocks.ts",
+    "./widget-snapshots": "./widget-snapshots.ts",
     "./schedule-editor-context": "./schedule-editor-context.tsx",
     "./schedule-mobile": "./schedule-mobile.tsx",
     "./schedule-tablet": "./schedule-tablet.tsx",
     "./activity-modal": "./activity-modal.tsx",
-    "./signin-modal": "./signin-modal.tsx"
+    "./signin-modal": "./signin-modal.tsx",
+    "./overview-layout": "./overview-layout.ts"
   }
 }

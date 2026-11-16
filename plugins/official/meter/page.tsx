@@ -3,21 +3,20 @@
 import { useCallback, useEffect, useState } from "react"
 import { AirVent, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
+import type { PluginPageProps } from "@orahako/plugin-sdk"
 import { Badge } from "@orahako/plugin-ui/components"
 import { Button } from "@orahako/plugin-ui/components"
 import { Card, CardContent, CardHeader, CardTitle } from "@orahako/plugin-ui/components"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@orahako/plugin-ui/components"
 import { Separator } from "@orahako/plugin-ui/components"
 import { Skeleton } from "@orahako/plugin-ui/components"
-import { useTranslation } from "@orahako/plugin-ui/hooks"
-import { useAuthStore } from "@orahako/plugin-ui/stores"
+import { useSessionSnapshot, useTranslation } from "@orahako/plugin-ui/hooks"
 import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
 import { fetchMeterData, MeterError, type MeterData } from "./client"
 import { cn } from "@orahako/plugin-ui/components"
-export function MeterPage() {
+export function MeterPage({ context }: PluginPageProps) {
   const { t } = useTranslation()
-  const hasHydrated = useAuthStore((s) => s.hasHydrated)
-  const username = useAuthStore((s) => s.username)
+  const { hasHydrated, username } = useSessionSnapshot()
 
   const [data, setData] = useState<MeterData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +27,7 @@ export function MeterPage() {
     if (!username) return
     setLoading(true)
     try {
-      const d = await fetchMeterData(username)
+      const d = await fetchMeterData(username, context.http)
       setData(d)
       setError(null)
       setUpdatedAt(new Date())
@@ -45,7 +44,7 @@ export function MeterPage() {
     } finally {
       setLoading(false)
     }
-  }, [username, data, t])
+  }, [username, data, t, context.http])
 
   useEffect(() => {
     if (hasHydrated && username) void load()

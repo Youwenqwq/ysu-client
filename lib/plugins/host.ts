@@ -16,28 +16,32 @@ import * as PluginPlatform from "@orahako/plugin-ui/platform"
 import * as PluginRuntimeUI from "@orahako/plugin-ui/plugin"
 import * as PluginShellRuntime from "@orahako/plugin-ui/shell"
 import * as PluginAssets from "@orahako/plugin-ui/assets"
-import type { Context } from "@cordisjs/core"
 import type {
+  AppComposition,
+  CompositionPlugin,
+  CompositionSource,
   MarketplaceIndex,
   MarketplaceRelease,
-  PluginInstallerService,
   PluginManifest,
-  PluginPlatform as PluginPlatformType,
+
+  PluginNavigationService,
+  PluginUIRegistryService,
+  PluginSlotRegistryService,
+  PluginNotificationService,
+  PluginSettingsService,
+
+  PluginI18nRegistryService,
+
+  PluginNativeService,
 } from "@orahako/plugin-sdk"
-import { supportsPlugin, type AcademicProvider } from "@orahako/plugin-sdk"
-import { APP_VERSION } from "@/lib/version"
-import { isCapacitor } from "@/lib/native/platform"
-import { OFFICIAL_PLUGINS } from "@/plugins/official/registry"
-import { PluginRuntime } from "./runtime"
-import { PluginUIRegistry } from "./ui-registry"
-import { PluginSlotRegistry } from "./slot-registry"
-import { PluginLifecycleRegistry } from "./lifecycle-service"
-import { PluginNotificationRegistry } from "./notification-registry"
-import { PluginSettingsRegistry } from "./settings-registry"
-import { pluginI18nRegistry } from "./i18n-registry"
-import { providerRegistry } from "@/providers/provider-registry"
-import { createPluginStorageService } from "./storage-service"
-import { createPluginPlatformServices } from "./platform-service"
+import {
+  composeApplication,
+  isCapacitor,
+  selectCompatibleRelease,
+} from "@orahako/plugin-sdk"
+import semver from "semver"
+import { PluginDependencyError, PluginRuntime } from "./runtime"
+import { validateCompositionSource, validatePluginConfig } from "./config"
 import {
   createHostModuleRegistry,
   loadExternalPlugin,
@@ -58,18 +62,13 @@ import {
   type PluginRecoveryState,
 } from "./recovery"
 import { usePluginPreferences } from "@/lib/stores/plugin-preferences"
-import { loadPluginMarket, PLUGIN_MARKET_URL, selectCompatibleRelease } from "./market"
 
 export class PluginHost {
-  readonly ui = new PluginUIRegistry()
-  readonly slots = new PluginSlotRegistry()
-  readonly lifecycle = new PluginLifecycleRegistry()
-  readonly notifications = new PluginNotificationRegistry()
-  readonly settings = new PluginSettingsRegistry()
-  readonly i18n = pluginI18nRegistry
-  readonly providers = providerRegistry
-  readonly packages = new PluginPackageStore()
-  readonly runtime = new PluginRuntime((ctx, manifest) => this.configureServices(ctx, manifest))
+  readonly packages: PluginPackageStore
+  readonly runtime = new PluginRuntime()
+  readonly appVersion: string
+  readonly appBuild: string
+  readonly composition: AppComposition
   readonly loadErrors = new Map<string, string>()
   recovery?: PluginRecoveryState
   bootstrapError?: string
@@ -77,67 +76,77 @@ export class PluginHost {
   private hostModules?: HostModuleRegistry
   private readonly external = new Map<string, LoadedExternalPlugin>()
   private readonly styleElements = new Map<string, HTMLStyleElement[]>()
-  private readonly providerDisabledIds = new Set<string>()
-  private activeSupportedPlugins: AcademicProvider["supportedPlugins"]
-  private supportRevision = 0
+  private readonly compositionPlugins: ReadonlyMap<string, CompositionPlugin>
 
-  private configureServices(ctx: Context, manifest: PluginManifest): void {
-    this.ui.createService(ctx, manifest)
-    this.slots.createService(ctx, manifest)
-    this.lifecycle.createService(ctx, manifest)
-    this.notifications.createService(ctx, manifest)
-    this.settings.createService(ctx, manifest)
-    this.i18n.createService(ctx, manifest)
-    this.providers.createService(ctx, manifest)
-    createPluginStorageService(ctx, manifest)
-    createPluginPlatformServices(ctx, manifest)
-    ctx.set(
-      "plugins",
-      createMarketPluginInstaller({
-        installFromUrl: (url, sha256, expected) => this.installFromUrl(url, sha256, expected),
-      })
-    )
-    ctx.set("assets", {
-      url: (path: string) => this.external.get(manifest.id)?.assets.get(path),
+  constructor(source: CompositionSource, packages = new PluginPackageStore()) {
+    this.appVersion = source.appVersion
+    this.appBuild = source.appBuild
+    this.composition = composeApplication(source.composition, source.layers)
+    validateCompositionSource({
+      appVersion: source.appVersion,
+      appBuild: source.appBuild,
+      composition: this.composition,
+      plugins: source.plugins,
+    })
+    this.compositionPlugins = new Map(source.plugins.map((plugin) => [plugin.manifest.id, plugin]))
+    this.packages = packages
+    this.runtime.context.set("packageRuntime", {
+      installFromUrl: (url: string, sha256: string, expected: { id: string; version: string }) =>
+        this.installFromUrl(url, sha256, expected),
+      applyPluginBundle: (pluginIds: readonly string[], index: MarketplaceIndex) =>
+        this.applyPluginBundle(pluginIds, index),
+      assetUrl: (pluginId: string, path: string) => this.external.get(pluginId)?.assets.get(path),
+      nativeCapabilities: () => this.composition.nativeCapabilities ?? [],
+    })
+    this.runtime.context.set("pluginManager", {
+      enable: (id: string) => this.enable(id),
+      suspend: (id: string) => this.suspend(id),
+      disable: (id: string) => this.disable(id),
+      isProtected: (id: string) =>
+        this.composition.plugins.some((entry) => entry.id === id && entry.protected),
+      isUserDisabled: (id: string) =>
+        usePluginPreferences.getState().disabledPluginIds.includes(id),
+      getSnapshot: () => this.runtime.getSnapshot(),
+      subscribe: this.runtime.subscribe,
+    })
+    this.runtime.subscribe(() => {
+      for (const id of Array.from(this.styleElements.keys())) {
+        if (this.runtime.get(id)?.status !== "active") this.removeStyles(id)
+      }
     })
   }
+
+  get ui(): PluginUIRegistryService {
+    return this.runtime.context.get("ui") as PluginUIRegistryService
+  }
+
+  get slots(): PluginSlotRegistryService {
+    return this.runtime.context.get("slots") as PluginSlotRegistryService
+  }
+
+  get notifications(): PluginNotificationService {
+    return this.runtime.context.get("notifications") as PluginNotificationService
+  }
+
+  get settings(): PluginSettingsService {
+    return this.runtime.context.get("settings") as PluginSettingsService
+  }
+
+  get i18n(): PluginI18nRegistryService {
+    return this.runtime.context.get("i18n") as PluginI18nRegistryService
+  }
+
+
+  get navigation(): PluginNavigationService {
+    return this.runtime.context.get("navigation") as PluginNavigationService
+  }
+
 
   bootstrap(): Promise<void> {
     this.bootstrapPromise ??= this.bootstrapAll()
     return this.bootstrapPromise
   }
 
-  async reconcileProviderSupport(
-    supportedPlugins: AcademicProvider["supportedPlugins"]
-  ): Promise<void> {
-    this.activeSupportedPlugins = supportedPlugins
-    const revision = ++this.supportRevision
-    for (const state of this.runtime.getSnapshot()) {
-      if (revision !== this.supportRevision) return
-      const { manifest } = state
-      if (manifest.kind !== "feature" || manifest.required || manifest.providerIndependent) continue
-      const id = manifest.id
-      if (!supportsPlugin(supportedPlugins, id)) {
-        if (state.status !== "disabled") {
-          this.providerDisabledIds.add(id)
-          this.runtime.stop(id)
-        }
-        continue
-      }
-      if (
-        !this.providerDisabledIds.has(id) ||
-        usePluginPreferences.getState().disabledPluginIds.includes(id)
-      ) {
-        continue
-      }
-      try {
-        await this.runtime.startAndWait(id)
-        if (revision === this.supportRevision) this.providerDisabledIds.delete(id)
-      } catch {
-        // The runtime exposes the failed state; other school features stay usable.
-      }
-    }
-  }
 
   async install(
     input: PluginPackageInput,
@@ -147,6 +156,14 @@ export class PluginHost {
     if (expectedSha256) await verifyPackageHash(input, expectedSha256)
     const bytes = await packageInputBytes(input)
     const manifest = parsePluginPackage(bytes).manifest
+    const missingNativeCapabilities = (manifest.nativeCapabilities ?? []).filter(
+      (capability) => !(this.composition.nativeCapabilities ?? []).includes(capability)
+    )
+    if (missingNativeCapabilities.length > 0) {
+      throw new Error(
+        `Plugin requires unavailable native capabilities: ${missingNativeCapabilities.join(", ")}`
+      )
+    }
     if (expected && (manifest.id !== expected.id || manifest.version !== expected.version)) {
       throw new Error("Plugin package identity does not match the market release")
     }
@@ -156,7 +173,6 @@ export class PluginHost {
     usePluginPreferences.getState().setPluginDisabled(snapshot.manifest.id, false)
     try {
       await this.load(snapshot.manifest.id, true)
-      await this.reconcileProviderSupport(this.activeSupportedPlugins)
     } catch (error) {
       await this.rollback(snapshot.manifest.id, previousSnapshot, wasDisabled)
       this.loadErrors.set(snapshot.manifest.id, errorMessage(error))
@@ -182,9 +198,13 @@ export class PluginHost {
    * market index before anything changes, so an unsupported or unavailable
    * plugin cannot leave a partially applied bundle behind.
    */
-  async applyPluginBundle(pluginIds: readonly string[], index: MarketplaceIndex): Promise<void> {
-    const releases = await this.preflightPluginBundle(pluginIds, index)
-    for (const id of new Set(pluginIds)) {
+  async applyPluginBundle(
+    pluginIds: readonly string[],
+    index: MarketplaceIndex
+  ): Promise<PluginManifest> {
+    if (pluginIds.length === 0) throw new Error("Plugin bundle must not be empty")
+    const { releases, ordered } = await this.preflightPluginBundle(pluginIds, index)
+    for (const id of ordered) {
       const state = this.runtime.get(id)
       if (state?.status === "active" || state?.status === "starting") continue
       if (state) {
@@ -198,49 +218,124 @@ export class PluginHost {
         continue
       }
       await this.installFromUrl(
-        new URL(release.zipUrl, PLUGIN_MARKET_URL).toString(),
+        new URL(release.zipUrl, this.requireMarketUrl()).toString(),
         release.sha256,
         { id, version: release.version }
       )
     }
+    const manifest = this.runtime.get(pluginIds[0])?.manifest
+    if (!manifest) throw new Error(`Plugin was not installed: ${pluginIds[0]}`)
+    return manifest
+  }
+
+  private availableNativeCapabilities(): readonly string[] {
+    const native = this.runtime.context.get("native") as PluginNativeService | undefined
+    if (!native?.isNative) return []
+    return native.capabilities.list().map((capability) => `${capability.id}@${capability.version}`)
+  }
+
+  private validateNativeCapabilityProfile(): void {
+    const native = this.runtime.context.get("native") as PluginNativeService | undefined
+    if (!native?.isNative) return
+    const available = new Set(this.availableNativeCapabilities())
+    const missing = (this.composition.nativeCapabilities ?? []).filter(
+      (capability) => !available.has(capability)
+    )
+    if (missing.length > 0) {
+      throw new Error(`Composition native capabilities are not implemented: ${missing.join(", ")}`)
+    }
+  }
+
+  private requireMarketUrl(): string {
+    const url = this.composition.market?.indexUrl
+    if (!url) throw new Error("The active composition does not provide a plugin market")
+    return url
   }
 
   private async preflightPluginBundle(
     pluginIds: readonly string[],
     index: MarketplaceIndex
-  ): Promise<Map<string, MarketplaceRelease>> {
-    const requests = Array.from(new Set(pluginIds))
-    const unregistered = requests.filter((id) => !this.runtime.get(id))
+  ): Promise<{ releases: Map<string, MarketplaceRelease>; ordered: string[] }> {
     const installed = new Map<string, PluginManifest>()
-    if (unregistered.length > 0) {
-      for (const summary of await this.packages.list()) {
-        installed.set(summary.manifest.id, summary.manifest)
-      }
+    for (const summary of await this.packages.list()) {
+      installed.set(summary.manifest.id, summary.manifest)
     }
     const platform = isCapacitor() ? "android" : "web"
     const releases = new Map<string, MarketplaceRelease>()
-    for (const id of requests) {
+    const ordered: string[] = []
+    const visiting = new Set<string>()
+    const resolved = new Set<string>()
+
+    const visit = (id: string): void => {
+      if (resolved.has(id)) return
+      if (visiting.has(id)) throw new Error(`Plugin dependency cycle detected: ${id}`)
+      visiting.add(id)
       const manifest = this.runtime.get(id)?.manifest ?? installed.get(id)
-      if (
-        manifest?.kind === "feature" &&
-        !manifest.required &&
-        !manifest.providerIndependent &&
-        !supportsPlugin(this.activeSupportedPlugins, id)
-      ) {
-        throw new Error(`Plugin not supported by the active school: ${id}`)
-      }
-      if (manifest) continue
-      const plugin = index.plugins.find((entry) => entry.id === id)
-      if (!plugin) throw new Error(`Plugin not found in market: ${id}`)
-      const release = selectCompatibleRelease(plugin, APP_VERSION, platform)
-      if (!release) {
-        throw new Error(
-          `No compatible release for plugin ${id} (app ${APP_VERSION}, platform ${platform})`
+
+      let release: MarketplaceRelease | undefined
+      if (!manifest) {
+        const plugin = index.plugins.find((entry) => entry.id === id)
+        if (!plugin) throw new Error(`Plugin not found in market: ${id}`)
+        release = selectCompatibleRelease(
+          plugin,
+          this.appVersion,
+          platform,
+          this.composition.nativeCapabilities ?? []
         )
+        if (!release) {
+          throw new Error(
+            `No compatible release for plugin ${id} (app ${this.appVersion}, platform ${platform})`
+          )
+        }
       }
-      releases.set(id, release)
+      for (const [dependency, range] of Object.entries(
+        manifest?.requires ?? release?.requires ?? {}
+      )) {
+        const installedVersion =
+          this.runtime.get(dependency)?.manifest.version ?? installed.get(dependency)?.version
+        if (installedVersion && !semver.satisfies(installedVersion, range)) {
+          throw new Error(
+            `Plugin dependency ${dependency}@${installedVersion} does not satisfy ${range}`
+          )
+        }
+        visit(dependency)
+      }
+      for (const service of manifest?.inject ?? release?.inject ?? []) {
+        if (this.runtime.context.get(service) != null) continue
+        if ((manifest?.provides ?? release?.provides ?? []).includes(service)) continue
+        const installedProvider = Array.from(installed.values()).find((candidate) =>
+          candidate.provides?.includes(service)
+        )
+        if (installedProvider) {
+          visit(installedProvider.id)
+          continue
+        }
+        const compositionProvider = Array.from(this.compositionPlugins.values()).find((plugin) =>
+          plugin.manifest.provides?.includes(service)
+        )
+        if (compositionProvider) {
+          visit(compositionProvider.manifest.id)
+          continue
+        }
+        const marketProvider = index.plugins.find((plugin) =>
+          selectCompatibleRelease(
+            plugin,
+            this.appVersion,
+            platform,
+            this.composition.nativeCapabilities ?? []
+          )?.provides?.includes(service)
+        )
+        if (!marketProvider) throw new Error(`No provider for required service ${service}: ${id}`)
+        visit(marketProvider.id)
+      }
+      if (release) releases.set(id, release)
+      visiting.delete(id)
+      resolved.add(id)
+      ordered.push(id)
     }
-    return releases
+
+    for (const id of new Set(pluginIds)) visit(id)
+    return { releases, ordered }
   }
 
   async uninstall(id: string): Promise<void> {
@@ -252,7 +347,7 @@ export class PluginHost {
     }
     this.external.get(id)?.dispose()
     this.external.delete(id)
-    this.providerDisabledIds.delete(id)
+
     this.removeStyles(id)
     this.loadErrors.delete(id)
     const preferences = usePluginPreferences.getState()
@@ -261,7 +356,15 @@ export class PluginHost {
     await this.packages.remove(id)
   }
 
+  suspend(id: string): void {
+    this.runtime.stop(id)
+    this.removeStyles(id)
+  }
+
   disable(id: string): void {
+    if (this.composition.plugins.some((entry) => entry.id === id && entry.protected)) {
+      throw new Error(`Plugin is protected by the active composition: ${id}`)
+    }
     this.runtime.stop(id)
     this.removeStyles(id)
     usePluginPreferences.getState().setPluginDisabled(id, true)
@@ -303,28 +406,69 @@ export class PluginHost {
   }
 
   private async bootstrapAll(): Promise<void> {
-    this.recovery = beginPluginBoot()
-    for (const plugin of OFFICIAL_PLUGINS) {
-      if (!this.runtime.get(plugin.manifest.id)) {
-        this.runtime.register(plugin.manifest, plugin.definition, "builtin")
+
+    this.recovery = beginPluginBoot(this.appBuild)
+    const pending = new Set<string>()
+    for (const entry of this.composition.plugins) {
+      const plugin = this.compositionPlugins.get(entry.id)
+      if (!plugin) throw new Error(`Composition module is not available: ${entry.id}`)
+      if (!this.runtime.get(entry.id)) {
+        this.runtime.register(
+          plugin.manifest,
+          plugin.definition,
+          "builtin",
+          validatePluginConfig(plugin.manifest, entry.config)
+        )
       }
-      const disabled = usePluginPreferences
-        .getState()
-        .disabledPluginIds.includes(plugin.manifest.id)
+      const disabled =
+        entry.disabled ||
+        usePluginPreferences.getState().disabledPluginIds.includes(plugin.manifest.id)
       if (disabled) this.runtime.stop(plugin.manifest.id)
-      else if (this.runtime.get(plugin.manifest.id)?.status !== "active") {
-        markPluginStarted(plugin.manifest.id)
-        this.runtime.start(plugin.manifest.id)
-      }
+      else pending.add(entry.id)
     }
+    await this.startPending(pending)
+    this.validateNativeCapabilityProfile()
+
     if (!this.recovery.safeMode) {
       try {
         await this.loadInstalled()
+
       } catch (error) {
         this.bootstrapError = errorMessage(error)
       }
     }
+
     window.setTimeout(finishPluginBoot, 2000)
+  }
+
+  private async startPending(input: ReadonlySet<string>): Promise<void> {
+    const pending = new Set(input)
+    while (pending.size > 0) {
+      let progressed = false
+      for (const id of Array.from(pending)) {
+        try {
+
+          markPluginStarted(id)
+          await this.runtime.startAndWait(id)
+
+          this.applyStyles(id)
+          pending.delete(id)
+          progressed = true
+        } catch (error) {
+
+          if (error instanceof PluginDependencyError) continue
+          pending.delete(id)
+          progressed = true
+          this.loadErrors.set(id, errorMessage(error))
+        }
+      }
+      if (!progressed) {
+        for (const id of pending) {
+          this.loadErrors.set(id, "Plugin dependencies could not be satisfied")
+        }
+        return
+      }
+    }
   }
 
   private async loadInstalled(): Promise<void> {
@@ -341,38 +485,16 @@ export class PluginHost {
         this.loadErrors.set(summary.manifest.id, errorMessage(error))
       }
     }
-    while (pending.size > 0) {
-      let progressed = false
-      for (const id of Array.from(pending)) {
-        const state = this.runtime.get(id)
-        if (state?.manifest.requires?.some((dependency) => pending.has(dependency))) continue
-        pending.delete(id)
-        progressed = true
-        try {
-          markPluginStarted(id)
-          await this.runtime.startAndWait(id)
-          this.applyStyles(id)
-        } catch (error) {
-          this.loadErrors.set(id, errorMessage(error))
-        }
-      }
-      if (!progressed) {
-        for (const id of pending) {
-          try {
-            await this.runtime.startAndWait(id)
-          } catch (error) {
-            this.loadErrors.set(id, errorMessage(error))
-          }
-        }
-        pending.clear()
-      }
-    }
+    await this.startPending(pending)
   }
 
   private async load(id: string, replaceActive: boolean, start = true): Promise<void> {
     this.loadErrors.delete(id)
     const snapshot = await this.packages.read(id)
     if (!snapshot) throw new Error(`Installed plugin not found: ${id}`)
+    if (this.runtime.get(id)?.source === "builtin") {
+      throw new Error(`External plugin cannot shadow a composition module: ${id}`)
+    }
     const loaded = await loadExternalPlugin(snapshot, {
       hostModules: this.getHostModules(),
     })
@@ -381,7 +503,12 @@ export class PluginHost {
     this.external.set(id, loaded)
     this.removeStyles(id)
     try {
-      this.runtime.register(loaded.manifest, loaded.definition, "external")
+      this.runtime.register(
+        loaded.manifest,
+        loaded.definition,
+        "external",
+        validatePluginConfig(loaded.manifest)
+      )
       if (shouldStart) {
         markPluginStarted(id)
         await this.runtime.startAndWait(id)
@@ -446,47 +573,6 @@ export class PluginHost {
   }
 }
 
-export interface MarketPluginInstallerOptions {
-  installFromUrl: (
-    url: string,
-    sha256: string,
-    expected: { id: string; version: string }
-  ) => Promise<PluginManifest>
-  loadMarket?: () => Promise<{ index: MarketplaceIndex }>
-  appVersion?: string
-  platform?: () => PluginPlatformType
-}
-
-/**
- * Builds the public `ctx.plugins` service around the host's verified package
- * installer, resolving releases relative to the configured market URL.
- */
-export function createMarketPluginInstaller({
-  installFromUrl,
-  loadMarket = loadPluginMarket,
-  appVersion = APP_VERSION,
-  platform = () => (isCapacitor() ? "android" : "web"),
-}: MarketPluginInstallerOptions): PluginInstallerService {
-  return {
-    async installFromMarket(pluginId: string): Promise<PluginManifest> {
-      const { index } = await loadMarket()
-      const plugin = index.plugins.find((entry) => entry.id === pluginId)
-      if (!plugin) throw new Error(`Plugin not found in market: ${pluginId}`)
-      const currentPlatform = platform()
-      const release = selectCompatibleRelease(plugin, appVersion, currentPlatform)
-      if (!release) {
-        throw new Error(
-          `No compatible release for plugin ${pluginId} (app ${appVersion}, platform ${currentPlatform})`
-        )
-      }
-      return installFromUrl(new URL(release.zipUrl, PLUGIN_MARKET_URL).toString(), release.sha256, {
-        id: plugin.id,
-        version: release.version,
-      })
-    },
-  }
-}
-
 async function packageInputBytes(input: PluginPackageInput): Promise<Uint8Array> {
   if (input instanceof Uint8Array) return input
   if (input instanceof ArrayBuffer) return new Uint8Array(input)
@@ -510,7 +596,10 @@ function errorMessage(error: unknown): string {
 
 let host: PluginHost | undefined
 
-export function getPluginHost(): PluginHost {
-  host ??= new PluginHost()
+export function getPluginHost(source?: CompositionSource): PluginHost {
+  if (!host) {
+    if (!source) throw new Error("An application composition is required to create the plugin host")
+    host = new PluginHost(source)
+  }
   return host
 }

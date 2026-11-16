@@ -1,9 +1,8 @@
 import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
-import { unregisterSchoolConfig } from "@orahako/plugin-sdk/host"
-import type { SchoolConfig } from "@orahako/plugin-sdk/provider-school"
-import ysuConfig from "./ysu.json"
-import { labelYsuRequest } from "./activity"
+import { classifyYsuRequest, labelYsuRequest } from "./activity"
+import type { YSUPluginContext } from "./context"
 import { YSUProvider } from "./ysu-provider"
+import { YSU_CONFIG } from "./ysu-config"
 
 export const manifest: PluginManifest = {
   id: "ysu.provider",
@@ -12,12 +11,13 @@ export const manifest: PluginManifest = {
   apiVersion: PLUGIN_API_VERSION,
   kind: "provider",
   required: true,
+  inject: ["i18n", "providers", "http", "session", "storage", "query", "native", "mfa"],
   entry: "index.js",
   description: "燕山大学 CAS / 教务 / 移动端 / 缴费平台 Provider",
 }
 
-export const definition = definePlugin((ctx) => {
-  const config = ysuConfig as SchoolConfig
+export const definition = definePlugin((baseCtx) => {
+  const ctx = baseCtx as unknown as YSUPluginContext
   ctx.i18n.register({
     zh: {
       networkActivity: {
@@ -99,15 +99,12 @@ export const definition = definePlugin((ctx) => {
     },
   })
   ctx.http.activity.registerLabeler(labelYsuRequest)
+  ctx.http.activity.registerClassifier(classifyYsuRequest)
 
-  const disposeRegistration = ctx.providers.registerSchool({
-    config,
-    providerFactory: () => new YSUProvider(),
-  })
-  ctx.on("dispose", () => {
-    disposeRegistration()
-    unregisterSchoolConfig(config)
-  })
+  // The registry owns disposal: destroying this Cordis scope revokes the
+  // registration together with the factory. The factory captures this plugin's
+  // typed context, which is the exact scope the registry reuses for creation.
+  ctx.providers.registerProvider(YSU_CONFIG.id, () => new YSUProvider(ctx))
 })
 
 export type { YSUMfaMethod } from "./types"

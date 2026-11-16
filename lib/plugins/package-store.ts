@@ -1,4 +1,6 @@
-import { validatePluginManifest, type PluginManifest } from "@orahako/plugin-sdk"
+import { validatePluginManifest, type InstalledPluginSummary, type PluginManifest } from "@orahako/plugin-sdk"
+
+export type { InstalledPluginSummary } from "@orahako/plugin-sdk"
 import {
   parsePluginPackage,
   type PluginPackageFile,
@@ -18,12 +20,6 @@ export interface PluginPackageSnapshot {
 }
 
 /** Storage-level summary returned by list(); file contents are loaded via read(). */
-export interface InstalledPluginSummary {
-  manifest: PluginManifest
-  installedAt: number
-  fileCount: number
-  byteSize: number
-}
 
 export type PluginPackageInput = Uint8Array | ArrayBuffer | Blob
 

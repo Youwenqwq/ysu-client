@@ -8,14 +8,8 @@ import {
   ScxtError,
   ScxtNotLoggedInError,
   ScxtProtocolError,
-  queryAllCreditRecords as _queryAllCreditRecords,
-  queryCompetitions as _queryCompetitions,
-  queryCreditBatches as _queryCreditBatches,
-  queryCreditDeclarations as _queryCreditDeclarations,
-  queryCreditRecords as _queryCreditRecords,
-  queryCreditSummary as _queryCreditSummary,
-  queryLibraryActivities as _queryLibraryActivities,
 } from "./protocol/scxt"
+import type { ScxtProtocol } from "./protocol/scxt"
 import type {
   CatalogPage as ScxtCatalogPage,
   Competition as ScxtCompetition,
@@ -25,8 +19,32 @@ import type {
   CreditSummary as ScxtCreditSummary,
   LibraryActivity as ScxtLibraryActivity,
 } from "./protocol/scxt"
-import { mapCASSessionError } from "./cas-auth"
 import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
+
+export type ScxtFetcher = Pick<
+  ScxtProtocol,
+  | "queryCreditBatches"
+  | "queryCreditDeclarations"
+  | "queryCreditRecords"
+  | "queryAllCreditRecords"
+  | "queryCreditSummary"
+  | "queryCompetitions"
+  | "queryLibraryActivities"
+>
+
+export function createScxtFetcher(
+  scxt: ScxtProtocol,
+  mapCASSessionError: (error: unknown) => ProviderError | undefined
+): ScxtFetcher {
+  const {
+    queryAllCreditRecords: _queryAllCreditRecords,
+    queryCompetitions: _queryCompetitions,
+    queryCreditBatches: _queryCreditBatches,
+    queryCreditDeclarations: _queryCreditDeclarations,
+    queryCreditRecords: _queryCreditRecords,
+    queryCreditSummary: _queryCreditSummary,
+    queryLibraryActivities: _queryLibraryActivities,
+  } = scxt
 
 function mapScxtError(e: unknown): ProviderError {
   const sessionError = mapCASSessionError(e)
@@ -52,18 +70,18 @@ async function withScxt<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function queryCreditBatches(): Promise<ScxtCreditBatch[]> {
+async function queryCreditBatches(): Promise<ScxtCreditBatch[]> {
   return withScxt(() => _queryCreditBatches())
 }
 
-export async function queryCreditDeclarations(opts?: {
+async function queryCreditDeclarations(opts?: {
   batchId?: string
   itemName?: string
 }): Promise<ScxtCreditDeclaration[]> {
   return withScxt(() => _queryCreditDeclarations(opts))
 }
 
-export async function queryCreditRecords(opts?: {
+async function queryCreditRecords(opts?: {
   batchId?: string
   itemName?: string
   year?: string
@@ -71,24 +89,35 @@ export async function queryCreditRecords(opts?: {
   return withScxt(() => _queryCreditRecords(opts))
 }
 
-export async function queryAllCreditRecords(): Promise<ScxtCreditRecord[]> {
+async function queryAllCreditRecords(): Promise<ScxtCreditRecord[]> {
   return withScxt(() => _queryAllCreditRecords())
 }
 
-export async function queryCreditSummary(): Promise<ScxtCreditSummary> {
+async function queryCreditSummary(): Promise<ScxtCreditSummary> {
   return withScxt(() => _queryCreditSummary())
 }
 
-export async function queryCompetitions(opts?: {
+async function queryCompetitions(opts?: {
   itemName?: string
   pageIndex?: number
 }): Promise<ScxtCatalogPage<ScxtCompetition>> {
   return withScxt(() => _queryCompetitions(opts))
 }
 
-export async function queryLibraryActivities(opts?: {
+async function queryLibraryActivities(opts?: {
   name?: string
   pageIndex?: number
 }): Promise<ScxtCatalogPage<ScxtLibraryActivity>> {
   return withScxt(() => _queryLibraryActivities(opts))
+}
+
+  return {
+    queryCreditBatches,
+    queryCreditDeclarations,
+    queryCreditRecords,
+    queryAllCreditRecords,
+    queryCreditSummary,
+    queryCompetitions,
+    queryLibraryActivities,
+  }
 }

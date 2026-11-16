@@ -28,7 +28,7 @@ import { toast } from "sonner"
 import { useProvider } from "@orahako/plugin-ui/hooks"
 import { Spinner } from "@orahako/plugin-ui/components"
 import type { AcademicCompletion } from "@orahako/plugin-sdk"
-import { useAcademicCompletion, useAcademicWarnings, useTrainingPlan } from "@orahako/plugin-ui/hooks"
+import { useAcademicCompletion, useAcademicWarnings, useTrainingPlan } from "@orahako/academic"
 import { AlertTriangle, CheckCircle2, RefreshCw, RotateCcw, Search } from "lucide-react"
 
 const ALL = "__all__"

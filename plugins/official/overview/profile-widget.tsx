@@ -11,9 +11,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@orahako/plugin-ui/components"
 import { useSettingsStore } from "@orahako/plugin-ui/stores"
 import { useStoredMediaUrl } from "@orahako/plugin-ui/hooks"
-import { loadAvatarImage } from "@orahako/plugin-ui/stores"
+import { loadAvatarImage } from "@/plugins/official/shell/media/avatar"
 import { useTranslation } from "@orahako/plugin-ui/hooks"
-import { useStudentInfo } from "@orahako/plugin-ui/hooks"
+import { useStudentInfo } from "@orahako/academic"
 import { QueryState } from "@orahako/academic"
 
 export function ProfileWidget({ compact, children }: { compact: boolean; children?: ReactNode }) {

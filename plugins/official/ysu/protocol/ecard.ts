@@ -5,9 +5,10 @@
  * （service = /publicapp/sys/myyktzd/index.do），再调余额接口。
  */
 import type { EcardBalance, EcardSessionStatus } from "@orahako/plugin-sdk/academic"
-import { SimpleCookieJar, fetchWithJar, type HttpResponse } from "@orahako/plugin-sdk/host"
+import type { CookieJar, HttpResponse } from "@orahako/plugin-sdk"
+import type { YSUContext } from "../context"
+import type { CASProtocol } from "./cas"
 import { parseLooseJson } from "./parse-json"
-import { authorize, getCredentialApplied } from "./cas"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 
 // ─── Constants ────────────────────────────────────────────────────────── //
@@ -41,29 +42,38 @@ export class EcardNotLoggedInError extends EcardProtocolError {
   }
 }
 
-// ─── Module state ─────────────────────────────────────────────────────── //
+// ─── Provider-scoped state ────────────────────────────────────────────── //
 
-let ecardJar = new SimpleCookieJar()
-let timeoutMs = 30_000
-let authorized = false
-let inflightAuth: Promise<void> | null = null
-let authorizationGeneration = 0
+export interface EcardProtocol {
+  getJar(): CookieJar
+  setTimeoutMs(ms: number): void
+  resetEcard(): void
+  toEcardBalance(body: unknown): EcardBalance | null
+  getEcardBalance(): Promise<EcardSessionStatus>
+}
 
-export function getJar(): SimpleCookieJar {
+export function createECARD(ctx: YSUContext, cas: CASProtocol): EcardProtocol {
+  let ecardJar = ctx.session.createCookieJar()
+  let timeoutMs = 30_000
+  let authorized = false
+  let inflightAuth: Promise<void> | null = null
+  let authorizationGeneration = 0
+
+function getJar(): CookieJar {
   return ecardJar
 }
 
-export function setTimeoutMs(ms: number): void {
+function setTimeoutMs(ms: number): void {
   timeoutMs = ms
 }
 
-export function resetEcard(): void {
-  ecardJar = new SimpleCookieJar()
+function resetEcard(): void {
+  ecardJar = ctx.session.createCookieJar()
   authorized = false
   inflightAuth = null
 }
 
-function assertCurrentSession(jar: SimpleCookieJar): void {
+function assertCurrentSession(jar: CookieJar): void {
   if (jar !== ecardJar) {
     throw new EcardProtocolError("ecard session changed during request")
   }
@@ -71,11 +81,11 @@ function assertCurrentSession(jar: SimpleCookieJar): void {
 
 // ─── Auth & low-level requests ────────────────────────────────────────── //
 
-async function ensureAuthorized(jar: SimpleCookieJar): Promise<void> {
+async function ensureAuthorized(jar: CookieJar): Promise<void> {
   await waitForAuthTransition()
   assertCurrentSession(jar)
   if (authorized) return
-  await getCredentialApplied()
+  await cas.getCredentialApplied()
   assertCurrentSession(jar)
   if (inflightAuth) {
     await inflightAuth
@@ -86,7 +96,7 @@ async function ensureAuthorized(jar: SimpleCookieJar): Promise<void> {
   const promise = withAuthTransition(async () => {
     assertCurrentSession(jar)
     if (authorized) return
-    await authorize(`${BASE_URL}${SERVICE_PATH}`, jar)
+    await cas.authorize(`${BASE_URL}${SERVICE_PATH}`, jar)
     assertCurrentSession(jar)
     authorizationGeneration += 1
     authorized = true
@@ -100,7 +110,7 @@ async function ensureAuthorized(jar: SimpleCookieJar): Promise<void> {
   }
 }
 
-async function runWithReauth<T>(fn: (jar: SimpleCookieJar) => Promise<T>): Promise<T> {
+async function runWithReauth<T>(fn: (jar: CookieJar) => Promise<T>): Promise<T> {
   const jar = ecardJar
   for (let attempt = 0; ; attempt += 1) {
     await ensureAuthorized(jar)
@@ -147,7 +157,7 @@ function parseBalance(value: unknown): number {
  * 解析 loadSmartCardBillMain.do 返回的余额结构。
  * 顶层 remining/availdate/cardstatusname 或 datas.KNYE/KYXQ/MC。
  */
-export function toEcardBalance(body: unknown): EcardBalance | null {
+function toEcardBalance(body: unknown): EcardBalance | null {
   const root = asRecord(body)
   const datas = asRecord(root.datas)
 
@@ -173,11 +183,11 @@ export function toEcardBalance(body: unknown): EcardBalance | null {
 // ─── Public ───────────────────────────────────────────────────────────── //
 
 /** 查询一卡通余额。 */
-export async function getEcardBalance(): Promise<EcardSessionStatus> {
+async function getEcardBalance(): Promise<EcardSessionStatus> {
   return runWithReauth(async (jar) => {
     let resp: HttpResponse
     try {
-      resp = await fetchWithJar(jar, {
+      resp = await ctx.session.fetchWithJar(jar, {
         method: "POST",
         url: `${BASE_URL}${BALANCE_PATH}`,
         redirect: "manual",
@@ -242,4 +252,13 @@ export async function getEcardBalance(): Promise<EcardSessionStatus> {
     }
     return { ready: true, balance: toEcardBalance(body) }
   })
+}
+
+  return {
+    getJar,
+    setTimeoutMs,
+    resetEcard,
+    toEcardBalance,
+    getEcardBalance,
+  }
 }

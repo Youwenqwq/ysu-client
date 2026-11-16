@@ -1,8 +1,8 @@
 import semver from "semver"
 
-export const PLUGIN_API_VERSION = 1
+export const PLUGIN_API_VERSION = 2
 
-export type PluginKind = "provider" | "feature" | "theme" | "shell"
+export type PluginKind = "runtime" | "provider" | "feature" | "theme" | "shell"
 
 export interface PluginManifest {
   id: string
@@ -19,8 +19,16 @@ export interface PluginManifest {
   styles?: string[]
   /** Optional UI categories such as academic, provider, or toybox. */
   categories?: string[]
-  /** Plugin IDs that must be active before this plugin can start. */
-  requires?: string[]
+  /** Exact plugin package dependencies and their required SemVer ranges. */
+  requires?: Record<string, string>
+  /** Root Cordis services required by this plugin. */
+  inject?: string[]
+  /** Root Cordis services supplied by this plugin. */
+  provides?: string[]
+  /** JSON Schema draft-07 object schema validated by the kernel at startup. */
+  configSchema?: Record<string, unknown>
+  /** Versioned Android capabilities required by this package, when applicable. */
+  nativeCapabilities?: string[]
   /** Core providers can be replaced but not disabled from the plugin manager. */
   required?: boolean
   /**
@@ -76,8 +84,8 @@ export function validatePluginManifest(input: unknown): PluginManifest {
   if (value.apiVersion !== PLUGIN_API_VERSION) {
     issues.push(`apiVersion must be ${PLUGIN_API_VERSION}`)
   }
-  if (!["provider", "feature", "theme", "shell"].includes(String(value.kind))) {
-    issues.push("kind must be provider, feature, theme, or shell")
+  if (!["runtime", "provider", "feature", "theme", "shell"].includes(String(value.kind))) {
+    issues.push("kind must be runtime, provider, feature, theme, or shell")
   }
   if (typeof value.entry === "string" && !PACKAGE_FILE_PATTERN.test(value.entry)) {
     issues.push("entry must be a safe relative JavaScript file path")
@@ -108,15 +116,43 @@ export function validatePluginManifest(input: unknown): PluginManifest {
   }
   if (
     value.requires !== undefined &&
-    (!Array.isArray(value.requires) ||
-      value.requires.some((id) => typeof id !== "string" || !PLUGIN_ID_PATTERN.test(id)))
+    (!value.requires ||
+      typeof value.requires !== "object" ||
+      Array.isArray(value.requires) ||
+      Object.entries(value.requires).some(
+        ([id, range]) =>
+          !PLUGIN_ID_PATTERN.test(id) || typeof range !== "string" || !semver.validRange(range)
+      ))
   ) {
-    issues.push("requires must contain valid plugin IDs")
+    issues.push("requires must contain valid plugin IDs and SemVer ranges")
+  }
+  for (const field of ["inject", "provides", "nativeCapabilities"] as const) {
+    if (
+      value[field] !== undefined &&
+      (!Array.isArray(value[field]) ||
+        value[field].some((name) => typeof name !== "string" || !name.trim()))
+    ) {
+      issues.push(`${field} must contain non-empty service names`)
+    }
+  }
+  if (
+    Array.isArray(value.nativeCapabilities) &&
+    value.nativeCapabilities.some((capability) => !/^[^\s@]+@\d+$/.test(capability))
+  ) {
+    issues.push("nativeCapabilities must use the <capability-id>@<version> form")
+  }
+  if (
+    value.configSchema !== undefined &&
+    (!value.configSchema || typeof value.configSchema !== "object" || Array.isArray(value.configSchema))
+  ) {
+    issues.push("configSchema must be a JSON Schema object")
   }
   if (
     typeof value.id === "string" &&
-    Array.isArray(value.requires) &&
-    value.requires.includes(value.id)
+    value.requires &&
+    typeof value.requires === "object" &&
+    !Array.isArray(value.requires) &&
+    Object.prototype.hasOwnProperty.call(value.requires, value.id)
   ) {
     issues.push("plugin must not depend on itself")
   }

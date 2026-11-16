@@ -10,7 +10,7 @@ const baseManifest = {
   id: "org.example.feature",
   name: "Example feature",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: 2,
   kind: "feature" as const,
   entry: "index.js",
 }
@@ -124,7 +124,7 @@ describe("PluginPackageStore", () => {
       code: "archive",
     })
     await expect(
-      store.install(buildArchive({}, { version: "2.0.0", apiVersion: 2 }))
+      store.install(buildArchive({}, { version: "2.0.0", apiVersion: 1 }))
     ).rejects.toMatchObject({ code: "manifest" })
     await expect(
       store.install(buildArchive({ "index.js": null }, { version: "2.0.0" }))

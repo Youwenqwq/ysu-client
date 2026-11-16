@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { ProviderErrorCode } from "@orahako/plugin-sdk/provider-errors"
-import { mapCASSessionError } from "./cas-auth"
-import { NotAuthenticatedError } from "./protocol/cas"
+import { createCasAuth } from "./cas-auth"
+import { createCAS, NotAuthenticatedError } from "./protocol/cas"
+import { createTestContext } from "./test-context"
+
+const ctx = createTestContext().ctx
+const { mapCASSessionError } = createCasAuth(ctx, createCAS(ctx))
 
 describe("CAS session error mapping", () => {
   it("converts a CAS login bounce into a user-facing session error", () => {

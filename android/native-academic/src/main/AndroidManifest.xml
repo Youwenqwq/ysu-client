@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application>
+        <receiver
+            android:name="me.uwen.orahako.notify.ClassAlarmReceiver"
+            android:exported="false" />
+
+        <service
+            android:name="me.uwen.orahako.notify.ClassReminderService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-enabled Live Updates: refresh pre-class, in-class and consecutive-class countdowns from the configured reminder time, using the same visible notification and a wake lock bounded by class end." />
+        </service>
+
+        <!-- Class reminder notifications open the schedule route. -->
+        <activity
+            android:name="${applicationId}.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="${orahakoDeepLinkScheme}"
+                    android:host="${orahakoDeepLinkHostSchedule}" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

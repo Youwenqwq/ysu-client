@@ -8,10 +8,10 @@
  *
  * - `@orahako/plugin-ui/components`  shadcn/ui + shared presentational components
  * - `@orahako/plugin-ui/hooks`       React hooks (i18n, provider data, media)
- * - `@orahako/plugin-ui/stores`      host Zustand stores + storage adapters
+ * - `@orahako/plugin-ui/stores`      official Shell preference stores
  * - `@orahako/plugin-ui/academic`    schedule/term/exam utilities
- * - `@orahako/plugin-ui/platform`    native bridge, navigation, widgets, version
- * - `@orahako/plugin-ui/plugin`      plugin-host hooks + navigation resolvers
+ * - `@orahako/plugin-ui/platform`    platform detection, back navigation, version
+ * - `@orahako/plugin-ui/plugin`      scoped services bridge, i18n, navigation
  * - `@orahako/plugin-ui/shell`       host-aware shell components (provider ctx)
  * - `@orahako/plugin-ui/assets`      host static image assets
  *

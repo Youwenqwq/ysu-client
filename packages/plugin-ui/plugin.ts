@@ -1,13 +1,20 @@
 /**
- * @orahako/plugin-ui/plugin — plugin-host-facing hooks and navigation resolvers.
+ * @orahako/plugin-ui/plugin — scoped plugin services plus pure navigation and
+ * i18n helpers for shell/plugin UI.
  *
- * Pure resolvers plus UI-store hooks; none of these load the plugin provider
- * context (that lives in `@orahako/plugin-ui/shell`), so plugins can import this
- * submodule freely.
+ * The shell bridges its scoped `PluginContext` into React with
+ * `PluginServicesProvider`; components read it through `usePluginServices`.
+ * This module never exposes the kernel host, a registry instance, or an
+ * implementation module.
  */
-export { usePluginUI } from "@/lib/plugins/use-plugin-ui"
-export { usePluginTranslation } from "@/lib/plugins/use-plugin-translation"
-export { usePluginRouteStore, type ActivePluginRoute } from "@/lib/stores/plugin-route"
+export {
+  PluginServicesProvider,
+  usePluginServices,
+  usePluginUI,
+} from "./services"
+export { useSemanticNavigation, type SemanticNav } from "@/plugins/official/runtime/navigation/use-semantic-navigation"
+export { usePluginTranslation } from "@/plugins/official/runtime/i18n/use-plugin-translation"
+export { pluginCategory, groupByPluginCategory } from "./categories"
 export {
   hasPluginCapability,
   isAppNavigation,
@@ -18,11 +25,10 @@ export {
   resolvePrimaryTarget,
   semanticTargetHref,
   landingPreferenceHref,
-  CORE_DASHBOARD_FALLBACK_HREF,
   type SemanticPageInput,
   type SemanticNavigationInput,
   type PluginNavigationLocation,
   type PluginNavigationScope,
   type SemanticNavSources,
   type SemanticNavTarget,
-} from "@/lib/plugins/navigation"
+} from "@/plugins/official/runtime/navigation/resolvers"

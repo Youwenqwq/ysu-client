@@ -7,57 +7,74 @@
  * 学校协议与会话留在 provider，界面和启动提醒仅消费此访问桥。
  */
 import {
-  getEpayStatus,
   EpayNotLoggedInError,
   EpayProtocolError,
+  type EpayProtocol,
   type EpaySessionStatus,
 } from "./protocol/epay"
-import { getSchoolConfigScope, useAuthStore } from "@orahako/plugin-sdk/host"
 import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
-import { mapCASSessionError } from "./cas-auth"
+import type { SessionSnapshot } from "@orahako/plugin-sdk"
+import type { YSUContext } from "./context"
 
 export type { EpayRecord, EpaySessionStatus } from "./protocol/epay"
 
-/**
- * 登录态下查询缴费状态（历史记录与官方待缴清单）。
- * 未登录/会话失效通过 ProviderError.code 区分。
- */
-export async function fetchEpayPayments(): Promise<EpaySessionStatus> {
-  const { username, credential, isAuthenticated } = useAuthStore.getState()
-  if (!username || !credential || !isAuthenticated) {
-    throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "请先登录教务", undefined, 401)
+interface SessionIdentity {
+  readonly schoolId: string | null
+  readonly username: string | null
+  readonly credential: string | null
+}
+
+function identityOf(snapshot: SessionSnapshot): SessionIdentity {
+  return {
+    schoolId: snapshot.activeSchoolId,
+    username: snapshot.username,
+    credential: snapshot.credential,
   }
-  const scope = getSchoolConfigScope()
-  try {
-    const result = await getEpayStatus()
-    const current = useAuthStore.getState()
-    if (
-      current.username !== username ||
-      !current.isAuthenticated ||
-      current.credential !== credential ||
-      getSchoolConfigScope() !== scope
-    ) {
-      throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "缴费账号已切换")
+}
+
+function sameIdentity(left: SessionIdentity, right: SessionIdentity): boolean {
+  return (
+    left.schoolId === right.schoolId &&
+    left.username === right.username &&
+    left.credential === right.credential
+  )
+}
+
+export function createEpayAccess(
+  ctx: YSUContext,
+  epay: EpayProtocol,
+  mapCASSessionError: (error: unknown) => ProviderError | undefined
+): () => Promise<EpaySessionStatus> {
+  return async function fetchEpayPayments(): Promise<EpaySessionStatus> {
+    const snapshot = ctx.session.getSnapshot()
+    if (!snapshot.username || !snapshot.credential || !snapshot.isAuthenticated) {
+      throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "请先登录教务", undefined, 401)
     }
-    return result
-  } catch (e) {
-    const error =
-      mapCASSessionError(e) ??
-      (e instanceof EpayNotLoggedInError
-        ? new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, e.message, e, 401)
-        : e instanceof EpayProtocolError
-          ? new ProviderError(ProviderErrorCode.BACKEND_PROTOCOL_ERROR, e.message, e)
-          : wrapError(e))
-    const current = useAuthStore.getState()
-    if (
-      error.code === ProviderErrorCode.AUTH_SESSION_EXPIRED &&
-      current.isAuthenticated &&
-      current.username === username &&
-      current.credential === credential &&
-      getSchoolConfigScope() === scope
-    ) {
-      current.setSessionExpired(true)
+    const identity = identityOf(snapshot)
+
+    try {
+      const result = await epay.getEpayStatus()
+      if (!sameIdentity(identity, identityOf(ctx.session.getSnapshot()))) {
+        throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "缴费账号已切换")
+      }
+      return result
+    } catch (e) {
+      const error =
+        mapCASSessionError(e) ??
+        (e instanceof EpayNotLoggedInError
+          ? new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, e.message, e, 401)
+          : e instanceof EpayProtocolError
+            ? new ProviderError(ProviderErrorCode.BACKEND_PROTOCOL_ERROR, e.message, e)
+            : wrapError(e))
+      const current = ctx.session.getSnapshot()
+      if (
+        error.code === ProviderErrorCode.AUTH_SESSION_EXPIRED &&
+        current.isAuthenticated &&
+        sameIdentity(identity, identityOf(current))
+      ) {
+        ctx.session.setSessionExpired(true)
+      }
+      throw error
     }
-    throw error
   }
 }

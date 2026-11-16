@@ -11,6 +11,7 @@
     "./academic": "./academic.ts",
     "./platform": "./platform.ts",
     "./plugin": "./plugin.ts",
+    "./services": "./services.ts",
     "./shell": "./shell.ts",
     "./assets": "./assets.ts"
   },

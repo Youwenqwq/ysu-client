@@ -1,30 +1,33 @@
 import type { ProviderDiagnosticCookie, ProviderDiagnostics } from "@orahako/plugin-sdk/academic"
-import { getJar as getCasJar, isAuthenticated as checkCASAuth } from "./protocol/cas"
-import { getJar as getJwxtJar, resetJWXT } from "./protocol/jwxt"
-import { ensureMobileAuthorized } from "./protocol/jwmobile"
+import type { CookieJar } from "@orahako/plugin-sdk"
+import type { CASProtocol } from "./protocol/cas"
+import type { JWXTProtocol } from "./protocol/jwxt"
+import type { JWMobileProtocol } from "./protocol/jwmobile"
 
-async function getJarCookies(
-  getJar: () => {
-    getAllCookies(): Promise<readonly ProviderDiagnosticCookie[]>
-  }
-): Promise<ProviderDiagnosticCookie[]> {
+async function getJarCookies(getJar: () => CookieJar): Promise<ProviderDiagnosticCookie[]> {
   return [...(await getJar().getAllCookies())]
 }
 
-export const ysuDiagnostics: ProviderDiagnostics = {
-  labels: {
-    authSystem: "CAS",
-    academicSystem: "JWXT",
-    authToken: "CASTGC",
-    authCookies: "CAS Jar",
-    academicCookies: "JWXT Jar",
-    authSession: "CAS Auth",
-    academicSession: "JWXT Session",
-    mobileAuth: "Mobile Auth",
-  },
-  getAuthCookies: () => getJarCookies(getCasJar),
-  getAcademicCookies: () => getJarCookies(getJwxtJar),
-  checkAuth: checkCASAuth,
-  resetAcademicSession: resetJWXT,
-  ensureMobileAuthorized,
+export function createYsuDiagnostics(
+  cas: CASProtocol,
+  jwxt: JWXTProtocol,
+  mobile: JWMobileProtocol
+): ProviderDiagnostics {
+  return {
+    labels: {
+      authSystem: "CAS",
+      academicSystem: "JWXT",
+      authToken: "CASTGC",
+      authCookies: "CAS Jar",
+      academicCookies: "JWXT Jar",
+      authSession: "CAS Auth",
+      academicSession: "JWXT Session",
+      mobileAuth: "Mobile Auth",
+    },
+    getAuthCookies: () => getJarCookies(() => cas.getJar()),
+    getAcademicCookies: () => getJarCookies(() => jwxt.getJar()),
+    checkAuth: () => cas.isAuthenticated(),
+    resetAcademicSession: () => jwxt.resetJWXT(),
+    ensureMobileAuthorized: (verify?: boolean) => mobile.ensureMobileAuthorized(verify),
+  }
 }

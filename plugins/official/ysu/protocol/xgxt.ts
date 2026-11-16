@@ -7,15 +7,11 @@
  *
  * 纯函数 + 模块级状态(cookie jar)。
  */
-import {
-  SimpleCookieJar,
-  fetchWithJar,
-  getSchoolConfig,
-  headerSingle,
-  type HttpResponse,
-} from "@orahako/plugin-sdk/host"
+import type { CookieJar, HttpResponse } from "@orahako/plugin-sdk"
+import type { YSUContext } from "../context"
+import type { CASProtocol } from "./cas"
+import { headerSingle } from "../http-utils"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
-import { authorize, getCredentialApplied } from "./cas"
 
 // ─── Constants ────────────────────────────────────────────────────────── //
 
@@ -181,26 +177,44 @@ export class XgxtBusinessError extends XgxtError {
   }
 }
 
-// ─── Module state ─────────────────────────────────────────────────────── //
+// ─── Provider-scoped state ────────────────────────────────────────────── //
 
-let xgxtJar = new SimpleCookieJar()
-let timeoutMs = 30_000
-let inflightAuth: Promise<unknown> | null = null
-let inflightReauth: Promise<void> | null = null
-let appRoleReady = false
-let inflightRole: Promise<void> | null = null
-let sessionGeneration = 0
+export interface XgxtProtocol {
+  getJar(): CookieJar
+  setTimeoutMs(ms: number): void
+  resetXgxt(): void
+  queryEvaluationTerms(): Promise<EvaluationTerm[]>
+  queryEvaluationResult(year?: string, term?: string): Promise<EvaluationResult>
+  queryEvaluationIndicators(
+    year?: string,
+    term?: string
+  ): Promise<EvaluationIndicatorDetail[]>
+  queryEvaluationRadar(year?: string, term?: string): Promise<EvaluationRadarItem[]>
+  queryYearScoreStatics(): Promise<YearScoreStatic[]>
+  queryAcademicReportYears(): Promise<AcademicReportYears>
+  queryAcademicReport(year?: string): Promise<AcademicReportPage>
+}
 
-export function getJar(): SimpleCookieJar {
+export function createXGXT(ctx: YSUContext, cas: CASProtocol): XgxtProtocol {
+  const configuredBaseUrl = ctx.config.xgxt?.baseUrl
+  let xgxtJar = ctx.session.createCookieJar()
+  let timeoutMs = 30_000
+  let inflightAuth: Promise<unknown> | null = null
+  let inflightReauth: Promise<void> | null = null
+  let appRoleReady = false
+  let inflightRole: Promise<void> | null = null
+  let sessionGeneration = 0
+
+function getJar(): CookieJar {
   return xgxtJar
 }
 
-export function setTimeoutMs(ms: number): void {
+function setTimeoutMs(ms: number): void {
   timeoutMs = ms
 }
 
-export function resetXgxt(): void {
-  xgxtJar = new SimpleCookieJar()
+function resetXgxt(): void {
+  xgxtJar = ctx.session.createCookieJar()
   inflightAuth = null
   inflightReauth = null
   appRoleReady = false
@@ -209,11 +223,10 @@ export function resetXgxt(): void {
 }
 
 function baseUrl(): string {
-  const url = getSchoolConfig().xgxt?.baseUrl
-  if (!url) {
+  if (!configuredBaseUrl) {
     throw new XgxtProtocolError("xgxt base URL not configured for current school")
   }
-  return url
+  return configuredBaseUrl
 }
 
 function cookieDomain(): string {
@@ -243,11 +256,11 @@ async function ensureAuthorized(): Promise<void> {
   const promise = withAuthTransition(async () => {
     if (appRoleReady) return
 
-    await getCredentialApplied()
+    await cas.getCredentialApplied()
     const cookies = await xgxtJar.getAllCookies()
     const hasSession = cookies.some((c) => c.domain && c.domain.includes(cookieDomain()))
     if (!hasSession) {
-      await authorize(zhcpServiceUrl(), xgxtJar)
+      await cas.authorize(zhcpServiceUrl(), xgxtJar)
     }
     await ensureAppRole()
   })
@@ -343,7 +356,7 @@ async function rawPost(
   const query = opts?.params ? `?${new URLSearchParams(opts.params).toString()}` : ""
   let resp: HttpResponse
   try {
-    resp = await fetchWithJar(xgxtJar, {
+    resp = await ctx.session.fetchWithJar(xgxtJar, {
       method: "POST",
       url: `${url}${query}`,
       body: new URLSearchParams(opts?.data ?? {}),
@@ -395,7 +408,7 @@ async function reauthorize(failedGeneration: number): Promise<void> {
       }
     }
     appRoleReady = false
-    await authorize(zhcpServiceUrl(), xgxtJar)
+    await cas.authorize(zhcpServiceUrl(), xgxtJar)
     await ensureAppRole()
     sessionGeneration += 1
   })
@@ -412,7 +425,7 @@ async function post(path: string, data: Record<string, string>): Promise<Record<
   const url = buildApiUrl(path)
   let resp: HttpResponse
   try {
-    resp = await fetchWithJar(xgxtJar, {
+    resp = await ctx.session.fetchWithJar(xgxtJar, {
       method: "POST",
       url,
       body: new URLSearchParams(data),
@@ -640,7 +653,7 @@ function parseReportEntry(r: Record<string, unknown>): AcademicReportEntry {
 // ─── Public: 综测成绩 ─────────────────────────────────────────────────── //
 
 /** 查询可查看综测成绩的学年学期列表（按时间倒序，首个为最新）。 */
-export async function queryEvaluationTerms(): Promise<EvaluationTerm[]> {
+async function queryEvaluationTerms(): Promise<EvaluationTerm[]> {
   return runWithReauth(async () => {
     const data = await postController(API_PATHS.cpxnxq, {})
     const rows =
@@ -655,7 +668,7 @@ export async function queryEvaluationTerms(): Promise<EvaluationTerm[]> {
 }
 
 /** 查询指定学年学期的综测成绩与班级/年级排名；缺省时取最新测评批次。 */
-export async function queryEvaluationResult(
+async function queryEvaluationResult(
   year?: string,
   term?: string
 ): Promise<EvaluationResult> {
@@ -673,7 +686,7 @@ export async function queryEvaluationResult(
 }
 
 /** 查询指定学年学期的指标得分明细；缺省时取最新测评批次。 */
-export async function queryEvaluationIndicators(
+async function queryEvaluationIndicators(
   year?: string,
   term?: string,
   opts?: { pageSize?: number; pageNumber?: number }
@@ -695,7 +708,7 @@ export async function queryEvaluationIndicators(
 }
 
 /** 查询指定学年学期的指标雷达对比；缺省时取最新测评批次。 */
-export async function queryEvaluationRadar(
+async function queryEvaluationRadar(
   year?: string,
   term?: string
 ): Promise<EvaluationRadarItem[]> {
@@ -715,7 +728,7 @@ export async function queryEvaluationRadar(
 }
 
 /** 查询各学年学期的综测分数总览（「我和自己比一比」）。 */
-export async function queryYearScoreStatics(): Promise<YearScoreStatic[]> {
+async function queryYearScoreStatics(): Promise<YearScoreStatic[]> {
   return runWithReauth(async () => {
     const data = await postController(API_PATHS.yearCjStatic, {})
     if (!Array.isArray(data)) {
@@ -730,7 +743,7 @@ export async function queryYearScoreStatics(): Promise<YearScoreStatic[]> {
 // ─── Public: 学业成绩报告 ─────────────────────────────────────────────── //
 
 /** 查询学业成绩报告的可选学年与默认学年。 */
-export async function queryAcademicReportYears(): Promise<AcademicReportYears> {
+async function queryAcademicReportYears(): Promise<AcademicReportYears> {
   return runWithReauth(async () => {
     const [yearsRaw, defaultRaw] = await Promise.all([
       postController(API_PATHS.fiveYears, {}),
@@ -752,7 +765,7 @@ export async function queryAcademicReportYears(): Promise<AcademicReportYears> {
 }
 
 /** 查询学业成绩报告（按学年分页的课程成绩列表）；year 缺省时用服务端默认学年。 */
-export async function queryAcademicReport(
+async function queryAcademicReport(
   year?: string,
   opts?: { pageSize?: number; pageNumber?: number }
 ): Promise<AcademicReportPage> {
@@ -785,4 +798,18 @@ export async function queryAcademicReport(
       raw: node,
     }
   })
+}
+
+  return {
+    getJar,
+    setTimeoutMs,
+    resetXgxt,
+    queryEvaluationTerms,
+    queryEvaluationResult,
+    queryEvaluationIndicators,
+    queryEvaluationRadar,
+    queryYearScoreStatics,
+    queryAcademicReportYears,
+    queryAcademicReport,
+  }
 }

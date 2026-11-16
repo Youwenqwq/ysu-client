@@ -3,10 +3,9 @@ import { toast } from "sonner"
 import {
   PLUGIN_API_VERSION,
   definePlugin,
-  type PluginLocale,
+  type AcademicPluginContext,
   type PluginManifest,
 } from "@orahako/plugin-sdk"
-import { STORAGE_KEYS } from "@orahako/plugin-ui/stores"
 import { runEpayAutoCheck } from "./auto-check"
 import { EpayPage } from "./page"
 import { EpayNotificationSettings } from "./settings"
@@ -17,16 +16,13 @@ export const manifest: PluginManifest = {
   version: "1.0.0",
   apiVersion: PLUGIN_API_VERSION,
   kind: "feature",
+  inject: ["ui", "slots", "i18n", "provider"],
   entry: "index.js",
 }
 
-function currentLocale(): PluginLocale {
-  if (typeof window === "undefined") return "zh"
-  const locale = localStorage.getItem(STORAGE_KEYS.locale)
-  return locale === "en" ? "en" : "zh"
-}
 
-export const definition = definePlugin((ctx) => {
+export const definition = definePlugin((baseCtx) => {
+  const ctx = baseCtx as unknown as AcademicPluginContext
   ctx.i18n.register({
     zh: {
       settings: { epayReminderTitle: "缴费提醒" },
@@ -69,15 +65,16 @@ export const definition = definePlugin((ctx) => {
     component: EpayNotificationSettings,
   })
 
-  ctx.hostLifecycle.onProviderReady(async () => {
-    const result = await runEpayAutoCheck()
+  const check = async () => {
+    const result = await runEpayAutoCheck(ctx)
     if (!result?.hasUnpaid) return
     toast.warning(
       ctx.i18n.t(
         "epay.unpaidNotify",
-        { count: result.count, total: result.total.toFixed(2) },
-        currentLocale()
+        { count: result.count, total: result.total.toFixed(2) }
       )
     )
-  })
+  }
+  ctx.on("provider/ready", check)
+  if (ctx.provider.getSnapshot().status === "ready") void check()
 })

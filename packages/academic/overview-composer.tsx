@@ -38,7 +38,6 @@ import {
   RotateCcw,
   UserRound,
 } from "lucide-react"
-import { usePluginHost } from "@/components/plugin-provider"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -76,12 +75,13 @@ import {
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import type { RegisteredPluginOverviewWidget } from "@/lib/plugins/ui-registry"
-import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
-import { useSupportedPlugins } from "@/providers/use-provider"
+import { useTranslation } from "@/plugins/official/runtime/i18n/use-translation"
+import type { PluginOverviewWidgetContribution } from "@orahako/plugin-sdk"
+import { useSupportedPlugins } from "@orahako/plugin-ui/hooks"
+import { usePluginUI, useSemanticNavigation } from "@orahako/plugin-ui/plugin"
+import { useAppTranslation } from "@/components/plugin-provider"
 import { supportsPlugin } from "@orahako/plugin-sdk"
-import { useSettingsStore } from "@/lib/stores/settings"
+import { useSettingsStore } from "@/plugins/official/shell/stores/settings"
 import { cn } from "@/lib/utils"
 import {
   createDefaultOverviewLayout,
@@ -93,7 +93,7 @@ import {
   type OverviewLayout,
   type OverviewRegion,
   type OverviewWidgetId,
-} from "@/lib/plugins/overview-layout"
+} from "@orahako/academic/overview-layout"
 
 type WidgetIcon = ComponentType<{ className?: string }>
 
@@ -106,8 +106,9 @@ interface OverviewWidgetMeta {
 
 function useOverviewWidgetMeta() {
   const { locale } = useTranslation()
-  const { host } = usePluginHost()
-  const { overviewWidgets } = usePluginUI(host.ui)
+  const { translate } = useAppTranslation()
+
+  const { overviewWidgets } = usePluginUI()
   const supportedPlugins = useSupportedPlugins()
   const available = overviewWidgets.filter((widget) =>
     supportsPlugin(supportedPlugins, widget.pluginId)
@@ -117,7 +118,7 @@ function useOverviewWidgetMeta() {
     region: widget.region,
     defaultVisible: widget.defaultVisible,
   }))
-  const contributions = new Map<string, RegisteredPluginOverviewWidget>()
+  const contributions = new Map<string, PluginOverviewWidgetContribution>()
   for (const widget of available) {
     contributions.set(pluginOverviewWidgetId(widget.pluginId, widget.id), widget)
   }
@@ -126,10 +127,10 @@ function useOverviewWidgetMeta() {
     if (!widget) return undefined
     return {
       title: widget.titleKey
-        ? host.i18n.translate(widget.pluginId, widget.titleKey, locale)
+        ? translate(widget.pluginId, widget.titleKey, locale)
         : widget.title,
       description: widget.descriptionKey
-        ? host.i18n.translate(widget.pluginId, widget.descriptionKey, locale)
+        ? translate(widget.pluginId, widget.descriptionKey, locale)
         : widget.description,
       icon: widget.icon,
       region: widget.region,
@@ -446,6 +447,7 @@ export function OverviewEditor() {
 function LayoutEditor({ initialLayout }: { initialLayout: OverviewLayout }) {
   const { t } = useTranslation()
   const router = useRouter()
+  const nav = useSemanticNavigation()
   const setLayout = useSettingsStore((state) => state.setOverviewLayout)
   const { dynamicWidgets } = useOverviewWidgetMeta()
   const [draft, setDraft] = useState(() => normalizeOverviewLayout(initialLayout, dynamicWidgets))
@@ -481,7 +483,7 @@ function LayoutEditor({ initialLayout }: { initialLayout: OverviewLayout }) {
             <Check data-icon="inline-start" />
             {t("overviewLayout.save")}
           </Button>
-          <Button variant="outline" onClick={() => router.push("/dashboard/me/settings")}>
+          <Button variant="outline" onClick={() => router.push(nav.href("settings") ?? "/dashboard")}>
             {t("overviewLayout.cancel")}
           </Button>
           <Button
@@ -540,6 +542,7 @@ export function OverviewComposer({
   renderProfile?: (compact: boolean, summaries?: ReactNode) => ReactNode
 }) {
   const { t } = useTranslation()
+  const nav = useSemanticNavigation()
   const hydrated = useLayoutHydrated()
   const compact = useIsMobile()
   const layout = useSettingsStore((state) => state.overviewLayout)
@@ -659,7 +662,7 @@ export function OverviewComposer({
             </EmptyHeader>
             <EmptyContent>
               <Button asChild>
-                <Link href="/dashboard/me/settings">{t("settings.title")}</Link>
+                <Link href={nav.href("settings") ?? "/dashboard"}>{t("settings.title")}</Link>
               </Button>
               <Button
                 variant="outline"

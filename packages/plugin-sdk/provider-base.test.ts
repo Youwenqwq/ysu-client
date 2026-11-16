@@ -4,6 +4,7 @@ import { ALL_CAPABILITIES, NO_CAPABILITIES } from "./provider-capabilities"
 import { ProviderError, ProviderErrorCode } from "./provider-errors"
 import type {
   AcademicCapabilities,
+  AcademicProvider,
   AuthStatus,
   Credential,
   LoginStep1Input,
@@ -26,6 +27,9 @@ function makeProvider(capabilities: AcademicCapabilities) {
       return { authenticated: false }
     }
     async logout(): Promise<void> {}
+    async relogin(): Promise<boolean> {
+      return false
+    }
     isAuthenticated(): boolean {
       return false
     }
@@ -85,6 +89,27 @@ describe("BaseProvider capability-gated defaults", () => {
       )
     }
   )
+
+  it("accepts providers that implement only the runtime lifecycle", () => {
+    const minimal: AcademicProvider = {
+      id: "minimal",
+      name: "Minimal University",
+      capabilities: { customFeature: true },
+      initialize: async () => {},
+      reset: async () => {},
+      logout: async () => {},
+      relogin: async () => true,
+    }
+
+    expect(minimal.capabilities.customFeature).toBe(true)
+    expect(minimal.getGrades).toBeUndefined()
+    expect(minimal.wechatMfa).toBeUndefined()
+  })
+
+  it("exposes the WeChat MFA extension only when the capability is declared", () => {
+    expect(makeProvider(NO_CAPABILITIES).wechatMfa).toBeUndefined()
+    expect(makeProvider(ALL_CAPABILITIES).wechatMfa).toBeDefined()
+  })
 
   it("answers checkCaptchaNeeded=false without a captcha capability", async () => {
     await expect(makeProvider(NO_CAPABILITIES).checkCaptchaNeeded("u")).resolves.toBe(false)

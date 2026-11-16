@@ -31,7 +31,7 @@ import {
   useCreditLibraryActivities,
   useCreditRecords,
   useCreditSummary,
-} from "@orahako/plugin-ui/hooks"
+} from "@orahako/academic"
 import type {
   CatalogPage,
   CatalogQueryOptions,

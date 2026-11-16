@@ -4,11 +4,9 @@ import { Component, type ReactNode } from "react"
 import { usePluginHost } from "./plugin-context"
 import { usePluginUI } from "@/lib/plugins/use-plugin-ui"
 import { usePluginPreferences } from "@/lib/stores/plugin-preferences"
-import type { RegisteredPluginShell } from "@/lib/plugins/ui-registry"
+import type { PluginShellContribution } from "@orahako/plugin-sdk"
 
-const DEFAULT_SHELL = "orahako.shell:default"
-
-function shellKey(shell: RegisteredPluginShell): string {
+function shellKey(shell: PluginShellContribution): string {
   return `${shell.pluginId}:${shell.id}`
 }
 
@@ -34,8 +32,8 @@ function KernelRecovery({ message }: { message?: string }) {
 
 class ShellBoundary extends Component<
   {
-    shell: RegisteredPluginShell
-    fallback?: RegisteredPluginShell
+    shell: PluginShellContribution
+    fallback?: PluginShellContribution
     children: ReactNode
     selectShell(id?: string): void
     onFailure: () => void
@@ -69,19 +67,33 @@ class ShellBoundary extends Component<
       )
     }
     const Shell = this.props.shell.component
-    return <Shell selectShell={this.props.selectShell}>{this.props.children}</Shell>
+    return (
+      <Shell context={this.props.shell.context} selectShell={this.props.selectShell}>
+        {this.props.children}
+      </Shell>
+    )
   }
 }
 
-export function PluginShell({ children }: { children: ReactNode }) {
+export function useActivePluginShell() {
   const { host } = usePluginHost()
   const { shells } = usePluginUI(host.ui)
   const activeShell = usePluginPreferences((state) => state.activeShell)
   const setActiveShell = usePluginPreferences((state) => state.setActiveShell)
-  const fallback = shells.find((shell) => shellKey(shell) === DEFAULT_SHELL) ?? shells[0]
+  const fallback =
+    shells.find((shell) => shellKey(shell) === host.composition.defaults.shell) ?? shells[0]
   const selected = shells.find((shell) => shellKey(shell) === activeShell)
-  const shell = selected ?? fallback
+  return {
+    shell: selected ?? fallback,
+    selected,
+    fallback,
+    activeShell,
+    setActiveShell,
+  }
+}
 
+export function PluginShell({ children }: { children: ReactNode }) {
+  const { shell, selected, fallback, activeShell, setActiveShell } = useActivePluginShell()
   if (!shell) return <KernelRecovery />
   return (
     <ShellBoundary

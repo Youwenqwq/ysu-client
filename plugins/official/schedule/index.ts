@@ -1,5 +1,5 @@
 import { BookOpen, Calendar, Clock, LayoutGrid } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
+import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/plugin-sdk"
 import { SchedulePage } from "./page"
 import {
   ClassReminderSettings,
@@ -13,8 +13,9 @@ export const manifest: PluginManifest = {
   id: "orahako.schedule",
   name: "日程",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: PLUGIN_API_VERSION,
   kind: "feature",
+  inject: ["ui", "slots", "settings", "notifications"],
   entry: "index.js",
 }
 

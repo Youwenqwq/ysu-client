@@ -5,39 +5,20 @@
  * academic systems. UI code should consume these contracts (or provider hooks)
  * instead of importing CAS/JWXT implementation modules directly.
  */
+import type { ManagedProvider, PluginProviderRuntimeService } from "./provider-runtime"
+import type { PluginSessionService } from "./session"
+import type { PluginQueryService } from "./query"
+import type { PluginProviderRegistryService } from "./providers"
+import type { PluginContext } from "./runtime"
 
-/** Capability flags indicating which features a provider supports. */
-export interface AcademicCapabilities {
-  auth: boolean
-  captcha: boolean
-  mfa: boolean
-  wechatMfa: boolean
-  grades: boolean
-  gradeAnalytics: boolean
-  schedule: boolean
-  labSchedule: boolean
-  exams: boolean
-  makeupExams: boolean
-  laborEducation: boolean
-  innovationCredits: boolean
-  comprehensiveEval: boolean
-  schoolSchedule: boolean
-  gpa: boolean
-  evaluation: boolean
-  evaluationScorePreview: boolean
-  trainingPlan: boolean
-  studentInfo: boolean
-  currentWeek: boolean
-  classPeriods: boolean
-  termCalendar: boolean
-  mobileSignin: boolean
-  /** 一卡通余额查询（学校专属缴费平台，无契约方法）。 */
-  ecard: boolean
-  /** 宿舍电费查询（学校专属缴费平台，无契约方法）。 */
-  meter: boolean
-  /** 在线缴费记录查询（学校专属缴费平台，无契约方法）。 */
-  epay: boolean
-}
+/**
+ * Capability flags indicating which features a provider supports.
+ *
+ * The record is open-ended: providers may advertise school- or plugin-specific
+ * capability keys without changing this contract. Only an explicit `true`
+ * enables a capability; absent or falsy values disable it.
+ */
+export type AcademicCapabilities = Readonly<Record<string, boolean>>
 
 /** Login credential supplied by the user. */
 export interface Credential {
@@ -103,6 +84,23 @@ export interface WechatQrPollResult {
   code?: string
   /** 微信返回的原始 errcode；空响应体时为 undefined。 */
   errcode?: number
+}
+
+/**
+ * Optional WeChat QR-scan MFA extension.
+ *
+ * A provider advertises it through `AcademicProvider.wechatMfa` (and the
+ * `wechatMfa` capability) only when its auth backend supports the flow. Shell
+ * UI must fall back to code-based MFA when this extension is absent.
+ */
+export interface WechatMfaProvider {
+  initiateWechatMfa(): Promise<WechatMfaContext>
+  pollWechatMfaQr(
+    uuid: string,
+    lastErrcode?: number,
+    signal?: AbortSignal
+  ): Promise<WechatQrPollResult>
+  completeWechatMfa(code: string, state: string): Promise<string>
 }
 
 export interface AuthStatus {
@@ -884,12 +882,6 @@ export interface StudentSignResult {
   raw?: Record<string, unknown>
 }
 
-export interface ProviderLifecycle {
-  initialize(): Promise<void>
-  warmup?(): Promise<void>
-  reset(): Promise<void>
-}
-
 export interface ProviderAuth {
   prepareLogin(): Promise<void>
   resetLoginSession(): Promise<void> | void
@@ -899,13 +891,6 @@ export interface ProviderAuth {
   loginStep1(input: LoginStep1Input): Promise<LoginStep1Result>
   requestMfaCode(input: MfaRequestInput): Promise<MfaChallenge>
   submitMfaCode(input: MfaSubmitInput): Promise<string>
-  initiateWechatMfa(): Promise<WechatMfaContext>
-  pollWechatMfaQr(
-    uuid: string,
-    lastErrcode?: number,
-    signal?: AbortSignal
-  ): Promise<WechatQrPollResult>
-  completeWechatMfa(code: string, state: string): Promise<string>
   checkAuthStatus(): Promise<AuthStatus>
   logout(): Promise<void>
   isAuthenticated(): boolean
@@ -977,10 +962,6 @@ export interface ProviderMobile {
   getSigninDetail(input: SigninDetailQuery): Promise<SigninActivityDetail>
   getStudentSigninStatus(input: SigninDetailQuery): Promise<StudentSigninStatus>
   doStudentSign(input: StudentSignInput): Promise<StudentSignResult>
-}
-
-export interface ProviderRelogin {
-  relogin?(): Promise<boolean>
 }
 
 export interface ProviderDiagnosticCookie {
@@ -1101,28 +1082,67 @@ export interface ProviderGradeScale {
 }
 
 /**
- * Abstract contract for an academic data provider.
+ * Makes every member of a provider module optional at the composition level.
+ *
+ * Providers implement only the modules they support; consumers narrow the
+ * surface explicitly (`requireProviderMethod`, capability checks) instead of
+ * assuming the full academic contract.
  */
-export interface AcademicProvider
-  extends ProviderLifecycle, ProviderAuth, ProviderAcademics, ProviderEvaluation, ProviderRelogin {
-  readonly id: string
-  readonly name: string
-  readonly capabilities: AcademicCapabilities
-  /**
-   * Explicit allowlist of plugin manifest ids this provider supports.
-   *
-   * Omitted (or `undefined`) keeps the historical behaviour: every plugin is
-   * allowed. When present it narrows plugin-contributed pages, navigation
-   * entries, and overview widgets on top of `capabilities`; it never widens
-   * them, so both checks must pass.
-   */
-  readonly supportedPlugins?: readonly string[]
-  readonly mobile?: ProviderMobile
-  readonly diagnostics?: ProviderDiagnostics
-  readonly nativeNotification?: ProviderNativeNotification
-  readonly ecard?: ProviderEcard
-  readonly epay?: ProviderEpay
-  readonly gradeScale?: ProviderGradeScale
-  /** Required to show GPA ratings; omitted when the school has no such interpretation. */
-  readonly gpaScale?: ProviderGPAScale
+export type OptionalProviderModule<T> = { [K in keyof T]?: T[K] }
+
+/**
+ * Abstract composition contract for an academic data provider.
+ *
+ * Only the runtime lifecycle, identity and capability declaration are
+ * required. Auth, academic and evaluation methods are optional here so a
+ * provider can contribute just the modules it implements; the module
+ * interfaces themselves remain the required shape for consumers that need a
+ * specific surface. WeChat MFA is a separate optional extension.
+ */
+export type AcademicProvider = ManagedProvider &
+  OptionalProviderModule<ProviderAuth> &
+  OptionalProviderModule<ProviderAcademics> &
+  OptionalProviderModule<ProviderEvaluation> & {
+    /** Warms caches after the runtime reports the provider ready. */
+    warmup?(): Promise<void>
+    readonly id: string
+    readonly name: string
+    readonly capabilities: AcademicCapabilities
+    /** Optional WeChat QR-scan MFA extension; absent providers use code MFA. */
+    readonly wechatMfa?: WechatMfaProvider
+    /**
+     * Explicit allowlist of plugin manifest ids this provider supports.
+     *
+     * Omitted (or `undefined`) keeps the historical behaviour: every plugin is
+     * allowed. When present it narrows plugin-contributed pages, navigation
+     * entries, and overview widgets on top of `capabilities`; it never widens
+     * them, so both checks must pass.
+     */
+    readonly supportedPlugins?: readonly string[]
+    readonly mobile?: ProviderMobile
+    readonly diagnostics?: ProviderDiagnostics
+    readonly nativeNotification?: ProviderNativeNotification
+    readonly ecard?: ProviderEcard
+    readonly epay?: ProviderEpay
+    readonly gradeScale?: ProviderGradeScale
+    /** Required to show GPA ratings; omitted when the school has no such interpretation. */
+    readonly gpaScale?: ProviderGPAScale
+  }
+
+/**
+ * Full academic surface used by host UI that renders the built-in academic
+ * pages. The provider contract itself stays optional; this view is asserted at
+ * the UI boundary, while capability checks keep unsupported features off.
+ */
+export type AcademicProviderRuntime = AcademicProvider &
+  ProviderAuth &
+  ProviderAcademics &
+  ProviderEvaluation
+
+/** Services available only when the academic runtime is included in a composition. */
+export interface AcademicPluginContext extends PluginContext {
+  session: PluginSessionService
+  provider: PluginProviderRuntimeService
+  providers: PluginProviderRegistryService
+  query: PluginQueryService
 }

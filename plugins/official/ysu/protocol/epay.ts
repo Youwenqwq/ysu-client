@@ -7,9 +7,10 @@
  * 接口返回"宽松 JSON"（key 不带引号），用 parseLooseJson 处理。
  */
 import type { EpayRecord, EpayRecordStatus, EpaySessionStatus } from "@orahako/plugin-sdk/academic"
-import { SimpleCookieJar, fetchWithJar, type HttpResponse } from "@orahako/plugin-sdk/host"
+import type { CookieJar, HttpResponse } from "@orahako/plugin-sdk"
+import type { YSUContext } from "../context"
+import type { CASProtocol } from "./cas"
 import { parseLooseJson } from "./parse-json"
-import { authorize, getCredentialApplied } from "./cas"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 
 // ─── Constants ────────────────────────────────────────────────────────── //
@@ -44,24 +45,36 @@ export class EpayNotLoggedInError extends EpayProtocolError {
   }
 }
 
-// ─── Module state ─────────────────────────────────────────────────────── //
+// ─── Provider-scoped state ────────────────────────────────────────────── //
 
-let epayJar = new SimpleCookieJar()
-let timeoutMs = 30_000
-let authorized = false
-let inflightAuth: Promise<void> | null = null
-let inflightStatus: Promise<EpaySessionStatus> | null = null
+export interface EpayProtocol {
+  getJar(): CookieJar
+  setTimeoutMs(ms: number): void
+  resetEpay(): void
+  toEpayRecords(D: unknown): EpayRecord[]
+  toRecordStatus(record: EpayRecord): EpayRecordStatus
+  mergeRecords(...lists: EpayRecord[][]): EpayRecord[]
+  toUnpaidRecords(pending: EpayRecord[]): EpayRecord[]
+  getEpayStatus(): Promise<EpaySessionStatus>
+}
 
-export function getJar(): SimpleCookieJar {
+export function createEPAY(ctx: YSUContext, cas: CASProtocol): EpayProtocol {
+  let epayJar = ctx.session.createCookieJar()
+  let timeoutMs = 30_000
+  let authorized = false
+  let inflightAuth: Promise<void> | null = null
+  let inflightStatus: Promise<EpaySessionStatus> | null = null
+
+function getJar(): CookieJar {
   return epayJar
 }
 
-export function setTimeoutMs(ms: number): void {
+function setTimeoutMs(ms: number): void {
   timeoutMs = ms
 }
 
-export function resetEpay(): void {
-  epayJar = new SimpleCookieJar()
+function resetEpay(): void {
+  epayJar = ctx.session.createCookieJar()
   authorized = false
   inflightAuth = null
   inflightStatus = null
@@ -77,7 +90,7 @@ function repr(e: unknown): string {
  * 懒认证：用 CAS session 换取 epay 会话。
  * 授权即 GET /pay/allPay.html（service），成功后 epayJar 即持有有效会话。
  */
-async function ensureAuthorized(targetJar: SimpleCookieJar): Promise<void> {
+async function ensureAuthorized(targetJar: CookieJar): Promise<void> {
   await waitForAuthTransition()
   assertCurrentSession(targetJar)
   if (authorized) return
@@ -86,9 +99,9 @@ async function ensureAuthorized(targetJar: SimpleCookieJar): Promise<void> {
   const promise = withAuthTransition(async () => {
     assertCurrentSession(targetJar)
     if (authorized) return
-    await getCredentialApplied()
+    await cas.getCredentialApplied()
     assertCurrentSession(targetJar)
-    await authorize(`${BASE_URL}${SERVICE_PATH}`, targetJar)
+    await cas.authorize(`${BASE_URL}${SERVICE_PATH}`, targetJar)
     assertCurrentSession(targetJar)
     authorized = true
   })
@@ -100,14 +113,14 @@ async function ensureAuthorized(targetJar: SimpleCookieJar): Promise<void> {
   }
 }
 
-function assertCurrentSession(targetJar: SimpleCookieJar): void {
+function assertCurrentSession(targetJar: CookieJar): void {
   if (epayJar !== targetJar) {
     throw new EpayNotLoggedInError("payment session changed during query")
   }
 }
 
 /** 会话过期时重新认证一次并重试（与 jwxt runWithReauth 同一模式）。 */
-async function runWithReauth<T>(fn: (jar: SimpleCookieJar) => Promise<T>): Promise<T> {
+async function runWithReauth<T>(fn: (jar: CookieJar) => Promise<T>): Promise<T> {
   const targetJar = epayJar
   await ensureAuthorized(targetJar)
   try {
@@ -135,12 +148,12 @@ function isLoginPage(response: HttpResponse, text: string): boolean {
 }
 
 /** 共用只读传输和会话失效判定，所有请求绑定查询开始时的 jar。 */
-async function requestText(targetJar: SimpleCookieJar, path: string): Promise<string> {
+async function requestText(targetJar: CookieJar, path: string): Promise<string> {
   assertCurrentSession(targetJar)
   const url = `${BASE_URL}${path}`
   let response: HttpResponse
   try {
-    response = await fetchWithJar(targetJar, {
+    response = await ctx.session.fetchWithJar(targetJar, {
       method: "GET",
       url,
       redirect: "follow",
@@ -183,7 +196,7 @@ function idxOf(names: Record<string, unknown>, key: string): number | null {
  * 从 eterna $E.D（D 对象）解析 queryResult 全部付款记录。
  * body 为 /pay/allPay.html 内 `var $E={G:...,D:{...},...}` 里 D 的对象值。
  */
-export function toEpayRecords(D: unknown): EpayRecord[] {
+function toEpayRecords(D: unknown): EpayRecord[] {
   const d = asRecord(D)
   const qr = asRecord(d.queryResult)
   const names = asRecord(qr.names)
@@ -237,7 +250,7 @@ export function toEpayRecords(D: unknown): EpayRecord[] {
 }
 
 /** 从行数据归一化支付状态。 */
-export function toRecordStatus(r: EpayRecord): EpayRecordStatus {
+function toRecordStatus(r: EpayRecord): EpayRecordStatus {
   if (r.overTime.trim() !== "") return "paid"
   if (r.expired.trim() === "1") return "expired"
   const status = r.status.trim()
@@ -287,7 +300,7 @@ function extractDObject(html: string): Record<string, unknown> | null {
 
 /** 登录后抓指定页面（allPay/index）里的付款记录，解出其 D 对象里的 queryResult。 */
 async function fetchRecordsFromPage(
-  targetJar: SimpleCookieJar,
+  targetJar: CookieJar,
   path: string
 ): Promise<EpayRecord[]> {
   const text = await requestText(targetJar, path)
@@ -307,7 +320,7 @@ async function fetchRecordsFromPage(
  * allPay（已缴历史）与 index（待缴）互补；同一笔单不会同时出现在两边，
  * 但去重保险，避免边界情况重复展示。
  */
-export function mergeRecords(...lists: EpayRecord[][]): EpayRecord[] {
+function mergeRecords(...lists: EpayRecord[][]): EpayRecord[] {
   const seen = new Set<string>()
   const merged: EpayRecord[] = []
   for (const list of lists) {
@@ -326,14 +339,14 @@ export function mergeRecords(...lists: EpayRecord[][]): EpayRecord[] {
  * 判定与官方页面一致：overTime 为空 && status=1 && expired=0。
  * allPay 记录（含已过期/已关闭的未支付历史）不参与待缴判定。
  */
-export function toUnpaidRecords(pending: EpayRecord[]): EpayRecord[] {
+function toUnpaidRecords(pending: EpayRecord[]): EpayRecord[] {
   return pending.filter(
     (r) => r.overTime.trim() === "" && r.status.trim() === "1" && r.expired.trim() === "0"
   )
 }
 
 /** 查询当前会话的付款状态（全部记录 = allPay 已缴 + index 待缴；待缴只以 index 为准）。 */
-export async function getEpayStatus(): Promise<EpaySessionStatus> {
+async function getEpayStatus(): Promise<EpaySessionStatus> {
   if (inflightStatus) return inflightStatus
   const promise = runWithReauth(async (targetJar) => {
     const history = await fetchRecordsFromPage(targetJar, ALL_PAY_PATH)
@@ -348,5 +361,17 @@ export async function getEpayStatus(): Promise<EpaySessionStatus> {
     return await promise
   } finally {
     if (inflightStatus === promise) inflightStatus = null
+  }
+}
+
+  return {
+    getJar,
+    setTimeoutMs,
+    resetEpay,
+    toEpayRecords,
+    toRecordStatus,
+    mergeRecords,
+    toUnpaidRecords,
+    getEpayStatus,
   }
 }

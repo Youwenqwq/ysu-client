@@ -1,19 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { HttpRequest, HttpResponse } from "@orahako/plugin-sdk/host"
+import type { HttpRequest, HttpResponse } from "@orahako/plugin-sdk"
 import {
   aes128EcbDecrypt,
   aes128EcbEncrypt,
   base64ToBytes,
   bytesToBase64,
 } from "@orahako/plugin-sdk/crypto"
+import { MeterClient, MeterError } from "./client"
 
 const sendMock = vi.fn<(req: HttpRequest) => Promise<HttpResponse>>()
-
-vi.mock("@orahako/plugin-sdk/host", () => ({
-  fetchStateless: (req: HttpRequest) => sendMock(req),
-}))
-
-import { MeterClient, MeterError } from "./client"
+const http = { send: sendMock }
 
 // 与协议笔记一致的独立实现（client 内部 deriveKey 未导出，测试中复算以交叉验证）
 function deriveKey(ts: string, rs: string): Uint8Array {
@@ -87,7 +83,7 @@ describe("MeterClient 协议契约", () => {
       })
     })
 
-    const room = await new MeterClient("202411040369").getRoom()
+    const room = await new MeterClient("202411040369", http).getRoom()
     expect(room).toEqual({
       roomFullName: "燕山大学西校区_四组团B座_5层_526房间",
       roomverify: "104-9--36-526",
@@ -103,14 +99,14 @@ describe("MeterClient 协议契约", () => {
         body: JSON.stringify({ result: "-20003", message: "账号不存在" }),
       })
     )
-    await expect(new MeterClient("x").getRoom()).resolves.toBeNull()
+    await expect(new MeterClient("x", http).getRoom()).resolves.toBeNull()
   })
 
   it("信封 code_ != 0 抛 MeterError（带服务端 message_）", async () => {
     sendMock.mockResolvedValue(
       encryptedResponse({ code_: 500, result_: "false", message_: "系统繁忙", body: "" })
     )
-    const err = await new MeterClient("x").getRoom().catch((e: unknown) => e)
+    const err = await new MeterClient("x", http).getRoom().catch((e: unknown) => e)
     expect(err).toBeInstanceOf(MeterError)
     expect((err as MeterError).code).toBe(500)
     expect((err as MeterError).message).toBe("系统繁忙")
@@ -124,7 +120,7 @@ describe("MeterClient 协议契约", () => {
       text: async () => "",
       arrayBuffer: async () => new ArrayBuffer(0),
     })
-    await expect(new MeterClient("x").getRoom()).rejects.toThrow("HTTP 502")
+    await expect(new MeterClient("x", http).getRoom()).rejects.toThrow("HTTP 502")
   })
 
   it("getDailyUse：携带 account 与 businesstype=0（实测缺 account 报参数异常）", async () => {
@@ -148,7 +144,7 @@ describe("MeterClient 协议契约", () => {
         body: JSON.stringify({ result: "0", dayuselist: [{ date: "2026-08-15", use: "0.01" }] }),
       })
     })
-    const daily = await new MeterClient("202411040369").getDailyUse(
+    const daily = await new MeterClient("202411040369", http).getDailyUse(
       "104-9--36-526",
       "2026-08-15",
       "2026-08-22"

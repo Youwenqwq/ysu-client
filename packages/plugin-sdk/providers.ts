@@ -1,24 +1,23 @@
-import type { AcademicProvider } from "./academic"
-import type { SchoolConfig } from "./provider-school"
+import type { ManagedProvider } from "./provider-runtime"
+import type { PluginContext } from "./runtime"
 
-/** Creates a fresh provider instance for one school. */
-export type ProviderFactory = () => AcademicProvider
-
-/** A school config plus the provider factory that serves it. */
-export interface SchoolRegistration {
-  config: SchoolConfig
-  providerFactory: ProviderFactory
-}
+/** Creates a fresh provider instance using the contributing plugin's context. */
+export type ProviderFactory = (ctx: PluginContext) => ManagedProvider
 
 /**
- * Provider capability exposed to plugins as `ctx.providers`.
+ * Provider contribution capability exposed to plugins as `ctx.providers`.
  *
  * Registrations made through this service are revoked automatically when the
- * contributing plugin's Cordis scope is disposed. Each method also returns a
+ * contributing plugin's Cordis scope is disposed. `registerProvider` returns a
  * disposer for manual early removal.
  */
 export interface PluginProviderService {
   registerProvider(schoolId: string, factory: ProviderFactory): () => void
-  registerSchool(registration: SchoolRegistration): () => void
   hasProvider(schoolId: string): boolean
+}
+
+/** Read side of the provider registry owned by the host. */
+export interface PluginProviderRegistryService extends PluginProviderService {
+  createProvider(schoolId: string): ManagedProvider
+  subscribe(listener: (schoolId: string) => void): () => void
 }

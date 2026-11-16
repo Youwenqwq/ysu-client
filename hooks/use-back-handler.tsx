@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import { BACK_PRIORITY, registerBackHandler } from "@/lib/navigation/back"
+import { BACK_PRIORITY, registerBackHandler } from "@orahako/plugin-ui/platform"
 
 const BackDepth = createContext(0)
 

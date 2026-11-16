@@ -6,9 +6,9 @@
  * 仅读取状态，不发起任何支付。
  */
 
-import { useAuthStore } from "@orahako/plugin-ui/stores"
 import { useSettingsStore } from "@orahako/plugin-ui/stores"
-import { getActiveProvider } from "@orahako/plugin-ui/stores"
+import type { AcademicPluginContext } from "@orahako/plugin-sdk"
+import type { AcademicProvider } from "@orahako/plugin-sdk/academic"
 /** 距离上次检查的最小间隔（毫秒）：3 小时 */
 const MIN_INTERVAL_MS = 3 * 3600 * 1000
 
@@ -26,11 +26,13 @@ export interface EpayCheckResult {
 /**
  * 触发一次自动检查（幂等：频率受限）。返回查询结果或 null（未满足条件/失败）。
  */
-export async function runEpayAutoCheck(): Promise<EpayCheckResult | null> {
+export async function runEpayAutoCheck(
+  runtime: Pick<AcademicPluginContext, "session" | "provider">
+): Promise<EpayCheckResult | null> {
   const settings = useSettingsStore.getState()
   if (!settings.epayNotifyEnabled) return null
 
-  const { username, credential } = useAuthStore.getState()
+  const { username, credential } = runtime.session.getSnapshot()
   if (!username || checkingAccounts.get(username) === credential) return null
 
   const account = settings.epayAccountSettings[username]
@@ -39,9 +41,10 @@ export async function runEpayAutoCheck(): Promise<EpayCheckResult | null> {
   checkingAccounts.set(username, credential)
 
   try {
-    const status = await getActiveProvider().epay?.fetchPayments()
+    const provider = runtime.provider.getActive() as AcademicProvider
+    const status = await provider.epay?.fetchPayments()
     if (!status) return null
-    const currentAuth = useAuthStore.getState()
+    const currentAuth = runtime.session.getSnapshot()
     if (
       currentAuth.username !== username ||
       currentAuth.credential !== credential ||

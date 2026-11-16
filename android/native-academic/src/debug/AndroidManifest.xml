@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Debug builds only: drives the real cache, alarm, service and optional
+         vibration path through a synthetic reminder. It is never exported. -->
+    <application>
+        <receiver
+            android:name="me.uwen.orahako.notify.DebugLiveUpdateReceiver"
+            android:exported="false" />
+    </application>
+</manifest>

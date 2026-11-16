@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { validatePluginManifest } from "@orahako/plugin-sdk"
 import { PluginRuntime } from "@/lib/plugins/runtime"
-import { PluginUIRegistry } from "@/lib/plugins/ui-registry"
+import { PluginUIRegistry } from "@/plugins/official/runtime/registries/ui"
 
 vi.mock("./page", () => ({ MakeupExamsPage: () => null }))
 
@@ -15,7 +15,8 @@ describe("makeup exams plugin", () => {
 
   it("registers the makeup exams page and academic navigation", () => {
     const ui = new PluginUIRegistry()
-    const runtime = new PluginRuntime(ui.createService)
+    const runtime = new PluginRuntime()
+    runtime.context.set("ui", ui)
     runtime.register(manifest, definition, "builtin")
     runtime.start(manifest.id)
 

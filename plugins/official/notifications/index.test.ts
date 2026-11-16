@@ -1,27 +1,29 @@
 import { describe, expect, it } from "vitest"
 import type { PluginManifest } from "@orahako/plugin-sdk"
-import { PluginNotificationRegistry } from "@/lib/plugins/notification-registry"
+import { PluginNotificationRegistry } from "@/plugins/official/runtime/registries/notifications"
 import { PluginRuntime } from "@/lib/plugins/runtime"
-import { PluginSettingsRegistry } from "@/lib/plugins/settings-registry"
-import { PluginSlotRegistry } from "@/lib/plugins/slot-registry"
+import { PluginSettingsRegistry } from "@/plugins/official/runtime/registries/settings"
+import { PluginSlotRegistry } from "@/plugins/official/runtime/registries/slots"
 import { definition, manifest } from "./index"
 
 const shellManifest: PluginManifest = {
   id: "test.shell",
   name: "Test shell",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: 2,
   kind: "shell",
   entry: "index.js",
+  inject: ["slots"],
 }
 
 const reminderManifest: PluginManifest = {
   id: "test.reminder",
   name: "Test reminder",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: 2,
   kind: "feature",
   entry: "index.js",
+  inject: ["slots", "notifications"],
 }
 
 function ReminderSettings() {
@@ -33,11 +35,10 @@ describe("notifications plugin", () => {
     const slots = new PluginSlotRegistry()
     const notifications = new PluginNotificationRegistry()
     const settings = new PluginSettingsRegistry()
-    const runtime = new PluginRuntime((ctx, plugin) => {
-      slots.createService(ctx, plugin)
-      notifications.createService(ctx, plugin)
-      settings.createService(ctx, plugin)
-    })
+    const runtime = new PluginRuntime()
+    runtime.context.set("slots", slots)
+    runtime.context.set("notifications", notifications)
+    runtime.context.set("settings", settings)
     runtime.register(
       shellManifest,
       (ctx) => {

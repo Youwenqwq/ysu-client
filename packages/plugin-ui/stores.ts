@@ -1,29 +1,19 @@
 /**
- * @orahako/plugin-ui/stores — host Zustand stores and storage adapters.
+ * @orahako/plugin-ui/stores — official Shell preference stores only.
+ *
+ * These stores describe the default Shell's UI preferences; they are not
+ * runtime capabilities. Storage keys, secure storage and file media stay owned
+ * by the module that persists them.
  */
-export { useAuthStore } from "@/lib/stores/auth"
-export { useSettingsStore } from "@/lib/stores/settings"
+export { useSettingsStore } from "@/plugins/official/shell/stores/settings"
 export type {
   CardStyle,
   BackgroundStyle,
   LandingPage,
   WidgetAssistantPosition,
-} from "@/lib/stores/settings"
+} from "@/plugins/official/shell/stores/settings"
 export {
   useMobileHeaderStore,
   useMobileHeaderRight,
   useMobileHeaderLayout,
-} from "@/lib/stores/mobile-header"
-export {
-  getActiveProvider,
-  setActiveProviderSchool,
-  initializeActiveProvider,
-  resetActiveProvider,
-  logoutActiveProvider,
-  reloginActiveProvider,
-} from "@/providers/provider-service"
-export { STORAGE_KEYS } from "@/lib/storage/keys"
-export { localStorageAdapter } from "@/lib/storage/local"
-export { secureStorage } from "@/lib/storage/secure"
-export { loadAvatarImage, saveAvatarImage, removeAvatarImage } from "@/lib/storage/avatar"
-export { getSchoolConfigScope } from "@/lib/server-config"
+} from "@/plugins/official/shell/stores/mobile-header"

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest"
 import { validatePluginManifest, type PluginManifest } from "@orahako/plugin-sdk"
 import { PluginRuntime } from "@/lib/plugins/runtime"
-import { PluginNotificationRegistry } from "@/lib/plugins/notification-registry"
-import { PluginSlotRegistry } from "@/lib/plugins/slot-registry"
-import { PluginUIRegistry } from "@/lib/plugins/ui-registry"
+import { PluginNotificationRegistry } from "@/plugins/official/runtime/registries/notifications"
+import { PluginSlotRegistry } from "@/plugins/official/runtime/registries/slots"
+import { PluginUIRegistry } from "@/plugins/official/runtime/registries/ui"
 
 vi.mock("./page", () => ({ ExamsPage: () => null }))
 vi.mock("./settings", () => ({
@@ -18,20 +18,20 @@ const shellManifest: PluginManifest = {
   id: "orahako.shell",
   name: "Shell",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: 2,
   kind: "shell",
   entry: "index.js",
+  inject: ["slots"],
 }
 
 function createRuntime() {
   const ui = new PluginUIRegistry()
   const slots = new PluginSlotRegistry()
   const notifications = new PluginNotificationRegistry()
-  const runtime = new PluginRuntime((ctx, current) => {
-    ui.createService(ctx, current)
-    slots.createService(ctx, current)
-    notifications.createService(ctx, current)
-  })
+  const runtime = new PluginRuntime()
+  runtime.context.set("ui", ui)
+  runtime.context.set("slots", slots)
+  runtime.context.set("notifications", notifications)
   runtime.register(
     shellManifest,
     (ctx) => {

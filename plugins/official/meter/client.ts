@@ -5,7 +5,7 @@
  * 接口无会话鉴权，凭据即学工号；详见逆向笔记（docs 未入库）。
  */
 
-import { fetchStateless } from "@orahako/plugin-sdk/host"
+import type { PluginHttpService } from "@orahako/plugin-sdk"
 import {
   aes128EcbDecrypt,
   aes128EcbEncrypt,
@@ -57,9 +57,15 @@ function deriveKey(ts: string, rs: string): Uint8Array {
   return new TextEncoder().encode(part + rs)
 }
 
+/** Public stateless HTTP surface the client needs; plugins pass `ctx.http`. */
+export type MeterHttp = Pick<PluginHttpService, "send">
+
 export class MeterClient {
   /** account 即学工号 */
-  constructor(private readonly account: string) {}
+  constructor(
+    private readonly account: string,
+    private readonly http: MeterHttp
+  ) {}
 
   private async call(cmd: string, params: Record<string, string>): Promise<unknown> {
     const ts = String(Date.now())
@@ -74,7 +80,7 @@ export class MeterClient {
       aes128EcbEncrypt(deriveKey(ts, rs), new TextEncoder().encode(outer))
     )
 
-    const res = await fetchStateless({
+    const res = await this.http.send({
       method: "POST",
       url: API_URL,
       headers: {
@@ -153,9 +159,14 @@ export interface MeterData {
   recharges: RechargeRecord[]
 }
 
+/** 显式工厂：把插件上下文的 HTTP 服务绑定到本次查询。 */
+export function createMeterClient(account: string, http: MeterHttp): MeterClient {
+  return new MeterClient(account, http)
+}
+
 /** 一次拉齐页面所需全部数据：先 getbindroom 拿 roomverify，其余并行 */
-export async function fetchMeterData(account: string): Promise<MeterData> {
-  const client = new MeterClient(account)
+export async function fetchMeterData(account: string, http: MeterHttp): Promise<MeterData> {
+  const client = createMeterClient(account, http)
   const room = await client.getRoom()
   if (!room) throw new MeterError(1, "NOT_BOUND")
   const end = new Date()

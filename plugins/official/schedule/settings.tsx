@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Device } from "@capacitor/device"
@@ -29,15 +29,11 @@ import {
   cn,
 } from "@orahako/plugin-ui/components"
 import { useProvider, useProviderCapabilities, useTranslation } from "@orahako/plugin-ui/hooks"
+import { usePluginServices } from "@orahako/plugin-ui/plugin"
 import { useSettingsStore } from "@orahako/plugin-ui/stores"
 import { buroImage } from "@orahako/plugin-ui/assets"
-import {
-  checkExactAlarmPermission,
-  isCapacitor,
-  requestExactAlarmPermission,
-  setNotificationEnabled,
-  syncWidgetSettingsToWidget,
-} from "@orahako/plugin-ui/platform"
+import { isCapacitor } from "@orahako/plugin-ui/platform"
+import { syncScheduleWidgetSettings } from "@orahako/academic/widget-snapshots"
 
 export function ScheduleStartupOption() {
   const { t } = useTranslation()
@@ -56,6 +52,8 @@ export function ScheduleStartupOption() {
 export function ScheduleWidgetSettingsPanel() {
   const { t } = useTranslation()
   const capabilities = useProviderCapabilities()
+  const services = usePluginServices()
+  const native = services.native
   const widgetSyncReminderHours = useSettingsStore((s) => s.widgetSyncReminderHours)
   const setWidgetSyncReminderHours = useSettingsStore((s) => s.setWidgetSyncReminderHours)
   const widgetShowNextDaySchedule = useSettingsStore((s) => s.widgetShowNextDaySchedule)
@@ -93,7 +91,7 @@ export function ScheduleWidgetSettingsPanel() {
           value={widgetSyncReminderHours}
           onChange={(v) => {
             setWidgetSyncReminderHours(v)
-            syncWidgetSettingsToWidget(v, widgetShowNextDaySchedule).catch(() => {})
+            syncScheduleWidgetSettings(native, v, widgetShowNextDaySchedule).catch(() => {})
           }}
           min={0}
           max={168}
@@ -108,7 +106,7 @@ export function ScheduleWidgetSettingsPanel() {
             checked={widgetShowNextDaySchedule}
             onCheckedChange={(v) => {
               setWidgetShowNextDaySchedule(v)
-              syncWidgetSettingsToWidget(widgetSyncReminderHours, v).catch(() => {})
+              syncScheduleWidgetSettings(native, widgetSyncReminderHours, v).catch(() => {})
             }}
           />
         </div>
@@ -148,6 +146,8 @@ export function ClassReminderSettings() {
   const { t } = useTranslation()
   const provider = useProvider()
   const capabilities = useProviderCapabilities()
+  const services = usePluginServices()
+  const native = services.native
   const classReminderEnabled = useSettingsStore((s) => s.classReminderEnabled)
   const classReminderMinutes = useSettingsStore((s) => s.classReminderMinutes)
   const setClassReminderMinutes = useSettingsStore((s) => s.setClassReminderMinutes)
@@ -157,6 +157,15 @@ export function ClassReminderSettings() {
   const setClassVibrationEnabled = useSettingsStore((s) => s.setClassVibrationEnabled)
   const classReminderDays = useSettingsStore((s) => s.classReminderDays)
   const setClassReminderDays = useSettingsStore((s) => s.setClassReminderDays)
+  const setClassReminderEnabled = useSettingsStore((s) => s.setClassReminderEnabled)
+
+  const checkExactAlarmPermission = useCallback(async (): Promise<{ granted: boolean }> => {
+    const result = await native.capabilities.invoke<{ granted?: boolean }>(
+      "notifications.core",
+      "checkExactAlarmPermission"
+    )
+    return { granted: result?.granted === true }
+  }, [native.capabilities])
 
   const [notificationPermissionPending, setNotificationPermissionPending] = useState(false)
   const [liveUpdatePermissionPending, setLiveUpdatePermissionPending] = useState(false)
@@ -207,7 +216,7 @@ export function ClassReminderSettings() {
       disposed = true
       listener?.remove()
     }
-  }, [visible, setClassLiveUpdateEnabled])
+  }, [visible, setClassLiveUpdateEnabled, checkExactAlarmPermission])
 
   if (!visible) return null
 
@@ -215,8 +224,12 @@ export function ClassReminderSettings() {
     if (!enabled) awaitingExactAlarmPermission.current = false
     setNotificationPermissionPending(true)
     try {
-      if (!(await setNotificationEnabled("classes", enabled))) {
+      if (!enabled) {
+        setClassReminderEnabled(false)
+      } else if (!(await native.requestNotificationPermission())) {
         toast.error(t("settings.notificationPermissionDenied"))
+      } else {
+        setClassReminderEnabled(true)
       }
     } catch {
       toast.error(t("settings.notificationSyncFailed"))
@@ -234,7 +247,7 @@ export function ClassReminderSettings() {
     awaitingExactAlarmPermission.current = true
     setLiveUpdatePermissionPending(true)
     try {
-      const { granted } = await requestExactAlarmPermission()
+      const granted = await native.requestExactAlarmPermission()
       if (granted) {
         awaitingExactAlarmPermission.current = false
         setClassLiveUpdateEnabled(true)

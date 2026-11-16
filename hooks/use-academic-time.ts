@@ -2,9 +2,9 @@
 
 import { useMemo, useSyncExternalStore } from "react"
 import { App } from "@capacitor/app"
-import type { CurrentWeek, TermCalendar } from "@/providers/types"
-import { isCapacitor } from "@/lib/native/platform"
-import { getAcademicClock, resolveAcademicWeek } from "@/lib/academic/academic-time"
+import type { CurrentWeek, TermCalendar } from "@orahako/plugin-sdk/academic"
+import { isCapacitor } from "@orahako/plugin-sdk/native"
+import { getAcademicClock, resolveAcademicWeek } from "@orahako/academic/academic-time"
 
 const listeners = new Set<() => void>()
 let stopClock: (() => void) | undefined

@@ -40,7 +40,7 @@ import {
 import { useTranslation } from "@orahako/plugin-ui/hooks"
 import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
 import { cn } from "@orahako/plugin-ui/components"
-import { useEvaluationTypes, usePendingEvaluations } from "@orahako/plugin-ui/hooks"
+import { useEvaluationTypes, usePendingEvaluations } from "@orahako/academic"
 import { useProvider } from "@orahako/plugin-ui/hooks"
 import type { EvaluationTask, EvaluationDetail, Question, EvaluationAnswer } from "@orahako/plugin-sdk"
 import { ChevronDown, ChevronRight, ClipboardCheck, Sparkles } from "lucide-react"

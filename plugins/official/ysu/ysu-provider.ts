@@ -1,5 +1,11 @@
-import type { AcademicCompletion as ProtocolAcademicCompletion } from "./protocol/jwxt"
-import { getSchoolConfig, isFeatureAvailable, useAuthStore } from "@orahako/plugin-sdk/host"
+import type {
+  AcademicCompletion as ProtocolAcademicCompletion,
+  Course as JWXTCourse,
+  EvaluationTask as JWXTEvaluationTask,
+  Grade as JWXTGrade,
+  StudentInfo as JWXTStudentInfo,
+} from "./protocol/jwxt"
+import type { YSUPluginContext } from "./context"
 import { BaseProvider } from "@orahako/plugin-sdk/provider-base"
 import { ProviderError, ProviderErrorCode } from "@orahako/plugin-sdk/provider-errors"
 import type {
@@ -67,6 +73,8 @@ import type {
   ProviderMobile,
   ProviderEcard,
   ProviderEpay,
+  ProviderDiagnostics,
+  ProviderNativeNotification,
   ProviderGPAScale,
   ProviderGradeScale,
   ScheduleQueryOptions,
@@ -81,102 +89,27 @@ import type {
   WechatMfaContext,
   WechatQrPollResult,
 } from "@orahako/plugin-sdk/academic"
-import {
-  checkCaptchaNeeded,
-  completeWechatMFA,
-  getCaptchaUrl,
-  initiateWechatMFA,
-  isAuthenticated as checkCASAuthenticated,
-  loginStep1,
-  pollWechatQR,
-  prepareLogin,
-  requestMFACode,
-  resetLoginSession,
-  saveCredential,
-  submitMFACode,
-} from "./cas-auth"
-import {
-  calculateEvaluationScore as _calculateEvaluationScore,
-  queryAcademicCompletion,
-  recalculateAcademicCompletion as recalculateAcademicCompletionImpl,
-  queryAcademicWarnings,
-  queryClassPeriods,
-  queryCurrentWeek,
-  queryEvaluationDetail,
-  queryEvaluationTypes,
-  queryExams,
-  queryMakeupExamBatches,
-  queryMakeupExamCourses,
-  queryGradeYears,
-  queryDepartments,
-  queryMajors,
-  querySchoolClasses,
-  queryClassSchedule,
-  queryCampuses,
-  queryTeachingBuildings,
-  queryClassrooms,
-  queryClassroomSchedule,
-  signupMakeupExam,
-  queryExperimentalSchedule,
-  queryGpaStats,
-  queryGradeDistribution,
-  queryGradeRanking,
-  queryGradeStatistics,
-  queryGrades,
-  queryPendingEvaluations,
-  querySchedule,
-  queryStudentInfo,
-  queryTermCalendar,
-  queryTrainingPlan,
-  queryUnscheduledCourses,
-  submitEvaluation as _submitEvaluation,
-} from "./emap-fetcher"
-import { queryEnrollableActivities, queryLaborRecords, queryLaborSummary } from "./ldxt-fetcher"
-import {
-  queryAllCreditRecords,
-  queryCompetitions,
-  queryCreditBatches,
-  queryCreditDeclarations,
-  queryCreditRecords,
-  queryCreditSummary,
-  queryLibraryActivities,
-} from "./scxt-fetcher"
-import {
-  queryAcademicReport,
-  queryAcademicReportYears,
-  queryEvaluationIndicators,
-  queryEvaluationRadar,
-  queryEvaluationResult,
-  queryEvaluationTerms,
-  queryYearScoreStatics,
-} from "./xgxt-fetcher"
 import type { CreditRecord as ScxtCreditRecord } from "./protocol/scxt"
-import { toRecordStatus } from "./protocol/epay"
-import { initializeSession, resetSession, warmupSession } from "./adapters/session-adapter"
-import { YSUMobileAdapter } from "./adapters/mobile-adapter"
-import { ysuDiagnostics } from "./diagnostics"
-import { ysuNativeNotification } from "./native-notification"
-import { reloginYSU } from "./relogin"
-import { fetchEcardBalance } from "./ecard-access"
-import { fetchEpayPayments } from "./epay-access"
+import type { YSUConfig } from "./ysu-config"
+import { createYSUProviderRuntime, type YSUProviderRuntime } from "./runtime"
 import { letterOfGradeLevel, letterOfScore, YSU_GPA_SCALE } from "./grade-letters"
 import { getYSUMfaMethods, isYSUMfaMethod } from "./types"
 
-function ysuCapabilities(): AcademicCapabilities {
+function ysuCapabilities(config: YSUConfig): AcademicCapabilities {
   return {
     auth: true,
     captcha: true,
-    mfa: isFeatureAvailable("hasMfa"),
-    wechatMfa: isFeatureAvailable("hasMfa"),
+    mfa: config.features.hasMfa,
+    wechatMfa: config.features.hasMfa,
     grades: true,
     gradeAnalytics: true,
     schedule: true,
-    labSchedule: isFeatureAvailable("hasLabSchedule"),
+    labSchedule: config.features.hasLabSchedule,
     exams: true,
     makeupExams: true,
-    laborEducation: getSchoolConfig().ldxt !== undefined,
-    innovationCredits: getSchoolConfig().scxt !== undefined,
-    comprehensiveEval: getSchoolConfig().xgxt !== undefined,
+    laborEducation: config.ldxt !== undefined,
+    innovationCredits: config.scxt !== undefined,
+    comprehensiveEval: config.xgxt !== undefined,
     schoolSchedule: true,
     gpa: true,
     evaluation: true,
@@ -186,7 +119,7 @@ function ysuCapabilities(): AcademicCapabilities {
     currentWeek: true,
     classPeriods: true,
     termCalendar: true,
-    mobileSignin: isFeatureAvailable("hasMobile"),
+    mobileSignin: config.features.hasMobile,
     ecard: true,
     meter: true,
     epay: true,
@@ -202,7 +135,7 @@ function providerTaskId(task: {
   return `${task.groupNo}|${task.evalType}|${task.sequence ?? 1}`
 }
 
-function mapStudentInfo(info: Awaited<ReturnType<typeof queryStudentInfo>>): StudentInfo {
+function mapStudentInfo(info: JWXTStudentInfo): StudentInfo {
   return {
     name: info.name ?? "",
     namePinyin: info.namePinyin ?? undefined,
@@ -225,7 +158,7 @@ function mapStudentInfo(info: Awaited<ReturnType<typeof queryStudentInfo>>): Stu
   }
 }
 
-function mapGrade(row: Awaited<ReturnType<typeof queryGrades>>[number]): Grade {
+function mapGrade(row: JWXTGrade): Grade {
   return {
     courseName: row.courseName ?? "",
     courseCode: row.courseCode ?? undefined,
@@ -256,7 +189,7 @@ function mapGrade(row: Awaited<ReturnType<typeof queryGrades>>[number]): Grade {
   }
 }
 
-function mapCourse(row: Awaited<ReturnType<typeof querySchedule>>[number]): Course {
+function mapCourse(row: JWXTCourse): Course {
   return {
     name: row.name ?? "",
     code: row.code ?? undefined,
@@ -278,7 +211,7 @@ function mapCourse(row: Awaited<ReturnType<typeof querySchedule>>[number]): Cour
 }
 
 function mapEvaluationTask(
-  row: Awaited<ReturnType<typeof queryPendingEvaluations>>[number]
+  row: JWXTEvaluationTask
 ): EvaluationTask {
   const task = {
     wid: row.wid ?? "",
@@ -347,48 +280,61 @@ function mapCompletion(completion: ProtocolAcademicCompletion): AcademicCompleti
 }
 
 export class YSUProvider extends BaseProvider {
-  readonly id = "ysu"
-  readonly name = "燕山大学"
-  readonly capabilities = ysuCapabilities()
-  readonly mobile?: ProviderMobile = this.capabilities.mobileSignin
-    ? new YSUMobileAdapter()
-    : undefined
-  readonly diagnostics = ysuDiagnostics
-  readonly nativeNotification = ysuNativeNotification
-  readonly ecard: ProviderEcard = { fetchBalance: fetchEcardBalance }
-  readonly epay: ProviderEpay = {
-    fetchPayments: fetchEpayPayments,
-    recordStatus: toRecordStatus,
-  }
+  readonly id: string
+  readonly name: string
+  readonly capabilities: AcademicCapabilities
+  readonly mobile?: ProviderMobile
+  readonly diagnostics: ProviderDiagnostics
+  readonly nativeNotification: ProviderNativeNotification
+  readonly ecard: ProviderEcard
+  readonly epay: ProviderEpay
   readonly gradeScale: ProviderGradeScale = { letterOfScore, letterOfGradeLevel }
   readonly gpaScale: ProviderGPAScale = YSU_GPA_SCALE
+  private readonly runtime: YSUProviderRuntime
+
+  constructor(ctx: YSUPluginContext) {
+    super()
+    const runtime = createYSUProviderRuntime(ctx)
+    this.runtime = runtime
+    this.id = runtime.ctx.config.id
+    this.name = runtime.ctx.config.name
+    this.capabilities = ysuCapabilities(runtime.ctx.config)
+    this.mobile = this.capabilities.mobileSignin ? runtime.mobileAdapter : undefined
+    this.diagnostics = runtime.diagnostics
+    this.nativeNotification = runtime.nativeNotification
+    this.ecard = { fetchBalance: runtime.fetchEcardBalance }
+    this.epay = {
+      fetchPayments: runtime.fetchEpayPayments,
+      recordStatus: runtime.epay.toRecordStatus,
+    }
+  }
 
   protected async onInitialize(): Promise<void> {
-    await initializeSession()
+    await this.runtime.lifecycle.initializeSession()
   }
 
   async warmup(): Promise<void> {
-    await warmupSession()
+    await this.runtime.lifecycle.warmupSession()
   }
 
   protected async onReset(): Promise<void> {
-    await resetSession()
+    await this.runtime.lifecycle.resetSession()
   }
 
   async prepareLogin(): Promise<void> {
-    await prepareLogin()
+    await this.runtime.auth.prepareLogin()
   }
 
   async resetLoginSession(): Promise<void> {
-    await resetLoginSession()
+    await this.runtime.auth.resetLoginSession()
   }
 
   getCaptchaUrl(): string | null {
-    return getCaptchaUrl()
+    return this.runtime.auth.getCaptchaUrl()
   }
 
   async checkCaptchaNeeded(username: string): Promise<boolean> {
-    return checkCaptchaNeeded(username)
+    return this.runtime.auth.checkCaptchaNeeded(username)
   }
 
   async login(credential: Credential): Promise<void> {
@@ -412,7 +358,7 @@ export class YSUProvider extends BaseProvider {
     })
 
     if (result.authenticated && result.credential) {
-      saveCredential(result.credential, result.username)
+      this.runtime.auth.saveCredential(result.credential, result.username)
       return
     }
 
@@ -433,7 +379,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async loginStep1(input: LoginStep1Input): Promise<LoginStep1Result> {
-    return loginStep1(
+    return this.runtime.auth.loginStep1(
       {
         username: input.username,
         password: input.password,
@@ -444,7 +390,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async requestMfaCode(input: MfaRequestInput): Promise<MfaChallenge> {
-    return requestMFACode(input.username, input.method)
+    return this.runtime.auth.requestMFACode(input.username, input.method)
   }
 
   async submitMfaCode(input: MfaSubmitInput): Promise<string> {
@@ -458,7 +404,7 @@ export class YSUProvider extends BaseProvider {
       )
     }
 
-    const credential = await submitMFACode(
+    const credential = await this.runtime.auth.submitMFACode(
       {
         method: input.challenge.method,
         methodCode: input.challenge.methodCode,
@@ -468,12 +414,12 @@ export class YSUProvider extends BaseProvider {
       },
       input.code
     )
-    saveCredential(credential, input.challenge.username)
+    this.runtime.auth.saveCredential(credential, input.challenge.username)
     return credential
   }
 
   async initiateWechatMfa(): Promise<WechatMfaContext> {
-    return initiateWechatMFA()
+    return this.runtime.auth.initiateWechatMFA()
   }
 
   async pollWechatMfaQr(
@@ -481,38 +427,38 @@ export class YSUProvider extends BaseProvider {
     lastErrcode?: number,
     signal?: AbortSignal
   ): Promise<WechatQrPollResult> {
-    return pollWechatQR(uuid, lastErrcode, signal)
+    return this.runtime.auth.pollWechatQR(uuid, lastErrcode, signal)
   }
 
   async completeWechatMfa(code: string, state: string): Promise<string> {
-    const credential = await completeWechatMFA(code, state)
-    saveCredential(credential)
+    const credential = await this.runtime.auth.completeWechatMFA(code, state)
+    this.runtime.auth.saveCredential(credential)
     return credential
   }
 
   async checkAuthStatus(): Promise<AuthStatus> {
-    return { authenticated: await checkCASAuthenticated() }
+    return { authenticated: await this.runtime.auth.isAuthenticated() }
   }
 
   async logout(): Promise<void> {
     await this.reset()
-    useAuthStore.getState().clearCredential()
+    this.runtime.ctx.session.clearCredential()
   }
 
   isAuthenticated(): boolean {
-    return useAuthStore.getState().isAuthenticated
+    return this.runtime.ctx.session.getSnapshot().isAuthenticated
   }
 
   async relogin(): Promise<boolean> {
-    return reloginYSU()
+    return this.runtime.relogin.reloginYSU()
   }
 
   async getStudentInfo(): Promise<StudentInfo> {
-    return mapStudentInfo(await queryStudentInfo())
+    return mapStudentInfo(await this.runtime.emap.queryStudentInfo())
   }
 
   async getGrades(options?: GradeQueryOptions): Promise<Grade[]> {
-    const rows = await queryGrades({
+    const rows = await this.runtime.emap.queryGrades({
       term: options?.semester,
       courseName: options?.courseName,
       pageSize: options?.pageSize,
@@ -522,7 +468,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getGPAStats(options?: GPAQueryOptions): Promise<GPAStats> {
-    const stats = await queryGpaStats({ studentId: options?.studentId })
+    const stats = await this.runtime.emap.queryGpaStats({ studentId: options?.studentId })
     return {
       planName: stats.planName ?? undefined,
       studyType: stats.studyType ?? undefined,
@@ -554,7 +500,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getGradeStatistics(options?: GradeAnalyticsQueryOptions): Promise<GradeStatistics> {
-    const stats = await queryGradeStatistics({
+    const stats = await this.runtime.emap.queryGradeStatistics({
       term: options?.semester,
       classId: options?.classId,
       courseCode: options?.courseCode,
@@ -572,7 +518,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getGradeDistribution(options?: GradeAnalyticsQueryOptions): Promise<GradeDistribution[]> {
-    const rows = await queryGradeDistribution({
+    const rows = await this.runtime.emap.queryGradeDistribution({
       term: options?.semester,
       classId: options?.classId,
       courseCode: options?.courseCode,
@@ -590,7 +536,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getGradeRanking(options?: GradeRankingQueryOptions): Promise<GradeRanking> {
-    const ranking = await queryGradeRanking({
+    const ranking = await this.runtime.emap.queryGradeRanking({
       term: options?.semester,
       studentId: options?.studentId,
       classId: options?.classId,
@@ -616,17 +562,17 @@ export class YSUProvider extends BaseProvider {
       (options?.includeLabSchedule ?? this.capabilities.labSchedule) &&
       this.capabilities.labSchedule
     const rows = includeLab
-      ? await queryExperimentalSchedule({
+      ? await this.runtime.emap.queryExperimentalSchedule({
           term,
           courseCategory: options?.courseCategory ?? "all",
         })
-      : await querySchedule({ term })
+      : await this.runtime.emap.querySchedule({ term })
     return rows.map(mapCourse)
   }
 
   async getUnscheduledCourses(options?: UnscheduledCourseQueryOptions): Promise<Course[]> {
     if (!this.capabilities.labSchedule) return []
-    const rows = await queryUnscheduledCourses({
+    const rows = await this.runtime.emap.queryUnscheduledCourses({
       term: options?.semester,
       courseCategory: options?.courseCategory ?? "all",
     })
@@ -634,7 +580,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getClassPeriods(): Promise<ClassPeriod[]> {
-    const rows = await queryClassPeriods()
+    const rows = await this.runtime.emap.queryClassPeriods()
     return rows.map((row) => ({
       name: row.name ?? undefined,
       section: row.section ?? 0,
@@ -648,7 +594,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getTermCalendar(options?: TermCalendarQueryOptions): Promise<TermCalendar> {
-    const calendar = await queryTermCalendar({ term: options?.semester })
+    const calendar = await this.runtime.emap.queryTermCalendar({ term: options?.semester })
     return {
       semester: calendar.term ?? undefined,
       startDate: calendar.startDate ?? undefined,
@@ -660,7 +606,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getCurrentWeek(options?: CurrentWeekQueryOptions): Promise<CurrentWeek> {
-    const week = await queryCurrentWeek({
+    const week = await this.runtime.emap.queryCurrentWeek({
       term: options?.semester,
       date: options?.date,
     })
@@ -682,7 +628,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getExams(options?: ExamQueryOptions): Promise<Exam[]> {
-    const rows = await queryExams({ term: options?.semester })
+    const rows = await this.runtime.emap.queryExams({ term: options?.semester })
     return rows.map((row) => ({
       name: row.name ?? "",
       examName: row.examName ?? undefined,
@@ -699,7 +645,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getMakeupExamBatches(options?: ExamQueryOptions): Promise<MakeupExamBatch[]> {
-    const rows = await queryMakeupExamBatches({ term: options?.semester })
+    const rows = await this.runtime.emap.queryMakeupExamBatches({ term: options?.semester })
     return rows.map((row) => ({
       name: row.name,
       batchId: row.batchId,
@@ -713,7 +659,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getMakeupExamCourses(options?: MakeupExamCourseQueryOptions): Promise<MakeupExamCourse[]> {
-    const rows = await queryMakeupExamCourses({
+    const rows = await this.runtime.emap.queryMakeupExamCourses({
       term: options?.semester,
       batchId: options?.batchId,
       registered: options?.registered,
@@ -737,21 +683,21 @@ export class YSUProvider extends BaseProvider {
   }
 
   async signupMakeupExam(input: MakeupExamSignupInput): Promise<void> {
-    await signupMakeupExam({ taskId: input.taskId, batchId: input.batchId })
+    await this.runtime.emap.signupMakeupExam({ taskId: input.taskId, batchId: input.batchId })
   }
 
   async getSchoolGradeYears(): Promise<CodeItem[]> {
-    const rows = await queryGradeYears()
+    const rows = await this.runtime.emap.queryGradeYears()
     return rows.map((row) => ({ id: row.id, name: row.name }))
   }
 
   async getSchoolDepartments(): Promise<CodeItem[]> {
-    const rows = await queryDepartments()
+    const rows = await this.runtime.emap.queryDepartments()
     return rows.map((row) => ({ id: row.id, name: row.name }))
   }
 
   async getSchoolMajors(department?: string): Promise<MajorInfo[]> {
-    const rows = await queryMajors(department)
+    const rows = await this.runtime.emap.queryMajors(department)
     return rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -760,7 +706,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getSchoolClasses(options?: SchoolClassQueryOptions): Promise<SchoolClassInfo[]> {
-    const rows = await querySchoolClasses({
+    const rows = await this.runtime.emap.querySchoolClasses({
       term: options?.semester,
       grade: options?.grade,
       department: options?.department,
@@ -781,22 +727,22 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getSchoolClassSchedule(classId: string, options?: ExamQueryOptions): Promise<Course[]> {
-    const rows = await queryClassSchedule(classId, { term: options?.semester })
+    const rows = await this.runtime.emap.queryClassSchedule(classId, { term: options?.semester })
     return rows.map(mapCourse)
   }
 
   async getSchoolCampuses(): Promise<CodeItem[]> {
-    const rows = await queryCampuses()
+    const rows = await this.runtime.emap.queryCampuses()
     return rows.map((row) => ({ id: row.id, name: row.name }))
   }
 
   async getSchoolBuildings(campus?: string): Promise<CodeItem[]> {
-    const rows = await queryTeachingBuildings(campus)
+    const rows = await this.runtime.emap.queryTeachingBuildings(campus)
     return rows.map((row) => ({ id: row.id, name: row.name }))
   }
 
   async getSchoolClassrooms(options?: ClassroomQueryOptions): Promise<ClassroomInfo[]> {
-    const rows = await queryClassrooms({
+    const rows = await this.runtime.emap.queryClassrooms({
       term: options?.semester,
       name: options?.name,
       campus: options?.campus,
@@ -817,12 +763,12 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getSchoolClassroomSchedule(code: string, options?: ExamQueryOptions): Promise<Course[]> {
-    const rows = await queryClassroomSchedule(code, { term: options?.semester })
+    const rows = await this.runtime.emap.queryClassroomSchedule(code, { term: options?.semester })
     return rows.map(mapCourse)
   }
 
   async getLaborRecords(): Promise<LaborRecord[]> {
-    const rows = await queryLaborRecords()
+    const rows = await this.runtime.ldxtFetcher.queryLaborRecords()
     return rows.map((row) => ({
       term: row.term,
       name: row.name,
@@ -839,7 +785,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getLaborSummary(): Promise<LaborSummary> {
-    const row = await queryLaborSummary()
+    const row = await this.runtime.ldxtFetcher.queryLaborSummary()
     return {
       studentId: row.studentId || undefined,
       name: row.name || undefined,
@@ -855,7 +801,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getLaborActivities(): Promise<EnrollableActivity[]> {
-    const rows = await queryEnrollableActivities()
+    const rows = await this.runtime.ldxtFetcher.queryEnrollableActivities()
     return rows.map((row) => ({
       name: row.name,
       category: row.category || undefined,
@@ -874,12 +820,12 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getCreditBatches(): Promise<CreditBatch[]> {
-    const rows = await queryCreditBatches()
+    const rows = await this.runtime.scxtFetcher.queryCreditBatches()
     return rows.map((row) => ({ batchId: row.batchId, name: row.name }))
   }
 
   async getCreditDeclarations(options?: CreditQueryOptions): Promise<CreditDeclaration[]> {
-    const rows = await queryCreditDeclarations({
+    const rows = await this.runtime.scxtFetcher.queryCreditDeclarations({
       batchId: options?.batchId,
       itemName: options?.itemName,
     })
@@ -897,7 +843,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getCreditRecords(options?: CreditQueryOptions): Promise<CreditRecord[]> {
-    const rows = await queryCreditRecords({
+    const rows = await this.runtime.scxtFetcher.queryCreditRecords({
       batchId: options?.batchId,
       itemName: options?.itemName,
     })
@@ -905,12 +851,12 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getAllCreditRecords(): Promise<CreditRecord[]> {
-    const rows = await queryAllCreditRecords()
+    const rows = await this.runtime.scxtFetcher.queryAllCreditRecords()
     return rows.map(mapCreditRecord)
   }
 
   async getCreditSummary(): Promise<CreditSummary> {
-    const row = await queryCreditSummary()
+    const row = await this.runtime.scxtFetcher.queryCreditSummary()
     return {
       studentId: row.studentId || undefined,
       name: row.name || undefined,
@@ -925,7 +871,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getCreditCompetitions(options?: CatalogQueryOptions): Promise<CatalogPage<Competition>> {
-    const page = await queryCompetitions({
+    const page = await this.runtime.scxtFetcher.queryCompetitions({
       itemName: options?.keyword,
       pageIndex: options?.pageIndex,
     })
@@ -948,7 +894,7 @@ export class YSUProvider extends BaseProvider {
   async getCreditLibraryActivities(
     options?: CatalogQueryOptions
   ): Promise<CatalogPage<LibraryActivity>> {
-    const page = await queryLibraryActivities({
+    const page = await this.runtime.scxtFetcher.queryLibraryActivities({
       name: options?.keyword,
       pageIndex: options?.pageIndex,
     })
@@ -967,7 +913,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getComprehensiveTerms(): Promise<ComprehensiveTerm[]> {
-    const rows = await queryEvaluationTerms()
+    const rows = await this.runtime.xgxtFetcher.queryEvaluationTerms()
     return rows.map((row) => ({
       year: row.year,
       term: row.term,
@@ -977,7 +923,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getComprehensiveResult(options?: ComprehensiveQueryOptions): Promise<ComprehensiveResult> {
-    const row = await queryEvaluationResult(options?.year, options?.term)
+    const row = await this.runtime.xgxtFetcher.queryEvaluationResult(options?.year, options?.term)
     return {
       totalScore: row.totalScore,
       classRank: row.classRank,
@@ -1000,7 +946,7 @@ export class YSUProvider extends BaseProvider {
   async getComprehensiveIndicators(
     options?: ComprehensiveQueryOptions
   ): Promise<ComprehensiveIndicatorDetail[]> {
-    const rows = await queryEvaluationIndicators(options?.year, options?.term)
+    const rows = await this.runtime.xgxtFetcher.queryEvaluationIndicators(options?.year, options?.term)
     return rows.map((row) => ({
       name: row.name,
       score: row.score,
@@ -1015,7 +961,7 @@ export class YSUProvider extends BaseProvider {
   async getComprehensiveRadar(
     options?: ComprehensiveQueryOptions
   ): Promise<ComprehensiveRadarItem[]> {
-    const rows = await queryEvaluationRadar(options?.year, options?.term)
+    const rows = await this.runtime.xgxtFetcher.queryEvaluationRadar(options?.year, options?.term)
     return rows.map((row) => ({
       name: row.name,
       personal: row.personal,
@@ -1025,7 +971,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getComprehensiveYearScores(): Promise<ComprehensiveYearScore[]> {
-    const rows = await queryYearScoreStatics()
+    const rows = await this.runtime.xgxtFetcher.queryYearScoreStatics()
     return rows.map((row) => ({
       year: row.year,
       term: row.term,
@@ -1036,7 +982,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getComprehensiveReportYears(): Promise<ComprehensiveReportYears> {
-    const data = await queryAcademicReportYears()
+    const data = await this.runtime.xgxtFetcher.queryAcademicReportYears()
     return {
       years: data.years.map((y) => ({
         year: y.year,
@@ -1047,7 +993,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getComprehensiveReport(options?: { year?: string }): Promise<ComprehensiveReportPage> {
-    const page = await queryAcademicReport(options?.year)
+    const page = await this.runtime.xgxtFetcher.queryAcademicReport(options?.year)
     return {
       entries: page.entries.map((entry) => ({
         courseName: entry.courseName,
@@ -1063,7 +1009,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getEvaluationTypes(options?: TermQueryOptions): Promise<EvaluationType[]> {
-    const rows = await queryEvaluationTypes({ term: options?.semester })
+    const rows = await this.runtime.emap.queryEvaluationTypes({ term: options?.semester })
     return rows.map((row) => ({
       name: row.name ?? "",
       code: row.code ?? undefined,
@@ -1075,7 +1021,7 @@ export class YSUProvider extends BaseProvider {
     evalType: string,
     options?: TermQueryOptions
   ): Promise<EvaluationTask[]> {
-    const rows = await queryPendingEvaluations(evalType, {
+    const rows = await this.runtime.emap.queryPendingEvaluations(evalType, {
       term: options?.semester,
     })
     return rows.map(mapEvaluationTask)
@@ -1092,7 +1038,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getEvaluationDetail(query: EvaluationDetailQuery): Promise<EvaluationDetail> {
-    const detail = await queryEvaluationDetail(query.groupNo, query.evalType, {
+    const detail = await this.runtime.emap.queryEvaluationDetail(query.groupNo, query.evalType, {
       sequence: query.sequence,
     })
     return {
@@ -1121,7 +1067,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async calculateEvaluationScore(input: EvaluationScoreInput): Promise<Record<string, unknown>> {
-    return _calculateEvaluationScore(
+    return this.runtime.emap.calculateEvaluationScore(
       input.groupNo,
       input.wjid,
       input.evalType,
@@ -1136,7 +1082,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async submitEvaluation(input: EvaluationSubmitInput): Promise<void> {
-    await _submitEvaluation(
+    await this.runtime.emap.submitEvaluation(
       input.groupNo,
       input.wjid,
       input.evalType,
@@ -1151,7 +1097,7 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getTrainingPlan(options?: PageQueryOptions): Promise<TrainingPlan[]> {
-    const rows = await queryTrainingPlan({
+    const rows = await this.runtime.emap.queryTrainingPlan({
       pageSize: options?.pageSize,
       pageNumber: options?.pageNumber,
     })
@@ -1167,17 +1113,17 @@ export class YSUProvider extends BaseProvider {
   }
 
   async getAcademicCompletion(): Promise<AcademicCompletion> {
-    const completion = await queryAcademicCompletion()
+    const completion = await this.runtime.emap.queryAcademicCompletion()
     return mapCompletion(completion)
   }
 
   async recalculateAcademicCompletion(): Promise<AcademicCompletion> {
-    const completion = await recalculateAcademicCompletionImpl()
+    const completion = await this.runtime.emap.recalculateAcademicCompletion()
     return mapCompletion(completion)
   }
 
   async getAcademicWarnings(): Promise<AcademicWarning[]> {
-    const rows = await queryAcademicWarnings()
+    const rows = await this.runtime.emap.queryAcademicWarnings()
     return rows.map((row) => ({
       warningType: row.warningType ?? "",
       warningLevel: row.warningLevel ?? undefined,

@@ -11,7 +11,7 @@ const manifest = {
   id: "org.example.feature",
   name: "Example feature",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: 2,
   kind: "feature",
   entry: "index.js",
   styles: ["style.css"],
@@ -148,7 +148,7 @@ describe("parsePluginPackage", () => {
       () =>
         parsePluginPackage(
           buildArchive({
-            [PLUGIN_MANIFEST_PATH]: strToU8(JSON.stringify({ ...manifest, apiVersion: 2 })),
+            [PLUGIN_MANIFEST_PATH]: strToU8(JSON.stringify({ ...manifest, apiVersion: 1 })),
           })
         ),
       "manifest"

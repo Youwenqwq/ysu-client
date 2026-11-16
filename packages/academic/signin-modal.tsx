@@ -14,8 +14,8 @@ import {
   ResponsiveModalHeader,
   ResponsiveModalTitle,
 } from "@/components/responsive-modal"
-import { useTranslation } from "@/lib/i18n/use-translation"
-import { useProvider } from "@/providers/use-provider"
+import { useTranslation } from "@/plugins/official/runtime/i18n/use-translation"
+import { useProvider } from "@orahako/plugin-ui/hooks"
 import type { SigninActivityDetail, StudentSigninStatus } from "@orahako/plugin-sdk/academic"
 import { CheckCircle2, XCircle, Timer, Fingerprint, Hash, QrCode, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"

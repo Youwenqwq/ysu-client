@@ -24,7 +24,7 @@ import {
   useComprehensiveResult,
   useComprehensiveTerms,
   useComprehensiveYearScores,
-} from "@orahako/plugin-ui/hooks"
+} from "@orahako/academic"
 function ResultPanel({ year, term }: { year: string; term: string }) {
   const { t } = useTranslation()
   const opts = useMemo(() => ({ year, term }), [year, term])

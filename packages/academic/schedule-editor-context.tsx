@@ -3,7 +3,7 @@
 import { createContext, useContext } from "react"
 import { GripVertical, History } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { useTranslation } from "@/lib/i18n/use-translation"
+import { useTranslation } from "@/plugins/official/runtime/i18n/use-translation"
 import { cn } from "@/lib/utils"
 import {
   scheduleDate,
@@ -12,7 +12,7 @@ import {
   type ScheduleOccurrence,
   type SchedulePatch,
   type ScheduleTrace,
-} from "@/lib/academic/schedule-patches"
+} from "./schedule-patches"
 import type { Course } from "@orahako/plugin-sdk/academic"
 
 export interface ScheduleEditorValue {

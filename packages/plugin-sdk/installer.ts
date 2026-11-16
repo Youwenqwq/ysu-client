@@ -1,5 +1,12 @@
 import type { PluginManifest } from "./manifest"
 
+export interface InstalledPluginSummary {
+  manifest: PluginManifest
+  installedAt: number
+  fileCount: number
+  byteSize: number
+}
+
 /**
  * Public installation surface exposed to plugins as `ctx.plugins`.
  *

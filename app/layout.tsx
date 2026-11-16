@@ -2,13 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { I18nProvider } from "@/lib/i18n/context"
-import { PwaRegister } from "@/components/pwa-register"
-import { PwaUpdatePrompt } from "@/components/pwa-update-prompt"
-import { PluginProvider } from "@/components/plugin-provider"
-import { PluginThemeManager } from "@/components/plugin-theme-manager"
-import { PluginShell } from "@/components/plugin-shell"
+import { AppComposition, appIdentity } from "./composition"
 import { cn } from "@/lib/utils"
 
 const geist = Geist({
@@ -25,17 +19,16 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "酸橙盒",
-    template: "%s · 酸橙盒",
+    default: appIdentity.name,
+    template: `%s · ${appIdentity.name}`,
   },
-  description:
-    "Orahako — a third-party shadcn/ui client for the Yanshan University academic system.",
-  applicationName: "酸橙盒",
+  description: appIdentity.descriptionEn,
+  applicationName: appIdentity.name,
   authors: [{ name: "orahako contributors" }],
-  keywords: ["酸橙盒", "Orahako", "燕山大学", "YSU", "教务系统"],
+  keywords: [appIdentity.name, appIdentity.nameEn],
   appleWebApp: {
     capable: true,
-    title: "酸橙盒",
+    title: appIdentity.name,
     statusBarStyle: "default",
   },
 }
@@ -60,16 +53,7 @@ export default function RootLayout({
       className={cn("antialiased", fontMono.variable, "font-sans", geist.variable)}
     >
       <body>
-        <I18nProvider>
-          <PwaRegister />
-          <PwaUpdatePrompt />
-          <ThemeProvider>
-            <PluginProvider>
-              <PluginThemeManager />
-              <PluginShell>{children}</PluginShell>
-            </PluginProvider>
-          </ThemeProvider>
-        </I18nProvider>
+        <AppComposition>{children}</AppComposition>
       </body>
     </html>
   )

@@ -6,13 +6,9 @@
  *
  * 纯函数 + 模块级状态(cookie jar)。
  */
-import {
-  SimpleCookieJar,
-  fetchWithJar,
-  getSchoolConfig,
-  type HttpResponse,
-} from "@orahako/plugin-sdk/host"
-import { authorize, getCredentialApplied } from "./cas"
+import type { CookieJar, HttpResponse } from "@orahako/plugin-sdk"
+import type { YSUContext } from "../context"
+import type { CASProtocol } from "./cas"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
 import { parseTables, type TableData } from "./table"
 import { toIsoDatetime } from "./datetime"
@@ -108,33 +104,47 @@ export class LdxtProtocolError extends LdxtError {
   }
 }
 
-// ─── Module state ─────────────────────────────────────────────────────── //
+// ─── Provider-scoped state ────────────────────────────────────────────── //
 
-let ldxtJar = new SimpleCookieJar()
-let timeoutMs = 30_000
-let authorized = false
-let inflightAuth: Promise<void> | null = null
+export interface LdxtProtocol {
+  getJar(): CookieJar
+  setTimeoutMs(ms: number): void
+  resetLdxt(): void
+  queryLaborRecords(opts?: {
+    termCode?: string
+    batchId?: string
+    pageSize?: number
+  }): Promise<LaborRecord[]>
+  queryLaborSummary(): Promise<LaborSummary>
+  queryEnrollableActivities(): Promise<EnrollableActivity[]>
+}
 
-export function getJar(): SimpleCookieJar {
+export function createLDXT(ctx: YSUContext, cas: CASProtocol): LdxtProtocol {
+  const configuredBaseUrl = ctx.config.ldxt?.baseUrl
+  let ldxtJar = ctx.session.createCookieJar()
+  let timeoutMs = 30_000
+  let authorized = false
+  let inflightAuth: Promise<void> | null = null
+
+function getJar(): CookieJar {
   return ldxtJar
 }
 
-export function setTimeoutMs(ms: number): void {
+function setTimeoutMs(ms: number): void {
   timeoutMs = ms
 }
 
-export function resetLdxt(): void {
-  ldxtJar = new SimpleCookieJar()
+function resetLdxt(): void {
+  ldxtJar = ctx.session.createCookieJar()
   authorized = false
   inflightAuth = null
 }
 
 function baseUrl(): string {
-  const url = getSchoolConfig().ldxt?.baseUrl
-  if (!url) {
+  if (!configuredBaseUrl) {
     throw new LdxtProtocolError("ldxt base URL not configured for current school")
   }
-  return url
+  return configuredBaseUrl
 }
 
 // ─── Auth & low-level requests ────────────────────────────────────────── //
@@ -152,7 +162,7 @@ function baseUrl(): string {
 async function ensureAuthorized(): Promise<void> {
   await waitForAuthTransition()
   if (authorized) return
-  await getCredentialApplied()
+  await cas.getCredentialApplied()
   if (inflightAuth) {
     await inflightAuth
     return
@@ -161,12 +171,12 @@ async function ensureAuthorized(): Promise<void> {
   const promise = withAuthTransition(async () => {
     if (authorized) return
 
-    await authorize(`${baseUrl()}${SSO_PATH}`, ldxtJar)
+    await cas.authorize(`${baseUrl()}${SSO_PATH}`, ldxtJar)
 
     const url = `${baseUrl()}${SSO_PATH}`
     let resp: HttpResponse
     try {
-      resp = await fetchWithJar(ldxtJar, {
+      resp = await ctx.session.fetchWithJar(ldxtJar, {
         method: "POST",
         url,
         redirect: "follow",
@@ -208,7 +218,7 @@ async function getPage(path: string, params?: Record<string, string | number>): 
   const url = `${baseUrl()}${path}${query}`
   let resp: HttpResponse
   try {
-    resp = await fetchWithJar(ldxtJar, {
+    resp = await ctx.session.fetchWithJar(ldxtJar, {
       method: "GET",
       url,
       redirect: "follow",
@@ -307,7 +317,7 @@ function zipRaw(headers: readonly string[], row: readonly string[]): Record<stri
  * 过滤参数为厂商内部代码，原样透传；默认全部为空即查询全部记录，
  * 每页取最大档（200 条）避免翻页。
  */
-export async function queryLaborRecords(opts?: {
+async function queryLaborRecords(opts?: {
   termCode?: string
   batchId?: string
   categoryCode1?: string
@@ -356,7 +366,7 @@ export async function queryLaborRecords(opts?: {
 // ─── Public: 学生学分汇总 ─────────────────────────────────────────────── //
 
 /** 查询本人劳动学分汇总（累计时长/总学分）。 */
-export async function queryLaborSummary(): Promise<LaborSummary> {
+async function queryLaborSummary(): Promise<LaborSummary> {
   return runWithReauth(async () => {
     const table = await getTable(SUMMARY_QUERY_PATH)
     const cols = colMap(table.headers)
@@ -386,7 +396,7 @@ export async function queryLaborSummary(): Promise<LaborSummary> {
  *
  * 报名、上传佐证材料是写操作，未封装。
  */
-export async function queryEnrollableActivities(): Promise<EnrollableActivity[]> {
+async function queryEnrollableActivities(): Promise<EnrollableActivity[]> {
   return runWithReauth(async () => {
     const table = await getTable(ENROLL_PATH)
     const cols = colMap(table.headers)
@@ -410,4 +420,14 @@ export async function queryEnrollableActivities(): Promise<EnrollableActivity[]>
       }
     })
   })
+}
+
+  return {
+    getJar,
+    setTimeoutMs,
+    resetLdxt,
+    queryLaborRecords,
+    queryLaborSummary,
+    queryEnrollableActivities,
+  }
 }

@@ -15,33 +15,39 @@ import type {
   PluginNativeService,
   PluginProviderService,
 } from "@orahako/plugin-sdk"
-import { setSchoolConfig } from "@orahako/plugin-sdk/host"
 import { Badge, Button, Spinner } from "@orahako/plugin-ui/components"
-import { useTranslation } from "@orahako/plugin-ui/hooks"
-import { setActiveProviderSchool, useAuthStore, useSettingsStore } from "@orahako/plugin-ui/stores"
+import { useSessionSnapshot, useTranslation } from "@orahako/plugin-ui/hooks"
+import { useSettingsStore } from "@orahako/plugin-ui/stores"
 
-const SCHOOLS = [
-  { id: "ysu", name: "燕山大学", providerId: "ysu.provider", online: false },
-  { id: "zmu", name: "遵义医科大学", providerId: "zmu.provider", online: true },
-] as const
+export interface OnboardingSchool {
+  id: string
+  name: string
+  nameEn?: string
+  providerId: string
+  online?: boolean
+}
 
 interface OnboardingWizardProps {
+  schools: readonly OnboardingSchool[]
   installFromMarket: PluginInstallerService["installFromMarket"]
   hasProvider: PluginProviderService["hasProvider"]
+  selectSchool: (schoolId: string) => void
   native: PluginNativeService
 }
 
 export function OnboardingWizard({
+  schools,
   installFromMarket,
   hasProvider,
+  selectSchool,
   native,
 }: OnboardingWizardProps) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const settingsHydrated = useSettingsStore((state) => state.hasHydrated)
-  const authHydrated = useAuthStore((state) => state.hasHydrated)
+  const { hasHydrated: authHydrated } = useSessionSnapshot()
   const completed = useSettingsStore((state) => state.onboardingCompleted)
   const [step, setStep] = useState<"school" | "permissions">("school")
-  const [schoolId, setSchoolId] = useState("ysu")
+  const [schoolId, setSchoolId] = useState(schools[0]?.id ?? "")
   const [installing, setInstalling] = useState(false)
   const [error, setError] = useState(false)
   const [permissionBusy, setPermissionBusy] = useState("")
@@ -49,8 +55,9 @@ export function OnboardingWizard({
 
   if (!settingsHydrated || !authHydrated || completed) return null
 
-  async function selectSchool() {
-    const school = SCHOOLS.find((item) => item.id === schoolId) ?? SCHOOLS[0]
+  async function selectSchoolAndContinue() {
+    const school = schools.find((item) => item.id === schoolId) ?? schools[0]
+    if (!school) return
     setInstalling(true)
     setError(false)
     try {
@@ -58,9 +65,8 @@ export function OnboardingWizard({
         await installFromMarket(school.providerId)
       }
       if (!hasProvider(school.id)) throw new Error("Provider registration missing")
+      selectSchool(school.id)
       useSettingsStore.getState().setSchoolId(school.id)
-      setSchoolConfig(school.id)
-      setActiveProviderSchool(school.id)
       setStep("permissions")
     } catch {
       setError(true)
@@ -136,7 +142,7 @@ export function OnboardingWizard({
               {t("onboarding.chooseSchool")}
             </h1>
             <div className="space-y-3">
-              {SCHOOLS.map((school) => (
+              {schools.map((school) => (
                 <button
                   key={school.id}
                   type="button"
@@ -145,7 +151,9 @@ export function OnboardingWizard({
                   className="flex h-14 w-full items-center justify-between rounded-xl border px-4 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 aria-pressed:border-primary aria-pressed:bg-primary/5"
                   aria-pressed={schoolId === school.id}
                 >
-                  <span className="font-medium">{school.name}</span>
+                  <span className="font-medium">
+                    {locale === "en" && school.nameEn ? school.nameEn : school.name}
+                  </span>
                   <span className="flex items-center gap-2">
                     {school.online && !hasProvider(school.id) && (
                       <Badge variant="secondary">{t("onboarding.online")}</Badge>
@@ -162,11 +170,13 @@ export function OnboardingWizard({
             )}
             <Button
               className="mt-6 w-full"
-              disabled={installing}
-              onClick={() => void selectSchool()}
+              disabled={installing || !schoolId}
+              onClick={() => void selectSchoolAndContinue()}
             >
               {installing ? <Spinner data-icon="inline-start" /> : null}
-              {!installing && !hasProvider(schoolId) ? <Download data-icon="inline-start" /> : null}
+              {!installing && schoolId && !hasProvider(schoolId) ? (
+                <Download data-icon="inline-start" />
+              ) : null}
               {installing ? t("onboarding.installing") : t("onboarding.continue")}
             </Button>
           </section>

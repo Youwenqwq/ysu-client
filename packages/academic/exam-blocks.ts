@@ -6,8 +6,8 @@
  * 时刻表重叠 → 起止节次（无重叠时钳到最近节次，如晚间考试）。
  */
 import type { ClassPeriod, CurrentWeek, Exam } from "@orahako/plugin-sdk/academic"
-import { getExamEndTime, getExamStartTime } from "@/lib/academic/exam-utils"
-import { getAcademicClock } from "@/lib/academic/academic-time"
+import { getExamEndTime, getExamStartTime } from "./exam-utils"
+import { getAcademicClock } from "./academic-time"
 import { buildSectionTimeMap } from "./schedule-utils"
 export interface ExamBlock {
   exam: Exam

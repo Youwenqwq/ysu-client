@@ -1,5 +1,5 @@
 import { GraduationCap } from "lucide-react"
-import { definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
+import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/plugin-sdk"
 import { GradesPage } from "./page"
 import { GradeNotificationContent, GradesSettingsPanel } from "./settings"
 import { useGradeGachaStore } from "./grade-gacha-store"
@@ -9,8 +9,9 @@ export const manifest: PluginManifest = {
   id: "orahako.grades",
   name: "成绩",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: PLUGIN_API_VERSION,
   kind: "feature",
+  inject: ["ui", "slots", "settings", "notifications"],
   entry: "index.js",
 }
 

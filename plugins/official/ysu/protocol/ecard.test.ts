@@ -1,45 +1,55 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type * as HostModule from "@orahako/plugin-sdk/host"
-import type * as CasModule from "./cas"
+import type { HttpResponse } from "@orahako/plugin-sdk"
+import { ProviderErrorCode } from "@orahako/plugin-sdk/provider-errors"
+import { ProviderError } from "@orahako/plugin-sdk/provider-errors"
+import type { CASProtocol } from "./cas"
+import {
+  createECARD,
+  EcardNotLoggedInError,
+  EcardProtocolError,
+  type EcardProtocol,
+  type EcardSessionStatus,
+} from "./ecard"
+import { NotAuthenticatedError } from "./cas"
+import { createEcardAccess } from "../ecard-access"
+import { createTestContext } from "../test-context"
 
 const mocks = vi.hoisted(() => ({
   authorize: vi.fn(),
   getCredentialApplied: vi.fn(),
-  fetchWithJar: vi.fn<typeof HostModule.fetchWithJar>(),
+  fetchWithJar: vi.fn(),
   authState: {
-    username: "account-a",
-    credential: "credential-a",
+    activeSchoolId: "ysu" as string | null,
+    username: "account-a" as string | null,
+    credential: "credential-a" as string | null,
     isAuthenticated: true,
     sessionExpired: false,
-    setSessionExpired(expired: boolean) {
-      this.sessionExpired = expired
-    },
+    artifacts: {} as Record<string, string>,
   },
 }))
 
-vi.mock("@orahako/plugin-sdk/host", async (importOriginal) => ({
-  ...(await importOriginal<typeof HostModule>()),
-  fetchWithJar: mocks.fetchWithJar,
-  useAuthStore: { getState: () => mocks.authState },
-}))
-vi.mock("./cas", async (importOriginal) => ({
-  ...(await importOriginal<typeof CasModule>()),
-  authorize: mocks.authorize,
-  getCredentialApplied: mocks.getCredentialApplied,
-}))
+const mapCASSessionError = (error: unknown) =>
+  error instanceof NotAuthenticatedError
+    ? new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, "会话已过期", error, 401)
+    : undefined
 
-import { type HttpResponse } from "@orahako/plugin-sdk/host"
+let ecard: EcardProtocol
+let fetchEcardBalance: () => Promise<EcardSessionStatus>
 
-import {
-  EcardNotLoggedInError,
-  EcardProtocolError,
-  getEcardBalance,
-  resetEcard,
-  toEcardBalance,
-} from "./ecard"
-import { NotAuthenticatedError } from "./cas"
-import { fetchEcardBalance } from "../ecard-access"
-import { ProviderErrorCode } from "@orahako/plugin-sdk/provider-errors"
+beforeEach(() => {
+  mocks.authorize.mockResolvedValue(undefined)
+  mocks.getCredentialApplied.mockResolvedValue(undefined)
+  const ctx = createTestContext({
+    state: mocks.authState,
+    fetchWithJar: (jar, request) => mocks.fetchWithJar(jar, request),
+  }).ctx
+  const cas = {
+    authorize: mocks.authorize,
+    getCredentialApplied: mocks.getCredentialApplied,
+  } as unknown as CASProtocol
+  ecard = createECARD(ctx, cas)
+  fetchEcardBalance = createEcardAccess(ctx, ecard, mapCASSessionError)
+})
 
 /** 真实抓包结构（余额 18.55，学号已脱敏） */
 const REAL = {
@@ -64,7 +74,7 @@ const REAL = {
 
 describe("toEcardBalance", () => {
   it("真实结构解析（顶层字段优先）", () => {
-    const b = toEcardBalance({ ...REAL, datas: { ...REAL.datas, KNYE: 99 } })
+    const b = ecard.toEcardBalance({ ...REAL, datas: { ...REAL.datas, KNYE: 99 } })
     expect(b).not.toBeNull()
     expect(b!.balance).toBeCloseTo(18.55)
     expect(b!.cardNum).toBe("000000000001")
@@ -78,7 +88,7 @@ describe("toEcardBalance", () => {
       id: "student-id",
       datas: { KNYE: "5.00", KYXQ: "2025-01-01", MC: "挂失", KH: "123" },
     }
-    const b = toEcardBalance(body)
+    const b = ecard.toEcardBalance(body)
     expect(b!.balance).toBe(5)
     expect(b!.availableDate).toBe("2025-01-01")
     expect(b!.cardStatusName).toBe("挂失")
@@ -86,15 +96,15 @@ describe("toEcardBalance", () => {
   })
 
   it("缺少余额不能被有效期伪装成零余额，真实零余额仍有效", () => {
-    expect(toEcardBalance({ availdate: "2029-08-31" })).toBeNull()
-    expect(toEcardBalance({ remining: null })).toBeNull()
-    expect(toEcardBalance({ remining: "0.00" })?.balance).toBe(0)
+    expect(ecard.toEcardBalance({ availdate: "2029-08-31" })).toBeNull()
+    expect(ecard.toEcardBalance({ remining: null })).toBeNull()
+    expect(ecard.toEcardBalance({ remining: "0.00" })?.balance).toBe(0)
   })
 
   it("拒绝把无效金额转成零或把布尔值转成金额", () => {
-    expect(() => toEcardBalance({ remining: "unavailable" })).toThrow(EcardProtocolError)
-    expect(() => toEcardBalance({ remining: true })).toThrow(EcardProtocolError)
-    expect(() => toEcardBalance({ remining: Number.POSITIVE_INFINITY })).toThrow(EcardProtocolError)
+    expect(() => ecard.toEcardBalance({ remining: "unavailable" })).toThrow(EcardProtocolError)
+    expect(() => ecard.toEcardBalance({ remining: true })).toThrow(EcardProtocolError)
+    expect(() => ecard.toEcardBalance({ remining: Number.POSITIVE_INFINITY })).toThrow(EcardProtocolError)
   })
 })
 
@@ -113,7 +123,7 @@ function response(body: unknown, status = 200, url = BALANCE_URL): HttpResponse 
 
 describe("ecard session and response handling", () => {
   beforeEach(() => {
-    resetEcard()
+    ecard.resetEcard()
     vi.resetAllMocks()
     mocks.authorize.mockResolvedValue(undefined)
     mocks.authState.username = "account-a"
@@ -128,12 +138,12 @@ describe("ecard session and response handling", () => {
       .mockResolvedValueOnce(response({}, 401))
       .mockResolvedValueOnce(response(REAL))
 
-    expect((await getEcardBalance()).balance?.balance).toBe(18.55)
+    expect((await ecard.getEcardBalance()).balance?.balance).toBe(18.55)
   })
 
   it("keeps a renewed session usable when an older request reports expiry later", async () => {
     mocks.fetchWithJar.mockResolvedValue(response(REAL))
-    await getEcardBalance()
+    await ecard.getEcardBalance()
 
     const entered = Promise.withResolvers<void>()
     const pending = Promise.withResolvers<HttpResponse>()
@@ -143,9 +153,9 @@ describe("ecard session and response handling", () => {
         return pending.promise
       })
       .mockResolvedValueOnce(response({}, 401))
-    const lateBalance = getEcardBalance()
+    const lateBalance = ecard.getEcardBalance()
     await entered.promise
-    expect((await getEcardBalance()).balance?.balance).toBe(18.55)
+    expect((await ecard.getEcardBalance()).balance?.balance).toBe(18.55)
 
     mocks.authorize.mockRejectedValue(new NotAuthenticatedError("extra authorization rejected"))
     pending.resolve(response({}, 401))
@@ -155,7 +165,7 @@ describe("ecard session and response handling", () => {
   it("surfaces repeated redirects as session expiry rather than an empty card", async () => {
     mocks.fetchWithJar.mockResolvedValue(response({}, 302))
 
-    await expect(getEcardBalance()).rejects.toBeInstanceOf(EcardNotLoggedInError)
+    await expect(ecard.getEcardBalance()).rejects.toBeInstanceOf(EcardNotLoggedInError)
   })
 
   it("rejects a lookalike origin without exposing the redirect ticket", async () => {
@@ -163,7 +173,7 @@ describe("ecard session and response handling", () => {
       response(REAL, 200, "https://ehall.ysu.edu.cn.evil.example/card?ticket=secret")
     )
 
-    const result = getEcardBalance()
+    const result = ecard.getEcardBalance()
     await expect(result).rejects.toBeInstanceOf(EcardNotLoggedInError)
     await expect(result).rejects.not.toThrow("secret")
   })
@@ -171,15 +181,15 @@ describe("ecard session and response handling", () => {
   it("does not render business errors as successful balances", async () => {
     mocks.fetchWithJar.mockResolvedValue(response({ ...REAL, code: 500 }))
 
-    await expect(getEcardBalance()).rejects.toBeInstanceOf(EcardProtocolError)
+    await expect(ecard.getEcardBalance()).rejects.toBeInstanceOf(EcardProtocolError)
   })
 
   it("distinguishes an absent card from a malformed response", async () => {
     mocks.fetchWithJar.mockResolvedValueOnce(response({ code: 200, datas: {} }))
-    expect((await getEcardBalance()).balance).toBeNull()
+    expect((await ecard.getEcardBalance()).balance).toBeNull()
 
     mocks.fetchWithJar.mockResolvedValueOnce(response({ message: "backend unavailable" }))
-    await expect(getEcardBalance()).rejects.toBeInstanceOf(EcardProtocolError)
+    await expect(ecard.getEcardBalance()).rejects.toBeInstanceOf(EcardProtocolError)
   })
 
   it("discards an old account balance after reset while the replacement account remains usable", async () => {
@@ -189,16 +199,16 @@ describe("ecard session and response handling", () => {
       entered.resolve()
       return pending.promise
     })
-    const oldBalance = getEcardBalance()
+    const oldBalance = ecard.getEcardBalance()
     const rejected = expect(oldBalance).rejects.toBeInstanceOf(EcardProtocolError)
     await entered.promise
 
-    resetEcard()
+    ecard.resetEcard()
     mocks.fetchWithJar.mockResolvedValue(response({ ...REAL, remining: "27.50" }))
-    expect((await getEcardBalance()).balance?.balance).toBe(27.5)
+    expect((await ecard.getEcardBalance()).balance?.balance).toBe(27.5)
     pending.resolve(response(REAL))
     await rejected
-    expect((await getEcardBalance()).balance?.balance).toBe(27.5)
+    expect((await ecard.getEcardBalance()).balance?.balance).toBe(27.5)
   })
 
   it("does not authorize the replacement account with an old in-flight login", async () => {
@@ -208,10 +218,10 @@ describe("ecard session and response handling", () => {
       entered.resolve()
       return pending.promise
     })
-    const oldBalance = getEcardBalance()
+    const oldBalance = ecard.getEcardBalance()
     const rejected = expect(oldBalance).rejects.toBeInstanceOf(EcardProtocolError)
     await entered.promise
-    resetEcard()
+    ecard.resetEcard()
     pending.resolve()
     await rejected
 

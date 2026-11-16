@@ -4,17 +4,17 @@ import { useEffect } from "react"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { useTranslation } from "@/lib/i18n/use-translation"
+import { usePluginServices } from "@/components/plugin-context"
 import { cn } from "@/lib/utils"
 import { CalendarOff } from "lucide-react"
 
 /** 查询错误统一 toast（message 为空时回退到通用更新失败文案）。 */
 export function useErrorToast(error: { message: string } | undefined) {
-  const { t } = useTranslation()
+  const { i18n } = usePluginServices()
   useEffect(() => {
     if (!error) return
-    toast.error(error.message || t("app.updating"))
-  }, [error, t])
+    toast.error(error.message || i18n.t("app.updating"))
+  }, [error, i18n])
 }
 
 /** 列表加载骨架（卡片流）。 */

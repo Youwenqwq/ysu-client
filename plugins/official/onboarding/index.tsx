@@ -1,5 +1,31 @@
-import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
-import { OnboardingWizard } from "./panel"
+import {
+  PLUGIN_API_VERSION,
+  definePlugin,
+  type AcademicPluginContext,
+  type PluginConfig,
+  type PluginDefinition,
+  type PluginManifest,
+} from "@orahako/plugin-sdk"
+import { OnboardingWizard, type OnboardingSchool } from "./panel"
+
+export type { OnboardingSchool }
+
+export type OnboardingConfig = PluginConfig & {
+  /**
+   * School choices supplied by the application composition. The first entry is
+   * the default selection; `id` is the provider school id, `providerId` is the
+   * market plugin id, and `online` marks market-distributed providers.
+   */
+  schools: OnboardingSchool[]
+}
+
+/** Applies the schema-validated composition config with a safe runtime fallback. */
+function resolveOnboardingConfig(config: PluginConfig): OnboardingConfig {
+  return {
+    ...config,
+    schools: Array.isArray(config.schools) ? (config.schools as OnboardingSchool[]) : [],
+  }
+}
 
 export const manifest: PluginManifest = {
   id: "orahako.onboarding",
@@ -7,11 +33,37 @@ export const manifest: PluginManifest = {
   version: "1.0.0",
   apiVersion: PLUGIN_API_VERSION,
   kind: "feature",
+  inject: ["slots", "i18n", "providers", "plugins", "native", "provider"],
   entry: "index.js",
   required: true,
+  configSchema: {
+    type: "object",
+    required: ["schools"],
+    properties: {
+      schools: {
+        type: "array",
+        minItems: 1,
+        items: {
+          type: "object",
+          required: ["id", "name", "providerId"],
+          properties: {
+            id: { type: "string", minLength: 1 },
+            name: { type: "string", minLength: 1 },
+            nameEn: { type: "string", minLength: 1 },
+            providerId: { type: "string", minLength: 1 },
+            online: { type: "boolean" },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    additionalProperties: false,
+  },
 }
 
-export const definition = definePlugin((ctx) => {
+export const definition: PluginDefinition = definePlugin((baseCtx, config: PluginConfig) => {
+  const ctx = baseCtx as unknown as AcademicPluginContext
+  const { schools } = resolveOnboardingConfig(config)
   ctx.i18n.register({
     zh: {
       onboarding: {
@@ -62,8 +114,12 @@ export const definition = definePlugin((ctx) => {
     order: -100,
     component: () => (
       <OnboardingWizard
-        installFromMarket={ctx.plugins.installFromMarket}
-        hasProvider={ctx.providers.hasProvider}
+        schools={schools}
+        installFromMarket={(pluginId) => ctx.plugins.installFromMarket(pluginId)}
+        hasProvider={(schoolId) => ctx.providers.hasProvider(schoolId)}
+        selectSchool={(schoolId) => {
+          ctx.provider.selectSchool(schoolId)
+        }}
         native={ctx.native}
       />
     ),

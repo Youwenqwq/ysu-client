@@ -22,8 +22,8 @@ async function packFixture(manifest: Partial<PluginManifest>, sources: Record<st
     id: "test.sample",
     name: "Sample",
     version: "1.0.0",
-    apiVersion: 1,
-    minAppVersion: "0.15.0",
+    apiVersion: 2,
+    minAppVersion: "0.16.0",
     kind: "feature",
     entry: "dist/index.js",
   }
@@ -45,6 +45,17 @@ async function packFixture(manifest: Partial<PluginManifest>, sources: Record<st
 }
 
 describe("plugin packaging styles", () => {
+  it("embeds image imports as data URLs for external packages", async () => {
+    const { read } = await packFixture(
+      {},
+      {
+        "src/index.tsx": 'import icon from "./icon.png"\nexport default icon',
+        "src/icon.png": "not-a-real-png-but-valid-build-input",
+      }
+    )
+    expect(read("dist/index.js")).toContain("data:image/png")
+  })
+
   it("adds the plugin's Tailwind utilities next to its imported CSS", async () => {
     const { files, manifest, read } = await packFixture(
       { styles: ["dist/index.css"] },

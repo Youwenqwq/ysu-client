@@ -1,0 +1,93 @@
+// Auditable native module composition for the official Android build.
+//
+// `:native-core` is the generic bridge and capability registry; it never lists
+// an official capability. `:native-official` is one composition provider that
+// binds the factories of the companion modules selected below and registers the
+// process-wide background adapters.
+//
+// The app module depends only on `:native-core` and on the provider module named
+// here. It reads the provider class from a generated BuildConfig field, so a
+// community build replaces this file (metadata, provider module and companion
+// list) without editing any app source.
+//
+// Widget selection is intentionally granular:
+//
+//   :native-widgets           generic widget host (`widgets.generic`)
+//   :native-widgets-schedule  schedule/tomorrow companions (`widgets.schedule`)
+//   :native-widgets-exam      exam companions (`widgets.exam`)
+//
+// A build can include `:native-widgets` without either official widget
+// companion. The optional companions listed in
+// `orahakoNativeWidgetCompositionModules` contribute their factories through the
+// generated composition module list; the generic host is part of the official
+// provider.
+
+def orahakoNativeCompositionProviderModule = ':native-official'
+def orahakoNativeCompositionProviderClass =
+    'me.uwen.orahako.nativebridge.official.OfficialNativeComposition'
+
+def orahakoOfficialNativeCompanions = [
+    ':native-platform',
+    ':native-academic',
+    ':native-ysu',
+    ':native-widgets',
+    ':native-widgets-schedule',
+    ':native-widgets-exam',
+]
+
+// module path -> NativeCapabilityCompositionModule implementation.
+// The generic widget host is registered by the provider itself; only optional
+// widget companions are listed here.
+def orahakoNativeWidgetCompositionModules = [
+    ':native-widgets-schedule': 'me.uwen.orahako.widget.schedule.ScheduleWidgetComposition',
+    ':native-widgets-exam'    : 'me.uwen.orahako.widget.exam.ExamWidgetComposition',
+]
+
+// Host identity consumed by generic module manifests and deep-link builders.
+def orahakoDeepLinkScheme = 'orahako'
+def orahakoDeepLinkHosts = [
+    schedule: 'schedule',
+    exams   : 'exams',
+    grades  : 'grades',
+    settings: 'settings',
+]
+
+if (!orahakoNativeCompositionProviderModule?.trim()) {
+    throw new GradleException(
+        'nativeComposition.gradle must name a native composition provider module'
+    )
+}
+if (!orahakoNativeCompositionProviderClass?.trim()) {
+    throw new GradleException(
+        'nativeComposition.gradle must name a native composition provider class'
+    )
+}
+if (orahakoOfficialNativeCompanions.isEmpty()) {
+    throw new GradleException(
+        'nativeComposition.gradle must select at least one official native companion module'
+    )
+}
+if (!orahakoDeepLinkScheme?.trim()) {
+    throw new GradleException('nativeComposition.gradle must select a deep-link scheme')
+}
+orahakoNativeWidgetCompositionModules.each { modulePath, className ->
+    if (!(modulePath in orahakoOfficialNativeCompanions)) {
+        throw new GradleException(
+            "Widget composition module $modulePath must be part of orahakoOfficialNativeCompanions"
+        )
+    }
+    if (!className?.trim()) {
+        throw new GradleException("Widget composition module $modulePath must name a class")
+    }
+}
+
+include ':native-core'
+include orahakoNativeCompositionProviderModule
+orahakoOfficialNativeCompanions.each { include it }
+
+gradle.ext.orahakoNativeCompositionProviderModule = orahakoNativeCompositionProviderModule
+gradle.ext.orahakoNativeCompositionProviderClass = orahakoNativeCompositionProviderClass
+gradle.ext.orahakoOfficialNativeCompanions = orahakoOfficialNativeCompanions
+gradle.ext.orahakoNativeWidgetCompositionModules = orahakoNativeWidgetCompositionModules
+gradle.ext.orahakoDeepLinkScheme = orahakoDeepLinkScheme
+gradle.ext.orahakoDeepLinkHosts = orahakoDeepLinkHosts

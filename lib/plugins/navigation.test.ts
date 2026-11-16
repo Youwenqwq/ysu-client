@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest"
 import {
-  CORE_DASHBOARD_FALLBACK_HREF,
   isPrimaryNavigationLocation,
   landingPreferenceHref,
   navigationForScope,
@@ -10,7 +9,7 @@ import {
   resolveSemanticTarget,
   semanticTargetHref,
   type SemanticNavSources,
-} from "./navigation"
+} from "@/plugins/official/runtime/navigation/resolvers"
 
 function sources(overrides: Partial<SemanticNavSources> = {}): SemanticNavSources {
   return {
@@ -258,7 +257,7 @@ describe("landing preference", () => {
     )
   })
 
-  it("falls back to the primary page, then a core page", () => {
+  it("falls back to the primary page, then the configured destination", () => {
     expect(
       landingPreferenceHref(
         "schedule",
@@ -268,7 +267,7 @@ describe("landing preference", () => {
         })
       )
     ).toBe("/dashboard/plugin/?plugin=org.orahako.overview&page=index")
-    expect(landingPreferenceHref("overview", sources())).toBe(CORE_DASHBOARD_FALLBACK_HREF)
+    expect(landingPreferenceHref("overview", sources())).toBe("")
   })
 
   it("never targets a disabled or missing plugin", () => {
@@ -350,7 +349,7 @@ describe("provider plugin allowlist", () => {
     const empty = sources({ ...defaultSources, supportedPlugins: [] })
     expect(resolvePrimaryTarget(empty)).toBeUndefined()
     expect(resolveSemanticTarget("schedule", empty)).toBeUndefined()
-    expect(landingPreferenceHref("schedule", empty)).toBe(CORE_DASHBOARD_FALLBACK_HREF)
+    expect(landingPreferenceHref("schedule", empty)).toBe("")
   })
 })
 

@@ -5,7 +5,7 @@
 
 const DEFAULT_INDEX = {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-15T00:44:03Z",
+  "updatedAt": "2026-11-16T05:49:36Z",
   "plugins": [
     {
       "id": "community.theme.yuna",
@@ -18,18 +18,22 @@ const DEFAULT_INDEX = {
       ],
       "versions": [
         {
-          "version": "1.0.0",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
+          "version": "1.0.1",
+          "apiVersion": 2,
+          "minAppVersion": "0.16.0",
+          "inject": [
+            "ui",
+            "assets"
+          ],
           "platforms": [
             "web",
             "android"
           ],
-          "zipUrl": "/plugins/community.theme.yuna/1.0.0.zip",
-          "sha256": "c09b6832b759fff94445b932a0fb279c88cb1a83bf17177e0cdb60357f7bd7f9",
-          "size": 87275,
-          "publishedAt": "2026-11-14T07:59:54Z",
-          "changelog": "新增基于 YUNA 2026-11-14 规范的三套主题，使用公共主题注册与包内离线字体。"
+          "zipUrl": "/plugins/community.theme.yuna/1.0.1.zip",
+          "sha256": "247de67868f99bd4e7c4bd35571a8f6b947884b3e6c054a962a842ad7635593d",
+          "size": 88971,
+          "publishedAt": "2026-11-16T05:49:36Z",
+          "changelog": "修正开关关闭态、复选/单选框、分段选择、标签页与按钮的可辨识度；开关保留滑块位置差异，开启态另带勾形标记，不单靠颜色传达状态。"
         }
       ]
     },
@@ -45,15 +49,18 @@ const DEFAULT_INDEX = {
       "versions": [
         {
           "version": "1.0.1",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
+          "apiVersion": 2,
+          "minAppVersion": "0.16.0",
+          "inject": [
+            "ui"
+          ],
           "platforms": [
             "web",
             "android"
           ],
           "zipUrl": "/plugins/community.theme.arknights/1.0.1.zip",
-          "sha256": "150b3d7f21dcbf9a4599141c987281c3ff7fe4e29cb324abdf1b29f1c8658e7c",
-          "size": 7175,
+          "sha256": "51ab1ecdff57cd891230a3a1be3562cac28d6601c95a798a426c50dc2e267c1a",
+          "size": 9378,
           "publishedAt": "2026-11-13T10:04:29Z",
           "changelog": "迁移至 Orahako 公共模块。"
         }
@@ -71,74 +78,28 @@ const DEFAULT_INDEX = {
       ],
       "versions": [
         {
-          "version": "1.2.0",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
+          "version": "1.3.0",
+          "apiVersion": 2,
+          "minAppVersion": "0.16.0",
+          "nativeCapabilities": [
+            "native.geolocation@1"
+          ],
+          "inject": [
+            "ui",
+            "i18n",
+            "storage",
+            "http",
+            "native"
+          ],
           "platforms": [
             "web",
             "android"
           ],
-          "zipUrl": "/plugins/community.perlica-toybox/1.2.0.zip",
-          "sha256": "565c07d295239c09324c23700d2b8e9271611afde9f90dce69d96ffce24d53ca",
-          "size": 216931,
-          "publishedAt": "2026-11-14T22:34:25Z",
-          "changelog": "优化移动端找车、扫码解锁、骑行还车和历史详情；支持停车点吸附、还车区域与真实骑行轨迹，并修复车辆状态、费用单位和编号展示。"
-        },
-        {
-          "version": "1.1.1",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
-          "platforms": [
-            "web",
-            "android"
-          ],
-          "zipUrl": "/plugins/community.perlica-toybox/1.1.1.zip",
-          "sha256": "b6b00cc31a5df0acb6631771368beb55e04d69624daeeadb98b3cb52c361899a",
-          "size": 207434,
-          "publishedAt": "2026-11-14T19:03:19Z",
-          "changelog": "修复桌面端地图模式的工具栏边距，避免标签与刷新按钮被挤压到页面边缘；保留移动端全屏地图。"
-        },
-        {
-          "version": "1.1.0",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
-          "platforms": [
-            "web",
-            "android"
-          ],
-          "zipUrl": "/plugins/community.perlica-toybox/1.1.0.zip",
-          "sha256": "9d0ce27323f4f254e5f94640841aacce204d959736f267f011c940cc1f04b4f4",
-          "size": 207422,
-          "publishedAt": "2026-11-14T18:33:10Z",
-          "changelog": "新增插件作用域移动底部导航；主功能标签同步至 URL；地图改为全内容区背景布局。"
-        },
-        {
-          "version": "1.0.2",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
-          "platforms": [
-            "web",
-            "android"
-          ],
-          "zipUrl": "/plugins/community.perlica-toybox/1.0.2.zip",
-          "sha256": "d5dc3cce76e35cf3c0598085567fe27b919c8bc1289bfaa8eea7af55cb5575a9",
-          "size": 207152,
-          "publishedAt": "2026-11-14T17:45:21Z",
-          "changelog": "移除 Perlica 自定义 UI，改用应用统一页面、卡片与 Tabs 样式；标记为不依赖学校 Provider。"
-        },
-        {
-          "version": "1.0.1",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
-          "platforms": [
-            "web",
-            "android"
-          ],
-          "zipUrl": "/plugins/community.perlica-toybox/1.0.1.zip",
-          "sha256": "31db6fd3e71eb808919cf14bfb598e2ce192331c2981d695aa9e75956bbc42e0",
-          "size": 209275,
-          "publishedAt": "2026-11-13T10:04:29Z",
-          "changelog": "迁移至 Orahako 公共模块。"
+          "zipUrl": "/plugins/community.perlica-toybox/1.3.0.zip",
+          "sha256": "5706dbcfecae28dbd9ddc7c9afa84e6adca99b086d0d2a4d49d2c53db81da1e9",
+          "size": 218589,
+          "publishedAt": "2026-11-16T05:49:36Z",
+          "changelog": "还车弹窗显示当前骑行费用，并按骑行卡免费时长与服务器分时计价预估抵扣；计时改用实际耗时（含临时停车），移除未使用的调度费报价流程。"
         }
       ]
     },
@@ -155,15 +116,20 @@ const DEFAULT_INDEX = {
       "versions": [
         {
           "version": "1.0.0",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
+          "apiVersion": 2,
+          "minAppVersion": "0.16.0",
+          "inject": [
+            "providers",
+            "session",
+            "query"
+          ],
           "platforms": [
             "web",
             "android"
           ],
           "zipUrl": "/plugins/zmu.provider/1.0.0.zip",
-          "sha256": "2e306b0fe5f80e852b22796345a34a650533409b3078853a40e415688bf0dad0",
-          "size": 7003,
+          "sha256": "345b3fa727db73a4f2ea41b843f95ef086c0cfda7d1832482e9c5acbaba96e5a",
+          "size": 7717,
           "publishedAt": "2026-11-13T12:53:43Z",
           "changelog": "首个乘方教务 Provider。"
         }
@@ -181,59 +147,27 @@ const DEFAULT_INDEX = {
       "versions": [
         {
           "version": "1.2.0",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
+          "apiVersion": 2,
+          "minAppVersion": "0.16.0",
+          "nativeCapabilities": [
+            "native.files@1"
+          ],
+          "inject": [
+            "ui",
+            "i18n",
+            "http",
+            "storage",
+            "native"
+          ],
           "platforms": [
             "web",
             "android"
           ],
           "zipUrl": "/plugins/orahako.skbird/1.2.0.zip",
-          "sha256": "38752ea2867b88f3edcabefffa22e019ac0afd5bf852ec0f22b7c679f301ed61",
-          "size": 24812,
+          "sha256": "07becb9aa37eff06a9c1c83ba1fcd6a624828def556726c68d45e7b19abbfbfe",
+          "size": 24952,
           "publishedAt": "2026-11-15T00:44:03Z",
           "changelog": "移动端设置入口移至顶栏，底部导航仅保留消息与我的；重构帖子列表与详情的移动端布局、分隔和图片展示。"
-        },
-        {
-          "version": "1.1.1",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
-          "platforms": [
-            "web",
-            "android"
-          ],
-          "zipUrl": "/plugins/orahako.skbird/1.1.1.zip",
-          "sha256": "45a6f48f1650485370d22aceff15d81e5c661ca8ee131bdb982b24a3d5ba8a95",
-          "size": 24806,
-          "publishedAt": "2026-11-14T23:59:19Z",
-          "changelog": "修复宿主移除旧存储键后启动时凭据持久化键为空的问题；存储键改由插件包持有。"
-        },
-        {
-          "version": "1.1.0",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
-          "platforms": [
-            "web",
-            "android"
-          ],
-          "zipUrl": "/plugins/orahako.skbird/1.1.0.zip",
-          "sha256": "9bd3a9e9c3c65def9a6594c044e791bb8fe4e0ac018b54ba8e7dd14d8e6fd8cc",
-          "size": 20373,
-          "publishedAt": "2026-11-14T18:33:10Z",
-          "changelog": "新增插件作用域移动底部导航，将消息、我的与设置移入底部栏，并保留消息未读提示。"
-        },
-        {
-          "version": "1.0.1",
-          "apiVersion": 1,
-          "minAppVersion": "0.15.0",
-          "platforms": [
-            "web",
-            "android"
-          ],
-          "zipUrl": "/plugins/orahako.skbird/1.0.1.zip",
-          "sha256": "a9e64700644213802de090bcb5ac99108636ab23c4aee6b500bd51bae57e9940",
-          "size": 20121,
-          "publishedAt": "2026-11-13T13:33:23Z",
-          "changelog": "从内置功能迁移为官方市场插件。"
         }
       ]
     }

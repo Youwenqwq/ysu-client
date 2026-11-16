@@ -75,14 +75,16 @@ import type {
   TrainingPlan,
   UnscheduledCourseQueryOptions,
   WechatMfaContext,
+  WechatMfaProvider,
   WechatQrPollResult,
 } from "./academic"
 
 /**
  * Base class for academic providers.
  *
- * Auth-core methods (login/logout/status) stay abstract — the login page and
- * sdk-provider call them unconditionally, so every provider must implement them.
+ * Auth-core methods (login/logout/relogin/status) stay abstract — the login
+ * page, shell and runtime call them unconditionally, so every provider must
+ * implement them.
  *
  * Capability-gated methods default to throwing FEATURE_NOT_SUPPORTED: providers
  * only override what they support and declare it in `capabilities`. Declaring a
@@ -93,6 +95,14 @@ export abstract class BaseProvider implements AcademicProvider {
   abstract readonly id: string
   abstract readonly name: string
   abstract readonly capabilities: AcademicCapabilities
+
+  /**
+   * Base providers already implement the flat WeChat methods, so the optional
+   * extension is exposed whenever the capability is declared.
+   */
+  get wechatMfa(): WechatMfaProvider | undefined {
+    return hasCapability(this.capabilities, "wechatMfa") ? this : undefined
+  }
 
   readonly mobile?: ProviderMobile = undefined
   readonly diagnostics?: ProviderDiagnostics = undefined
@@ -115,7 +125,7 @@ export abstract class BaseProvider implements AcademicProvider {
 
   protected async onReset(): Promise<void> {}
 
-  private unsupported(capability: keyof AcademicCapabilities, method: string): never {
+  private unsupported(capability: string, method: string): never {
     if (hasCapability(this.capabilities, capability)) {
       throw new ProviderError(
         ProviderErrorCode.FEATURE_NOT_SUPPORTED,
@@ -140,6 +150,7 @@ export abstract class BaseProvider implements AcademicProvider {
   abstract loginStep1(input: LoginStep1Input): Promise<LoginStep1Result>
   abstract checkAuthStatus(): Promise<AuthStatus>
   abstract logout(): Promise<void>
+  abstract relogin(): Promise<boolean>
   abstract isAuthenticated(): boolean
 
   // ─── Auth (capability-gated) ─────────────────────────────────────────── //

@@ -5,16 +5,17 @@ import type {
   PluginSettingsService,
 } from "@orahako/plugin-sdk"
 import { PluginRuntime } from "./runtime"
-import { PluginSettingsRegistry } from "./settings-registry"
+import { PluginSettingsRegistry } from "@/plugins/official/runtime/registries/settings"
 
 function manifest(id: string): PluginManifest {
   return {
     id,
     name: id,
     version: "1.0.0",
-    apiVersion: 1,
+    apiVersion: 2,
     kind: "feature",
     entry: "index.js",
+    inject: ["settings"],
   }
 }
 
@@ -34,7 +35,8 @@ const beta = manifest("example.beta")
 
 function setup() {
   const registry = new PluginSettingsRegistry()
-  const runtime = new PluginRuntime(registry.createService)
+  const runtime = new PluginRuntime()
+  runtime.context.set("settings", registry)
   return { registry, runtime }
 }
 

@@ -14,7 +14,7 @@ const manifest: PluginManifest = {
   id: "org.example.feature",
   name: "Example feature",
   version: "1.0.0",
-  apiVersion: 1,
+  apiVersion: 2,
   kind: "feature",
   entry: "index.js",
 }

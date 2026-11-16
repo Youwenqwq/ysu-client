@@ -8,17 +8,29 @@ import {
   LdxtError,
   LdxtNotLoggedInError,
   LdxtProtocolError,
-  queryEnrollableActivities as _queryEnrollableActivities,
-  queryLaborRecords as _queryLaborRecords,
-  queryLaborSummary as _queryLaborSummary,
 } from "./protocol/ldxt"
+import type { LdxtProtocol } from "./protocol/ldxt"
 import type {
   EnrollableActivity as LdxtEnrollableActivity,
   LaborRecord as LdxtLaborRecord,
   LaborSummary as LdxtLaborSummary,
 } from "./protocol/ldxt"
-import { mapCASSessionError } from "./cas-auth"
 import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
+
+export type LdxtFetcher = Pick<
+  LdxtProtocol,
+  "queryLaborRecords" | "queryLaborSummary" | "queryEnrollableActivities"
+>
+
+export function createLdxtFetcher(
+  ldxt: LdxtProtocol,
+  mapCASSessionError: (error: unknown) => ProviderError | undefined
+): LdxtFetcher {
+  const {
+    queryLaborRecords: _queryLaborRecords,
+    queryLaborSummary: _queryLaborSummary,
+    queryEnrollableActivities: _queryEnrollableActivities,
+  } = ldxt
 
 function mapLdxtError(e: unknown): ProviderError {
   const sessionError = mapCASSessionError(e)
@@ -44,7 +56,7 @@ async function withLdxt<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function queryLaborRecords(opts?: {
+async function queryLaborRecords(opts?: {
   termCode?: string
   batchId?: string
   pageSize?: number
@@ -52,10 +64,17 @@ export async function queryLaborRecords(opts?: {
   return withLdxt(() => _queryLaborRecords(opts))
 }
 
-export async function queryLaborSummary(): Promise<LdxtLaborSummary> {
+async function queryLaborSummary(): Promise<LdxtLaborSummary> {
   return withLdxt(() => _queryLaborSummary())
 }
 
-export async function queryEnrollableActivities(): Promise<LdxtEnrollableActivity[]> {
+async function queryEnrollableActivities(): Promise<LdxtEnrollableActivity[]> {
   return withLdxt(() => _queryEnrollableActivities())
+}
+
+  return {
+    queryLaborRecords,
+    queryLaborSummary,
+    queryEnrollableActivities,
+  }
 }

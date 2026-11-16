@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application>
+        <!-- YSU notifications deep link into their own app routes. -->
+        <activity
+            android:name="${applicationId}.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="${orahakoDeepLinkScheme}"
+                    android:host="${orahakoDeepLinkHostGrades}" />
+                <data
+                    android:scheme="${orahakoDeepLinkScheme}"
+                    android:host="${orahakoDeepLinkHostExams}" />
+                <data
+                    android:scheme="${orahakoDeepLinkScheme}"
+                    android:host="${orahakoDeepLinkHostSettings}" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

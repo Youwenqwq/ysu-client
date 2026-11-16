@@ -1,0 +1,95 @@
+// Official composition provider: binds the enabled capability ids from
+// assets/native-companion.json to the factories of the companion modules
+// selected in nativeComposition.gradle and registers the process-wide
+// background adapters.
+//
+// The module class list is generated into BuildConfig so the composition does
+// not import optional widget companions: a build can select the generic widget
+// host without the schedule/exam companions, and selecting nothing is a build
+// failure instead of a silent empty composition.
+
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+def officialCompanions = gradle.ext.find('orahakoOfficialNativeCompanions')
+if (officialCompanions == null || officialCompanions.isEmpty()) {
+    throw new GradleException(
+        'native-official requires nativeComposition.gradle to select at least one companion module'
+    )
+}
+def compositionProviderModule = gradle.ext.find('orahakoNativeCompositionProviderModule')
+def compositionProviderClass = gradle.ext.find('orahakoNativeCompositionProviderClass')
+if (!compositionProviderClass?.toString()?.trim()) {
+    throw new GradleException('nativeComposition.gradle must select a composition provider class')
+}
+if (compositionProviderModule?.toString()?.trim() != project.path) {
+    // Another module owns the provider; this module is only its implementation
+    // unless a community composition points the build at a different provider.
+    logger.info("Native composition provider is ${compositionProviderModule}, not ${project.path}")
+} else {
+    def providerPath = compositionProviderClass.toString().trim().replace('.', '/')
+    def providerSources = ['src/main/java', 'src/main/kotlin'].collect { file(it) }
+    def providerFound = providerSources.any { root ->
+        new File(root, providerPath + '.kt').isFile() ||
+            new File(root, providerPath + '.java').isFile()
+    }
+    if (!providerFound) {
+        throw new GradleException(
+            "Configured native composition provider ${compositionProviderClass} is missing from ${project.path}"
+        )
+    }
+}
+
+def widgetCompositionModules = gradle.ext.find('orahakoNativeWidgetCompositionModules') ?: [:]
+def widgetCompositionClasses = []
+widgetCompositionModules.each { modulePath, className ->
+    def name = className?.toString()?.trim()
+    if (!name) {
+        throw new GradleException("Widget composition module $modulePath must name a class")
+    }
+    if (!(modulePath in officialCompanions)) {
+        throw new GradleException(
+            "Widget composition module $modulePath must be one of the official companion modules"
+        )
+    }
+    def relative = name.replace('.', '/')
+    def moduleProject = project(modulePath)
+    def sources = ['src/main/java', 'src/main/kotlin'].collect { moduleProject.file(it) }
+    def found = sources.any { root ->
+        new File(root, relative + '.kt').isFile() || new File(root, relative + '.java').isFile()
+    }
+    if (!found) {
+        throw new GradleException(
+            "Native composition module $name is missing from $modulePath"
+        )
+    }
+    widgetCompositionClasses << name
+}
+
+android {
+    namespace = "me.uwen.orahako.nativebridge.official"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        buildConfigField "String", "NATIVE_CAPABILITY_COMPOSITION_MODULES",
+            "\"${widgetCompositionClasses.join(',')}\""
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+dependencies {
+    api project(':native-core')
+    officialCompanions.each { implementation project(it) }
+
+    testImplementation "junit:junit:$junitVersion"
+    testImplementation "org.json:json:20250517"
+}

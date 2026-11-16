@@ -1,39 +1,18 @@
 /**
- * @orahako/plugin-ui/platform — native bridge, navigation, and widget helpers.
+ * @orahako/plugin-ui/platform — platform detection, version metadata and the
+ * shared back-navigation contract.
+ *
+ * Native capabilities, notifications, widgets and login throttling are
+ * services: use the scoped `PluginContext` (`native`, `session`, `query`) or
+ * the owning official module instead of importing bridge globals.
  */
-export { isCapacitor, isTablet } from "@/lib/native/platform"
-export {
-  syncScheduleToWidget,
-  syncExamsToWidget,
-  syncWidgetSettingsToWidget,
-  requestWidgetPin,
-  clearWidgetDataFromNative,
-  type NativeWidgetId,
-  type WidgetCourse,
-  type WidgetWeekInfo,
-  type WidgetExam,
-} from "@/lib/native/widget-bridge"
-export {
-  syncClassAlarmsToNative,
-  observeNativeNotifications,
-  stopNotify,
-  setNotificationEnabled,
-  checkExactAlarmPermission,
-  requestExactAlarmPermission,
-} from "@/lib/native/notify"
-export { NotifyPlugin, type OrahakoNotifyPlugin } from "@/lib/native/notify-plugin"
-export { OrahakoFile, type OrahakoFilePlugin } from "@/lib/native/orahako-file"
+export { isCapacitor, isTablet } from "@orahako/plugin-sdk/native"
 export {
   BACK_PRIORITY,
   registerBackHandler,
   consumeBackLayer,
   requestBack,
-} from "@/lib/navigation/back"
-export {
-  checkRateLimit,
-  recordLoginAttempt,
-  clearLoginAttempts,
-  formatRetryDuration,
-  rateLimitMessage,
-} from "@/lib/rate-limit"
-export { APP_VERSION, APP_BUILD, APP_COPYRIGHT, APP_LICENSE, APP_REPO } from "@/lib/version"
+  setNavigationBackHandler,
+} from "./back"
+export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"
+export const APP_BUILD = process.env.NEXT_PUBLIC_APP_BUILD ?? "dev"

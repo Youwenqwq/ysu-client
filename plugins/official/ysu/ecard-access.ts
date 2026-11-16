@@ -5,57 +5,77 @@
  * 该能力由 YSU provider 通过 `AcademicProvider.ecard` 暴露。
  */
 import {
-  getEcardBalance,
   EcardNotLoggedInError,
   EcardProtocolError,
+  type EcardProtocol,
   type EcardSessionStatus,
 } from "./protocol/ecard"
-import { mapCASSessionError } from "./cas-auth"
 import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
-import { getSchoolConfigScope, useAuthStore } from "@orahako/plugin-sdk/host"
+import type { SessionSnapshot } from "@orahako/plugin-sdk"
+import type { YSUContext } from "./context"
 
 export type { EcardBalance, EcardSessionStatus } from "./protocol/ecard"
 
-/** 登录态下查询一卡通余额，复用 ProviderError 会话错误契约。 */
-export async function fetchEcardBalance(): Promise<EcardSessionStatus> {
-  const { username, credential, isAuthenticated } = useAuthStore.getState()
-  const scope = getSchoolConfigScope()
-  if (!username || !credential || !isAuthenticated) {
-    throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "请先登录后查询一卡通")
+interface SessionIdentity {
+  readonly schoolId: string | null
+  readonly username: string | null
+  readonly credential: string | null
+}
+
+function identityOf(snapshot: SessionSnapshot): SessionIdentity {
+  return {
+    schoolId: snapshot.activeSchoolId,
+    username: snapshot.username,
+    credential: snapshot.credential,
   }
-  try {
-    const status = await getEcardBalance()
-    const current = useAuthStore.getState()
-    if (
-      current.username !== username ||
-      current.credential !== credential ||
-      !current.isAuthenticated ||
-      getSchoolConfigScope() !== scope
-    ) {
-      throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "一卡通查询账户已切换")
+}
+
+function sameIdentity(left: SessionIdentity, right: SessionIdentity): boolean {
+  return (
+    left.schoolId === right.schoolId &&
+    left.username === right.username &&
+    left.credential === right.credential
+  )
+}
+
+export function createEcardAccess(
+  ctx: YSUContext,
+  ecard: EcardProtocol,
+  mapCASSessionError: (error: unknown) => ProviderError | undefined
+): () => Promise<EcardSessionStatus> {
+  return async function fetchEcardBalance(): Promise<EcardSessionStatus> {
+    const snapshot = ctx.session.getSnapshot()
+    if (!snapshot.username || !snapshot.credential || !snapshot.isAuthenticated) {
+      throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "请先登录后查询一卡通")
     }
-    return status
-  } catch (e) {
-    let error = mapCASSessionError(e)
-    if (!error) {
-      if (e instanceof EcardNotLoggedInError) {
-        error = new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, e.message, e, 401)
-      } else if (e instanceof EcardProtocolError) {
-        error = new ProviderError(ProviderErrorCode.BACKEND_PROTOCOL_ERROR, e.message, e, 500)
-      } else {
-        error = wrapError(e)
+    const identity = identityOf(snapshot)
+
+    try {
+      const status = await ecard.getEcardBalance()
+      if (!sameIdentity(identity, identityOf(ctx.session.getSnapshot()))) {
+        throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "一卡通查询账户已切换")
       }
+      return status
+    } catch (e) {
+      let error = mapCASSessionError(e)
+      if (!error) {
+        if (e instanceof EcardNotLoggedInError) {
+          error = new ProviderError(ProviderErrorCode.AUTH_SESSION_EXPIRED, e.message, e, 401)
+        } else if (e instanceof EcardProtocolError) {
+          error = new ProviderError(ProviderErrorCode.BACKEND_PROTOCOL_ERROR, e.message, e, 500)
+        } else {
+          error = wrapError(e)
+        }
+      }
+      const current = ctx.session.getSnapshot()
+      if (
+        error.code === ProviderErrorCode.AUTH_SESSION_EXPIRED &&
+        current.isAuthenticated &&
+        sameIdentity(identity, identityOf(current))
+      ) {
+        ctx.session.setSessionExpired(true)
+      }
+      throw error
     }
-    const current = useAuthStore.getState()
-    if (
-      error.code === ProviderErrorCode.AUTH_SESSION_EXPIRED &&
-      current.isAuthenticated &&
-      current.username === username &&
-      current.credential === credential &&
-      getSchoolConfigScope() === scope
-    ) {
-      current.setSessionExpired(true)
-    }
-    throw error
   }
 }

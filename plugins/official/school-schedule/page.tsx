@@ -40,7 +40,7 @@ import {
   useSchoolGradeYears,
   useSchoolMajors,
   useTermCalendar,
-} from "@orahako/plugin-ui/hooks"
+} from "@orahako/academic"
 import type { Course, SchoolClassInfo, ClassroomInfo } from "@orahako/plugin-sdk/academic"
 import { useIsMobile } from "@orahako/plugin-ui/hooks"
 import { useBackHandler } from "@orahako/plugin-ui/hooks"

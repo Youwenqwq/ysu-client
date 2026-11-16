@@ -3,43 +3,11 @@
  *
  * 纯函数 + 模块级状态(cookie jar)。
  */
-import {
-  SimpleCookieJar,
-  collectCookies,
-  cookieEntryFromJSON,
-  fetchWithJar,
-  getJwxtCookieDomain,
-  getSchoolConfig,
-  getSchoolConfigOrNull,
-  headerSingle,
-  installCookies,
-  jwxtUrls,
-  onSchoolConfigChanged,
-  serverConfig,
-  type CookieEntry,
-} from "@orahako/plugin-sdk/host"
+import type { CookieEntry, CookieJar, HttpResponse } from "@orahako/plugin-sdk"
+import { collectCookies, cookieEntryFromJSON, headerSingle, installCookies } from "../http-utils"
+import type { CASProtocol } from "./cas"
+import type { YSUContext } from "../context"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
-import { authorize, getCredentialApplied } from "./cas"
-
-// Cached school config references for performance. The config is registered by
-// the provider plugin, so module import must not require it to exist yet.
-const initialSchoolConfig = getSchoolConfigOrNull()
-let _appIds: Readonly<Record<string, string>> = initialSchoolConfig?.jwxt.appIds ?? {}
-let _apiPaths: Readonly<Record<string, string>> = initialSchoolConfig?.jwxt.apiPaths ?? {}
-
-function refreshSchoolConfigCache(): void {
-  const config = getSchoolConfigOrNull()
-  if (!config) {
-    _appIds = {}
-    _apiPaths = {}
-    return
-  }
-  _appIds = config.jwxt.appIds
-  _apiPaths = config.jwxt.apiPaths
-}
-
-// Register callback to refresh cache when school config changes
-onSchoolConfigChanged(refreshSchoolConfigCache)
 
 // ─── Types ────────────────────────────────────────────────────────────── //
 
@@ -444,18 +412,18 @@ export class JWXTBusinessError extends JWXTError {
 
 // ─── JWXTSession ──────────────────────────────────────────────────────── //
 
-function isJwxtCookie(e: CookieEntry): boolean {
-  return e.domain.length > 0 && e.domain.includes(getJwxtCookieDomain()) && e.name !== "_WEU"
+function isJwxtCookie(e: CookieEntry, cookieDomain: string): boolean {
+  return e.domain.length > 0 && e.domain.includes(cookieDomain) && e.name !== "_WEU"
 }
 
 export class JWXTSession {
   constructor(public readonly cookies: readonly CookieEntry[]) {}
 
-  static async fromJar(jar: SimpleCookieJar): Promise<JWXTSession> {
-    return new JWXTSession(await collectCookies(jar, isJwxtCookie))
+  static async fromJar(jar: CookieJar, cookieDomain: string): Promise<JWXTSession> {
+    return new JWXTSession(await collectCookies(jar, (e) => isJwxtCookie(e, cookieDomain)))
   }
 
-  async apply(jar: SimpleCookieJar): Promise<void> {
+  async apply(jar: CookieJar): Promise<void> {
     await installCookies(jar, this.cookies)
   }
 
@@ -486,28 +454,153 @@ export class JWXTSession {
   }
 }
 
-// ─── Module state ─────────────────────────────────────────────────────── //
+// ─── Provider-scoped state ────────────────────────────────────────────── //
 
-let jwxtJar = new SimpleCookieJar()
-let timeoutMs = 30_000
-let hydrationDone: Promise<void> = Promise.resolve()
+export interface JWXTProtocol {
+  getJar(): CookieJar
+  setJar(jar: CookieJar): void
+  setTimeoutMs(ms: number): void
+  restoreSession(session: JWXTSession): Promise<void>
+  resetJWXT(): void
+  queryStudentInfo(): Promise<StudentInfo>
+  queryGrades(opts?: {
+    term?: string
+    courseName?: string
+    pageSize?: number
+    pageNumber?: number
+  }): Promise<Grade[]>
+  queryGpaStats(opts?: { studentId?: string }): Promise<GPAStats>
+  queryGradeStatistics(opts?: {
+    term?: string
+    classId?: string
+    courseCode?: string
+  }): Promise<GradeStatistics>
+  queryGradeDistribution(opts?: {
+    term?: string
+    classId?: string
+    courseCode?: string
+  }): Promise<GradeDistribution[]>
+  queryGradeRanking(opts?: {
+    term?: string
+    studentId?: string
+    classId?: string
+    courseCode?: string
+  }): Promise<GradeRanking>
+  querySchedule(opts?: { term?: string }): Promise<Course[]>
+  queryScheduleExperimental(opts?: {
+    term?: string
+    studentId?: string
+    courseCategory?: string
+  }): Promise<Course[]>
+  queryUnscheduledCourses(opts?: {
+    term?: string
+    studentId?: string
+    courseCategory?: string
+  }): Promise<Course[]>
+  queryClassPeriods(): Promise<ClassPeriod[]>
+  queryTermCalendar(opts?: { term?: string }): Promise<TermCalendar>
+  queryCurrentWeek(opts?: { term?: string; date?: string }): Promise<CurrentWeek>
+  queryExams(opts?: { term?: string }): Promise<Exam[]>
+  queryMakeupExamBatches(opts?: { term?: string }): Promise<MakeupExamBatch[]>
+  queryMakeupExamCourses(opts?: {
+    term?: string
+    batchId?: string
+    registered?: boolean
+    pageSize?: number
+  }): Promise<MakeupExamCourse[]>
+  signupMakeupExam(args: { taskId: string; batchId: string }): Promise<void>
+  queryGradeYears(): Promise<CodeItem[]>
+  queryDepartments(): Promise<CodeItem[]>
+  queryMajors(department?: string): Promise<MajorInfo[]>
+  querySchoolClasses(opts?: {
+    term?: string
+    grade?: string
+    department?: string
+    major?: string
+    pageSize?: number
+  }): Promise<SchoolClassInfo[]>
+  queryClassSchedule(classId: string, opts?: { term?: string }): Promise<Course[]>
+  queryCampuses(): Promise<CodeItem[]>
+  queryTeachingBuildings(campus?: string): Promise<CodeItem[]>
+  queryClassrooms(opts?: {
+    term?: string
+    name?: string
+    campus?: string
+    building?: string
+    pageSize?: number
+    pageNumber?: number
+  }): Promise<ClassroomInfo[]>
+  queryClassroomSchedule(classroomCode: string, opts?: { term?: string }): Promise<Course[]>
+  queryTrainingPlan(opts?: { pageSize?: number; pageNumber?: number }): Promise<TrainingPlan[]>
+  queryAcademicCompletion(): Promise<AcademicCompletion>
+  recalculateAcademicCompletion(options?: {
+    timeoutMs?: number
+    pollIntervalMs?: number
+  }): Promise<AcademicCompletion>
+  queryAcademicWarnings(): Promise<AcademicWarning[]>
+  queryEvaluationTypes(opts?: { term?: string }): Promise<EvaluationType[]>
+  queryPendingEvaluations(evalType: string, opts?: { term?: string }): Promise<EvaluationTask[]>
+  getEvaluationDetail(
+    groupNo: string,
+    evalType: string,
+    opts?: { sequence?: number }
+  ): Promise<EvaluationDetail>
+  calculateEvaluationScore(
+    groupNo: string,
+    wjid: string,
+    evalType: string,
+    answers: readonly EvaluationAnswer[],
+    opts?: {
+      teacherRelationId?: string
+      courseName?: string
+      teacherName?: string
+      sequence?: number
+    }
+  ): Promise<Record<string, unknown>>
+  submitEvaluation(
+    groupNo: string,
+    wjid: string,
+    evalType: string,
+    answers: readonly EvaluationAnswer[],
+    opts?: {
+      teacherRelationId?: string
+      courseName?: string
+      teacherName?: string
+      sequence?: number
+    }
+  ): Promise<void>
+}
 
-/** Per-app WEU cookie entries, keyed by appId value. */
-const weuStore = new Map<string, CookieEntry>()
+export function createJWXT(ctx: YSUContext, cas: CASProtocol): JWXTProtocol {
+  const appIds = ctx.config.jwxt.appIds
+  const apiPaths = ctx.config.jwxt.apiPaths
+  const jwxtBase = ctx.urls.jwxt.base
+  const appBase = ctx.urls.jwxt.appBase
+  const portalUrl = ctx.urls.jwxt.portal
+  const appShowUrl = ctx.urls.jwxt.appShow
+  const jwxtCookieDomain = ctx.urls.jwxtCookieDomain
+  const pjappGoodRoute = ctx.config.jwxt.pjappGoodRoute
 
-export function getJar(): SimpleCookieJar {
+  let jwxtJar = ctx.session.createCookieJar()
+  let timeoutMs = 30_000
+  let hydrationDone: Promise<void> = Promise.resolve()
+
+  /** Per-app WEU cookie entries, keyed by appId value. */
+  const weuStore = new Map<string, CookieEntry>()
+
+function getJar(): CookieJar {
   return jwxtJar
 }
 
-export function setJar(jar: SimpleCookieJar): void {
+function setJar(jar: CookieJar): void {
   jwxtJar = jar
 }
 
-export function setTimeoutMs(ms: number): void {
+function setTimeoutMs(ms: number): void {
   timeoutMs = ms
 }
 
-export async function restoreSession(session: JWXTSession): Promise<void> {
+async function restoreSession(session: JWXTSession): Promise<void> {
   hydrationDone = session.apply(jwxtJar)
   await hydrationDone
 }
@@ -515,8 +608,8 @@ export async function restoreSession(session: JWXTSession): Promise<void> {
 let cachedStudentInfo: StudentInfo | null = null
 let inflightStudentInfo: Promise<StudentInfo> | null = null
 
-export function resetJWXT(): void {
-  jwxtJar = new SimpleCookieJar()
+function resetJWXT(): void {
+  jwxtJar = ctx.session.createCookieJar()
   hydrationDone = Promise.resolve()
   authorized = false
   inflightAuth = null
@@ -549,9 +642,9 @@ function toBool(val: unknown): boolean {
 function buildApiUrl(path: string): string {
   // 以 / 开头的路径视为站内绝对路径（如代码表 /jwapp/code/...）
   if (path.startsWith("/")) {
-    return `${jwxtUrls.jwxtBase}${path}`
+    return `${jwxtBase}${path}`
   }
-  return `${jwxtUrls.appBase}/${path}`
+  return `${appBase}/${path}`
 }
 
 function extractRows(datas: unknown, key: string): unknown[] {
@@ -795,9 +888,9 @@ async function emapPost(
   referer?: string
 ): Promise<Record<string, unknown>> {
   const weu = appId ? weuStore.get(appId) : undefined
-  const doRequest = async (): Promise<Awaited<ReturnType<typeof fetchWithJar>>> => {
+  const doRequest = async (): Promise<HttpResponse> => {
     try {
-      return await fetchWithJar(jwxtJar, {
+      return await ctx.session.fetchWithJar(jwxtJar, {
         method: "POST",
         url,
         cookies: weu ? [weu] : undefined,
@@ -816,17 +909,16 @@ async function emapPost(
     }
   }
 
-  let resp: Awaited<ReturnType<typeof fetchWithJar>>
+  let resp: HttpResponse
 
   resp = await doRequest()
   // Retry pjapp 404 with a known-good route cookie.
-  if (appId === _appIds.pjapp && resp.status === 404) {
-    const goodRoute = getSchoolConfig().jwxt.pjappGoodRoute
-    if (goodRoute) {
-      const domain = new URL(serverConfig.jwxtBaseUrl).hostname
+  if (appId === appIds.pjapp && resp.status === 404) {
+    if (pjappGoodRoute) {
+      const domain = new URL(jwxtBase).hostname
       await jwxtJar.setCookie(
-        `route=${goodRoute}; Domain=.${domain}; Path=/`,
-        serverConfig.jwxtBaseUrl,
+        `route=${pjappGoodRoute}; Domain=.${domain}; Path=/`,
+        jwxtBase,
         { ignoreError: true }
       )
       resp = await doRequest()
@@ -877,12 +969,12 @@ let sessionGeneration = 0
 async function ensureAuthorized(): Promise<void> {
   await waitForAuthTransition()
   if (authorized) return
-  await getCredentialApplied()
+  await cas.getCredentialApplied()
   await hydrationDone
 
   const cookies = await jwxtJar.getAllCookies()
   for (const c of cookies) {
-    if (c.domain && c.domain.includes(getJwxtCookieDomain())) {
+    if (c.domain && c.domain.includes(jwxtCookieDomain)) {
       authorized = true
       return
     }
@@ -894,18 +986,18 @@ async function ensureAuthorized(): Promise<void> {
 
   const promise = withAuthTransition(async () => {
     if (authorized) return
-    await getCredentialApplied()
+    await cas.getCredentialApplied()
     await hydrationDone
 
     const currentCookies = await jwxtJar.getAllCookies()
     for (const c of currentCookies) {
-      if (c.domain && c.domain.includes(getJwxtCookieDomain())) {
+      if (c.domain && c.domain.includes(jwxtCookieDomain)) {
         authorized = true
         return
       }
     }
 
-    await authorize(jwxtUrls.portal, jwxtJar)
+    await cas.authorize(portalUrl, jwxtJar)
     authorized = true
   })
   inflightAuth = promise
@@ -930,11 +1022,11 @@ async function reauthorize(failedGeneration: number): Promise<void> {
     authorized = false
     const all = await targetJar.getAllCookies()
     for (const c of all) {
-      if (c.domain && c.domain.includes(getJwxtCookieDomain())) {
+      if (c.domain && c.domain.includes(jwxtCookieDomain)) {
         await targetJar.removeCookie(c.domain, c.path ?? "/", c.name)
       }
     }
-    await authorize(jwxtUrls.portal, targetJar)
+    await cas.authorize(portalUrl, targetJar)
     if (sessionGeneration !== failedGeneration || jwxtJar !== targetJar) return
 
     sessionGeneration += 1
@@ -965,14 +1057,14 @@ async function ensureWeu(appId: string): Promise<void> {
   const requestGeneration = sessionGeneration
   const requestJar = jwxtJar
   const promise = (async () => {
-    const url = `${jwxtUrls.appShow}?id=${encodeURIComponent(appId)}`
+    const url = `${appShowUrl}?id=${encodeURIComponent(appId)}`
     try {
       // Use a temporary jar to avoid clobbering other apps' _WEU in the shared jar.
-      const tempJar = new SimpleCookieJar()
+      const tempJar = ctx.session.createCookieJar()
       const sessionCookies = await collectCookies(requestJar, (e) => e.name !== "_WEU")
       await installCookies(tempJar, sessionCookies)
 
-      await fetchWithJar(tempJar, {
+      await ctx.session.fetchWithJar(tempJar, {
         method: "GET",
         url,
         headers: {
@@ -1031,7 +1123,7 @@ async function getCurrentTerm(appId: string, pathKey: string): Promise<string> {
   const promise = (async () => {
     try {
       await ensureWeu(appId)
-      const datas = await post(_apiPaths[pathKey]!, {}, appId)
+      const datas = await post(apiPaths[pathKey]!, {}, appId)
       const segments = pathKey.split("_")
       const tail = segments[segments.length - 1]!
       const rows = extractRows(datas, tail)
@@ -1072,20 +1164,20 @@ async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
 
 // ─── Public: Student Info ─────────────────────────────────────────────── //
 
-export async function queryStudentInfo(): Promise<StudentInfo> {
+async function queryStudentInfo(): Promise<StudentInfo> {
   if (cachedStudentInfo) return cachedStudentInfo
   if (inflightStudentInfo) return inflightStudentInfo
 
   inflightStudentInfo = (async () => {
     try {
       return await runWithReauth(async () => {
-        await ensureWeu(_appIds.xsjbxxgl)
+        await ensureWeu(appIds.xsjbxxgl)
         const data = {
           querySetting: "[]",
           pageSize: "12",
           pageNumber: "1",
         }
-        const datas = await post(_apiPaths.xsjbxx, data, _appIds.xsjbxxgl)
+        const datas = await post(apiPaths.xsjbxx, data, appIds.xsjbxxgl)
         const rows = extractRows(datas, "cxxsjbxxlb")
         if (rows.length === 0) {
           throw new JWXTProtocolError("queryStudentInfo returned empty result")
@@ -1104,7 +1196,7 @@ export async function queryStudentInfo(): Promise<StudentInfo> {
 
 // ─── Public: Grades ───────────────────────────────────────────────────── //
 
-export async function queryGrades(opts?: {
+async function queryGrades(opts?: {
   term?: string
   courseName?: string
   pageSize?: number
@@ -1116,7 +1208,7 @@ export async function queryGrades(opts?: {
   const pageNumber = opts?.pageNumber ?? 1
 
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.cjcx)
+    await ensureWeu(appIds.cjcx)
 
     const query: Array<Record<string, unknown>> = []
     if (term) {
@@ -1170,13 +1262,13 @@ export async function queryGrades(opts?: {
       pageNumber: String(pageNumber),
       "*order": "-XNXQDM,-KCH,-KXH",
     }
-    const datas = await post(_apiPaths.cjcx, data, _appIds.cjcx)
+    const datas = await post(apiPaths.cjcx, data, appIds.cjcx)
     const rows = extractRows(datas, "xscjcx")
     return rows.map((r) => parseGrade(r as Record<string, unknown>))
   })
 }
 
-export async function queryGpaStats(opts?: { studentId?: string }): Promise<GPAStats> {
+async function queryGpaStats(opts?: { studentId?: string }): Promise<GPAStats> {
   return runWithReauth(async () => {
     let studentId = opts?.studentId
     if (studentId === undefined) {
@@ -1184,12 +1276,12 @@ export async function queryGpaStats(opts?: { studentId?: string }): Promise<GPAS
       studentId = info.studentId
     }
 
-    await ensureWeu(_appIds.cjcx)
+    await ensureWeu(appIds.cjcx)
 
     const data: Record<string, string> = {}
     for (let i = 1; i <= 6; i++) data[`XH${i}`] = studentId
 
-    const datas = await post(_apiPaths.cjcx_gpa, data, _appIds.cjcx)
+    const datas = await post(apiPaths.cjcx_gpa, data, appIds.cjcx)
     const rows = extractRows(datas, "cxzxfaxfjd")
     if (rows.length === 0) {
       throw new JWXTProtocolError("queryGpaStats returned empty result")
@@ -1198,23 +1290,23 @@ export async function queryGpaStats(opts?: { studentId?: string }): Promise<GPAS
   })
 }
 
-export async function queryGradeStatistics(opts?: {
+async function queryGradeStatistics(opts?: {
   term?: string
   classId?: string
   courseCode?: string
 }): Promise<GradeStatistics> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.cjcx)
+    await ensureWeu(appIds.cjcx)
     let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
+      term = await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const payload = buildGradeStatsRequest({
       term,
       classId: opts?.classId,
       courseCode: opts?.courseCode,
     })
-    const datas = await post(_apiPaths.jxbcjtjcx, payload, _appIds.cjcx)
+    const datas = await post(apiPaths.jxbcjtjcx, payload, appIds.cjcx)
     const rows = extractRows(datas, "jxbcjtjcx")
     if (rows.length === 0) {
       throw new JWXTProtocolError("queryGradeStatistics returned empty result")
@@ -1223,16 +1315,16 @@ export async function queryGradeStatistics(opts?: {
   })
 }
 
-export async function queryGradeDistribution(opts?: {
+async function queryGradeDistribution(opts?: {
   term?: string
   classId?: string
   courseCode?: string
 }): Promise<GradeDistribution[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.cjcx)
+    await ensureWeu(appIds.cjcx)
     let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
+      term = await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const payload: Record<string, string> = buildGradeStatsRequest({
       term,
@@ -1240,13 +1332,13 @@ export async function queryGradeDistribution(opts?: {
       courseCode: opts?.courseCode,
     })
     payload["*order"] = "+DJDM"
-    const datas = await post(_apiPaths.jxbcjfbcx, payload, _appIds.cjcx)
+    const datas = await post(apiPaths.jxbcjfbcx, payload, appIds.cjcx)
     const rows = extractRows(datas, "jxbcjfbcx")
     return rows.map((r) => parseGradeDistribution(r as Record<string, unknown>))
   })
 }
 
-export async function queryGradeRanking(opts?: {
+async function queryGradeRanking(opts?: {
   term?: string
   studentId?: string
   classId?: string
@@ -1259,11 +1351,11 @@ export async function queryGradeRanking(opts?: {
       studentId = info.studentId
     }
 
-    await ensureWeu(_appIds.cjcx)
+    await ensureWeu(appIds.cjcx)
 
     let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
+      term = await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const payload: Record<string, string> = buildGradeStatsRequest({
       term,
@@ -1271,7 +1363,7 @@ export async function queryGradeRanking(opts?: {
       courseCode: opts?.courseCode,
     })
     payload["XH"] = studentId
-    const datas = await post(_apiPaths.jxbxspmcx, payload, _appIds.cjcx)
+    const datas = await post(apiPaths.jxbxspmcx, payload, appIds.cjcx)
     const rows = extractRows(datas, "jxbxspmcx")
     if (rows.length === 0) {
       throw new JWXTProtocolError("queryGradeRanking returned empty result")
@@ -1282,25 +1374,25 @@ export async function queryGradeRanking(opts?: {
 
 // ─── Public: Schedule ─────────────────────────────────────────────────── //
 
-export async function querySchedule(opts?: { term?: string }): Promise<Course[]> {
+async function querySchedule(opts?: { term?: string }): Promise<Course[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.wdkb)
+    await ensureWeu(appIds.wdkb)
     let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
+      term = await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
-    const datas = await post(_apiPaths.wdkb, { XNXQDM: term }, _appIds.wdkb)
+    const datas = await post(apiPaths.wdkb, { XNXQDM: term }, appIds.wdkb)
     const rows = extractRows(datas, "cxxszhxqkb")
     return rows.map((r) => parseCourse(r as Record<string, unknown>))
   })
 }
 
-export async function queryScheduleExperimental(opts?: {
+async function queryScheduleExperimental(opts?: {
   term?: string
   studentId?: string
   courseCategory?: string
 }): Promise<Course[]> {
-  if (!_appIds.wdkb_sy || !_apiPaths.wdkb_sy) {
+  if (!appIds.wdkb_sy || !apiPaths.wdkb_sy) {
     return querySchedule({ term: opts?.term })
   }
   return queryCoursesByKblb({
@@ -1312,12 +1404,12 @@ export async function queryScheduleExperimental(opts?: {
   })
 }
 
-export async function queryUnscheduledCourses(opts?: {
+async function queryUnscheduledCourses(opts?: {
   term?: string
   studentId?: string
   courseCategory?: string
 }): Promise<Course[]> {
-  if (!_appIds.wdkb_sy || !_apiPaths.wdkb_sy_unscheduled) {
+  if (!appIds.wdkb_sy || !apiPaths.wdkb_sy_unscheduled) {
     return []
   }
   return queryCoursesByKblb({
@@ -1340,7 +1432,7 @@ async function queryCoursesByKblb(args: {
   return runWithReauth(async () => {
     let term = args.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
+      term = await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     let studentId = args.studentId
     if (studentId === undefined) {
@@ -1348,41 +1440,41 @@ async function queryCoursesByKblb(args: {
       studentId = info.studentId
     }
 
-    await ensureWeu(_appIds.wdkb_sy)
+    await ensureWeu(appIds.wdkb_sy)
 
     const kblb = COURSE_CATEGORY_TO_KBLB[courseCategory] ?? "0"
     const datas = await post(
-      _apiPaths[pathKey]!,
+      apiPaths[pathKey]!,
       {
         XNXQDM: term,
         XH: studentId,
         KBLB: kblb,
       },
-      _appIds.wdkb_sy
+      appIds.wdkb_sy
     )
     const rows = extractRows(datas, rowKey)
     return rows.map((r) => parseCourse(r as Record<string, unknown>))
   })
 }
 
-export async function queryClassPeriods(): Promise<ClassPeriod[]> {
+async function queryClassPeriods(): Promise<ClassPeriod[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.wdkb)
-    const datas = await post(_apiPaths.jc, {}, _appIds.wdkb)
+    await ensureWeu(appIds.wdkb)
+    const datas = await post(apiPaths.jc, {}, appIds.wdkb)
     const rows = extractRows(datas, "jc")
     return rows.map((r) => parseClassPeriod(r as Record<string, unknown>))
   })
 }
 
-export async function queryTermCalendar(opts?: { term?: string }): Promise<TermCalendar> {
+async function queryTermCalendar(opts?: { term?: string }): Promise<TermCalendar> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.wdkb)
+    await ensureWeu(appIds.wdkb)
     let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
+      term = await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const { xn, xq } = splitTerm(term)
-    const datas = await post(_apiPaths.cxxljc, { XN: xn, XQ: xq }, _appIds.wdkb)
+    const datas = await post(apiPaths.cxxljc, { XN: xn, XQ: xq }, appIds.wdkb)
     const rows = extractRows(datas, "cxxljc")
     if (rows.length === 0) {
       throw new JWXTProtocolError("queryTermCalendar returned empty result")
@@ -1391,15 +1483,15 @@ export async function queryTermCalendar(opts?: { term?: string }): Promise<TermC
   })
 }
 
-export async function queryCurrentWeek(opts?: {
+async function queryCurrentWeek(opts?: {
   term?: string
   date?: string
 }): Promise<CurrentWeek> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.wdkb)
+    await ensureWeu(appIds.wdkb)
     let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
+      term = await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const date = opts?.date ?? todayDate()
     const cacheKey = `${term}|${date}`
@@ -1411,7 +1503,7 @@ export async function queryCurrentWeek(opts?: {
     const promise = (async () => {
       try {
         const { xn, xq } = splitTerm(term!)
-        const datas = await post(_apiPaths.dqzc, { XN: xn, XQ: xq, RQ: date }, _appIds.wdkb)
+        const datas = await post(apiPaths.dqzc, { XN: xn, XQ: xq, RQ: date }, appIds.wdkb)
         const rows = extractRows(datas, "dqzc")
         if (rows.length === 0) {
           throw new JWXTProtocolError("queryCurrentWeek returned empty result")
@@ -1433,23 +1525,23 @@ export async function queryCurrentWeek(opts?: {
 
 // ─── Public: Exams ────────────────────────────────────────────────────── //
 
-export async function queryExams(opts?: { term?: string }): Promise<Exam[]> {
+async function queryExams(opts?: { term?: string }): Promise<Exam[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.studentWdksapApp)
+    await ensureWeu(appIds.studentWdksapApp)
     let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
+      term = await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const param: Record<string, unknown> = {
       XNXQDM: term,
       "*order": "-KSRQ,-KSSJMS",
     }
     const datas = await post(
-      _apiPaths.wdksap,
+      apiPaths.wdksap,
       {
         requestParamStr: JSON.stringify(param),
       },
-      _appIds.studentWdksapApp
+      appIds.studentWdksapApp
     )
     const rows = extractRows(datas, "cxxsksap")
     return rows.map((r) => parseExam(r as Record<string, unknown>))
@@ -1472,8 +1564,8 @@ async function getMakeupTerm(): Promise<string> {
 
   inflightMakeupTerm = (async () => {
     try {
-      await ensureWeu(_appIds.bkbl)
-      const datas = await post(_apiPaths.bkxtcs, { CSDM: "KW", ZCSDM: "BKBMXNXQ" }, _appIds.bkbl)
+      await ensureWeu(appIds.bkbl)
+      const datas = await post(apiPaths.bkxtcs, { CSDM: "KW", ZCSDM: "BKBMXNXQ" }, appIds.bkbl)
       const rows = extractRows(datas, "cxxtcs")
       if (rows.length === 0) {
         throw new JWXTProtocolError("makeup term query returned empty result")
@@ -1493,7 +1585,7 @@ async function getMakeupTerm(): Promise<string> {
 }
 
 /** 查询补考考试批次（cxbkkspc）。term 缺省时使用系统参数配置的补考报名学期。 */
-export async function queryMakeupExamBatches(opts?: { term?: string }): Promise<MakeupExamBatch[]> {
+async function queryMakeupExamBatches(opts?: { term?: string }): Promise<MakeupExamBatch[]> {
   return runWithReauth(async () => {
     const term = opts?.term ?? (await getMakeupTerm())
     const inflight = inflightMakeupBatches.get(term)
@@ -1502,8 +1594,8 @@ export async function queryMakeupExamBatches(opts?: { term?: string }): Promise<
     const marker = Symbol(term)
     const promise = (async () => {
       try {
-        await ensureWeu(_appIds.bkbl)
-        const datas = await post(_apiPaths.bkkspc, { XNXQDM: term }, _appIds.bkbl)
+        await ensureWeu(appIds.bkbl)
+        const datas = await post(apiPaths.bkkspc, { XNXQDM: term }, appIds.bkbl)
         const rows = extractRows(datas, "cxbkkspc")
         return rows.map((r) => parseMakeupBatch(r as Record<string, unknown>))
       } finally {
@@ -1523,7 +1615,7 @@ export async function queryMakeupExamBatches(opts?: { term?: string }): Promise<
  * 默认列出可报名课程；registered=true 时列出已报名课程。
  * batchId 缺省时取当前批次的第一个。
  */
-export async function queryMakeupExamCourses(opts?: {
+async function queryMakeupExamCourses(opts?: {
   term?: string
   batchId?: string
   registered?: boolean
@@ -1536,7 +1628,7 @@ export async function queryMakeupExamCourses(opts?: {
       const batches = await queryMakeupExamBatches({ term })
       batchId = batches[0]?.batchId ?? ""
     }
-    await ensureWeu(_appIds.bkbl)
+    await ensureWeu(appIds.bkbl)
 
     const query: Array<Record<string, string>> = [
       { name: "XNXQDM", value: term, builder: "equal", linkOpt: "and" },
@@ -1572,13 +1664,13 @@ export async function queryMakeupExamCourses(opts?: {
     }
 
     const datas = await post(
-      _apiPaths.bkbmmx,
+      apiPaths.bkbmmx,
       {
         querySetting: JSON.stringify(query),
         pageSize: String(opts?.pageSize ?? 100),
         pageNumber: "1",
       },
-      _appIds.bkbl
+      appIds.bkbl
     )
     const rows = extractRows(datas, "cxbkbmmx")
     return rows.map((r) => parseMakeupCourse(r as Record<string, unknown>))
@@ -1592,14 +1684,14 @@ export async function queryMakeupExamCourses(opts?: {
  * 注意本接口外层信封恒为 code=0，真实结果在 datas.xgksrwxs.extParams：
  * code === '1' 为成功，其余为拒绝（msg 含原因）。
  */
-export async function signupMakeupExam(args: {
+async function signupMakeupExam(args: {
   taskId: string
   batchId: string
   studentId?: string
 }): Promise<void> {
   return runWithReauth(async () => {
     const studentId = args.studentId ?? (await queryStudentInfo()).studentId
-    await ensureWeu(_appIds.bkbl)
+    await ensureWeu(appIds.bkbl)
 
     const param = JSON.stringify([
       {
@@ -1609,7 +1701,7 @@ export async function signupMakeupExam(args: {
         KSDM: args.batchId,
       },
     ])
-    const datas = await post(_apiPaths.xgksrwxs, { param }, _appIds.bkbl)
+    const datas = await post(apiPaths.xgksrwxs, { param }, appIds.bkbl)
 
     const node = datas["xgksrwxs"]
     const ext =
@@ -1624,7 +1716,7 @@ export async function signupMakeupExam(args: {
       throw new JWXTBusinessError(
         extParams["code"] as string | number | null,
         (extParams["msg"] as string | null) ?? null,
-        buildApiUrl(_apiPaths.xgksrwxs)
+        buildApiUrl(apiPaths.xgksrwxs)
       )
     }
   })
@@ -1634,32 +1726,32 @@ export async function signupMakeupExam(args: {
 
 /** kcbcx 应用首页，代码表与列表接口需要它作为 Referer。 */
 function kcbcxIndexUrl(): string {
-  return `${jwxtUrls.appBase}/kcbcx/*default/index.do`
+  return `${appBase}/kcbcx/*default/index.do`
 }
 
 /** 查询年级代码表。 */
-export async function queryGradeYears(): Promise<CodeItem[]> {
+async function queryGradeYears(): Promise<CodeItem[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.kcbcx)
-    const datas = await post(_apiPaths.code_nj, {}, _appIds.kcbcx, kcbcxIndexUrl())
+    await ensureWeu(appIds.kcbcx)
+    const datas = await post(apiPaths.code_nj, {}, appIds.kcbcx, kcbcxIndexUrl())
     return extractRows(datas, "code").map((r) => parseCodeItem(r as Record<string, unknown>))
   })
 }
 
 /** 查询院系代码表。 */
-export async function queryDepartments(): Promise<CodeItem[]> {
+async function queryDepartments(): Promise<CodeItem[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.kcbcx)
-    const datas = await post(_apiPaths.code_yxdm, {}, _appIds.kcbcx, kcbcxIndexUrl())
+    await ensureWeu(appIds.kcbcx)
+    const datas = await post(apiPaths.code_yxdm, {}, appIds.kcbcx, kcbcxIndexUrl())
     return extractRows(datas, "code").map((r) => parseCodeItem(r as Record<string, unknown>))
   })
 }
 
 /** 查询专业代码表（服务端不过滤，院系级联在客户端完成）。 */
-export async function queryMajors(department?: string): Promise<MajorInfo[]> {
+async function queryMajors(department?: string): Promise<MajorInfo[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.kcbcx)
-    const datas = await post(_apiPaths.code_zydm, {}, _appIds.kcbcx, kcbcxIndexUrl())
+    await ensureWeu(appIds.kcbcx)
+    const datas = await post(apiPaths.code_zydm, {}, appIds.kcbcx, kcbcxIndexUrl())
     const majors = extractRows(datas, "code").map((r) => parseMajor(r as Record<string, unknown>))
     if (department === undefined) return majors
     return majors.filter((m) => m.department === department)
@@ -1667,7 +1759,7 @@ export async function queryMajors(department?: string): Promise<MajorInfo[]> {
 }
 
 /** 查询全校班级列表（bjcx），可按年级/院系/专业级联筛选。 */
-export async function querySchoolClasses(opts?: {
+async function querySchoolClasses(opts?: {
   term?: string
   grade?: string
   department?: string
@@ -1675,8 +1767,8 @@ export async function querySchoolClasses(opts?: {
   pageSize?: number
 }): Promise<SchoolClassInfo[]> {
   return runWithReauth(async () => {
-    const term = opts?.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq"))
-    await ensureWeu(_appIds.kcbcx)
+    const term = opts?.term ?? (await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq"))
+    await ensureWeu(appIds.kcbcx)
     const form: Record<string, string> = {
       XNXQDM: term,
       SFSY: "1",
@@ -1687,7 +1779,7 @@ export async function querySchoolClasses(opts?: {
     if (opts?.grade !== undefined) form["NJ"] = opts.grade
     if (opts?.department !== undefined) form["YXDM"] = opts.department
     if (opts?.major !== undefined) form["ZYDM"] = opts.major
-    const datas = await post(_apiPaths.bjcx, form, _appIds.kcbcx, kcbcxIndexUrl())
+    const datas = await post(apiPaths.bjcx, form, appIds.kcbcx, kcbcxIndexUrl())
     return extractRows(datas, "bjcx").map((r) => parseSchoolClassInfo(r as Record<string, unknown>))
   })
 }
@@ -1700,21 +1792,21 @@ async function queryBjkbRows(args: {
   idValue: string
   term?: string
 }): Promise<Record<string, unknown>[]> {
-  const term = args.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq"))
-  await ensureWeu(_appIds.kcbcx)
+  const term = args.term ?? (await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq"))
+  await ensureWeu(appIds.kcbcx)
   const payload: Record<string, string> = { XNXQDM: term }
   payload[args.idParam] = args.idValue
   const datas = await post(
-    _apiPaths[args.pathKey]!,
+    apiPaths[args.pathKey]!,
     { requestParamStr: JSON.stringify(payload) },
-    _appIds.kcbcx,
+    appIds.kcbcx,
     kcbcxIndexUrl()
   )
   return extractRows(datas, args.rowKey) as Record<string, unknown>[]
 }
 
 /** 查询指定行政班的课表（querybjkb），与个人课表同构。 */
-export async function queryClassSchedule(
+async function queryClassSchedule(
   classId: string,
   opts?: { term?: string }
 ): Promise<Course[]> {
@@ -1731,19 +1823,19 @@ export async function queryClassSchedule(
 }
 
 /** 查询校区代码表。 */
-export async function queryCampuses(): Promise<CodeItem[]> {
+async function queryCampuses(): Promise<CodeItem[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.kcbcx)
-    const datas = await post(_apiPaths.code_xxxq, {}, _appIds.kcbcx, kcbcxIndexUrl())
+    await ensureWeu(appIds.kcbcx)
+    const datas = await post(apiPaths.code_xxxq, {}, appIds.kcbcx, kcbcxIndexUrl())
     return extractRows(datas, "code").map((r) => parseCodeItem(r as Record<string, unknown>))
   })
 }
 
 /** 查询教学楼代码表（按校区代码客户端过滤）。 */
-export async function queryTeachingBuildings(campus?: string): Promise<CodeItem[]> {
+async function queryTeachingBuildings(campus?: string): Promise<CodeItem[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.kcbcx)
-    const datas = await post(_apiPaths.code_jxldm, {}, _appIds.kcbcx, kcbcxIndexUrl())
+    await ensureWeu(appIds.kcbcx)
+    const datas = await post(apiPaths.code_jxldm, {}, appIds.kcbcx, kcbcxIndexUrl())
     const items = extractRows(datas, "code").map((r) => parseCodeItem(r as Record<string, unknown>))
     if (campus === undefined) return items
     return items.filter((item) => {
@@ -1758,7 +1850,7 @@ export async function queryTeachingBuildings(campus?: string): Promise<CodeItem[
 }
 
 /** 查询全校教室列表（jscx），可按名称/校区/教学楼筛选。 */
-export async function queryClassrooms(opts?: {
+async function queryClassrooms(opts?: {
   term?: string
   name?: string
   campus?: string
@@ -1767,8 +1859,8 @@ export async function queryClassrooms(opts?: {
   pageNumber?: number
 }): Promise<ClassroomInfo[]> {
   return runWithReauth(async () => {
-    const term = opts?.term ?? (await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq"))
-    await ensureWeu(_appIds.kcbcx)
+    const term = opts?.term ?? (await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq"))
+    await ensureWeu(appIds.kcbcx)
 
     const query: Array<Record<string, string>> = []
     if (opts?.name) {
@@ -1805,13 +1897,13 @@ export async function queryClassrooms(opts?: {
     if (query.length > 0) {
       form["querySetting"] = JSON.stringify(query)
     }
-    const datas = await post(_apiPaths.jscx, form, _appIds.kcbcx, kcbcxIndexUrl())
+    const datas = await post(apiPaths.jscx, form, appIds.kcbcx, kcbcxIndexUrl())
     return extractRows(datas, "jscx").map((r) => parseClassroomInfo(r as Record<string, unknown>))
   })
 }
 
 /** 查询指定教室的课表（queryjaskb）。 */
-export async function queryClassroomSchedule(
+async function queryClassroomSchedule(
   classroomCode: string,
   opts?: { term?: string }
 ): Promise<Course[]> {
@@ -1829,7 +1921,7 @@ export async function queryClassroomSchedule(
 
 // ─── Public: Training Plan / Academic ─────────────────────────────────── //
 
-export async function queryTrainingPlan(opts?: {
+async function queryTrainingPlan(opts?: {
   pageSize?: number
   pageNumber?: number
 }): Promise<TrainingPlan[]> {
@@ -1837,9 +1929,9 @@ export async function queryTrainingPlan(opts?: {
   const pageNumber = opts?.pageNumber ?? 1
 
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.xsfacx)
+    await ensureWeu(appIds.xsfacx)
 
-    const firstDatas = await post(_apiPaths.pyfa, {}, _appIds.xsfacx)
+    const firstDatas = await post(apiPaths.pyfa, {}, appIds.xsfacx)
     const planRows = extractRows(firstDatas, "grpyfacx")
     if (planRows.length === 0) {
       throw new JWXTProtocolError("queryTrainingPlan: no training plan found")
@@ -1850,13 +1942,13 @@ export async function queryTrainingPlan(opts?: {
     }
 
     const datas = await post(
-      _apiPaths.pyfa_courses,
+      apiPaths.pyfa_courses,
       {
         PYFADM: pyfadm,
         pageSize: String(pageSize),
         pageNumber: String(pageNumber),
       },
-      _appIds.xsfacx
+      appIds.xsfacx
     )
     const rows = extractRows(datas, "kzkccx")
     return rows.map((r) => parseTrainingPlan(r as Record<string, unknown>))
@@ -1865,12 +1957,12 @@ export async function queryTrainingPlan(opts?: {
 
 async function queryCompletionRow(): Promise<Record<string, unknown>> {
   const datas = await post(
-    _apiPaths.xywc,
+    apiPaths.xywc,
     {
       SCLBDM: "04",
       "*order": "-CZSJ",
     },
-    _appIds.xywccx
+    appIds.xywccx
   )
   const rows = extractRows(datas, "cxxsscfa")
   if (rows.length === 0) {
@@ -1879,9 +1971,9 @@ async function queryCompletionRow(): Promise<Record<string, unknown>> {
   return rows[0] as Record<string, unknown>
 }
 
-export async function queryAcademicCompletion(): Promise<AcademicCompletion> {
+async function queryAcademicCompletion(): Promise<AcademicCompletion> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.xywccx)
+    await ensureWeu(appIds.xywccx)
     return parseAcademicCompletion(await queryCompletionRow())
   })
 }
@@ -1891,12 +1983,12 @@ export async function queryAcademicCompletion(): Promise<AcademicCompletion> {
  * 触发后以前端同款 byscjd.do 轮询进度（YWCS>=ZS 为完成），
  * 完成后重新查询并返回最新结果。
  */
-export async function recalculateAcademicCompletion(options?: {
+async function recalculateAcademicCompletion(options?: {
   timeoutMs?: number
   pollIntervalMs?: number
 }): Promise<AcademicCompletion> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.xywccx)
+    await ensureWeu(appIds.xywccx)
 
     const row = await queryCompletionRow()
     const pyfadm = rawStr(row, "PYFADM")
@@ -1908,13 +2000,13 @@ export async function recalculateAcademicCompletion(options?: {
     }
 
     const datas = await post(
-      _apiPaths.xywc_recalc,
+      apiPaths.xywc_recalc,
       {
         PYFADM: pyfadm,
         BYNJDM: rawStr(row, "BYNJDM") || "-",
         SCLBDM: rawStr(row, "SCLBDM") || "04",
       },
-      _appIds.xywccx
+      appIds.xywccx
     )
     const result = datas["bysc"] as Record<string, unknown> | undefined
     if (!result || !("code" in result)) {
@@ -1924,7 +2016,7 @@ export async function recalculateAcademicCompletion(options?: {
       throw new JWXTBusinessError(
         result["code"] as string | number | null,
         (result["msg"] as string | null) ?? null,
-        _apiPaths.xywc_recalc
+        apiPaths.xywc_recalc
       )
     }
 
@@ -1934,11 +2026,11 @@ export async function recalculateAcademicCompletion(options?: {
     const progressKey = `BYSC_${studentId}`
     for (;;) {
       const progress = await post(
-        _apiPaths.xywc_recalc_progress,
+        apiPaths.xywc_recalc_progress,
         {
           ZXJDKEY: progressKey,
         },
-        _appIds.xywccx
+        appIds.xywccx
       )
       const rows = extractRows(progress, "byscjd")
       if (rows.length > 0) {
@@ -1961,10 +2053,10 @@ export async function recalculateAcademicCompletion(options?: {
   })
 }
 
-export async function queryAcademicWarnings(): Promise<AcademicWarning[]> {
+async function queryAcademicWarnings(): Promise<AcademicWarning[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.xyyj)
-    const datas = await post(_apiPaths.xyyj, {}, _appIds.xyyj)
+    await ensureWeu(appIds.xyyj)
+    const datas = await post(apiPaths.xyyj, {}, appIds.xyyj)
     const rows = extractRows(datas, "cxxsyjpcjg")
     return rows.map((r) => parseAcademicWarning(r as Record<string, unknown>))
   })
@@ -1972,28 +2064,28 @@ export async function queryAcademicWarnings(): Promise<AcademicWarning[]> {
 
 // ─── Public: Evaluation ───────────────────────────────────────────────── //
 
-export async function queryEvaluationTypes(opts?: { term?: string }): Promise<EvaluationType[]> {
+async function queryEvaluationTypes(opts?: { term?: string }): Promise<EvaluationType[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.pjapp)
+    await ensureWeu(appIds.pjapp)
     let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
+      term = await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
-    const datas = await post(_apiPaths.pjlx, { XNXQDM: term }, _appIds.pjapp)
+    const datas = await post(apiPaths.pjlx, { XNXQDM: term }, appIds.pjapp)
     const rows = extractRows(datas, "getPjlx")
     return rows.map((r) => parseEvaluationType(r as Record<string, unknown>))
   })
 }
 
-export async function queryPendingEvaluations(
+async function queryPendingEvaluations(
   evalType: string,
   opts?: { term?: string }
 ): Promise<EvaluationTask[]> {
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.pjapp)
+    await ensureWeu(appIds.pjapp)
     let term = opts?.term
     if (term === undefined) {
-      term = await getCurrentTerm(_appIds.studentWdksapApp, "wdksap_dqxnxq")
+      term = await getCurrentTerm(appIds.studentWdksapApp, "wdksap_dqxnxq")
     }
     const query = [
       {
@@ -2004,34 +2096,34 @@ export async function queryPendingEvaluations(
       },
     ]
     const datas = await post(
-      _apiPaths.dpwj,
+      apiPaths.dpwj,
       {
         PJLXDM: evalType,
         querySetting: JSON.stringify(query),
       },
-      _appIds.pjapp
+      appIds.pjapp
     )
     const rows = extractRows(datas, "getDpwj")
     return rows.map((r) => parseEvaluationTask(r as Record<string, unknown>))
   })
 }
 
-export async function getEvaluationDetail(
+async function getEvaluationDetail(
   groupNo: string,
   evalType: string,
   opts?: { sequence?: number }
 ): Promise<EvaluationDetail> {
   const sequence = opts?.sequence ?? 1
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.pjapp)
+    await ensureWeu(appIds.pjapp)
     const datas = await post(
-      _apiPaths.wjtxxx,
+      apiPaths.wjtxxx,
       {
         GROUPNO: groupNo,
         PJLXDM: evalType,
         XUH: String(sequence),
       },
-      _appIds.pjapp
+      appIds.pjapp
     )
     const raw = datas["getWjtxxx"]
     if (!raw || typeof raw !== "object") {
@@ -2041,7 +2133,7 @@ export async function getEvaluationDetail(
   })
 }
 
-export async function calculateEvaluationScore(
+async function calculateEvaluationScore(
   groupNo: string,
   wjid: string,
   evalType: string,
@@ -2061,9 +2153,9 @@ export async function calculateEvaluationScore(
   const sequence = opts?.sequence ?? 1
 
   return runWithReauth(async () => {
-    await ensureWeu(_appIds.pjapp)
+    await ensureWeu(appIds.pjapp)
     return post(
-      _apiPaths.calculate_score,
+      apiPaths.calculate_score,
       evaluationFormData({
         wjid,
         answers,
@@ -2072,12 +2164,12 @@ export async function calculateEvaluationScore(
         teacherName,
         sequence,
       }),
-      _appIds.pjapp
+      appIds.pjapp
     )
   })
 }
 
-export async function submitEvaluation(
+async function submitEvaluation(
   groupNo: string,
   wjid: string,
   evalType: string,
@@ -2097,9 +2189,9 @@ export async function submitEvaluation(
   const sequence = opts?.sequence ?? 1
 
   await runWithReauth(async () => {
-    await ensureWeu(_appIds.pjapp)
+    await ensureWeu(appIds.pjapp)
     await post(
-      _apiPaths.commit_answer,
+      apiPaths.commit_answer,
       evaluationFormData({
         wjid,
         answers,
@@ -2108,7 +2200,7 @@ export async function submitEvaluation(
         teacherName,
         sequence,
       }),
-      _appIds.pjapp
+      appIds.pjapp
     )
   })
 }
@@ -2634,4 +2726,47 @@ function evaluationFormData(args: {
     questionAnswers: JSON.stringify(daList),
   }
   return { requestParamStr: JSON.stringify([payload]) }
+}
+
+  return {
+    getJar,
+    setJar,
+    setTimeoutMs,
+    restoreSession,
+    resetJWXT,
+    queryStudentInfo,
+    queryGrades,
+    queryGpaStats,
+    queryGradeStatistics,
+    queryGradeDistribution,
+    queryGradeRanking,
+    querySchedule,
+    queryScheduleExperimental,
+    queryUnscheduledCourses,
+    queryClassPeriods,
+    queryTermCalendar,
+    queryCurrentWeek,
+    queryExams,
+    queryMakeupExamBatches,
+    queryMakeupExamCourses,
+    signupMakeupExam,
+    queryGradeYears,
+    queryDepartments,
+    queryMajors,
+    querySchoolClasses,
+    queryClassSchedule,
+    queryCampuses,
+    queryTeachingBuildings,
+    queryClassrooms,
+    queryClassroomSchedule,
+    queryTrainingPlan,
+    queryAcademicCompletion,
+    recalculateAcademicCompletion,
+    queryAcademicWarnings,
+    queryEvaluationTypes,
+    queryPendingEvaluations,
+    getEvaluationDetail,
+    calculateEvaluationScore,
+    submitEvaluation,
+  }
 }

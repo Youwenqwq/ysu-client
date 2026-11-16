@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
 import { PluginRuntime } from "@/lib/plugins/runtime"
-import { PluginUIRegistry } from "@/lib/plugins/ui-registry"
-import { PluginSlotRegistry } from "@/lib/plugins/slot-registry"
-import { PluginNotificationRegistry } from "@/lib/plugins/notification-registry"
-import { PluginSettingsRegistry } from "@/lib/plugins/settings-registry"
+import { PluginUIRegistry } from "@/plugins/official/runtime/registries/ui"
+import { PluginSlotRegistry } from "@/plugins/official/runtime/registries/slots"
+import { PluginNotificationRegistry } from "@/plugins/official/runtime/registries/notifications"
+import { PluginSettingsRegistry } from "@/plugins/official/runtime/registries/settings"
 import { definition as shell, manifest as shellManifest } from "../shell"
 import {
   definition as notificationDomain,
@@ -22,12 +22,11 @@ describe("overview widget ownership", () => {
     const slots = new PluginSlotRegistry()
     const notifications = new PluginNotificationRegistry()
     const settings = new PluginSettingsRegistry()
-    const runtime = new PluginRuntime((ctx, manifest) => {
-      registry.createService(ctx, manifest)
-      slots.createService(ctx, manifest)
-      notifications.createService(ctx, manifest)
-      settings.createService(ctx, manifest)
-    })
+    const runtime = new PluginRuntime()
+    runtime.context.set("ui", registry)
+    runtime.context.set("slots", slots)
+    runtime.context.set("notifications", notifications)
+    runtime.context.set("settings", settings)
     const plugins = [
       [shellManifest, shell],
       [notificationsManifest, notificationDomain],

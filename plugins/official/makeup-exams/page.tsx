@@ -16,7 +16,7 @@ import { EmptyState, LoadingCards, useErrorToast, ValidatingList } from "@orahak
 import { FilterChips } from "@orahako/plugin-ui/components"
 import { formatTimeRange } from "@orahako/plugin-ui/academic"
 import { useTranslation } from "@orahako/plugin-ui/hooks"
-import { useMakeupExamBatches, useMakeupExamCourses } from "@orahako/plugin-ui/hooks"
+import { useMakeupExamBatches, useMakeupExamCourses } from "@orahako/academic"
 import { useProvider } from "@orahako/plugin-ui/hooks"
 import { Button } from "@orahako/plugin-ui/components"
 import { Spinner } from "@orahako/plugin-ui/components"

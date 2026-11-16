@@ -30,7 +30,7 @@ import { useIsMobile } from "@orahako/plugin-ui/hooks"
 import { useBackHandler } from "@orahako/plugin-ui/hooks"
 import { useAcademicTime } from "@orahako/plugin-ui/hooks"
 import { useMobileHeaderLayout, useMobileHeaderRight } from "@orahako/plugin-ui/stores"
-import { useEffectiveSchedule } from "@orahako/plugin-ui/hooks"
+import { useEffectiveSchedule } from "@orahako/academic"
 import {
   schedulePatchAffectsWeek,
   scheduleWeek,
@@ -44,7 +44,7 @@ import {
   useExams,
   useSchedule,
   useTermCalendar,
-} from "@orahako/plugin-ui/hooks"
+} from "@orahako/academic"
 import {
   CalendarDays,
   CalendarSearch,
@@ -68,10 +68,11 @@ import { ScheduleMobile } from "@orahako/academic"
 import { ScheduleDragProvider } from "./schedule-drag"
 import { ScheduleAdjustmentDialog, ScheduleAdjustmentsDialog } from "./schedule-editor-dialogs"
 import { WidgetDiscovery } from "./widget-discovery"
-import { syncExamsToWidget, syncScheduleToWidget } from "@orahako/plugin-ui/platform"
-import { syncClassAlarmsToNative } from "@orahako/plugin-ui/platform"
+import { syncExamWidgets, syncScheduleWidgets } from "@orahako/academic/widget-snapshots"
+import { syncClassAlarmsToNative } from "@/plugins/official/runtime/native/notify"
 import { useSettingsStore } from "@orahako/plugin-ui/stores"
-export function SchedulePage() {
+import type { PluginPageProps } from "@orahako/plugin-sdk"
+export function SchedulePage({ context }: PluginPageProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
   const compactMode = useSettingsStore((s) => s.scheduleCompactMode)
@@ -295,7 +296,8 @@ export function SchedulePage() {
 
   useEffect(() => {
     if (!isDefaultTerm || (!effective.ready && currentWeek)) return
-    syncScheduleToWidget(
+    syncScheduleWidgets(
+      context.native,
       effective.courses,
       currentWeek,
       periods,
@@ -303,19 +305,19 @@ export function SchedulePage() {
       useSettingsStore.getState().widgetShowNextDaySchedule,
       termCalendar
     ).catch(() => {})
-  }, [isDefaultTerm, effective.ready, effective.courses, currentWeek, periods, termCalendar])
+  }, [isDefaultTerm, effective.ready, effective.courses, currentWeek, periods, termCalendar, context.native])
 
   useEffect(() => {
     if (!isDefaultTerm || (!effective.ready && currentWeek)) return
     void syncClassAlarmsToNative(effective.courses, currentWeek, periods, termCalendar).catch(
       () => {}
     )
-  }, [isDefaultTerm, effective.ready, effective.courses, currentWeek, periods, termCalendar])
+  }, [isDefaultTerm, effective.ready, effective.courses, currentWeek, periods, termCalendar, context.native])
 
   useEffect(() => {
     if (!isDefaultTerm || !examsQuery.data) return
-    syncExamsToWidget(examsQuery.data, widgetSyncReminderHours).catch(() => {})
-  }, [isDefaultTerm, examsQuery.data, widgetSyncReminderHours])
+    syncExamWidgets(context.native, examsQuery.data, widgetSyncReminderHours).catch(() => {})
+  }, [isDefaultTerm, examsQuery.data, widgetSyncReminderHours, context.native])
 
   async function handleQuery() {
     const nextTerm = term.trim()

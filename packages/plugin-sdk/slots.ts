@@ -26,6 +26,20 @@ export interface PluginSlotService {
   register<Props extends object>(contribution: PluginSlotContribution<Props>): () => void
 }
 
+export type PluginSlotSelectedContribution<Props extends object = object> =
+  PluginSlotContribution<Props> & { pluginId: string; generation: number }
+
+export interface PluginSlotRegistrySnapshot {
+  declarations: readonly PluginSlotDeclaration[]
+  contributions: readonly PluginSlotSelectedContribution[]
+}
+
+export interface PluginSlotRegistryService {
+  getSnapshot(): PluginSlotRegistrySnapshot
+  subscribe(listener: () => void): () => void
+  select(name: string, itemKey?: string): readonly PluginSlotSelectedContribution[]
+}
+
 export interface PluginSlotProps<Props extends object = object> {
   name: string
   props?: Props

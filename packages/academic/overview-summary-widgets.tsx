@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@orahako/plugin-ui/com
 import { Button } from "@orahako/plugin-ui/components"
 import { useSettingsStore } from "@orahako/plugin-ui/stores"
 import { useTranslation } from "@orahako/plugin-ui/hooks"
-import { useGPAStats } from "@orahako/plugin-ui/hooks"
+import { useGPAStats } from "./hooks/use-academics"
 import { useIsMobile } from "@orahako/plugin-ui/hooks"
 import { QueryState } from "@orahako/academic"
 import { useOverviewScheduleData } from "@orahako/academic"

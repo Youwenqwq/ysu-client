@@ -3,48 +3,23 @@
  *
  * 纯函数 + 模块级状态(cookie jar)。
  */
-import {
-  APP_VERSION,
-  SimpleCookieJar,
-  casUrls,
-  collectCookies,
-  cookieEntryFromJSON,
-  fetchStateless,
-  fetchWithJar,
-  getCapacitorCore,
-  getCasCookieDomain,
-  getSchoolConfig,
-  headerSingle,
-  installCookies,
-  isCapacitor,
-  loadCASTGC,
-  saveCASTGC as saveCASTGCSecure,
-  serverConfig,
-  type CookieEntry,
-  type HttpResponse,
-} from "@orahako/plugin-sdk/host"
+import { CapacitorCookies } from "@capacitor/core"
+import type { CookieEntry, CookieJar, HttpRequest, HttpResponse } from "@orahako/plugin-sdk"
+import type { YSUContext } from "../context"
+import { collectCookies, cookieEntryFromJSON, headerSingle, installCookies } from "../http-utils"
 import type { YSUMfaMethod } from "../types"
+import { YSU_SECURE_KEY_CAS_TGC } from "../ysu-config"
 
 // ─── Constants ────────────────────────────────────────────────────────── //
-
-function getAESChars(): string {
-  return getSchoolConfig().cas.aesChars
-}
-
-function getMFAMethodToCode(): Readonly<Record<string, string>> {
-  return getSchoolConfig().cas.mfaMethodToCode
-}
-
-function getMFAMethodToAuthCodeType(): Readonly<Record<string, string>> {
-  return getSchoolConfig().cas.mfaMethodToAuthCodeType
-}
 
 const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308])
 
 // CAS serves different reAuth pages based on User-Agent.
 // The mobile version lacks WeChat MFA (only SMS/Cpdaily/WeChat Work).
 // Use a desktop UA to get the PC reAuth flow with reAuthType=8 (WeChat).
-const DESKTOP_UA = `Mozilla/5.0 (X11; Linux x86_64) orahako/${APP_VERSION}`
+function desktopUserAgent(appVersion: string): string {
+  return `Mozilla/5.0 (X11; Linux x86_64) orahako/${appVersion}`
+}
 
 // ─── Types ────────────────────────────────────────────────────────────── //
 
@@ -139,19 +114,19 @@ function isCasPath(p: string): boolean {
   return p === "/" || p.startsWith(ALLOWED_PATH_PREFIX)
 }
 
-function isCasCookie(e: CookieEntry): boolean {
+function isCasCookie(e: CookieEntry, cookieDomain: string): boolean {
   const domain = e.domain.startsWith(".") ? e.domain.slice(1) : e.domain
-  return domain === getCasCookieDomain() && isCasPath(e.path)
+  return domain === cookieDomain && isCasPath(e.path)
 }
 
 export class CASCredential {
   constructor(public readonly cookies: readonly CookieEntry[]) {}
 
-  static async fromJar(jar: SimpleCookieJar): Promise<CASCredential> {
-    return new CASCredential(await collectCookies(jar, isCasCookie))
+  static async fromJar(jar: CookieJar, cookieDomain: string): Promise<CASCredential> {
+    return new CASCredential(await collectCookies(jar, (e) => isCasCookie(e, cookieDomain)))
   }
 
-  async apply(jar: SimpleCookieJar): Promise<void> {
+  async apply(jar: CookieJar): Promise<void> {
     await installCookies(jar, this.cookies)
   }
 
@@ -159,7 +134,7 @@ export class CASCredential {
     return JSON.stringify({ cookies: this.cookies.map((c) => ({ ...c })) }, null, 2)
   }
 
-  static fromJSON(s: string): CASCredential {
+  static fromJSON(s: string, cookieDomain: string): CASCredential {
     const data: unknown = JSON.parse(s)
     if (data === null || typeof data !== "object" || !("cookies" in data)) {
       throw new Error("invalid CASCredential JSON: missing 'cookies'")
@@ -174,7 +149,7 @@ export class CASCredential {
       }
       const e = cookieEntryFromJSON(item as Record<string, unknown>)
       if (!e.domain) {
-        return { ...e, domain: getCasCookieDomain() }
+        return { ...e, domain: cookieDomain }
       }
       return e
     })
@@ -186,8 +161,7 @@ export class CASCredential {
 
 const VALID_AES_KEY_BYTES: ReadonlySet<number> = new Set([16, 24, 32])
 
-export function _randomString(length: number): string {
-  const aesChars = getAESChars()
+export function _randomString(length: number, aesChars: string): string {
   const alphabetLen = aesChars.length
   const rejectionThreshold = Math.floor(256 / alphabetLen) * alphabetLen
   const out: string[] = []
@@ -204,7 +178,11 @@ export function _randomString(length: number): string {
   return out.join("")
 }
 
-export async function encryptPassword(password: string, salt: string): Promise<string> {
+export async function encryptPassword(
+  password: string,
+  salt: string,
+  aesChars: string
+): Promise<string> {
   const encoder = new TextEncoder()
   const keyBytes = encoder.encode(salt)
   if (!VALID_AES_KEY_BYTES.has(keyBytes.length)) {
@@ -214,8 +192,8 @@ export async function encryptPassword(password: string, salt: string): Promise<s
     )
   }
 
-  const data = encoder.encode(_randomString(64) + password)
-  const iv = encoder.encode(_randomString(16))
+  const data = encoder.encode(_randomString(64, aesChars) + password)
+  const iv = encoder.encode(_randomString(16, aesChars))
 
   const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-CBC" }, false, [
     "encrypt",
@@ -297,48 +275,95 @@ export function extractErrorMessage(html: string): string | null {
   return null
 }
 
-// ─── Module state ─────────────────────────────────────────────────────── //
+// ─── Provider-scoped state ────────────────────────────────────────────── //
 
-let casJar = new SimpleCookieJar()
-let timeoutMs = 30_000
-let credentialApplied: Promise<void> = Promise.resolve()
+declare global {
+  interface Window {
+    /** 微信 qrconnect JSONP 轮询写入的全局结果。 */
+    wx_errcode?: number
+    wx_code?: string
+  }
+}
 
-export function getJar(): SimpleCookieJar {
+export interface CASProtocol {
+  getJar(): CookieJar
+  setJar(jar: CookieJar): void
+  setTimeoutMs(ms: number): void
+  resetCAS(): void
+  restoreCredential(credential: CASCredential): Promise<void>
+  getCredentialApplied(): Promise<void>
+  saveCASTGC(): Promise<void>
+  logoutCAS(): Promise<void>
+  prepareLogin(): Promise<void>
+  isAuthenticated(): Promise<boolean>
+  credential(): Promise<CASCredential>
+  checkCaptchaNeeded(username: string): Promise<boolean>
+  loginStep1(
+    username: string,
+    password: string,
+    options?: { readonly captcha?: string }
+  ): Promise<Step1Result>
+  requestMFACode(username: string, method?: MFAMethod): Promise<MFAChallenge>
+  submitMFACode(challenge: MFAChallenge, code: string): Promise<CASCredential>
+  initiateWechatMFA(): Promise<WechatMFAContext>
+  pollWechatQR(
+    uuid: string,
+    lastErrcode?: number,
+    signal?: AbortSignal
+  ): Promise<{ status: "waiting" | "scanned" | "confirmed" | "expired"; code?: string; errcode?: number }>
+  completeWechatMFA(code: string, state: string): Promise<CASCredential>
+  authorize(serviceUrl: string, targetJar?: CookieJar): Promise<CookieJar>
+}
+
+export function createCAS(ctx: YSUContext): CASProtocol {
+  const aesChars = ctx.config.cas.aesChars
+  const mfaMethodToCode = ctx.config.cas.mfaMethodToCode
+  const mfaMethodToAuthCodeType = ctx.config.cas.mfaMethodToAuthCodeType
+  const casUrls = ctx.urls.cas
+  const cerBaseUrl = ctx.urls.cas.cerBase
+  const casCookieDomain = ctx.urls.casCookieDomain
+  const desktopUa = desktopUserAgent(ctx.appVersion)
+
+  let casJar = ctx.session.createCookieJar()
+  let timeoutMs = 30_000
+  let credentialApplied: Promise<void> = Promise.resolve()
+
+function getJar(): CookieJar {
   return casJar
 }
 
-export function setJar(jar: SimpleCookieJar): void {
+function setJar(jar: CookieJar): void {
   casJar = jar
 }
 
-export function setTimeoutMs(ms: number): void {
+function setTimeoutMs(ms: number): void {
   timeoutMs = ms
 }
 
-export function resetCAS(): void {
-  casJar = new SimpleCookieJar()
+function resetCAS(): void {
+  casJar = ctx.session.createCookieJar()
   credentialApplied = Promise.resolve()
   loginPageCache = null
   loginPageInflight = null
 }
 
-export async function restoreCredential(credential: CASCredential): Promise<void> {
+async function restoreCredential(credential: CASCredential): Promise<void> {
   credentialApplied = credential.apply(casJar)
   await credentialApplied
 }
 
-export function getCredentialApplied(): Promise<void> {
+function getCredentialApplied(): Promise<void> {
   return credentialApplied
 }
 
 /**
  * Save CASTGC from jar to secure storage for cross-restart persistence.
  */
-export async function saveCASTGC(): Promise<void> {
+async function saveCASTGC(): Promise<void> {
   const allCookies = await casJar.getAllCookies()
   for (const c of allCookies) {
     if (c.name === "CASTGC" && c.value) {
-      await saveCASTGCSecure(c.value)
+      await ctx.storage.secure.setItem(YSU_SECURE_KEY_CAS_TGC, c.value)
       return
     }
   }
@@ -347,21 +372,21 @@ export async function saveCASTGC(): Promise<void> {
 /**
  * Logout CAS server session with CASTGC.
  */
-export async function logoutCAS(): Promise<void> {
-  let tgc = await loadCASTGC()
+async function logoutCAS(): Promise<void> {
+  let tgc = await ctx.storage.secure.getItem(YSU_SECURE_KEY_CAS_TGC)
   if (!tgc) {
     const staleTgc = await collectCookies(casJar, (e) => e.name === "CASTGC")
     tgc = staleTgc[0]?.value ?? ""
   }
   if (!tgc) return
 
-  const logoutJar = new SimpleCookieJar()
+  const logoutJar = ctx.session.createCookieJar()
   await logoutJar.setCookie(
-    `CASTGC=${tgc}; Domain=${getCasCookieDomain()}; Path=/authserver; Secure`,
+    `CASTGC=${tgc}; Domain=${casCookieDomain}; Path=/authserver; Secure`,
     casUrls.authLogout,
     { ignoreError: true }
   )
-  await fetchWithJar(logoutJar, {
+  await ctx.session.fetchWithJar(logoutJar, {
     method: "GET",
     url: casUrls.authLogout,
     redirect: "follow",
@@ -371,15 +396,15 @@ export async function logoutCAS(): Promise<void> {
 
 // ─── Internal fetch wrapper ───────────────────────────────────────────── //
 
-async function _fetch(req: Parameters<typeof fetchWithJar>[1]): Promise<HttpResponse> {
+async function _fetch(req: HttpRequest): Promise<HttpResponse> {
   await credentialApplied
-  return fetchWithJar(casJar, req)
+  return ctx.session.fetchWithJar(casJar, req)
 }
 
 // ─── Public API ───────────────────────────────────────────────────────── //
 
 /** 访问登录页以建立 CAS session (获取 JSESSIONID cookie)。 */
-export async function prepareLogin(): Promise<void> {
+async function prepareLogin(): Promise<void> {
   await getLoginPage()
   // Sync JSESSIONID from jar → WebView cookie store so that
   // <img src="getCaptcha.htl"> uses the same session as the login POST.
@@ -387,25 +412,12 @@ export async function prepareLogin(): Promise<void> {
 }
 
 async function syncJarCookiesToWebView(): Promise<void> {
-  const capCore = await getCapacitorCore()
-  if (!capCore) return
-
-  const CapacitorCookies = (capCore as Record<string, unknown>)["CapacitorCookies"] as
-    | {
-        setCookie?: (opts: {
-          url: string
-          key: string
-          value: string
-          path?: string
-        }) => Promise<void>
-      }
-    | undefined
-  if (!CapacitorCookies?.setCookie) return
+  if (!ctx.native.isNative) return
   const cookies = await casJar.getAllCookies()
   for (const c of cookies) {
     if (!c.value) continue
     const host = c.domain.replace(/^\./, "")
-    if (!host.includes(getCasCookieDomain())) continue
+    if (!host.includes(casCookieDomain)) continue
     await CapacitorCookies.setCookie({
       url: `https://${host}${c.path}`,
       key: c.name,
@@ -424,7 +436,7 @@ function isUnauthenticatedLocation(url: string): boolean {
   )
 }
 
-export async function isAuthenticated(): Promise<boolean> {
+async function isAuthenticated(): Promise<boolean> {
   const resp = await _fetch({
     method: "GET",
     url: casUrls.authIndex,
@@ -445,12 +457,12 @@ export async function isAuthenticated(): Promise<boolean> {
   throw new CASProtocolError(`CAS status request returned HTTP ${resp.status}`)
 }
 
-export async function credential(): Promise<CASCredential> {
-  return CASCredential.fromJar(casJar)
+async function credential(): Promise<CASCredential> {
+  return CASCredential.fromJar(casJar, casCookieDomain)
 }
 
 /** 检查指定用户是否需要验证码。不获取图片——图片由 `<img>` 直接加载。 */
-export async function checkCaptchaNeeded(username: string): Promise<boolean> {
+async function checkCaptchaNeeded(username: string): Promise<boolean> {
   const checkUrl = `${casUrls.checkCaptcha}?username=${encodeURIComponent(username)}`
   try {
     const resp = await _fetch({
@@ -467,7 +479,7 @@ export async function checkCaptchaNeeded(username: string): Promise<boolean> {
   }
 }
 
-export async function loginStep1(
+async function loginStep1(
   username: string,
   password: string,
   options: { readonly captcha?: string } = {}
@@ -489,7 +501,7 @@ export async function loginStep1(
     throw new CASProtocolError("login page missing 'pwdEncryptSalt' field")
   }
 
-  const encrypted = await encryptPassword(password, salt)
+  const encrypted = await encryptPassword(password, salt, aesChars)
 
   const body = new URLSearchParams({
     username,
@@ -511,7 +523,7 @@ export async function loginStep1(
     body,
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Origin: serverConfig.cerBaseUrl,
+      Origin: cerBaseUrl,
       Referer: `${casUrls.authLogin}?service=${encodedService}`,
     },
     redirect: "manual",
@@ -525,18 +537,18 @@ export async function loginStep1(
   return result
 }
 
-export async function requestMFACode(
+async function requestMFACode(
   username: string,
   method: MFAMethod = "cpdaily"
 ): Promise<MFAChallenge> {
-  const typeCode = getMFAMethodToCode()[method]
-  const authCodeType = getMFAMethodToAuthCodeType()[method]
+  const typeCode = mfaMethodToCode[method]
+  const authCodeType = mfaMethodToAuthCodeType[method]
   if (!typeCode || !authCodeType) {
     throw new CASProtocolError(`unsupported MFA method: ${method}`)
   }
 
   const encodedService = encodeURIComponent(casUrls.defaultLoginService)
-  const referer = `${serverConfig.cerBaseUrl}/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true&service=${encodedService}`
+  const referer = `${cerBaseUrl}/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true&service=${encodedService}`
 
   await _fetch({
     method: "POST",
@@ -599,9 +611,9 @@ export async function requestMFACode(
   )
 }
 
-export async function submitMFACode(challenge: MFAChallenge, code: string): Promise<CASCredential> {
+async function submitMFACode(challenge: MFAChallenge, code: string): Promise<CASCredential> {
   const encodedService = encodeURIComponent(casUrls.defaultLoginService)
-  const referer = `${serverConfig.cerBaseUrl}/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true&service=${encodedService}`
+  const referer = `${cerBaseUrl}/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true&service=${encodedService}`
   const resp = await _fetch({
     method: "POST",
     url: casUrls.reauthSubmit,
@@ -681,8 +693,8 @@ export async function submitMFACode(challenge: MFAChallenge, code: string): Prom
 
 const WECHAT_POLL_BASE = "https://lp.open.weixin.qq.com/connect/l/qrconnect"
 
-export async function initiateWechatMFA(): Promise<WechatMFAContext> {
-  const referer = `${serverConfig.cerBaseUrl}/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true`
+async function initiateWechatMFA(): Promise<WechatMFAContext> {
+  const referer = `${cerBaseUrl}/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true`
   const success = encodeURIComponent(casUrls.defaultLoginService)
 
   // The mobile reAuth page does not support WeChat MFA (only SMS/Cpdaily).
@@ -692,7 +704,7 @@ export async function initiateWechatMFA(): Promise<WechatMFAContext> {
     method: "GET",
     url: `${casUrls.combinedLogin}?type=weixin&reAuth=2&success=${success}&skipTmpReAuth=false`,
     headers: {
-      "User-Agent": DESKTOP_UA,
+      "User-Agent": desktopUa,
       Referer: referer,
     },
     redirect: "manual",
@@ -742,11 +754,11 @@ export async function initiateWechatMFA(): Promise<WechatMFAContext> {
   // Fetch the WeChat QR connect page to extract UUID from the QR image URL.
   // Only need the HTML — short timeout, no resources.
   // NOTE: 必须走 fetchStateless（Web 端经代理）；裸 fetch 在浏览器里会被 CORS 拦截。
-  const wxResp = await fetchStateless({
+  const wxResp = await ctx.http.send({
     method: "GET",
     url: wxOAuthUrl,
     headers: {
-      "User-Agent": DESKTOP_UA,
+      "User-Agent": desktopUa,
       Accept: "text/html",
     },
     redirect: "follow",
@@ -772,14 +784,6 @@ interface WechatQrPollRaw {
   /** 空响应体（未知 uuid）时为 null。 */
   errcode: number | null
   code: string
-}
-
-declare global {
-  interface Window {
-    /** 微信 qrconnect JSONP 轮询写入的全局结果。 */
-    wx_errcode?: number
-    wx_code?: string
-  }
 }
 
 /**
@@ -852,12 +856,12 @@ async function pollWechatQrViaHttp(
   const lastParam = lastErrcode !== undefined ? `&last=${lastErrcode}` : ""
   const pollUrl = `${WECHAT_POLL_BASE}?uuid=${encodeURIComponent(uuid)}${lastParam}`
 
-  const resp = await fetchStateless({
+  const resp = await ctx.http.send({
     method: "GET",
     url: pollUrl,
     headers: {
       Referer: "https://open.weixin.qq.com/",
-      "User-Agent": DESKTOP_UA,
+      "User-Agent": desktopUa,
     },
     redirect: "follow",
     timeoutMs: Math.min(timeoutMs, 30_000),
@@ -874,7 +878,7 @@ async function pollWechatQrViaHttp(
   }
 }
 
-export async function pollWechatQR(
+async function pollWechatQR(
   uuid: string,
   lastErrcode?: number,
   signal?: AbortSignal
@@ -883,7 +887,7 @@ export async function pollWechatQR(
   code?: string
   errcode?: number
 }> {
-  const { errcode, code } = isCapacitor()
+  const { errcode, code } = ctx.native.isNative
     ? await pollWechatQrViaHttp(uuid, lastErrcode, signal)
     : await pollWechatQrViaScriptTag(uuid, lastErrcode, signal)
 
@@ -904,7 +908,7 @@ export async function pollWechatQR(
   return { status: "expired", errcode: errcode ?? undefined }
 }
 
-export async function completeWechatMFA(code: string, state: string): Promise<CASCredential> {
+async function completeWechatMFA(code: string, state: string): Promise<CASCredential> {
   const callbackUrl = `${casUrls.callback}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`
 
   let resp = await _fetch({
@@ -964,21 +968,21 @@ export async function completeWechatMFA(code: string, state: string): Promise<CA
   throw new CASProtocolError("WeChat MFA completed but session not established")
 }
 
-export async function authorize(
+async function authorize(
   serviceUrl: string,
-  targetJar?: SimpleCookieJar
-): Promise<SimpleCookieJar> {
+  targetJar?: CookieJar
+): Promise<CookieJar> {
   const source = casJar
-  const target = targetJar ?? new SimpleCookieJar()
+  const target = targetJar ?? ctx.session.createCookieJar()
   await credentialApplied
-  await (await CASCredential.fromJar(source)).apply(target)
+  await (await CASCredential.fromJar(source, casCookieDomain)).apply(target)
 
   const encoded = encodeURIComponent(serviceUrl)
   const url = `${casUrls.authLogin}?service=${encoded}`
 
   let resp: HttpResponse
   try {
-    resp = await fetchWithJar(target, {
+    resp = await ctx.session.fetchWithJar(target, {
       method: "GET",
       url,
       redirect: "follow",
@@ -1007,7 +1011,7 @@ export async function authorize(
     throw new NotAuthenticatedError("CAS requires login or secondary authentication")
   }
 
-  const updated = await CASCredential.fromJar(target)
+  const updated = await CASCredential.fromJar(target, casCookieDomain)
   if (source !== casJar) {
     throw new NotAuthenticatedError("CAS session changed during authorization")
   }
@@ -1099,7 +1103,7 @@ async function classifyStep1Response(resp: HttpResponse, username: string): Prom
         method: "GET",
         url: absoluteLocation,
         headers: {
-          "User-Agent": DESKTOP_UA,
+          "User-Agent": desktopUa,
         },
         redirect: "manual",
         timeoutMs,
@@ -1191,4 +1195,27 @@ async function classifyStep1Response(resp: HttpResponse, username: string): Prom
     `unexpected status code from CAS: ${resp.status}` +
       (body ? ` — body snippet: ${body.slice(0, 300)}` : "")
   )
+}
+
+  return {
+    getJar,
+    setJar,
+    setTimeoutMs,
+    resetCAS,
+    restoreCredential,
+    getCredentialApplied,
+    saveCASTGC,
+    logoutCAS,
+    prepareLogin,
+    isAuthenticated,
+    credential,
+    checkCaptchaNeeded,
+    loginStep1,
+    requestMFACode,
+    submitMFACode,
+    initiateWechatMFA,
+    pollWechatQR,
+    completeWechatMFA,
+    authorize,
+  }
 }

@@ -7,15 +7,16 @@ import {
   useExams,
   useSchedule,
   useTermCalendar,
-} from "@orahako/plugin-ui/hooks"
+} from "./hooks/use-academics"
 import { useSettingsStore } from "@orahako/plugin-ui/stores"
-import { syncScheduleToWidget, syncExamsToWidget } from "@orahako/plugin-ui/platform"
-import { syncClassAlarmsToNative } from "@orahako/plugin-ui/platform"
+import { syncExamWidgets, syncScheduleWidgets } from "./widget-snapshots"
+import { syncClassAlarmsToNative } from "@/plugins/official/runtime/native/notify"
+import { usePluginServices } from "@orahako/plugin-ui/plugin"
 import { compareExamStartTime, isExamCompleted } from "@orahako/plugin-ui/academic"
 import type { ScheduleOccurrence } from "@orahako/plugin-ui/academic"
 import type { ClassPeriod, Course, CurrentWeek, Exam } from "@orahako/plugin-sdk/academic"
 import type { ProviderQueryResult } from "@orahako/plugin-ui/hooks"
-import { useEffectiveSchedule } from "@orahako/plugin-ui/hooks"
+import { useEffectiveSchedule } from "./hooks/use-effective-schedule"
 import { useAcademicTime } from "@orahako/plugin-ui/hooks"
 import {
   buildSectionTimeMap,
@@ -52,6 +53,7 @@ export interface OverviewSchedule {
 
 /** Page-lifetime data and native synchronization, never tied to a visible card. */
 export function useOverviewSchedule(): OverviewSchedule {
+  const native = usePluginServices().native
   const currentWeekQuery = useCurrentWeek()
   const termCalendarQuery = useTermCalendar()
   const scheduleQuery = useSchedule({ courseCategory: "all", includeLabSchedule: true })
@@ -100,7 +102,8 @@ export function useOverviewSchedule(): OverviewSchedule {
 
   useEffect(() => {
     if (!effective.ready && liveWeek) return
-    void syncScheduleToWidget(
+    void syncScheduleWidgets(
+      native,
       effective.courses,
       liveWeek,
       periods,
@@ -109,6 +112,7 @@ export function useOverviewSchedule(): OverviewSchedule {
       nativeCalendar
     ).catch(() => {})
   }, [
+    native,
     effective.ready,
     effective.courses,
     liveWeek,
@@ -123,12 +127,12 @@ export function useOverviewSchedule(): OverviewSchedule {
     void syncClassAlarmsToNative(effective.courses, liveWeek, periods, nativeCalendar).catch(
       () => {}
     )
-  }, [effective.ready, effective.courses, liveWeek, periods, nativeCalendar])
+  }, [native, effective.ready, effective.courses, liveWeek, periods, nativeCalendar])
 
   useEffect(() => {
     // Empty results must also clear stale exams from the native widget.
-    if (exams.data) void syncExamsToWidget(exams.data, reminderHours).catch(() => {})
-  }, [exams.data, reminderHours])
+    if (exams.data) void syncExamWidgets(native, exams.data, reminderHours).catch(() => {})
+  }, [native, exams.data, reminderHours])
 
   const todayCourses = useMemo(() => {
     if (!effective.ready || !liveWeek) return []

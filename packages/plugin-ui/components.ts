@@ -36,6 +36,8 @@ export {
   FieldTitle,
 } from "@/components/ui/field"
 export { Spinner } from "@/components/ui/spinner"
+export { ScrollArea } from "@/components/ui/scroll-area"
+export { Slider } from "@/components/ui/slider"
 export { SettingsSection } from "@/components/settings-section"
 export { SettingNumberInput } from "@/components/setting-number-input"
 export { Switch } from "@/components/ui/switch"

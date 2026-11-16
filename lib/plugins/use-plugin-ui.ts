@@ -1,8 +1,8 @@
 "use client"
 
 import { useSyncExternalStore } from "react"
-import type { PluginUIRegistry } from "./ui-registry"
+import type { PluginUIRegistryService } from "@orahako/plugin-sdk"
 
-export function usePluginUI(registry: PluginUIRegistry) {
+export function usePluginUI(registry: PluginUIRegistryService) {
   return useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot)
 }

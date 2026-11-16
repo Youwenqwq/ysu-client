@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest"
-import {
-  mergeRecords,
-  toEpayRecords,
-  toRecordStatus,
-  toUnpaidRecords,
-  type EpayRecord,
-} from "./epay"
+import { createEPAY, type EpayRecord } from "./epay"
+import { createCAS } from "./cas"
+import { createTestContext } from "../test-context"
+
+const testCtx = createTestContext().ctx
+const { mergeRecords, toEpayRecords, toRecordStatus, toUnpaidRecords } = createEPAY(
+  testCtx,
+  createCAS(testCtx)
+)
 
 /** 真实 allPay 数据结构，身份字段使用合成值。 */
 const D = {

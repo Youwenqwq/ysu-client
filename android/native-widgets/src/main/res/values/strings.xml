@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Strings shared by every widget companion. -->
+    <string name="widget_sync_just_now">刚刚同步</string>
+    <string name="widget_sync_hours_ago">%d小时前同步</string>
+    <string name="widget_sync_days_ago">%d天前同步</string>
+</resources>

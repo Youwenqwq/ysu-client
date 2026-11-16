@@ -17,7 +17,8 @@ import { toast } from "sonner"
 import { buroImage } from "@orahako/plugin-ui/assets"
 import { useIsMobile } from "@orahako/plugin-ui/hooks"
 import { isCapacitor } from "@orahako/plugin-ui/platform"
-import { requestWidgetPin } from "@orahako/plugin-ui/platform"
+import { requestWidgetPin } from "@/plugins/official/runtime/widget-pin"
+import { usePluginServices } from "@orahako/plugin-ui/plugin"
 import { useSettingsStore, type WidgetAssistantPosition } from "@orahako/plugin-ui/stores"
 import { useTranslation } from "@orahako/plugin-ui/hooks"
 import { cn } from "@orahako/plugin-ui/components"
@@ -73,12 +74,13 @@ function clamp(value: number, min: number, max: number): number {
 export function WidgetDiscovery({ suspended = false }: { suspended?: boolean }) {
   const router = useRouter()
   const { t } = useTranslation()
+  const native = usePluginServices().native
   const isMobile = useIsMobile()
   const hidden = useSettingsStore((s) => s.widgetAssistantHidden)
   const setHidden = useSettingsStore((s) => s.setWidgetAssistantHidden)
   const position = useSettingsStore((s) => s.widgetAssistantPosition)
   const setPosition = useSettingsStore((s) => s.setWidgetAssistantPosition)
-  const [native, setNative] = useState(false)
+  const [nativeReady, setNativeReady] = useState(false)
   const [mobileNavHeight, setMobileNavHeight] = useState<number | null>(null)
   const [viewport, setViewport] = useState({ width: 0, height: 0 })
   const [draftPosition, setDraftPosition] = useState<WidgetAssistantPosition | null>(null)
@@ -113,7 +115,7 @@ export function WidgetDiscovery({ suspended = false }: { suspended?: boolean }) 
     const height = nav?.getBoundingClientRect().height ?? 0
     // Set the initial offset in the same commit as native visibility, before motion starts.
     setMobileNavHeight(height > 0 ? height : null)
-    setNative(true)
+    setNativeReady(true)
   }, [])
 
   useEffect(() => {
@@ -126,7 +128,7 @@ export function WidgetDiscovery({ suspended = false }: { suspended?: boolean }) 
   }, [])
 
   useEffect(() => {
-    if (!native || !isMobile || suspended) return
+    if (!nativeReady || !isMobile || suspended) return
     const nav = document.querySelector<HTMLElement>('nav[aria-label="Primary"]')
     if (!nav) {
       setMobileNavHeight(null)
@@ -141,7 +143,7 @@ export function WidgetDiscovery({ suspended = false }: { suspended?: boolean }) 
     const observer = new ResizeObserver(updateHeight)
     observer.observe(nav)
     return () => observer.disconnect()
-  }, [native, isMobile, suspended])
+  }, [nativeReady, isMobile, suspended])
 
   useEffect(() => {
     if (suspended) setOpen(false)
@@ -312,7 +314,7 @@ export function WidgetDiscovery({ suspended = false }: { suspended?: boolean }) 
   async function addScheduleWidget() {
     if (adding) return
     setAdding(true)
-    const added = await requestWidgetPin("schedule")
+    const added = await requestWidgetPin(native, "schedule")
     setAdding(false)
     setOpen(false)
 
@@ -325,7 +327,7 @@ export function WidgetDiscovery({ suspended = false }: { suspended?: boolean }) 
   }
 
   if (
-    !native ||
+    !nativeReady ||
     hidden ||
     suspended ||
     (isMobile && !displayedPosition && mobileNavHeight === null) ||

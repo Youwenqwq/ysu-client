@@ -17,7 +17,10 @@ import {
 } from "@orahako/plugin-ui/components"
 import { useHasCapability, useTranslation } from "@orahako/plugin-ui/hooks"
 import { examCompactWidgetPreview, examWidgetPreview } from "@orahako/plugin-ui/assets"
-import { requestWidgetPin, type NativeWidgetId } from "@orahako/plugin-ui/platform"
+import { requestWidgetPin } from "@/plugins/official/runtime/widget-pin"
+import { usePluginServices } from "@orahako/plugin-ui/plugin"
+
+type ExamWidgetId = "exam" | "exam-compact"
 
 /** Settings contribution into "settings.notifications.content". */
 export function ExamNotificationContent() {
@@ -40,19 +43,20 @@ function ExamWidgetCard({
   size,
   compact,
 }: {
-  widget: NativeWidgetId
+  widget: ExamWidgetId
   name: string
   preview: typeof examWidgetPreview
   size: string
   compact?: boolean
 }) {
   const { t } = useTranslation()
+  const native = usePluginServices().native
   const [adding, setAdding] = useState(false)
 
   async function addWidget() {
     if (adding) return
     setAdding(true)
-    const added = await requestWidgetPin(widget)
+    const added = await requestWidgetPin(native, widget)
     setAdding(false)
     if (added) {
       toast.success(t("desktopWidgets.added"))

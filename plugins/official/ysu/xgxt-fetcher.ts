@@ -9,14 +9,8 @@ import {
   XgxtError,
   XgxtNotLoggedInError,
   XgxtProtocolError,
-  queryAcademicReport as _queryAcademicReport,
-  queryAcademicReportYears as _queryAcademicReportYears,
-  queryEvaluationIndicators as _queryEvaluationIndicators,
-  queryEvaluationRadar as _queryEvaluationRadar,
-  queryEvaluationResult as _queryEvaluationResult,
-  queryEvaluationTerms as _queryEvaluationTerms,
-  queryYearScoreStatics as _queryYearScoreStatics,
 } from "./protocol/xgxt"
+import type { XgxtProtocol } from "./protocol/xgxt"
 import type {
   AcademicReportPage as XgxtAcademicReportPage,
   AcademicReportYears as XgxtAcademicReportYears,
@@ -26,8 +20,32 @@ import type {
   EvaluationTerm as XgxtEvaluationTerm,
   YearScoreStatic as XgxtYearScoreStatic,
 } from "./protocol/xgxt"
-import { mapCASSessionError } from "./cas-auth"
 import { ProviderError, ProviderErrorCode, wrapError } from "@orahako/plugin-sdk/provider-errors"
+
+export type XgxtFetcher = Pick<
+  XgxtProtocol,
+  | "queryEvaluationTerms"
+  | "queryEvaluationResult"
+  | "queryEvaluationIndicators"
+  | "queryEvaluationRadar"
+  | "queryYearScoreStatics"
+  | "queryAcademicReportYears"
+  | "queryAcademicReport"
+>
+
+export function createXgxtFetcher(
+  xgxt: XgxtProtocol,
+  mapCASSessionError: (error: unknown) => ProviderError | undefined
+): XgxtFetcher {
+  const {
+    queryAcademicReport: _queryAcademicReport,
+    queryAcademicReportYears: _queryAcademicReportYears,
+    queryEvaluationIndicators: _queryEvaluationIndicators,
+    queryEvaluationRadar: _queryEvaluationRadar,
+    queryEvaluationResult: _queryEvaluationResult,
+    queryEvaluationTerms: _queryEvaluationTerms,
+    queryYearScoreStatics: _queryYearScoreStatics,
+  } = xgxt
 
 function mapXgxtError(e: unknown): ProviderError {
   const sessionError = mapCASSessionError(e)
@@ -56,39 +74,50 @@ async function withXgxt<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function queryEvaluationTerms(): Promise<XgxtEvaluationTerm[]> {
+async function queryEvaluationTerms(): Promise<XgxtEvaluationTerm[]> {
   return withXgxt(() => _queryEvaluationTerms())
 }
 
-export async function queryEvaluationResult(
+async function queryEvaluationResult(
   year?: string,
   term?: string
 ): Promise<XgxtEvaluationResult> {
   return withXgxt(() => _queryEvaluationResult(year, term))
 }
 
-export async function queryEvaluationIndicators(
+async function queryEvaluationIndicators(
   year?: string,
   term?: string
 ): Promise<XgxtEvaluationIndicatorDetail[]> {
   return withXgxt(() => _queryEvaluationIndicators(year, term))
 }
 
-export async function queryEvaluationRadar(
+async function queryEvaluationRadar(
   year?: string,
   term?: string
 ): Promise<XgxtEvaluationRadarItem[]> {
   return withXgxt(() => _queryEvaluationRadar(year, term))
 }
 
-export async function queryYearScoreStatics(): Promise<XgxtYearScoreStatic[]> {
+async function queryYearScoreStatics(): Promise<XgxtYearScoreStatic[]> {
   return withXgxt(() => _queryYearScoreStatics())
 }
 
-export async function queryAcademicReportYears(): Promise<XgxtAcademicReportYears> {
+async function queryAcademicReportYears(): Promise<XgxtAcademicReportYears> {
   return withXgxt(() => _queryAcademicReportYears())
 }
 
-export async function queryAcademicReport(year?: string): Promise<XgxtAcademicReportPage> {
+async function queryAcademicReport(year?: string): Promise<XgxtAcademicReportPage> {
   return withXgxt(() => _queryAcademicReport(year))
+}
+
+  return {
+    queryEvaluationTerms,
+    queryEvaluationResult,
+    queryEvaluationIndicators,
+    queryEvaluationRadar,
+    queryYearScoreStatics,
+    queryAcademicReportYears,
+    queryAcademicReport,
+  }
 }

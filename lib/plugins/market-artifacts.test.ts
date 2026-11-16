@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { describe, expect, it } from "vitest"
-import { validateMarketplaceIndex } from "./market"
+import { validateMarketplaceIndex } from "@orahako/plugin-sdk"
 import { onRequestGet } from "../../website/edge-functions/updates/plugins.json.js"
 
 describe("published plugin market artifacts", () => {

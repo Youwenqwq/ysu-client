@@ -10,27 +10,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@orahako/plugin-ui/com
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@orahako/plugin-ui/components"
 import { Separator } from "@orahako/plugin-ui/components"
 import { Skeleton } from "@orahako/plugin-ui/components"
-import { useTranslation } from "@orahako/plugin-ui/hooks"
-import { useAuthStore } from "@orahako/plugin-ui/stores"
+import type { AcademicPluginContext, PluginPageProps } from "@orahako/plugin-sdk"
+import { useProviderAccount, useTranslation } from "@orahako/plugin-ui/hooks"
 import { useMobileHeaderRight } from "@orahako/plugin-ui/stores"
 import { ProviderError, ProviderErrorCode } from "@orahako/plugin-sdk/provider-errors"
 import type { EpayRecord } from "@orahako/plugin-sdk/academic"
 import { useProvider, useProviderReady } from "@orahako/plugin-ui/hooks"
 import { providerQueryKey } from "@orahako/plugin-ui/hooks"
-import { getSchoolConfigScope } from "@orahako/plugin-ui/stores"
 import { cn } from "@orahako/plugin-ui/components"
-export function EpayPage() {
+export function EpayPage({ context: pluginContext }: PluginPageProps) {
+  const context = pluginContext as unknown as Pick<AcademicPluginContext, "provider" | "session">
   const { t } = useTranslation()
   const provider = useProvider()
   const isReady = useProviderReady()
-  const hasHydrated = useAuthStore((s) => s.hasHydrated)
-  const username = useAuthStore((s) => s.username)
-  const credential = useAuthStore((s) => s.credential)
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const schoolConfigScope = getSchoolConfigScope()
+  const {
+    session: { hasHydrated, username, credential, isAuthenticated },
+    providerScope,
+  } = useProviderAccount()
   const epay = provider.epay
   const canQuery =
     isReady && hasHydrated && !!username && !!credential && isAuthenticated && epay !== undefined
+  const isCurrentAccount = useCallback(() => {
+    const snapshot = context.session.getSnapshot()
+    if (snapshot.username !== username || snapshot.credential !== credential) return false
+    const providerSnapshot = context.provider.getSnapshot()
+    return `${providerSnapshot.schoolId ?? "none"}:${providerSnapshot.generation}` === providerScope
+  }, [context, username, credential, providerScope])
   const {
     data,
     error: queryError,
@@ -39,27 +44,17 @@ export function EpayPage() {
     mutate,
   } = useSWR(
     canQuery
-      ? providerQueryKey(provider.id, schoolConfigScope, username, "epay", { credential })
+      ? providerQueryKey(provider.id, providerScope, username, "epay", { credential })
       : null,
     async () => {
       if (!epay) {
         throw new ProviderError(ProviderErrorCode.FEATURE_NOT_SUPPORTED, "当前学校不支持缴费查询")
       }
-      const auth = useAuthStore.getState()
-      if (
-        auth.username !== username ||
-        auth.credential !== credential ||
-        getSchoolConfigScope() !== schoolConfigScope
-      ) {
+      if (!isCurrentAccount()) {
         throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "缴费账号已切换")
       }
       const status = await epay.fetchPayments()
-      const currentAuth = useAuthStore.getState()
-      if (
-        currentAuth.username !== username ||
-        currentAuth.credential !== credential ||
-        getSchoolConfigScope() !== schoolConfigScope
-      ) {
+      if (!isCurrentAccount()) {
         throw new ProviderError(ProviderErrorCode.AUTH_REQUIRED, "缴费账号已切换")
       }
       return { status, updatedAt: new Date() }

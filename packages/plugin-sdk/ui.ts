@@ -1,8 +1,10 @@
 import type { ComponentType, ReactNode } from "react"
+import type { PluginContext } from "./runtime"
 
 export type PluginIcon = ComponentType<{ className?: string }>
 
 export interface PluginPageProps {
+  context: PluginContext
   pluginId: string
   pageId: string
   params: URLSearchParams
@@ -22,6 +24,8 @@ export interface PluginPageDefinition {
   capability?: string
   /** Allows the active shell to provide an edge-to-edge mobile presentation. */
   fullscreen?: boolean
+  /** Defaults to true; provider-independent tools must opt out explicitly. */
+  requiresProvider?: boolean
 }
 
 export type PluginNavigationGroup = string
@@ -80,6 +84,7 @@ export interface PluginThemeDefinition {
 }
 
 export interface PluginShellProps {
+  context: PluginContext
   children: ReactNode
   /** Select another registered shell; undefined restores the default shell. */
   selectShell(id?: string): void
@@ -93,14 +98,28 @@ export interface PluginShellDefinition {
   id: string
   name: string
   component: ComponentType<PluginShellProps>
+  /** Optional layout for Next.js content routes; the root component remains shell-owned. */
+  layout?: ComponentType<{ children: ReactNode }>
 }
 
-export type PluginPageContribution = PluginPageDefinition & { pluginId: string }
+export type PluginPageContribution = PluginPageDefinition & {
+  pluginId: string
+  context: PluginContext
+}
 export type PluginNavigationContribution = PluginNavigationDefinition & { pluginId: string }
+export type PluginThemeContribution = PluginThemeDefinition & { pluginId: string }
+export type PluginOverviewWidgetContribution = PluginOverviewWidgetDefinition & { pluginId: string }
+export type PluginShellContribution = PluginShellDefinition & {
+  pluginId: string
+  context: PluginContext
+}
 
 export interface PluginUIServiceSnapshot {
   pages: readonly PluginPageContribution[]
   navigation: readonly PluginNavigationContribution[]
+  themes: readonly PluginThemeContribution[]
+  overviewWidgets: readonly PluginOverviewWidgetContribution[]
+  shells: readonly PluginShellContribution[]
 }
 
 export interface PluginUIService {
@@ -111,6 +130,14 @@ export interface PluginUIService {
   registerOverviewWidget(widget: PluginOverviewWidgetDefinition): () => void
   registerTheme(theme: PluginThemeDefinition): () => void
   registerShell(shell: PluginShellDefinition): () => void
+}
+
+/** Host-facing read contract for the active UI registry implementation. */
+export interface PluginUIRegistryService {
+  getSnapshot(): PluginUIServiceSnapshot
+  subscribe(listener: () => void): () => void
+  findPage(pluginId: string, pageId: string): PluginPageContribution | undefined
+  findNavigation(id: string): PluginNavigationContribution | undefined
 }
 
 export function withAppBasePath(path: string): string {

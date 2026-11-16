@@ -3,20 +3,12 @@
  *
  * 拥有独立的 SimpleCookieJar，不依赖 JWXT EMAP 的 session。
  */
-import {
-  SimpleCookieJar,
-  collectCookies,
-  cookieEntryFromJSON,
-  fetchWithJar,
-  getJwxtCookieDomain,
-  headerSingle,
-  installCookies,
-  mobileUrls,
-  useAuthStore,
-  type CookieEntry,
-} from "@orahako/plugin-sdk/host"
+import type { CookieEntry, CookieJar } from "@orahako/plugin-sdk"
+import { collectCookies, cookieEntryFromJSON, headerSingle, installCookies } from "../http-utils"
+import type { YSUContext } from "../context"
+import type { CASProtocol } from "./cas"
+import { YSU_SESSION_ARTIFACT_MOBILE } from "../ysu-config"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
-import { authorize } from "./cas"
 
 // ─── Constants ────────────────────────────────────────────────────────── //
 
@@ -116,18 +108,18 @@ export class MobileBusinessError extends MobileError {
 
 // ─── MobileSession ────────────────────────────────────────────────────── //
 
-function isMobileCookie(e: CookieEntry): boolean {
-  return e.domain.length > 0 && e.domain.includes(getJwxtCookieDomain())
+function isMobileCookie(e: CookieEntry, cookieDomain: string): boolean {
+  return e.domain.length > 0 && e.domain.includes(cookieDomain)
 }
 
 export class MobileSession {
   constructor(public readonly cookies: readonly CookieEntry[]) {}
 
-  static async fromJar(jar: SimpleCookieJar): Promise<MobileSession> {
-    return new MobileSession(await collectCookies(jar, isMobileCookie))
+  static async fromJar(jar: CookieJar, cookieDomain: string): Promise<MobileSession> {
+    return new MobileSession(await collectCookies(jar, (e) => isMobileCookie(e, cookieDomain)))
   }
 
-  async apply(jar: SimpleCookieJar): Promise<void> {
+  async apply(jar: CookieJar): Promise<void> {
     await installCookies(jar, this.cookies)
   }
 
@@ -158,33 +150,69 @@ export class MobileSession {
   }
 }
 
-// ─── Module state ─────────────────────────────────────────────────────── //
+// ─── Provider-scoped state ────────────────────────────────────────────── //
 
-let mobileJar = new SimpleCookieJar()
-let timeoutMs = DEFAULT_TIMEOUT_MS
-let hydrationDone: Promise<void> = Promise.resolve()
-let mobileAuthorized = false
-let inflightMobileAuth: Promise<unknown> | null = null
+export interface JWMobileProtocol {
+  getJar(): CookieJar
+  setJar(jar: CookieJar): void
+  setTimeoutMs(ms: number): void
+  restoreSession(session: MobileSession): Promise<void>
+  resetMobileAuth(): void
+  ensureMobileAuthorized(verify?: boolean): Promise<void>
+  queryCurrentLesson(params: {
+    teachClassId: string
+    teachClassType: string
+    scheduleId: string
+    week: number
+    weekDay: number
+    startNode: number
+    endNode: number
+  }): Promise<CurrentLesson>
+  querySigninDetail(params: { activityId: string; title?: string }): Promise<SigninActivityDetail>
+  queryStudentSigninStatus(params: {
+    activityId: string
+    title?: string
+  }): Promise<StudentSigninStatus>
+  studentSign(params: {
+    activityId: string
+    accuracy?: number
+    latitude?: number
+    longitude?: number
+    code?: string
+  }): Promise<StudentSignResult>
+}
 
-export function getJar(): SimpleCookieJar {
+export function createJWMobile(ctx: YSUContext, cas: CASProtocol): JWMobileProtocol {
+  const mobileApiBase = ctx.urls.mobile.apiBase
+  const mobileAuthUrl = ctx.urls.mobile.auth
+  const mobileCookiePath = ctx.urls.mobile.cookiePath
+  const jwxtCookieDomain = ctx.urls.jwxtCookieDomain
+
+  let mobileJar = ctx.session.createCookieJar()
+  let timeoutMs = DEFAULT_TIMEOUT_MS
+  let hydrationDone: Promise<void> = Promise.resolve()
+  let mobileAuthorized = false
+  let inflightMobileAuth: Promise<unknown> | null = null
+
+function getJar(): CookieJar {
   return mobileJar
 }
 
-export function setJar(jar: SimpleCookieJar): void {
+function setJar(jar: CookieJar): void {
   mobileJar = jar
 }
 
-export function setTimeoutMs(ms: number): void {
+function setTimeoutMs(ms: number): void {
   timeoutMs = ms
 }
 
-export async function restoreSession(session: MobileSession): Promise<void> {
+async function restoreSession(session: MobileSession): Promise<void> {
   hydrationDone = session.apply(mobileJar)
   await hydrationDone
 }
 
-export function resetMobileAuth(): void {
-  mobileJar = new SimpleCookieJar()
+function resetMobileAuth(): void {
+  mobileJar = ctx.session.createCookieJar()
   hydrationDone = Promise.resolve()
   mobileAuthorized = false
   inflightMobileAuth = null
@@ -193,12 +221,12 @@ export function resetMobileAuth(): void {
 // ─── Internal helpers ─────────────────────────────────────────────────── //
 
 async function captureMobileToken(): Promise<string | null> {
-  let url = mobileUrls.auth
+  let url = mobileAuthUrl
   let redirects = 0
   const maxRedirects = 5
 
   while (redirects < maxRedirects) {
-    const resp = await fetchWithJar(mobileJar, {
+    const resp = await ctx.session.fetchWithJar(mobileJar, {
       method: "GET",
       url,
       redirect: "manual",
@@ -227,9 +255,9 @@ async function captureMobileToken(): Promise<string | null> {
 
 async function verifyMobileToken(): Promise<boolean> {
   try {
-    const resp = await fetchWithJar(mobileJar, {
+    const resp = await ctx.session.fetchWithJar(mobileJar, {
       method: "GET",
-      url: `${mobileUrls.apiBase}/`,
+      url: `${mobileApiBase}/`,
       redirect: "follow",
       timeoutMs,
     })
@@ -249,7 +277,7 @@ async function verifyMobileToken(): Promise<boolean> {
   }
 }
 
-export async function ensureMobileAuthorized(verify = false): Promise<void> {
+async function ensureMobileAuthorized(verify = false): Promise<void> {
   await waitForAuthTransition()
   if (mobileAuthorized) return
   if (inflightMobileAuth) {
@@ -263,7 +291,7 @@ export async function ensureMobileAuthorized(verify = false): Promise<void> {
 
     const cookies = await mobileJar.getAllCookies()
     const hasAuthCookie = cookies.some(
-      (c) => c.name === "Authorization" && c.value && c.domain.includes(getJwxtCookieDomain())
+      (c) => c.name === "Authorization" && c.value && c.domain.includes(jwxtCookieDomain)
     )
     if (hasAuthCookie) {
       if (verify) {
@@ -273,7 +301,7 @@ export async function ensureMobileAuthorized(verify = false): Promise<void> {
           return
         }
         // Token 已过期，清除过期的 cookie 继续重新获取
-        await mobileJar.removeCookie(getJwxtCookieDomain(), "/jwmobile", "Authorization")
+        await mobileJar.removeCookie(jwxtCookieDomain, "/jwmobile", "Authorization")
       } else {
         mobileAuthorized = true
         return
@@ -281,7 +309,7 @@ export async function ensureMobileAuthorized(verify = false): Promise<void> {
     }
 
     // Step 1: Complete CAS SSO to obtain JSESSIONID.
-    await authorize(mobileUrls.auth, mobileJar)
+    await cas.authorize(mobileAuthUrl, mobileJar)
 
     // Step 2: Capture JWT token from the redirect chain.
     const token = await captureMobileToken()
@@ -290,10 +318,10 @@ export async function ensureMobileAuthorized(verify = false): Promise<void> {
     }
 
     // Step 3: Store token as Authorization cookie for jwmobile API calls.
-    const cookieDomain = getJwxtCookieDomain()
+    const cookieDomain = jwxtCookieDomain
     await mobileJar.setCookie(
-      `Authorization=${token}; Path=${mobileUrls.cookiePath}; Domain=${cookieDomain}; Secure`,
-      `https://${cookieDomain}${mobileUrls.cookiePath}/`
+      `Authorization=${token}; Path=${mobileCookiePath}; Domain=${cookieDomain}; Secure`,
+      `https://${cookieDomain}${mobileCookiePath}/`
     )
   })
 
@@ -310,9 +338,9 @@ export async function ensureMobileAuthorized(verify = false): Promise<void> {
 }
 
 async function persistSession(): Promise<void> {
-  const session = await MobileSession.fromJar(mobileJar)
+  const session = await MobileSession.fromJar(mobileJar, jwxtCookieDomain)
   if (!session.isEmpty()) {
-    useAuthStore.getState().setMobileSession(session.toJSON())
+    ctx.session.setArtifact(YSU_SESSION_ARTIFACT_MOBILE, session.toJSON(), ctx.config.id)
   }
 }
 
@@ -325,13 +353,13 @@ async function mobileRequest(
 ): Promise<Record<string, unknown>> {
   await ensureMobileAuthorized()
 
-  const url = `${mobileUrls.apiBase}/${path}`
+  const url = `${mobileApiBase}/${path}`
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
   }
 
-  const resp = await fetchWithJar(mobileJar, {
+  const resp = await ctx.session.fetchWithJar(mobileJar, {
     method,
     url,
     headers,
@@ -409,7 +437,7 @@ async function withMobileReauth<T>(fn: () => Promise<T>): Promise<T> {
 
 // ─── Public API ───────────────────────────────────────────────────────── //
 
-export async function queryCurrentLesson(params: {
+async function queryCurrentLesson(params: {
   teachClassId: string
   teachClassType: string
   scheduleId: string
@@ -432,7 +460,7 @@ export async function queryCurrentLesson(params: {
   })
 }
 
-export async function querySigninDetail(params: {
+async function querySigninDetail(params: {
   activityId: string
   title?: string
 }): Promise<SigninActivityDetail> {
@@ -445,7 +473,7 @@ export async function querySigninDetail(params: {
   })
 }
 
-export async function queryStudentSigninStatus(params: {
+async function queryStudentSigninStatus(params: {
   activityId: string
   title?: string
 }): Promise<StudentSigninStatus> {
@@ -458,7 +486,7 @@ export async function queryStudentSigninStatus(params: {
   })
 }
 
-export async function studentSign(params: {
+async function studentSign(params: {
   activityId: string
   accuracy?: number
   latitude?: number
@@ -599,5 +627,19 @@ function parseStudentSignResult(raw: Record<string, unknown>): StudentSignResult
     signOrder: rawInt(raw, "signOrder"),
     signinType: rawInt(raw, "signinType"),
     raw,
+  }
+}
+
+  return {
+    getJar,
+    setJar,
+    setTimeoutMs,
+    restoreSession,
+    resetMobileAuth,
+    ensureMobileAuthorized,
+    queryCurrentLesson,
+    querySigninDetail,
+    queryStudentSigninStatus,
+    studentSign,
   }
 }

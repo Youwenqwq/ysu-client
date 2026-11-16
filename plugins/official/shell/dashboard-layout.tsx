@@ -3,11 +3,10 @@
 import { Suspense, useCallback, useEffect, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { useAuthStore } from "@orahako/plugin-ui/stores"
 import { useMobileHeaderStore } from "@orahako/plugin-ui/stores"
 import { cn } from "@orahako/plugin-ui/components"
 import { useSettingsStore } from "@orahako/plugin-ui/stores"
-import { useTranslation } from "@orahako/plugin-ui/hooks"
+import { useTranslation, useSessionSnapshot } from "@orahako/plugin-ui/hooks"
 import {
   Sidebar,
   SidebarContent,
@@ -34,21 +33,28 @@ import {
   DropdownMenuTrigger,
 } from "@orahako/plugin-ui/components"
 import { toast } from "sonner"
-import { logoutActiveProvider, reloginActiveProvider } from "@orahako/plugin-ui/stores"
-import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@orahako/plugin-ui/platform"
+import { checkRateLimit, recordLoginAttempt, rateLimitMessage } from "@/plugins/official/runtime/login-rate-limit"
 import { GraduationCap, Info, LogIn, LogOut, Settings, TriangleAlert, User } from "lucide-react"
 import { MobileBottomNav, MobileTopBar } from "@orahako/plugin-ui/shell"
 import { RefreshIndicator, StaleIndicator } from "@orahako/plugin-ui/shell"
-import { useProviderCapabilities, useSupportedPlugins } from "@orahako/plugin-ui/hooks"
 import { UpdateDialog } from "@orahako/plugin-ui/shell"
 import { APP_VERSION, APP_BUILD } from "@orahako/plugin-ui/platform"
-import { useStoredMediaUrl } from "@orahako/plugin-ui/hooks"
-import { loadAvatarImage } from "@orahako/plugin-ui/stores"
-import { usePluginHost } from "@orahako/plugin-ui/shell"
-import { usePluginUI } from "@orahako/plugin-ui/plugin"
-import { PluginSlot, pluginPageHref, type PluginIcon } from "@orahako/plugin-sdk"
-import { usePluginRouteStore } from "@orahako/plugin-ui/plugin"
-import { navigationForScope } from "@orahako/plugin-ui/plugin"
+import { useStoredMediaUrl } from "@/plugins/official/shell/media/media"
+import { loadAvatarImage } from "@/plugins/official/shell/media/avatar"
+import { usePluginServices, usePluginUI } from "@orahako/plugin-ui/plugin"
+import {
+  PluginSlot,
+  pluginPageHref,
+  type AcademicPluginContext,
+  type PluginAppNavigationDefinition,
+  type PluginI18nRegistryService,
+  type PluginIcon,
+  type PluginNavigationContribution,
+} from "@orahako/plugin-sdk"
+import { usePluginRouteStore } from "./stores/plugin-route"
+
+type DashboardNavigation = PluginNavigationContribution & PluginAppNavigationDefinition
+type DashboardServices = AcademicPluginContext & { i18n: PluginI18nRegistryService }
 const SIDEBAR_WIDTH_KEY = "dashboard-sidebar-width"
 const DEFAULT_SIDEBAR_WIDTH = 288 // 18rem
 const MIN_SIDEBAR_WIDTH = 208 // 13rem
@@ -171,7 +177,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const rawPathname = usePathname()
   const pathname = rawPathname.replace(/\/$/, "")
-  const { isAuthenticated, hasHydrated, username, sessionExpired } = useAuthStore()
+  const { isAuthenticated, hasHydrated, username, sessionExpired } = useSessionSnapshot()
   const { t, locale } = useTranslation()
   const fullscreenRequested = useMobileHeaderStore((s) => s.fullscreen)
   const pluginRoute = usePluginRouteStore((state) => state.current)
@@ -213,14 +219,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [])
 
-  const capabilities = useProviderCapabilities()
-  const supportedPlugins = useSupportedPlugins()
-  const { host } = usePluginHost()
-  const { navigation: pluginNavigation } = usePluginUI(host.ui)
-  const availableNavigation = navigationForScope(pluginNavigation, "app", {
-    capabilities,
-    supportedPlugins,
-  })
+  const services = usePluginServices<DashboardServices>()
+  usePluginUI()
+  const availableNavigation = services.navigation.forScope<DashboardNavigation>("app")
   const knownGroupOrder = ["main", "academic", "platform", "fees", "extras", "plugins"]
   const groupLabels: Record<string, string> = {
     main: t("app.nav"),
@@ -243,7 +244,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .filter((item) => item.group === group)
       .map((item) => ({
         title: item.titleKey
-          ? host.i18n.translate(item.pluginId, item.titleKey, locale)
+          ? services.i18n.translate(item.pluginId, item.titleKey, locale)
           : item.title,
         url: pluginPageHref(item.pluginId, item.page, item.params),
         icon: item.icon,
@@ -262,7 +263,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
   const pageTitle = pluginRoute
     ? pluginRoute.titleKey
-      ? host.i18n.translate(pluginRoute.pluginId, pluginRoute.titleKey, locale)
+      ? services.i18n.translate(pluginRoute.pluginId, pluginRoute.titleKey, locale)
       : pluginRoute.title
     : (titleByPath[pathname] ?? t("app.name"))
 
@@ -275,7 +276,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [hasHydrated, isAuthenticated, router])
 
   async function handleLogout() {
-    await logoutActiveProvider()
+    await services.provider.logout()
     toast.success(t("app.logout"))
     router.replace("/login")
   }
@@ -299,7 +300,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setReloginLoading(true)
 
     try {
-      const success = await reloginActiveProvider()
+      const success = await services.provider.relogin()
       if (success) {
         toast.success(t("login.loginSuccess"))
         return
@@ -309,7 +310,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     } finally {
       setReloginLoading(false)
     }
-    await logoutActiveProvider()
+    await services.provider.logout()
     router.replace("/login")
   }
 

@@ -3,6 +3,7 @@ import { Bell } from "lucide-react"
 import { PLUGIN_API_VERSION, definePlugin, type PluginManifest } from "@orahako/plugin-sdk"
 import { NotificationSettingsPanel } from "./settings"
 import { NotificationRuntime } from "./runtime"
+import { stopNotify } from "@/plugins/official/runtime/native/notify"
 
 export const manifest: PluginManifest = {
   id: "orahako.notifications",
@@ -11,6 +12,7 @@ export const manifest: PluginManifest = {
   apiVersion: PLUGIN_API_VERSION,
   kind: "feature",
   required: true,
+  inject: ["slots", "settings", "notifications"],
   entry: "index.js",
   description: "系统权限、通知轮询与提醒设置",
 }
@@ -35,6 +37,9 @@ export const definition = definePlugin((ctx) => {
     slot: "shell.overlay",
     component: () => createElement(NotificationRuntime, { notifications }),
   })
+  // Native polling and class reminders are host-side state, not React
+  // subscriptions: stop them when this plugin's scope is disposed.
+  ctx.on("dispose", () => stopNotify())
 })
 
 export default definition

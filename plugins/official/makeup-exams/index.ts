@@ -8,6 +8,7 @@ export const manifest: PluginManifest = {
   version: "1.0.0",
   apiVersion: PLUGIN_API_VERSION,
   kind: "feature",
+  inject: ["ui"],
   entry: "index.js",
 }
 

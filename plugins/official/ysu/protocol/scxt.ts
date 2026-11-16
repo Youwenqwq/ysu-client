@@ -7,15 +7,11 @@
  *
  * 纯函数 + 模块级状态(cookie jar)。
  */
-import {
-  SimpleCookieJar,
-  fetchWithJar,
-  getSchoolConfig,
-  headerSingle,
-  type HttpResponse,
-} from "@orahako/plugin-sdk/host"
+import type { CookieJar, HttpResponse } from "@orahako/plugin-sdk"
+import type { YSUContext } from "../context"
+import type { CASProtocol } from "./cas"
+import { headerSingle } from "../http-utils"
 import { waitForAuthTransition, withAuthTransition } from "../auth-transition"
-import { authorize, getCredentialApplied } from "./cas"
 import { parseTables, type TableData } from "./table"
 
 // ─── Constants ────────────────────────────────────────────────────────── //
@@ -147,25 +143,54 @@ export class ScxtProtocolError extends ScxtError {
   }
 }
 
-// ─── Module state ─────────────────────────────────────────────────────── //
+// ─── Provider-scoped state ────────────────────────────────────────────── //
 
-let scxtJar = new SimpleCookieJar()
-let timeoutMs = 30_000
-let authorized = false
-let inflightAuth: Promise<void> | null = null
-let cachedCreditBatches: CreditBatch[] | null = null
-let inflightCreditBatches: Promise<CreditBatch[]> | null = null
+export interface ScxtProtocol {
+  getJar(): CookieJar
+  setTimeoutMs(ms: number): void
+  resetScxt(): void
+  queryCreditBatches(): Promise<CreditBatch[]>
+  queryCreditDeclarations(opts?: {
+    batchId?: string
+    itemName?: string
+  }): Promise<CreditDeclaration[]>
+  queryCreditRecords(opts?: {
+    batchId?: string
+    itemName?: string
+    year?: string
+  }): Promise<CreditRecord[]>
+  queryAllCreditRecords(): Promise<CreditRecord[]>
+  queryCreditSummary(): Promise<CreditSummary>
+  queryCompetitions(opts?: {
+    itemName?: string
+    pageIndex?: number
+  }): Promise<CatalogPage<Competition>>
+  queryLibraryActivities(opts?: {
+    name?: string
+    pageIndex?: number
+  }): Promise<CatalogPage<LibraryActivity>>
+}
 
-export function getJar(): SimpleCookieJar {
+export function createSCXT(ctx: YSUContext, cas: CASProtocol): ScxtProtocol {
+  const scxtBaseUrl = ctx.config.scxt?.baseUrl
+  const scxtPtBaseUrl = ctx.config.scxt?.ptBaseUrl
+  let scxtJar = ctx.session.createCookieJar()
+  let timeoutMs = 30_000
+  let authorized = false
+  let inflightAuth: Promise<void> | null = null
+  let cachedCreditBatches: CreditBatch[] | null = null
+  let inflightCreditBatches: Promise<CreditBatch[]> | null = null
+
+function getJar(): CookieJar {
   return scxtJar
 }
 
-export function setTimeoutMs(ms: number): void {
+function setTimeoutMs(ms: number): void {
   timeoutMs = ms
 }
 
-export function resetScxt(): void {
-  scxtJar = new SimpleCookieJar()
+function resetScxt(): void {
+  scxtJar = ctx.session.createCookieJar()
   authorized = false
   inflightAuth = null
   cachedCreditBatches = null
@@ -173,11 +198,10 @@ export function resetScxt(): void {
 }
 
 function scxtConfig(): { baseUrl: string; ptBaseUrl: string } {
-  const config = getSchoolConfig().scxt
-  if (!config) {
+  if (!scxtBaseUrl || !scxtPtBaseUrl) {
     throw new ScxtProtocolError("scxt base URLs not configured for current school")
   }
-  return config
+  return { baseUrl: scxtBaseUrl, ptBaseUrl: scxtPtBaseUrl }
 }
 
 // ─── Auth & low-level requests ────────────────────────────────────────── //
@@ -191,7 +215,7 @@ function scxtConfig(): { baseUrl: string; ptBaseUrl: string } {
 async function ensureAuthorized(): Promise<void> {
   await waitForAuthTransition()
   if (authorized) return
-  await getCredentialApplied()
+  await cas.getCredentialApplied()
   if (inflightAuth) {
     await inflightAuth
     return
@@ -204,12 +228,12 @@ async function ensureAuthorized(): Promise<void> {
     const ptHomeUrl = `${ptBaseUrl}${HOME_PATH}`
     const referer = { Referer: ptHomeUrl }
 
-    await authorize(`${ptBaseUrl}${PT_CAS_LOGIN_PATH}`, scxtJar)
+    await cas.authorize(`${ptBaseUrl}${PT_CAS_LOGIN_PATH}`, scxtJar)
 
     const bridgeUrl = `${ptBaseUrl}${SUBSYSTEM_BRIDGE_PATH}`
     let resp: HttpResponse
     try {
-      resp = await fetchWithJar(scxtJar, {
+      resp = await ctx.session.fetchWithJar(scxtJar, {
         method: "GET",
         url: bridgeUrl,
         headers: referer,
@@ -227,7 +251,7 @@ async function ensureAuthorized(): Promise<void> {
     }
 
     try {
-      resp = await fetchWithJar(scxtJar, {
+      resp = await ctx.session.fetchWithJar(scxtJar, {
         method: "GET",
         url: ticketUrl,
         headers: referer,
@@ -262,7 +286,7 @@ async function ensureAuthorized(): Promise<void> {
 async function getPageAbs(url: string): Promise<string> {
   let resp: HttpResponse
   try {
-    resp = await fetchWithJar(scxtJar, {
+    resp = await ctx.session.fetchWithJar(scxtJar, {
       method: "GET",
       url,
       redirect: "follow",
@@ -285,7 +309,7 @@ async function getPage(path: string, params?: Record<string, string | number>): 
   const url = `${scxtConfig().baseUrl}${path}${query}`
   let resp: HttpResponse
   try {
-    resp = await fetchWithJar(scxtJar, {
+    resp = await ctx.session.fetchWithJar(scxtJar, {
       method: "GET",
       url,
       redirect: "follow",
@@ -390,7 +414,7 @@ function parsePager(html: string): {
  *
  * 学分汇总页服务端默认只给当前批次，要查全部记录需按批次遍历。
  */
-export async function queryCreditBatches(): Promise<CreditBatch[]> {
+async function queryCreditBatches(): Promise<CreditBatch[]> {
   if (cachedCreditBatches) return cachedCreditBatches
   if (inflightCreditBatches) return inflightCreditBatches
 
@@ -423,7 +447,7 @@ export async function queryCreditBatches(): Promise<CreditBatch[]> {
 // ─── Public: 申报记录 ─────────────────────────────────────────────────── //
 
 /** 查询我的学分申报记录（默认服务端当前批次口径）。 */
-export async function queryCreditDeclarations(opts?: {
+async function queryCreditDeclarations(opts?: {
   batchId?: string
   itemName?: string
 }): Promise<CreditDeclaration[]> {
@@ -456,7 +480,7 @@ export async function queryCreditDeclarations(opts?: {
  * 注意：batchId 为空时服务端只返回当前批次的记录，
  * 查全部批次请用 queryAllCreditRecords。
  */
-export async function queryCreditRecords(opts?: {
+async function queryCreditRecords(opts?: {
   batchId?: string
   itemName?: string
   year?: string
@@ -498,7 +522,7 @@ export async function queryCreditRecords(opts?: {
 }
 
 /** 遍历全部批次查询认定记录（每批次一次请求，限制并发以保护服务端会话）。 */
-export async function queryAllCreditRecords(): Promise<CreditRecord[]> {
+async function queryAllCreditRecords(): Promise<CreditRecord[]> {
   const batches = await queryCreditBatches()
   const pages = new Array<CreditRecord[]>(batches.length)
   let nextIndex = 0
@@ -519,7 +543,7 @@ export async function queryAllCreditRecords(): Promise<CreditRecord[]> {
 // ─── Public: 学生学分汇总 ─────────────────────────────────────────────── //
 
 /** 查询本人学分总表（总学分/成绩）。 */
-export async function queryCreditSummary(): Promise<CreditSummary> {
+async function queryCreditSummary(): Promise<CreditSummary> {
   return runWithReauth(async () => {
     const { table } = await getTable(SUMMARY_QUERY_PATH)
     const cols = colMap(table.headers)
@@ -548,7 +572,7 @@ export async function queryCreditSummary(): Promise<CreditSummary> {
  *
  * isEnable 为厂商代码（是/否 对应值原样透传），分页信息在返回值上。
  */
-export async function queryCompetitions(opts?: {
+async function queryCompetitions(opts?: {
   itemCode?: string
   itemName?: string
   isEnable?: string
@@ -581,7 +605,7 @@ export async function queryCompetitions(opts?: {
 }
 
 /** 查询活动库（分页，每页固定 20 条）。 */
-export async function queryLibraryActivities(opts?: {
+async function queryLibraryActivities(opts?: {
   name?: string
   pageIndex?: number
 }): Promise<CatalogPage<LibraryActivity>> {
@@ -605,4 +629,18 @@ export async function queryLibraryActivities(opts?: {
       totalRecords: pager.totalRecords,
     }
   })
+}
+
+  return {
+    getJar,
+    setTimeoutMs,
+    resetScxt,
+    queryCreditBatches,
+    queryCreditDeclarations,
+    queryCreditRecords,
+    queryAllCreditRecords,
+    queryCreditSummary,
+    queryCompetitions,
+    queryLibraryActivities,
+  }
 }

@@ -10,11 +10,11 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer"
 import { CalendarOff, Layers } from "lucide-react"
-import { useTranslation } from "@/lib/i18n/use-translation"
+import { useTranslation } from "@/plugins/official/runtime/i18n/use-translation"
 import { cn } from "@/lib/utils"
 import type { ClassPeriod, Course, CurrentWeek, Exam } from "@orahako/plugin-sdk/academic"
 import { computeExamBlocks, type ExamBlock } from "./exam-blocks"
-import { formatExamTime } from "@/lib/academic/exam-utils"
+import { formatExamTime } from "./exam-utils"
 import {
   computeMergedBlocks,
   buildSectionTimeMap,
@@ -28,7 +28,7 @@ import {
 import { courseBgClass, type CourseColorMap } from "./course-color"
 import { ActivityModal } from "./activity-modal"
 import { SigninModal } from "./signin-modal"
-import { scheduleDate, scheduleOccurrence } from "@/lib/academic/schedule-patches"
+import { scheduleDate, scheduleOccurrence } from "./schedule-patches"
 import {
   ScheduleDayHandle,
   ScheduleDayLabel,
