@@ -92,13 +92,19 @@ export class PluginRuntime {
       if (!current) return
       const generation = current.generation
       let scoped = ctx
+      const scopedServices = []
       for (const [name, dependency] of Object.entries(current.inject)) {
         if (!dependency.required) continue
         const service = ctx.get(name)
         if (isScopedPluginService(service)) {
           scoped = scoped.isolate(name)
-          scoped.set(name, service[PLUGIN_SERVICE_SCOPE](scoped, current.manifest))
+          scopedServices.push({ name, service })
         }
+      }
+      // Facades may capture their context in registrations. Isolate every service first so
+      // those captures observe the same final context as the plugin definition itself.
+      for (const { name, service } of scopedServices) {
+        scoped.set(name, service[PLUGIN_SERVICE_SCOPE](scoped, current.manifest))
       }
       this.contexts.set(ctx, { plugin: current, generation })
       this.contexts.set(scoped, { plugin: current, generation })

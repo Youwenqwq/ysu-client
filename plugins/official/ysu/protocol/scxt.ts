@@ -245,7 +245,7 @@ async function ensureAuthorized(): Promise<void> {
     }
     const ticketUrl = headerSingle(resp.headers, "location") ?? ""
     if ((resp.status !== 301 && resp.status !== 302) || !ticketUrl.includes("authserver/access")) {
-      throw new ScxtProtocolError(
+      throw new ScxtNotLoggedInError(
         `subsystem bridge did not issue access ticket: ${resp.status} -> ${ticketUrl}`
       )
     }
@@ -348,8 +348,8 @@ async function getTable(
 
 /** 会话过期时重新认证一次并重试。 */
 async function runWithReauth<T>(fn: () => Promise<T>): Promise<T> {
-  await ensureAuthorized()
   try {
+    await ensureAuthorized()
     return await fn()
   } catch (e) {
     if (e instanceof ScxtNotLoggedInError) {

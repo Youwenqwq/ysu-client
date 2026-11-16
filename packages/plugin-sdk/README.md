@@ -164,7 +164,7 @@ class FeedRegistry implements ScopedPluginService<FeedService> {
 }
 ```
 
-宿主会在每个消费者的隔离作用域里注入 facade，因此注册项可以按插件归属并自动撤销。公开的 `trackPluginRegistration(ctx, register)`（来自 `@orahako/plugin-sdk`）封装了同一模式：先挂接上下文 dispose，再发布注册，避免已销毁的插件上下文泄漏全局状态。
+宿主会在每个消费者的隔离作用域里注入 facade，因此注册项可以按插件归属并自动撤销。所有 facade 工厂收到的都是该消费者的最终上下文，与插件 `apply` 收到的上下文一致；facade 可以保存它用于页面、Shell 等注册项，并读取消费者注入的其他 facade。公开的 `trackPluginRegistration(ctx, register)`（来自 `@orahako/plugin-sdk`）封装了同一模式：先挂接上下文 dispose，再发布注册，避免已销毁的插件上下文泄漏全局状态。
 
 清单 `inject` 中的服务名必须由 composition 中的某个插件（或宿主 `packageRuntime`）提供。只写 `inject` 而不在选择该服务的 composition 里运行，插件不会启动。外部 ZIP 可以提供新服务给其他外部插件，但不能在市场安装时并行替换一个已由 composition 提供的核心服务；替换核心服务需要改 composition。
 

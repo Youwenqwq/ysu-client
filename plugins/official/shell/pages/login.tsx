@@ -65,7 +65,7 @@ export function LoginPage() {
   }, [configuredSchool])
 
   useEffect(() => {
-    if (!isCapacitor()) return
+    if (!isCapacitor() || !selectedSchool) return
     const rememberedUsername = services.session.getArtifact("remembered-username", selectedSchool)
     const rememberedPassword = services.session.getArtifact("remembered-password", selectedSchool)
     if (rememberedUsername && rememberedPassword) {

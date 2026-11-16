@@ -271,6 +271,32 @@ describe("PluginRuntime root services", () => {
     }
   })
 
+  it("captures the final consumer context in every scoped facade", () => {
+    const runtime = new PluginRuntime()
+    const root = new ScopedRootService()
+    runtime.context.set("ui", root)
+    runtime.context.set("http", new LabelledRootService("http"))
+    const consumer: PluginManifest = {
+      ...manifest,
+      id: "example.consumer",
+      inject: ["ui", "http"],
+    }
+    let definitionContext: Context | undefined
+    runtime.register(
+      consumer,
+      (ctx) => {
+        definitionContext = ctx
+      },
+      "builtin"
+    )
+    runtime.start(consumer.id)
+
+    expect(root.facades[0]?.ctx).toBe(definitionContext)
+    expect(root.facades[0]?.ctx.get("http")).toEqual({ label: "http" })
+    expect(root.facades[0]?.ctx.get("http")).not.toBe(runtime.context.get("http"))
+    runtime.dispose()
+  })
+
   it("recreates the facade and disposes the consumer when its service restarts", () => {
     const runtime = new PluginRuntime()
     const root = new ScopedRootService()
