@@ -1,6 +1,7 @@
 export * from "./runtime"
 export * from "./native"
 export * from "./composition"
+export * from "./crypto"
 export * from "./http"
 export * from "./kernel"
 export * from "./session"

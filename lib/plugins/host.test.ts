@@ -11,6 +11,7 @@ import {
 import { createMarketPluginInstaller } from "@/plugins/official/runtime/market-installer"
 import { PluginHost } from "./host"
 import { PluginUIRegistry } from "@/plugins/official/runtime/registries/ui"
+
 import { usePluginPreferences } from "@/lib/stores/plugin-preferences"
 
 const MARKET_INDEX_URL = "https://market.example.com/plugins/index.json"
@@ -232,6 +233,31 @@ function bundleIndex(): MarketplaceIndex {
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+})
+
+describe("PluginHost external host modules", () => {
+  it("exports crypto helpers and scoped services to external ZIP modules", async () => {
+    const blobs = new Map<string, Blob>()
+    vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      if (!(blob instanceof Blob)) throw new TypeError("Expected Blob")
+      const url = `blob:test-${blobs.size}`
+      blobs.set(url, blob)
+      return url
+    })
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {})
+    const host = createHost()
+    const registry = host.getHostModules()
+    const cryptoUrl = registry.resolve("@orahako/plugin-sdk/crypto")
+    const servicesUrl = registry.resolve("@orahako/plugin-ui/services")
+    expect(cryptoUrl).toBeTypeOf("string")
+    expect(servicesUrl).toBeTypeOf("string")
+    const cryptoSource = await blobs.get(cryptoUrl!)!.text()
+    const servicesSource = await blobs.get(servicesUrl!)!.text()
+    expect(cryptoSource).toContain("aes128EcbEncrypt")
+    expect(cryptoSource).toContain("bytesToBase64")
+    expect(servicesSource).toContain("usePluginServices")
+    registry.dispose()
+  })
 })
 
 describe("ctx.plugins.installFromMarket", () => {

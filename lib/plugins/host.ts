@@ -16,6 +16,7 @@ import * as PluginPlatform from "@orahako/plugin-ui/platform"
 import * as PluginRuntimeUI from "@orahako/plugin-ui/plugin"
 import * as PluginShellRuntime from "@orahako/plugin-ui/shell"
 import * as PluginAssets from "@orahako/plugin-ui/assets"
+import * as PluginServices from "@orahako/plugin-ui/services"
 import type {
   AppComposition,
   CompositionPlugin,
@@ -524,7 +525,7 @@ export class PluginHost {
     if (previous && previous !== loaded) previous.dispose()
   }
 
-  private getHostModules(): HostModuleRegistry {
+  getHostModules(): HostModuleRegistry {
     if (!this.hostModules) {
       const modules: Record<string, object> = {
         react: React,
@@ -544,6 +545,7 @@ export class PluginHost {
         "@orahako/plugin-ui/plugin": PluginRuntimeUI,
         "@orahako/plugin-ui/shell": PluginShellRuntime,
         "@orahako/plugin-ui/assets": PluginAssets,
+        "@orahako/plugin-ui/services": PluginServices,
       }
       for (const specifier of SUPPORTED_HOST_MODULES) {
         if (specifier.startsWith("@orahako/plugin-sdk")) modules[specifier] = PluginSDK
