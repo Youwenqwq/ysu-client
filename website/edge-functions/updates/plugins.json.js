@@ -5,7 +5,7 @@
 
 const DEFAULT_INDEX = {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-16T05:49:36Z",
+  "updatedAt": "2026-11-16T13:17:32Z",
   "plugins": [
     {
       "id": "community.theme.yuna",
@@ -96,10 +96,10 @@ const DEFAULT_INDEX = {
             "android"
           ],
           "zipUrl": "/plugins/community.perlica-toybox/1.3.0.zip",
-          "sha256": "55d447581a4ff9bc3821c572ef2df7bc7f784fef360fc6866b4149836b9b4c5f",
-          "size": 218589,
-          "publishedAt": "2026-11-16T05:49:36Z",
-          "changelog": "还车弹窗显示当前骑行费用，并按骑行卡免费时长与服务器分时计价预估抵扣；计时改用实际耗时（含临时停车），移除未使用的调度费报价流程。"
+          "sha256": "267be81f25e9f65f775918a7c3307a3390ab3888cf2140cfc9c1f3dfde499cb2",
+          "size": 215986,
+          "publishedAt": "2026-11-16T13:17:32Z",
+          "changelog": "还车弹窗显示当前骑行费用，并按骑行卡免费时长与服务器分时计价预估抵扣；计时改用实际耗时（含临时停车），移除未使用的调度费报价流程。重新打包：修正插件工具类覆盖宿主响应式样式导致 PC 端显示移动端布局、以及主题变量覆盖宿主字体的问题。"
         }
       ]
     },
@@ -164,10 +164,10 @@ const DEFAULT_INDEX = {
             "android"
           ],
           "zipUrl": "/plugins/orahako.skbird/1.2.0.zip",
-          "sha256": "c843841769e30168d25f7de2a7f7cecaffddea77737d20d0ae89d5f68a8516d0",
-          "size": 24952,
-          "publishedAt": "2026-11-15T00:44:03Z",
-          "changelog": "移动端设置入口移至顶栏，底部导航仅保留消息与我的；重构帖子列表与详情的移动端布局、分隔和图片展示。"
+          "sha256": "dd2f8a66303e5ed4527c807a7023b01336e59d7d297336bb76f6ce75d7678f55",
+          "size": 23508,
+          "publishedAt": "2026-11-16T13:17:32Z",
+          "changelog": "移动端设置入口移至顶栏，底部导航仅保留消息与我的；重构帖子列表与详情的移动端布局、分隔和图片展示。重新打包：修正插件工具类覆盖宿主响应式样式导致 PC 端显示移动端布局、以及主题变量覆盖宿主字体的问题。"
         }
       ]
     }
