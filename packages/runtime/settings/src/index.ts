@@ -14,6 +14,7 @@ import {
   type PluginSettingsService,
   type PluginSlotDeclaration,
   type PluginSlotRegistryService,
+  type PluginSlotService,
   type PluginStorageService,
   type ScopedPluginService,
   type SettingsCategorySpec,
@@ -22,6 +23,12 @@ import {
   type StoreDefinition,
   type StoreInstance,
 } from "@orahako/sdk"
+
+declare module "@orahako/sdk" {
+  interface SlotMap {
+    "settings.category.panel": { kind: "keyed"; owner: Record<string, never> }
+  }
+}
 
 const DEFAULT_CATEGORY_ORDER = 100
 export const SETTINGS_RUNTIME_PLUGIN_ID = "orahako.runtime.settings"
@@ -41,6 +48,30 @@ function resolveRegistrantStorage(
     return isPluginStorageService(scoped) ? scoped : undefined
   }
   return isPluginStorageService(raw) ? raw : undefined
+}
+
+function isPluginSlotService(value: unknown): value is PluginSlotService {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "register" in value &&
+    typeof value.register === "function" &&
+    "inject" in value &&
+    typeof value.inject === "function"
+  )
+}
+
+function resolveRegistrantSlots(
+  ctx: Context,
+  manifest: PluginManifest
+): PluginSlotService | undefined {
+  const raw: unknown = ctx.get("slots") ?? ctx.root.get("slots")
+  if (!raw) return undefined
+  if (isScopedPluginService(raw)) {
+    const scoped = raw[PLUGIN_SERVICE_SCOPE](ctx, manifest)
+    return isPluginSlotService(scoped) ? scoped : undefined
+  }
+  return isPluginSlotService(raw) ? raw : undefined
 }
 
 function isStoreDefinition(
@@ -242,25 +273,85 @@ export class PluginSettingsRegistry
     }
 
     const pluginId = manifest?.id ?? ""
-    const disposeChildren = declareContributionChildren(registrantCtx, spec.children)
+    let disposed = false
+    let panelMounted = false
+    let disposeStandaloneChildren: (() => void) | undefined
+    let disposeSlotInject: (() => void) | undefined
+    let stopSlotsServiceListener: (() => void) | undefined
 
     let ownedStore: StoreInstance<unknown, Record<string, never>> | undefined
     let resolvedStore: unknown = spec.store
     if (isStoreDefinition(spec.store)) {
-      try {
-        const storage =
-          registrantCtx && manifest ? resolveRegistrantStorage(registrantCtx, manifest) : undefined
-        ownedStore = spec.store.create(storage)
-        resolvedStore = ownedStore
-      } catch (error) {
-        disposeChildren()
-        throw error
-      }
+      const storage =
+        registrantCtx && manifest ? resolveRegistrantStorage(registrantCtx, manifest) : undefined
+      ownedStore = spec.store.create(storage)
+      resolvedStore = ownedStore
     }
 
     const boundInject: ((ctx: Context) => unknown) | undefined = spec.inject
       ? (fallbackCtx: Context) => spec.inject!(registrantCtx ?? fallbackCtx)
       : undefined
+
+    const releaseStandaloneChildren = (): void => {
+      const release = disposeStandaloneChildren
+      disposeStandaloneChildren = undefined
+      release?.()
+    }
+
+    const attachSlotBridge = (slots: PluginSlotService): void => {
+      disposeSlotInject = slots.inject("settings.category.panel", () => {
+        releaseStandaloneChildren()
+        panelMounted = true
+        const disposePanel = slots.register<"settings.category.panel", Dict, Children, Store, I>(
+          {
+            id: `category-${spec.id}`,
+            slot: "settings.category.panel",
+            key: spec.id,
+            ...(spec.dictionary !== undefined ? { dictionary: spec.dictionary } : {}),
+            ...(spec.children !== undefined ? { children: spec.children } : {}),
+            ...(resolvedStore !== undefined ? { store: resolvedStore as Store } : {}),
+            ...(boundInject !== undefined ? { inject: boundInject as typeof spec.inject } : {}),
+          },
+          resolvedComponent
+        )
+        return () => {
+          panelMounted = false
+          disposePanel()
+          if (!disposed && spec.children && !disposeStandaloneChildren) {
+            disposeStandaloneChildren = declareContributionChildren(registrantCtx, spec.children)
+          }
+        }
+      })
+    }
+
+    try {
+      if (registrantCtx && manifest) {
+        const initialSlots = resolveRegistrantSlots(registrantCtx, manifest)
+        if (initialSlots) {
+          attachSlotBridge(initialSlots)
+        } else {
+          stopSlotsServiceListener = registrantCtx.on("internal/service", (serviceName: string) => {
+            if (disposed || serviceName !== "slots" || disposeSlotInject) return
+            const lateSlots = resolveRegistrantSlots(registrantCtx, manifest)
+            if (lateSlots) {
+              attachSlotBridge(lateSlots)
+            }
+          })
+        }
+      }
+
+      if (!panelMounted) {
+        disposeStandaloneChildren = declareContributionChildren(registrantCtx, spec.children)
+      }
+    } catch (error) {
+      disposed = true
+      stopSlotsServiceListener?.()
+      disposeSlotInject?.()
+      releaseStandaloneChildren()
+      ownedStore?.dispose()
+      ownedStore = undefined
+      throw error
+    }
 
     const registered: PluginSettingsCategory = {
       id: spec.id,
@@ -281,7 +372,6 @@ export class PluginSettingsRegistry
     this.categories.set(spec.id, registered)
     this.publish()
 
-    let disposed = false
     return () => {
       if (disposed) return
       disposed = true
@@ -289,7 +379,11 @@ export class PluginSettingsRegistry
         this.categories.delete(spec.id)
         this.publish()
       }
-      disposeChildren()
+      stopSlotsServiceListener?.()
+      stopSlotsServiceListener = undefined
+      disposeSlotInject?.()
+      disposeSlotInject = undefined
+      releaseStandaloneChildren()
       ownedStore?.dispose()
       ownedStore = undefined
     }

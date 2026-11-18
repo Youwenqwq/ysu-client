@@ -263,4 +263,102 @@ describe("@orahako/runtime-settings", () => {
     expect(registry.getSnapshot()).toEqual([])
     runtime.dispose()
   })
+
+  it("bridges registered categories into 'settings.category.panel' keyed slot with a single shared StoreInstance and child slots", () => {
+    let storeCreateCalls = 0
+    const baseStore = defineStore({
+      init: () => ({ count: 0 }),
+      actions: {
+        inc(ctx) {
+          ctx.set((s) => ({ count: s.count + 1 }))
+        },
+      },
+    })
+    const trackedStore = {
+      spec: baseStore.spec,
+      create: (...args: Parameters<typeof baseStore.create>) => {
+        storeCreateCalls += 1
+        return baseStore.create(...args)
+      },
+    }
+
+    const slotsRegistry = new PluginSlotRegistry()
+    const settingsRegistry = new PluginSettingsRegistry()
+    const runtime = new PluginRuntime()
+    runtime.context.set("slots", slotsRegistry)
+    runtime.context.set("settings", settingsRegistry)
+
+    const plugin = definePlugin({
+      manifest: {
+        id: "example.bridged",
+        name: "Bridged",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+      },
+      inject: ["settings"],
+      apply(ctx) {
+        ctx.settings.registerCategory(
+          {
+            id: "network",
+            title: "Network",
+            icon: Icon,
+            children: {
+              "test.settings.subsection": { kind: "list" },
+            },
+            store: trackedStore,
+            inject: () => ({ tag: "bridged-inject" }),
+          },
+          Panel
+        )
+      },
+    })
+
+    runtime.register(plugin, "builtin")
+    runtime.start(plugin.manifest.id)
+
+    // Before "settings.category.panel" is declared, store was created ONCE and child slot is declared
+    expect(storeCreateCalls).toBe(1)
+    expect(
+      slotsRegistry.getSnapshot().declarations.some((d) => d.name === "test.settings.subsection")
+    ).toBe(true)
+
+    // Declare "settings.category.panel" -> category panel registers automatically with key "network"
+    const disposePanelDecl = slotsRegistry.declare({
+      name: "settings.category.panel",
+      kind: "keyed",
+    })
+    expect(storeCreateCalls).toBe(1)
+
+    const matched = slotsRegistry.select("settings.category.panel", "network")
+    expect(matched).toHaveLength(1)
+    expect(matched[0]?.id).toBe("category-network")
+    expect(matched[0]?.pluginId).toBe("example.bridged")
+    expect(matched[0]?.store).toBe(settingsRegistry.getSnapshot()[0]?.store)
+    expect(matched[0]?.inject?.(runtime.context)).toEqual({ tag: "bridged-inject" })
+    expect(
+      slotsRegistry.getSnapshot().declarations.some((d) => d.name === "test.settings.subsection")
+    ).toBe(true)
+
+    // Tearing down and re-declaring "settings.category.panel" keeps store single and re-bridges cleanly
+    disposePanelDecl()
+    expect(
+      slotsRegistry.getSnapshot().declarations.some((d) => d.name === "test.settings.subsection")
+    ).toBe(true)
+    const disposePanelDecl2 = slotsRegistry.declare({
+      name: "settings.category.panel",
+      kind: "keyed",
+    })
+    expect(storeCreateCalls).toBe(1)
+    expect(slotsRegistry.select("settings.category.panel", "network")).toHaveLength(1)
+
+    // Stopping plugin removes both category metadata and slot contribution
+    runtime.stop(plugin.manifest.id)
+    expect(settingsRegistry.getSnapshot()).toEqual([])
+    expect(slotsRegistry.select("settings.category.panel", "network")).toEqual([])
+
+    disposePanelDecl2()
+    runtime.dispose()
+  })
 })

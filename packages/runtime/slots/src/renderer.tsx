@@ -3,12 +3,15 @@ import {
   Component,
   Fragment,
   useCallback,
+  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react"
 import {
+  parseRouteLocation,
+  pluginPageHref,
   resolveDictionaryMessage,
   type AppComposition,
   type ChildrenSpec,
@@ -17,12 +20,16 @@ import {
   type ObservableSource,
   type PluginI18nRegistryService,
   type PluginLocale,
+  type PluginNavigationService,
+  type PluginPageContribution,
+  type PluginRouterService,
   type PluginShellContribution,
   type PluginSlotRegistryService,
   type PluginSlotRegistrySnapshot,
   type PluginUIRegistryService,
   type PluginUIServiceSnapshot,
   type RenderSlotOptions,
+  type RouteLocation,
   type SlotComponent,
   type SlotKind,
   type SlotName,
@@ -627,6 +634,114 @@ export class ShellErrorBoundary extends Component<
   }
 }
 
+const ROOT_ROUTE_LOCATION: RouteLocation = parseRouteLocation("/")
+
+const STATIC_ROOT_LOCATION_SOURCE: ObservableSource<RouteLocation> = {
+  getSnapshot: () => ROOT_ROUTE_LOCATION,
+  subscribe: NOOP_SUBSCRIBE,
+}
+
+function isPluginRouterService(value: unknown): value is PluginRouterService {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "current" in value &&
+    isObservableSource(value.current) &&
+    "replace" in value &&
+    typeof value.replace === "function" &&
+    "push" in value &&
+    typeof value.push === "function"
+  )
+}
+
+function isPluginNavigationService(value: unknown): value is PluginNavigationService {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "state" in value &&
+    isObservableSource(value.state) &&
+    "resolve" in value &&
+    typeof value.resolve === "function" &&
+    "landing" in value &&
+    typeof value.landing === "function"
+  )
+}
+
+function isStartingPluginState(entry: unknown): boolean {
+  return (
+    typeof entry === "object" && entry !== null && "status" in entry && entry.status === "starting"
+  )
+}
+
+type PageStatusKind = "loading" | "unavailable" | "error"
+
+const PAGE_STATUS_MESSAGES: Readonly<
+  Record<
+    PluginLocale,
+    Readonly<Record<PageStatusKind, { readonly title: string; readonly description: string }>>
+  >
+> = {
+  zh: {
+    loading: {
+      title: "正在加载插件页面",
+      description: "正在准备插件与界面内容…",
+    },
+    unavailable: {
+      title: "插件页面不可用",
+      description: "对应插件尚未安装、已停用，或该页面不存在。",
+    },
+    error: {
+      title: "插件页面运行失败",
+      description: "该页面渲染时发生异常，请重试或返回其他页面。",
+    },
+  },
+  en: {
+    loading: {
+      title: "Loading plugin page",
+      description: "Preparing plugins and page content…",
+    },
+    unavailable: {
+      title: "Plugin page unavailable",
+      description: "The plugin is not installed, disabled, or this page does not exist.",
+    },
+    error: {
+      title: "Plugin page failed",
+      description: "An unexpected error occurred while rendering this page.",
+    },
+  },
+}
+
+function PageStatusView({
+  kind,
+  locale,
+  i18n,
+}: {
+  readonly kind: PageStatusKind
+  readonly locale: PluginLocale
+  readonly i18n?: PluginI18nRegistryService
+}): ReactNode {
+  const defaults = PAGE_STATUS_MESSAGES[locale === "en" ? "en" : "zh"][kind]
+  const titleKey = `host.page.${kind}.title`
+  const descKey = `host.page.${kind}.description`
+  const resolvedTitle = i18n ? i18n.translate("", titleKey, locale) : titleKey
+  const resolvedDesc = i18n ? i18n.translate("", descKey, locale) : descKey
+
+  return (
+    <div
+      data-slot="page-status"
+      data-page-status={kind}
+      className="flex min-h-64 flex-col items-center justify-center gap-2 p-6 text-center"
+    >
+      <h2 className="text-base font-semibold text-foreground">
+        {resolvedTitle !== titleKey ? resolvedTitle : defaults.title}
+      </h2>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        {resolvedDesc !== descKey ? resolvedDesc : defaults.description}
+      </p>
+    </div>
+  )
+}
+
 export interface OrahakoHostPreferencesLike {
   getActiveShell(): string | undefined
   setActiveShell(shellId: string | undefined): void
@@ -638,10 +753,15 @@ export interface OrahakoHostLike {
   readonly preferences?: OrahakoHostPreferencesLike
   readonly runtime?: {
     readonly state: ObservableSource<readonly unknown[]>
+    readonly context?: {
+      get(name: string): unknown
+    }
   }
   readonly ui?: PluginUIRegistryService
   readonly slots?: PluginSlotRegistryService
   readonly i18n?: PluginI18nRegistryService
+  readonly router?: PluginRouterService
+  readonly navigation?: PluginNavigationService
   readonly bootstrapError?: string
 }
 
@@ -661,15 +781,40 @@ export function OrahakoApp({
   activeTheme,
 }: OrahakoAppProps): ReactNode {
   const runtimeStates = useObservable(host.runtime?.state ?? STATIC_EMPTY_ARRAY_SOURCE)
-  void runtimeStates
 
   const slots = host.slots
   const ui = host.ui
   const i18n = host.i18n
 
+  const runtimeRouterCandidate = host.runtime?.context?.get("router")
+  const router =
+    host.router ??
+    (isPluginRouterService(runtimeRouterCandidate) ? runtimeRouterCandidate : undefined)
+
+  const runtimeNavigationCandidate = host.runtime?.context?.get("navigation")
+  const navigation =
+    host.navigation ??
+    (isPluginNavigationService(runtimeNavigationCandidate) ? runtimeNavigationCandidate : undefined)
+
   const slotsSnapshot = useObservable(slots ? slots.state : STATIC_EMPTY_SLOTS_SOURCE)
   const uiSnapshot = useObservable(ui ? ui.state : STATIC_EMPTY_UI_SOURCE)
+  const routeLocation = useObservable(router ? router.current : STATIC_ROOT_LOCATION_SOURCE)
+  const navRevision = useObservable(navigation ? navigation.state : STATIC_ZERO_SOURCE)
+  const locale = useObservable(i18n ? i18n.locale : STATIC_LOCALE_SOURCE)
+  const i18nRevisionSource = useMemo<ObservableSource<number>>(
+    () =>
+      i18n
+        ? {
+            getSnapshot: i18n.getSnapshot,
+            subscribe: i18n.subscribe,
+          }
+        : STATIC_ZERO_SOURCE,
+    [i18n]
+  )
+  const i18nRevision = useObservable(i18nRevisionSource)
   void slotsSnapshot
+  void navRevision
+  void i18nRevision
 
   const themeSource = isObservableSource<string | null | undefined>(activeTheme)
     ? activeTheme
@@ -697,6 +842,81 @@ export function OrahakoApp({
     controlledShell !== undefined
       ? controlledShell
       : (host.preferences?.getActiveShell() ?? memoryShell)
+
+  const defaultLanding = host.composition.defaults.landing ?? ""
+
+  const activePage = useMemo<PluginPageContribution | undefined>(() => {
+    if (children !== undefined) return undefined
+    void navRevision
+    const pages = uiSnapshot.pages
+    const lookupPage = (pluginId: string, pageId: string): PluginPageContribution | undefined =>
+      ui?.findPage(pluginId, pageId) ??
+      pages.find((candidate) => candidate.pluginId === pluginId && candidate.id === pageId)
+
+    if (routeLocation.route) {
+      if (navigation) {
+        const target = navigation.resolve(routeLocation.route)
+        return target ? lookupPage(target.pluginId, target.pageId) : undefined
+      }
+      return pages.find((candidate) => candidate.route === routeLocation.route)
+    }
+
+    if (routeLocation.pluginId) {
+      return lookupPage(routeLocation.pluginId, routeLocation.pageId ?? "index")
+    }
+
+    if (navigation) {
+      const target =
+        (defaultLanding ? navigation.resolve(defaultLanding) : undefined) ?? navigation.primary()
+      return target ? lookupPage(target.pluginId, target.pageId) : undefined
+    }
+
+    return undefined
+  }, [
+    children,
+    defaultLanding,
+    navRevision,
+    navigation,
+    routeLocation.pageId,
+    routeLocation.pluginId,
+    routeLocation.route,
+    ui,
+    uiSnapshot.pages,
+  ])
+
+  useEffect(() => {
+    if (children !== undefined || !router) return
+
+    if (routeLocation.route && activePage) {
+      const canonicalHref = pluginPageHref(activePage.pluginId, activePage.id, routeLocation.params)
+      const currentSnap = router.current.getSnapshot()
+      if (parseRouteLocation(router.href(canonicalHref)).href !== currentSnap.href) {
+        router.replace(canonicalHref)
+      }
+      return
+    }
+
+    if (!routeLocation.route && !routeLocation.pluginId && navigation) {
+      const currentSnap = router.current.getSnapshot()
+      if (currentSnap.route || currentSnap.pluginId) return
+      const landingHref = navigation.landing(defaultLanding)
+      if (!landingHref) return
+      const nextParsed = parseRouteLocation(router.href(landingHref))
+      if (nextParsed.href !== currentSnap.href) {
+        router.replace(landingHref)
+      }
+    }
+  }, [
+    activePage,
+    children,
+    defaultLanding,
+    navRevision,
+    navigation,
+    routeLocation.params,
+    routeLocation.pluginId,
+    routeLocation.route,
+    router,
+  ])
 
   const activeThemeEntry = useMemo(() => {
     const themes = uiSnapshot.themes
@@ -763,6 +983,30 @@ export function OrahakoApp({
       ? defaultShell
       : undefined
 
+  const isRuntimeLoading =
+    Boolean(host.runtime) &&
+    (runtimeStates.length === 0 || runtimeStates.some((entry) => isStartingPluginState(entry)))
+
+  const resolvedChildren: ReactNode =
+    children !== undefined ? (
+      children
+    ) : activePage ? (
+      <ContributionOutlet
+        key={`${activePage.pluginId}:${activePage.id}`}
+        entry={activePage}
+        owner={{}}
+        slots={slots}
+        i18n={i18n}
+        errorFallback={<PageStatusView kind="error" locale={locale} i18n={i18n} />}
+      />
+    ) : (
+      <PageStatusView
+        kind={isRuntimeLoading ? "loading" : "unavailable"}
+        locale={locale}
+        i18n={i18n}
+      />
+    )
+
   return (
     <Fragment>
       {themeElement}
@@ -780,7 +1024,7 @@ export function OrahakoApp({
           }
         }}
       >
-        {children}
+        {resolvedChildren}
       </ShellErrorBoundary>
     </Fragment>
   )
