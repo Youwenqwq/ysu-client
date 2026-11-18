@@ -1,0 +1,658 @@
+import { act } from "react"
+import { createRoot } from "react-dom/client"
+import { renderToStaticMarkup } from "react-dom/server"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import {
+  notificationRegistryRuntimePlugin,
+  providerRegistryRuntimePlugin,
+  providerRuntimePlugin,
+  queryRuntimePlugin,
+  sessionRuntimePlugin,
+} from "@orahako/academic-runtime"
+import {
+  defineSchoolProvider,
+  ProviderError,
+  ProviderErrorCode,
+  type AuthStatus,
+  type SchoolProvider,
+} from "@orahako/academic-sdk"
+import { PluginRuntime } from "@orahako/kernel"
+import { StatelessHttpService } from "@orahako/runtime-http"
+import { i18nRegistryPlugin } from "@orahako/runtime-i18n"
+import { navigationRuntimePlugin, routerRuntimePlugin } from "@orahako/runtime-router"
+import {
+  ContributionOutlet,
+  slotRegistryPlugin,
+  type PluginSlotRegistry,
+} from "@orahako/runtime-slots"
+import { NamespacedStorageService } from "@orahako/runtime-storage"
+import { uiRegistryPlugin } from "@orahako/runtime-ui"
+import {
+  definePlugin,
+  PLUGIN_API_VERSION,
+  type PluginI18nRegistryService,
+  type PluginKeyValueStorage,
+  type PluginRouterService,
+} from "@orahako/sdk"
+import { TooltipProvider } from "@orahako/ui-primitives"
+import {
+  AUTH_UI_PLUGIN_ID,
+  authUiPlugin,
+  createLoginRateLimiter,
+  formatRateLimitMessage,
+  formatRetryDuration,
+  RATE_LIMIT_INTERVAL_MS,
+  RATE_LIMIT_WINDOW_MS,
+  rememberedCredentialsStore,
+} from "../src"
+
+const capacitorFlag = vi.hoisted(() => ({ native: false }))
+
+vi.mock("@capacitor/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@capacitor/core")>()
+  return {
+    ...actual,
+    Capacitor: {
+      ...actual.Capacitor,
+      isNativePlatform: () => capacitorFlag.native,
+    },
+  }
+})
+
+class MiniDomNode {
+  readonly nodeType: number
+  readonly nodeName: string
+  readonly tagName?: string
+  readonly namespaceURI = "http://www.w3.org/1999/xhtml"
+  readonly childNodes: MiniDomNode[] = []
+  parentNode: MiniDomNode | null = null
+  ownerDocument: MiniDomNode | null = null
+  defaultView: unknown = undefined
+  activeElement: unknown = null
+  nodeValue?: string
+  readonly style: Record<string, string> = {}
+  readonly attributes = new Map<string, string>()
+  private rawText = ""
+
+  constructor(nodeType: number, nodeName: string) {
+    this.nodeType = nodeType
+    this.nodeName = nodeName
+    if (nodeType === 1) this.tagName = nodeName
+  }
+
+  get firstChild(): MiniDomNode | null {
+    return this.childNodes[0] ?? null
+  }
+
+  get nextSibling(): MiniDomNode | null {
+    if (!this.parentNode) return null
+    const index = this.parentNode.childNodes.indexOf(this)
+    return index >= 0 ? (this.parentNode.childNodes[index + 1] ?? null) : null
+  }
+
+  appendChild(child: MiniDomNode): MiniDomNode {
+    if (child.parentNode) child.parentNode.removeChild(child)
+    child.parentNode = this
+    this.childNodes.push(child)
+    return child
+  }
+
+  insertBefore(child: MiniDomNode, before: MiniDomNode | null): MiniDomNode {
+    if (!before) return this.appendChild(child)
+    if (child.parentNode) child.parentNode.removeChild(child)
+    const index = this.childNodes.indexOf(before)
+    child.parentNode = this
+    if (index >= 0) this.childNodes.splice(index, 0, child)
+    else this.childNodes.push(child)
+    return child
+  }
+
+  removeChild(child: MiniDomNode): MiniDomNode {
+    const index = this.childNodes.indexOf(child)
+    if (index >= 0) {
+      this.childNodes.splice(index, 1)
+      child.parentNode = null
+    }
+    return child
+  }
+
+  setAttribute(name: string, value: string): void {
+    this.attributes.set(name, String(value))
+  }
+
+  removeAttribute(name: string): void {
+    this.attributes.delete(name)
+  }
+
+  addEventListener(): void {}
+  removeEventListener(): void {}
+
+  set textContent(value: string) {
+    this.childNodes.length = 0
+    this.rawText = String(value)
+  }
+
+  get textContent(): string {
+    if (this.nodeType === 3) return this.nodeValue ?? ""
+    if (this.nodeType === 8) return ""
+    if (this.childNodes.length === 0) return this.rawText
+    return this.childNodes.map((child) => child.textContent).join("")
+  }
+}
+
+function mountMiniDom() {
+  const prevWindow = globalThis.window
+  const prevDocument = globalThis.document
+  const prevAct = (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT
+
+  const fakeWin = {
+    event: undefined,
+    HTMLIFrameElement: class {},
+    setTimeout: globalThis.setTimeout.bind(globalThis),
+    clearTimeout: globalThis.clearTimeout.bind(globalThis),
+    location: { pathname: "/", search: "", reload: vi.fn() },
+    matchMedia: () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }),
+  }
+  const doc = new MiniDomNode(9, "#document")
+  doc.defaultView = fakeWin
+  const docWithFactories = Object.assign(doc, {
+    createElement(tag: string) {
+      const el = new MiniDomNode(1, tag.toUpperCase())
+      el.ownerDocument = docWithFactories
+      return el
+    },
+    createElementNS(_ns: string, tag: string) {
+      return docWithFactories.createElement(tag)
+    },
+    createTextNode(text: string) {
+      const node = new MiniDomNode(3, "#text")
+      node.nodeValue = String(text)
+      node.ownerDocument = docWithFactories
+      return node
+    },
+    createComment(text: string) {
+      const node = new MiniDomNode(8, "#comment")
+      node.nodeValue = String(text)
+      node.ownerDocument = docWithFactories
+      return node
+    },
+  })
+
+  ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
+  ;(globalThis as Record<string, unknown>).window = fakeWin
+  ;(globalThis as Record<string, unknown>).document = docWithFactories
+
+  const container = docWithFactories.createElement("div")
+  const root = createRoot(container as never)
+
+  return {
+    container,
+    async render(node: React.ReactNode) {
+      await act(async () => {
+        root.render(node)
+      })
+    },
+    async unmount() {
+      await act(async () => {
+        root.unmount()
+      })
+      ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = prevAct
+      ;(globalThis as Record<string, unknown>).window = prevWindow
+      ;(globalThis as Record<string, unknown>).document = prevDocument
+    },
+  }
+}
+
+let activeUnmount: (() => Promise<void>) | undefined
+afterEach(async () => {
+  capacitorFlag.native = false
+  vi.useRealTimers()
+  if (activeUnmount) {
+    const fn = activeUnmount
+    activeUnmount = undefined
+    await fn()
+  }
+})
+
+function createMemoryStorage(): PluginKeyValueStorage & { readonly map: Map<string, string> } {
+  const map = new Map<string, string>()
+  return {
+    map,
+    getItem: async (key) => map.get(key) ?? null,
+    setItem: async (key, value) => {
+      map.set(key, value)
+    },
+    removeItem: async (key) => {
+      map.delete(key)
+    },
+  }
+}
+
+function setupAuthRuntime(options?: {
+  initialHref?: string
+  checkAuthStatus?: () => Promise<AuthStatus>
+  warmup?: () => Promise<void>
+  reloginResult?: boolean
+  canRemember?: boolean
+}) {
+  const localBackend = createMemoryStorage()
+  const secureBackend = createMemoryStorage()
+  const runtime = new PluginRuntime()
+  runtime.context.set(
+    "storage",
+    new NamespacedStorageService({
+      local: localBackend,
+      secure: secureBackend,
+    })
+  )
+  runtime.context.set("http", new StatelessHttpService())
+
+  const checkAuthStatus = options?.checkAuthStatus ?? (async () => ({ authenticated: true }))
+  const warmup = options?.warmup ?? vi.fn(async () => {})
+  const logoutSpy = vi.fn(async () => {})
+  const loginStep1Spy = vi.fn(async (input: { username: string; password: string }) => ({
+    authenticated: input.password === "good-pass",
+    needsMfa: input.password === "mfa-pass",
+    username: input.username,
+    credential: input.password === "good-pass" ? "issued-ticket" : undefined,
+  }))
+
+  const mockSchoolProvider: SchoolProvider = defineSchoolProvider({
+    id: "demo",
+    name: "示例大学",
+    warmup,
+    async initialize() {},
+    async reset() {},
+    async logout() {
+      await logoutSpy()
+      runtime.context.get("session")?.clearCredential("demo")
+    },
+    async relogin() {
+      return options?.reloginResult ?? true
+    },
+    slices: {
+      auth: {
+        async prepareLogin() {},
+        async resetLoginSession() {},
+        async login() {},
+        loginStep1: loginStep1Spy,
+        checkAuthStatus,
+        isAuthenticated: () =>
+          Boolean(runtime.context.get("session")?.getSnapshot().isAuthenticated),
+        getCaptchaUrl: () => "data:image/png;base64,AAAA",
+        checkCaptchaNeeded: async (u) => u === "need-captcha",
+        submitMfaCode: async () => "mfa-ticket",
+      },
+      studentProfile: {
+        getStudentInfo: async () => ({
+          name: "李青橙",
+          studentId: "20260001",
+          department: "信息科学与工程学院",
+          major: "计算机科学与技术",
+        }),
+      },
+    },
+  })
+
+  const schoolPlugin = definePlugin({
+    manifest: {
+      id: "demo.provider",
+      name: "Demo Provider",
+      version: "1.0.0",
+      apiVersion: PLUGIN_API_VERSION,
+      kind: "provider",
+      entry: "index.js",
+      inject: ["providers"],
+    },
+    inject: ["providers"] as const,
+    apply(ctx) {
+      ctx.providers.registerProvider("demo", () => mockSchoolProvider)
+    },
+  })
+
+  const pagesPlugin = definePlugin({
+    manifest: {
+      id: "demo.pages",
+      name: "Demo Pages",
+      version: "1.0.0",
+      apiVersion: PLUGIN_API_VERSION,
+      kind: "feature",
+      providerIndependent: true,
+      entry: "index.js",
+      inject: ["ui"],
+    },
+    inject: ["ui"] as const,
+    apply(ctx) {
+      ctx.ui.registerPage(
+        { id: "overview", route: "overview", requiresProvider: true, primary: true },
+        () => <div>OverviewContent</div>
+      )
+      ctx.ui.registerPage({ id: "settings", route: "settings", requiresProvider: false }, () => (
+        <div>SettingsContent</div>
+      ))
+      ctx.ui.registerPage(
+        { id: "student-info", route: "student-info", requiresProvider: true },
+        () => <div>StudentInfoPage</div>
+      )
+    },
+  })
+
+  const plugins = [
+    slotRegistryPlugin,
+    uiRegistryPlugin,
+    i18nRegistryPlugin,
+    routerRuntimePlugin,
+    navigationRuntimePlugin,
+    providerRegistryRuntimePlugin,
+    sessionRuntimePlugin,
+    providerRuntimePlugin,
+    queryRuntimePlugin,
+    notificationRegistryRuntimePlugin,
+    schoolPlugin,
+    pagesPlugin,
+  ]
+
+  for (const p of plugins) {
+    if (p.manifest.id === routerRuntimePlugin.manifest.id) {
+      runtime.register(p, "builtin", { initialHref: options?.initialHref ?? "/?route=overview" })
+    } else if (
+      p.manifest.id === sessionRuntimePlugin.manifest.id ||
+      p.manifest.id === providerRuntimePlugin.manifest.id
+    ) {
+      runtime.register(p, "builtin", { defaultSchoolId: "demo" })
+    } else {
+      runtime.register(p, "builtin")
+    }
+    runtime.start(p.manifest.id)
+  }
+
+  runtime.register(authUiPlugin, "builtin", {
+    capacitorRetryDelayMs: 5,
+    canRemember: options?.canRemember ?? true,
+    schools: [
+      { id: "demo", name: "示例大学", nameEn: "Demo University" },
+      { id: "other", name: "第二大学", nameEn: "Second University" },
+    ],
+  })
+  runtime.start(AUTH_UI_PLUGIN_ID)
+
+  return {
+    runtime,
+    localBackend,
+    secureBackend,
+    warmup,
+    logoutSpy,
+    loginStep1Spy,
+    mockSchoolProvider,
+  }
+}
+
+describe("@orahako/plugin-ui-auth stores & rate limiter", () => {
+  it("enforces 60s interval and 3-per-15m window limits in scoped local storage", async () => {
+    const local = createMemoryStorage()
+    const secure = createMemoryStorage()
+    const limiter = createLoginRateLimiter({ local, secure })
+
+    const base = 1_700_000_000_000
+    expect(limiter.checkRateLimit(base)).toEqual({
+      allowed: true,
+      retryAfterMs: 0,
+      reason: null,
+    })
+
+    limiter.recordLoginAttempt(base)
+    const intervalBlocked = limiter.checkRateLimit(base + 15_000)
+    expect(intervalBlocked).toEqual({
+      allowed: false,
+      retryAfterMs: RATE_LIMIT_INTERVAL_MS - 15_000,
+      reason: "interval",
+    })
+    expect(
+      formatRateLimitMessage(
+        intervalBlocked,
+        (key, params) => `${key}:${JSON.stringify(params)}`,
+        "win",
+        "int"
+      )
+    ).toBe('int:{"seconds":45}')
+
+    // Second and third attempts spaced > 1 min apart -> hits 3-per-15m window limit
+    limiter.recordLoginAttempt(base + 70_000)
+    limiter.recordLoginAttempt(base + 140_000)
+
+    const windowBlocked = limiter.checkRateLimit(base + 200_000)
+    expect(windowBlocked).toEqual({
+      allowed: false,
+      retryAfterMs: RATE_LIMIT_WINDOW_MS - 200_000,
+      reason: "window",
+    })
+    expect(formatRetryDuration(windowBlocked.retryAfterMs)).toEqual({
+      minutes: 11,
+      seconds: 40,
+    })
+
+    // After 15 minutes from first attempt, window re-opens
+    expect(limiter.checkRateLimit(base + RATE_LIMIT_WINDOW_MS + 1)).toEqual({
+      allowed: true,
+      retryAfterMs: 0,
+      reason: null,
+    })
+
+    await vi.waitFor(async () => {
+      expect(await local.getItem("login-rate-limit")).not.toBeNull()
+    })
+    limiter.dispose()
+  })
+
+  it("persists remembered credentials per school in scoped secure storage", async () => {
+    const local = createMemoryStorage()
+    const secure = createMemoryStorage()
+    const store = rememberedCredentialsStore.create({ local, secure })
+
+    store.actions.save("demo", { username: "20260001", password: "secret" })
+    expect(store.source.getSnapshot().bySchool.demo).toEqual({
+      username: "20260001",
+      password: "secret",
+    })
+
+    await vi.waitFor(async () => {
+      const raw = await secure.getItem("remembered-credentials")
+      expect(raw).toContain("20260001")
+    })
+    expect(await local.getItem("remembered-credentials")).toBeNull()
+
+    store.actions.remove("demo")
+    expect(store.source.getSnapshot().bySchool.demo).toBeUndefined()
+    store.dispose()
+  })
+})
+
+describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributions", () => {
+  it("redirects unauthenticated users away from provider-requiring pages to login, while allowing requiresProvider: false pages", async () => {
+    const env1 = setupAuthRuntime({ initialHref: "/?route=overview" })
+    const router1 = env1.runtime.context.get("router") as PluginRouterService
+
+    await vi.waitFor(() => {
+      expect(router1.current.getSnapshot().route).toBe("login")
+    })
+    env1.runtime.dispose()
+
+    const env2 = setupAuthRuntime({ initialHref: "/?route=settings" })
+    const router2 = env2.runtime.context.get("router") as PluginRouterService
+    await vi.waitFor(() => {
+      expect(env2.runtime.context.get("session")?.getSnapshot().hasHydrated).toBe(true)
+    })
+    expect(router2.current.getSnapshot().route).toBe("settings")
+    env2.runtime.dispose()
+  })
+
+  it("invalidates query and calls warmup when checkAuthStatus succeeds on provider/ready", async () => {
+    const warmup = vi.fn(async () => {})
+    const checkAuthStatus = vi.fn(async () => ({ authenticated: true }))
+    const env = setupAuthRuntime({ checkAuthStatus, warmup })
+
+    const session = env.runtime.context.get("session")!
+    const onInvalidate = vi.fn()
+    env.runtime.context.on("query/invalidate", onInvalidate)
+
+    await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
+    session.setCredential({
+      schoolId: "demo",
+      credential: "valid-tgc",
+      username: "20260001",
+    })
+
+    await vi.waitFor(() => {
+      expect(checkAuthStatus).toHaveBeenCalledTimes(1)
+      expect(warmup).toHaveBeenCalledTimes(1)
+    })
+    expect(onInvalidate).toHaveBeenCalled()
+    expect(session.getSnapshot().isAuthenticated).toBe(true)
+    expect(session.getSnapshot().sessionExpired).toBe(false)
+    env.runtime.dispose()
+  })
+
+  it("retries checkAuthStatus on Capacitor and marks sessionExpired WITHOUT logging out or redirecting when expired", async () => {
+    capacitorFlag.native = true
+    const checkAuthStatus = vi.fn(async () => ({ authenticated: false }))
+    const env = setupAuthRuntime({ initialHref: "/?route=settings", checkAuthStatus })
+
+    const session = env.runtime.context.get("session")!
+    const router = env.runtime.context.get("router") as PluginRouterService
+    await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
+
+    session.setCredential({
+      schoolId: "demo",
+      credential: "stale-tgc",
+      username: "20260001",
+    })
+    router.replace({ route: "overview" })
+
+    await vi.waitFor(() => {
+      expect(checkAuthStatus).toHaveBeenCalledTimes(2)
+      expect(session.getSnapshot().sessionExpired).toBe(true)
+    })
+
+    // CRITICAL: isAuthenticated stays true, logout is NOT called, route stays on overview!
+    expect(session.getSnapshot().isAuthenticated).toBe(true)
+    expect(env.logoutSpy).not.toHaveBeenCalled()
+    expect(router.current.getSnapshot().route).toBe("overview")
+
+    env.runtime.dispose()
+  })
+
+  it("marks sessionExpired on AUTH_SESSION_EXPIRED error from checkAuthStatus while ignoring transient network errors", async () => {
+    const envExpired = setupAuthRuntime({
+      initialHref: "/?route=settings",
+      checkAuthStatus: async () => {
+        throw new ProviderError(
+          ProviderErrorCode.AUTH_SESSION_EXPIRED,
+          "CAS expired",
+          undefined,
+          401
+        )
+      },
+    })
+    const session1 = envExpired.runtime.context.get("session")!
+    await vi.waitFor(() => expect(session1.getSnapshot().hasHydrated).toBe(true))
+    session1.setCredential({ schoolId: "demo", credential: "tgc-1", username: "20260001" })
+
+    await vi.waitFor(() => {
+      expect(session1.getSnapshot().sessionExpired).toBe(true)
+    })
+    expect(session1.getSnapshot().isAuthenticated).toBe(true)
+    expect(envExpired.logoutSpy).not.toHaveBeenCalled()
+    envExpired.runtime.dispose()
+
+    const checkNetworkErr = vi.fn(async (): Promise<AuthStatus> => {
+      throw new ProviderError(ProviderErrorCode.NETWORK_ERROR, "offline")
+    })
+    const envOffline = setupAuthRuntime({
+      initialHref: "/?route=settings",
+      checkAuthStatus: checkNetworkErr,
+    })
+    const session2 = envOffline.runtime.context.get("session")!
+    await vi.waitFor(() => expect(session2.getSnapshot().hasHydrated).toBe(true))
+    session2.setCredential({ schoolId: "demo", credential: "tgc-2", username: "20260001" })
+
+    await vi.waitFor(() => {
+      expect(checkNetworkErr).toHaveBeenCalledTimes(1)
+    })
+    expect(session2.getSnapshot().isAuthenticated).toBe(true)
+    expect(session2.getSnapshot().sessionExpired).toBe(false)
+    envOffline.runtime.dispose()
+  })
+
+  it("renders shell.banner, shell.activity, profile.header, accountActions, and login page as pure derived-props components", async () => {
+    const dom = mountMiniDom()
+    activeUnmount = dom.unmount
+
+    const env = setupAuthRuntime({ initialHref: "/?route=settings" })
+    const slots = env.runtime.context.get("slots") as PluginSlotRegistry
+    const ui = env.runtime.context.get("ui")!
+    const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
+    const session = env.runtime.context.get("session")!
+
+    slots.declare({ name: "shell.banner", kind: "list" })
+    slots.declare({ name: "shell.activity", kind: "list" })
+    slots.declare({ name: "profile.header", kind: "single" })
+    slots.declare({ name: "profile.accountActions", kind: "list" })
+    slots.declare({ name: "settings.account", kind: "list" })
+
+    await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
+
+    // Login page renders cleanly
+    const loginPage = ui
+      .getSnapshot()
+      .pages.find((p) => p.pluginId === AUTH_UI_PLUGIN_ID && p.id === "login")!
+    expect(loginPage.requiresProvider).toBe(false)
+    const loginHtml = renderToStaticMarkup(
+      <ContributionOutlet entry={loginPage} slots={slots} i18n={i18n} />
+    )
+    expect(loginHtml).toContain("酸橙盒")
+    expect(loginHtml).toContain("记住密码")
+
+    // Authenticate and mark sessionExpired -> banner & student profile render reactively
+    session.setCredential({
+      schoolId: "demo",
+      credential: "valid-tgc",
+      username: "20260001",
+    })
+    await vi.waitFor(() => {
+      expect(env.runtime.context.get("provider")?.getSnapshot().status).toBe("ready")
+    })
+    session.setSessionExpired(true)
+
+    const bannerEntry = slots.select("shell.banner")[0]!
+    const headerEntry = slots.select("profile.header")[0]!
+    const actionsEntry = slots.select("profile.accountActions")[0]!
+    const settingsAccountEntry = slots.select("settings.account")[0]!
+
+    await dom.render(
+      <TooltipProvider>
+        <div>
+          <ContributionOutlet entry={bannerEntry} slots={slots} i18n={i18n} />
+          <ContributionOutlet entry={headerEntry} slots={slots} i18n={i18n} />
+          <ContributionOutlet entry={actionsEntry} slots={slots} i18n={i18n} />
+          <ContributionOutlet entry={settingsAccountEntry} slots={slots} i18n={i18n} />
+        </div>
+      </TooltipProvider>
+    )
+
+    await vi.waitFor(() => {
+      expect(dom.container.textContent).toContain("登录已过期，请重新登录")
+      expect(dom.container.textContent).toContain("李青橙")
+      expect(dom.container.textContent).toContain("20260001")
+      expect(dom.container.textContent).toContain("切换学校")
+      expect(dom.container.textContent).toContain("退出登录")
+    })
+
+    activeUnmount = undefined
+    await dom.unmount()
+    env.runtime.dispose()
+  })
+})

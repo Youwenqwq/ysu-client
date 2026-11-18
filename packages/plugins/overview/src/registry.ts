@@ -1,0 +1,386 @@
+import type { Context } from "@cordisjs/core"
+import type {
+  OverviewService,
+  OverviewWidgetContribution,
+  OverviewWidgetSpec,
+} from "@orahako/academic-sdk"
+import {
+  createObservableSource,
+  isScopedPluginService,
+  PLUGIN_SERVICE_SCOPE,
+  resolveDictionaryMessage,
+  trackPluginRegistration,
+  type ChildrenSpec,
+  type DefinedDictionary,
+  type DerivedComponentProps,
+  type DictionaryMessages,
+  type ObservableSource,
+  type PluginI18nRegistryService,
+  type PluginLocale,
+  type PluginManifest,
+  type PluginSlotService,
+  type PluginStorageService,
+  type ScopedPluginService,
+  type SlotComponent,
+  type StoreDefinition,
+  type StoreInstance,
+} from "@orahako/sdk"
+import "./slots"
+
+const DEFAULT_WIDGET_ORDER = 100
+
+function isPluginStorageService(value: unknown): value is PluginStorageService {
+  return typeof value === "object" && value !== null && "local" in value && "secure" in value
+}
+
+function resolveRegistrantStorage(
+  ctx: Context,
+  manifest: PluginManifest
+): PluginStorageService | undefined {
+  const raw: unknown = ctx.get("storage")
+  if (!raw) return undefined
+  if (isScopedPluginService(raw)) {
+    const scoped = raw[PLUGIN_SERVICE_SCOPE](ctx, manifest)
+    return isPluginStorageService(scoped) ? scoped : undefined
+  }
+  return isPluginStorageService(raw) ? raw : undefined
+}
+
+function isPluginSlotService(value: unknown): value is PluginSlotService {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "register" in value &&
+    typeof value.register === "function" &&
+    "inject" in value &&
+    typeof value.inject === "function"
+  )
+}
+
+function resolveRegistrantSlots(
+  ctx: Context,
+  manifest: PluginManifest
+): PluginSlotService | undefined {
+  const raw: unknown = ctx.get("slots") ?? ctx.root.get("slots")
+  if (!raw) return undefined
+  if (isScopedPluginService(raw)) {
+    const scoped = raw[PLUGIN_SERVICE_SCOPE](ctx, manifest)
+    return isPluginSlotService(scoped) ? scoped : undefined
+  }
+  return isPluginSlotService(raw) ? raw : undefined
+}
+
+function isStoreDefinition(
+  value: unknown
+): value is StoreDefinition<unknown, Record<string, never>> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "create" in value &&
+    typeof value.create === "function"
+  )
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isDefinedDictionary(value: unknown): value is DefinedDictionary {
+  return isPlainRecord(value) && isPlainRecord(value.zh) && isPlainRecord(value.en)
+}
+
+function isDictionaryMessages(value: unknown): value is DictionaryMessages {
+  return isPlainRecord(value)
+}
+
+export function resolveOverviewWidgetText(
+  widget: OverviewWidgetContribution,
+  kind: "title" | "description",
+  locale: PluginLocale,
+  i18nRegistry?: PluginI18nRegistryService
+): string {
+  const key = kind === "title" ? widget.titleKey : widget.descriptionKey
+  const literal = kind === "title" ? widget.title : widget.description
+
+  if (key) {
+    if (isDefinedDictionary(widget.dictionary)) {
+      const primary = locale === "en" ? widget.dictionary.en : widget.dictionary.zh
+      const fallback = locale === "en" ? widget.dictionary.zh : widget.dictionary.en
+      const resolved =
+        resolveDictionaryMessage(primary, key) ?? resolveDictionaryMessage(fallback, key)
+      if (resolved !== undefined) return resolved
+    } else if (isDictionaryMessages(widget.dictionary)) {
+      const resolved = resolveDictionaryMessage(widget.dictionary, key)
+      if (resolved !== undefined) return resolved
+    }
+    if (i18nRegistry) {
+      const translated = i18nRegistry.translate(widget.pluginId, key, locale)
+      if (translated !== key) return translated
+    }
+  }
+
+  return literal ?? key ?? widget.id
+}
+
+export function overviewWidgetSlotKey(pluginId: string, widgetId: string): string {
+  return `${pluginId}:${widgetId}`
+}
+
+export class OverviewRegistry implements OverviewService, ScopedPluginService<OverviewService> {
+  readonly state: ObservableSource<readonly OverviewWidgetContribution[]>
+  private readonly stateSource = createObservableSource<readonly OverviewWidgetContribution[]>([])
+  private readonly widgets = new Map<string, OverviewWidgetContribution>()
+
+  constructor() {
+    this.state = {
+      getSnapshot: this.stateSource.getSnapshot,
+      subscribe: this.stateSource.subscribe,
+    }
+  }
+
+  [PLUGIN_SERVICE_SCOPE](ctx: Context, manifest: PluginManifest): OverviewService {
+    return this.createScopedFacade(ctx, manifest)
+  }
+
+  createScopedFacade(
+    ctx: Pick<Context, "effect"> & Partial<Pick<Context, "get" | "root" | "on">>,
+    manifest: PluginManifest,
+    explicitSlots?: PluginSlotService,
+    explicitStorage?: PluginStorageService
+  ): OverviewService {
+    const registerScoped = <
+      Dict = undefined,
+      const Children extends ChildrenSpec | undefined = undefined,
+      Store = undefined,
+      I = undefined,
+    >(
+      spec: OverviewWidgetSpec<Dict, Children, Store, I> & {
+        readonly component?: SlotComponent<
+          NoInfer<DerivedComponentProps<Record<string, never>, Dict, Children, Store, I>>
+        >
+      },
+      maybeComponent?: SlotComponent<
+        NoInfer<DerivedComponentProps<Record<string, never>, Dict, Children, Store, I>>
+      >
+    ): (() => void) =>
+      trackPluginRegistration(ctx, () =>
+        this.registerInternal(manifest, ctx, spec, maybeComponent, explicitSlots, explicitStorage)
+      )
+
+    return {
+      state: this.state,
+      getSnapshot: this.getSnapshot,
+      subscribe: this.subscribe,
+      registerWidget: registerScoped as OverviewService["registerWidget"],
+    }
+  }
+
+  getSnapshot = (): readonly OverviewWidgetContribution[] => {
+    return this.stateSource.getSnapshot()
+  }
+
+  subscribe = (listener: () => void): (() => void) => {
+    return this.stateSource.subscribe(listener)
+  }
+
+  registerWidget<
+    Dict = undefined,
+    const Children extends ChildrenSpec | undefined = undefined,
+    Store = undefined,
+    I = undefined,
+  >(
+    spec: OverviewWidgetSpec<Dict, Children, Store, I>,
+    Component: SlotComponent<
+      NoInfer<DerivedComponentProps<Record<string, never>, Dict, Children, Store, I>>
+    >
+  ): () => void
+  registerWidget<
+    Dict = undefined,
+    const Children extends ChildrenSpec | undefined = undefined,
+    Store = undefined,
+    I = undefined,
+  >(
+    spec: OverviewWidgetSpec<Dict, Children, Store, I> & {
+      readonly component: SlotComponent<
+        NoInfer<DerivedComponentProps<Record<string, never>, Dict, Children, Store, I>>
+      >
+    }
+  ): () => void
+  registerWidget<
+    Dict = undefined,
+    const Children extends ChildrenSpec | undefined = undefined,
+    Store = undefined,
+    I = undefined,
+  >(
+    spec: OverviewWidgetSpec<Dict, Children, Store, I> & {
+      readonly component?: SlotComponent<
+        NoInfer<DerivedComponentProps<Record<string, never>, Dict, Children, Store, I>>
+      >
+    },
+    maybeComponent?: SlotComponent<
+      NoInfer<DerivedComponentProps<Record<string, never>, Dict, Children, Store, I>>
+    >
+  ): () => void {
+    return this.registerInternal(undefined, undefined, spec, maybeComponent)
+  }
+
+  private registerInternal<
+    Dict = undefined,
+    Children extends ChildrenSpec | undefined = undefined,
+    Store = undefined,
+    I = undefined,
+  >(
+    manifest: PluginManifest | undefined,
+    registrantCtx:
+      | (Pick<Context, "effect"> & Partial<Pick<Context, "get" | "root" | "on">>)
+      | undefined,
+    spec: OverviewWidgetSpec<Dict, Children, Store, I> & {
+      readonly component?: SlotComponent<
+        NoInfer<DerivedComponentProps<Record<string, never>, Dict, Children, Store, I>>
+      >
+    },
+    maybeComponent?: SlotComponent<
+      NoInfer<DerivedComponentProps<Record<string, never>, Dict, Children, Store, I>>
+    >,
+    explicitSlots?: PluginSlotService,
+    explicitStorage?: PluginStorageService
+  ): () => void {
+    if (!spec.id) {
+      throw new Error("Overview widget id must not be empty")
+    }
+    const resolvedComponent = maybeComponent ?? spec.component
+    if (typeof resolvedComponent !== "function") {
+      throw new Error(`Overview widget requires a component: ${spec.id}`)
+    }
+
+    const pluginId = manifest?.id ?? "root"
+    const slotKey = overviewWidgetSlotKey(pluginId, spec.id)
+    if (this.widgets.has(slotKey)) {
+      throw new Error(`Overview widget already registered: ${slotKey}`)
+    }
+
+    const fullRegistrantCtx: Context | undefined =
+      registrantCtx && "get" in registrantCtx && "root" in registrantCtx
+        ? (registrantCtx as Context)
+        : undefined
+
+    let ownedStore: StoreInstance<unknown, Record<string, never>> | undefined
+    let resolvedStore: unknown = spec.store
+    if (isStoreDefinition(spec.store)) {
+      const storage =
+        explicitStorage ??
+        (fullRegistrantCtx && manifest
+          ? resolveRegistrantStorage(fullRegistrantCtx, manifest)
+          : undefined)
+      ownedStore = spec.store.create(storage)
+      resolvedStore = ownedStore
+    }
+
+    const boundInject: ((ctx: Context) => unknown) | undefined = spec.inject
+      ? (fallbackCtx: Context) => spec.inject!(fullRegistrantCtx ?? fallbackCtx)
+      : undefined
+
+    const contribution: OverviewWidgetContribution = {
+      id: spec.id,
+      pluginId,
+      ...(spec.title !== undefined ? { title: spec.title } : {}),
+      ...(spec.titleKey !== undefined ? { titleKey: spec.titleKey } : {}),
+      ...(spec.description !== undefined ? { description: spec.description } : {}),
+      ...(spec.descriptionKey !== undefined ? { descriptionKey: spec.descriptionKey } : {}),
+      icon: spec.icon,
+      region: spec.region,
+      defaultVisible: spec.defaultVisible,
+      ...(spec.order !== undefined ? { order: spec.order } : {}),
+      ...(spec.slice !== undefined ? { slice: spec.slice } : {}),
+      ...(spec.capability !== undefined ? { capability: spec.capability } : {}),
+      ...(spec.dictionary !== undefined ? { dictionary: spec.dictionary } : {}),
+      ...(spec.children !== undefined ? { children: spec.children } : {}),
+      ...(resolvedStore !== undefined ? { store: resolvedStore } : {}),
+      ...(boundInject !== undefined ? { inject: boundInject } : {}),
+      component: resolvedComponent as SlotComponent<never>,
+    }
+
+    let disposeSlotInject: (() => void) | undefined
+    let stopLateSlotsWatcher: (() => void) | undefined
+
+    const attachToSlotService = (slots: PluginSlotService): void => {
+      const slotComponent: SlotComponent<
+        DerivedComponentProps<
+          Record<string, never>,
+          unknown,
+          ChildrenSpec | undefined,
+          unknown,
+          unknown
+        >
+      > = (props) => contribution.component(props as never)
+      disposeSlotInject = slots.inject("overview.widget", () =>
+        slots.register<"overview.widget", unknown, ChildrenSpec | undefined, unknown, unknown>(
+          {
+            id: `overview-widget-${spec.id}`,
+            slot: "overview.widget",
+            key: slotKey,
+            ...(spec.order !== undefined ? { order: spec.order } : {}),
+            ...(spec.dictionary !== undefined ? { dictionary: spec.dictionary } : {}),
+            ...(spec.children !== undefined ? { children: spec.children } : {}),
+            ...(resolvedStore !== undefined ? { store: resolvedStore } : {}),
+            ...(boundInject !== undefined ? { inject: boundInject } : {}),
+          },
+          slotComponent
+        )
+      )
+    }
+
+    if (explicitSlots) {
+      try {
+        attachToSlotService(explicitSlots)
+      } catch (error) {
+        ownedStore?.dispose()
+        throw error
+      }
+    } else if (fullRegistrantCtx && manifest) {
+      const immediateSlots = resolveRegistrantSlots(fullRegistrantCtx, manifest)
+      if (immediateSlots) {
+        try {
+          attachToSlotService(immediateSlots)
+        } catch (error) {
+          ownedStore?.dispose()
+          throw error
+        }
+      } else {
+        stopLateSlotsWatcher = fullRegistrantCtx.on("internal/service", (serviceName: string) => {
+          if (serviceName !== "slots" || disposeSlotInject) return
+          const lateSlots = resolveRegistrantSlots(fullRegistrantCtx, manifest)
+          if (lateSlots) {
+            attachToSlotService(lateSlots)
+          }
+        })
+      }
+    }
+
+    this.widgets.set(slotKey, contribution)
+    this.publish()
+
+    let disposed = false
+    return () => {
+      if (disposed) return
+      disposed = true
+      stopLateSlotsWatcher?.()
+      stopLateSlotsWatcher = undefined
+      disposeSlotInject?.()
+      disposeSlotInject = undefined
+      if (this.widgets.get(slotKey) === contribution) {
+        this.widgets.delete(slotKey)
+        this.publish()
+      }
+      ownedStore?.dispose()
+      ownedStore = undefined
+    }
+  }
+
+  private publish(): void {
+    const sorted = Array.from(this.widgets.values()).sort(
+      (a, b) => (a.order ?? DEFAULT_WIDGET_ORDER) - (b.order ?? DEFAULT_WIDGET_ORDER)
+    )
+    this.stateSource.set(sorted)
+  }
+}
