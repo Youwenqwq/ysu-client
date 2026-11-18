@@ -73,6 +73,54 @@
       "@orahako/academic-runtime": [
         "./packages/edu/runtime/src/index.ts"
       ],
+      "@orahako/theme-default": [
+        "./packages/client/theme-default/src/index.ts"
+      ],
+      "@orahako/ui-activation": [
+        "./packages/client/ui-activation/src/index.ts"
+      ],
+      "@orahako/ui-analytics": [
+        "./packages/client/ui-analytics/src/index.ts"
+      ],
+      "@orahako/ui-announcement": [
+        "./packages/client/ui-announcement/src/index.ts"
+      ],
+      "@orahako/ui-mfa": [
+        "./packages/client/ui-mfa/src/index.ts"
+      ],
+      "@orahako/ui-network-activity": [
+        "./packages/client/ui-network-activity/src/index.ts"
+      ],
+      "@orahako/ui-plugin-manager": [
+        "./packages/client/ui-plugin-manager/src/index.ts"
+      ],
+      "@orahako/ui-profile": [
+        "./packages/client/ui-profile/src/index.ts"
+      ],
+      "@orahako/ui-settings": [
+        "./packages/client/ui-settings/src/index.ts"
+      ],
+      "@orahako/ui-shell": [
+        "./packages/client/ui-shell/src/index.ts"
+      ],
+      "@orahako/ui-updater": [
+        "./packages/client/ui-updater/src/index.ts"
+      ],
+      "@orahako/plugin-notifications": [
+        "./packages/plugins/notifications/src/index.ts"
+      ],
+      "@orahako/plugin-onboarding": [
+        "./packages/plugins/onboarding/src/index.ts"
+      ],
+      "@orahako/plugin-overview": [
+        "./packages/plugins/overview/src/index.ts"
+      ],
+      "@orahako/plugin-ui-auth": [
+        "./packages/plugins/ui-auth/src/index.ts"
+      ],
+      "@orahako/plugin-ysu-provider": [
+        "./packages/plugins/ysu-provider/src/index.ts"
+      ],
       "@orahako/plugin-sdk": [
         "./packages/plugin-sdk/index.ts"
       ],
@@ -109,6 +157,7 @@
     "packages/core",
     "packages/runtime",
     "packages/edu",
+    "packages/client",
     "packages/plugins"
   ]
 }
