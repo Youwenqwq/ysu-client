@@ -485,7 +485,7 @@ function ContributionBody<Owner extends object>({
   }
 
   const TargetComponent = entry.component as (props: Record<string, unknown>) => ReactNode
-  return TargetComponent(synthesizedProps)
+  return <TargetComponent {...synthesizedProps} />
 }
 
 export function ContributionOutlet<Owner extends object = Record<string, never>>({
@@ -499,7 +499,7 @@ export function ContributionOutlet<Owner extends object = Record<string, never>>
   const resetKey = `${entry.pluginId}:${entry.id}:${entry.generation ?? 0}`
   return (
     <ContributionErrorBoundary resetKey={resetKey} fallback={errorFallback} onError={onError}>
-      <ContributionBody entry={entry} owner={owner} slots={slots} i18n={i18n} />
+      <ContributionBody key={resetKey} entry={entry} owner={owner} slots={slots} i18n={i18n} />
     </ContributionErrorBoundary>
   )
 }
@@ -600,6 +600,7 @@ export class ShellErrorBoundary extends Component<
       }
       return (
         <ShellErrorBoundary
+          key={shellQualifiedKey(this.props.fallback)}
           shell={this.props.fallback}
           slots={this.props.slots}
           i18n={this.props.i18n}
@@ -613,6 +614,7 @@ export class ShellErrorBoundary extends Component<
 
     return (
       <ContributionBody
+        key={key}
         entry={this.props.shell}
         owner={{
           children: this.props.children,

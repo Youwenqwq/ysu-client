@@ -1,4 +1,4 @@
-import { act } from "react"
+import { act, useEffect, useState } from "react"
 import { createRoot } from "react-dom/client"
 import { renderToStaticMarkup } from "react-dom/server"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -683,6 +683,104 @@ describe("UIRenderer: ContributionOutlet 4-share synthesis, slot authorization, 
     expect(dom.container.textContent).toBe("sibling-alivefallback-shown")
     activeUnmount = undefined
     await dom.unmount()
+    runtime.dispose()
+  })
+
+  it("remounts dedicated target fibers cleanly when ContributionOutlet switches entries with different hook counts without an outer key", async () => {
+    const dom = mountInteractiveDom()
+    activeUnmount = dom.unmount
+
+    const ui = new PluginUIRegistry()
+    const runtime = new PluginRuntime()
+    runtime.context.set("ui", ui)
+
+    const lifecycleEvents: string[] = []
+    let mutatePageALocalState!: (next: string) => void
+
+    const pageBStore = defineStore({
+      init: () => ({ step: 42 }),
+      actions: {},
+    })
+
+    const plugin = definePlugin({
+      manifest: {
+        id: "example.switch",
+        name: "Switch",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+      },
+      inject: ["ui"],
+      apply(ctx) {
+        // pageA uses 2 useState hooks + 1 useEffect hook
+        ctx.ui.registerPage({ id: "pageA" }, (props) => {
+          const [draft, setDraft] = useState("initial-A")
+          const [extra] = useState(7)
+          mutatePageALocalState = setDraft
+          useEffect(() => {
+            lifecycleEvents.push("mount:A")
+            return () => {
+              lifecycleEvents.push("unmount:A")
+            }
+          }, [])
+          return (
+            <div>
+              A:{draft}:{extra}:{props.locale}
+            </div>
+          )
+        })
+
+        // pageB uses 0 useState hooks + 1 store hook + 1 useEffect hook (different hook signature!)
+        ctx.ui.registerPage({ id: "pageB", store: pageBStore }, (props) => {
+          const step = props.useStore((s) => s.step)
+          useEffect(() => {
+            lifecycleEvents.push("mount:B")
+            return () => {
+              lifecycleEvents.push("unmount:B")
+            }
+          }, [])
+          return <div>B:{step}</div>
+        })
+      },
+    })
+
+    runtime.register(plugin, "builtin")
+    runtime.start(plugin.manifest.id)
+
+    const pageA = ui.findPage("example.switch", "pageA")!
+    const pageB = ui.findPage("example.switch", "pageB")!
+
+    // Render pageA via unkeyed ContributionOutlet and mutate its local state
+    await dom.render(<ContributionOutlet entry={pageA} />)
+    expect(dom.container.textContent).toBe("A:initial-A:7:zh")
+    expect(lifecycleEvents).toEqual(["mount:A"])
+
+    await act(async () => {
+      mutatePageALocalState("dirty-A")
+    })
+    expect(dom.container.textContent).toBe("A:dirty-A:7:zh")
+
+    // Switch same unkeyed ContributionOutlet to pageB -> unmounts A cleanly and mounts B with zero hook mismatch!
+    await dom.render(<ContributionOutlet entry={pageB} />)
+    expect(dom.container.textContent).toBe("B:42")
+    expect(lifecycleEvents).toEqual(["mount:A", "unmount:A", "mount:B"])
+
+    // Switch back to pageA -> fresh remount resets local state back to "initial-A"
+    await dom.render(<ContributionOutlet entry={pageA} />)
+    expect(dom.container.textContent).toBe("A:initial-A:7:zh")
+    expect(lifecycleEvents).toEqual(["mount:A", "unmount:A", "mount:B", "unmount:B", "mount:A"])
+
+    activeUnmount = undefined
+    await dom.unmount()
+    expect(lifecycleEvents).toEqual([
+      "mount:A",
+      "unmount:A",
+      "mount:B",
+      "unmount:B",
+      "mount:A",
+      "unmount:A",
+    ])
     runtime.dispose()
   })
 })
