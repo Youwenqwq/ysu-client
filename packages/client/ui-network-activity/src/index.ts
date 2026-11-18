@@ -106,8 +106,14 @@ export const networkActivityPlugin = definePlugin({
     ctx.effect(() => () => storeInstance.dispose())
 
     ctx.i18n.register({
-      zh: { networkActivity: networkActivityDictionary.zh },
-      en: { networkActivity: networkActivityDictionary.en },
+      zh: {
+        settings: networkActivityDictionary.zh.settings,
+        networkActivity: networkActivityDictionary.zh,
+      },
+      en: {
+        settings: networkActivityDictionary.en.settings,
+        networkActivity: networkActivityDictionary.en,
+      },
     })
 
     ctx.settings.registerCategory(
@@ -115,9 +121,9 @@ export const networkActivityPlugin = definePlugin({
         id: "network-activity",
         order: 60,
         title: "网络活动",
-        titleKey: "networkActivity.settings.title",
+        titleKey: "settings.title",
         description: "控制顶栏网络加载提示的详细程度",
-        descriptionKey: "networkActivity.settings.description",
+        descriptionKey: "settings.description",
         icon: Activity,
         dictionary: networkActivityDictionary,
         store: storeInstance,

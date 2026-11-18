@@ -420,6 +420,11 @@ function mountInteractiveDom(screenWidth = 390, screenHeight = 844) {
       await act(async () => {
         root.unmount()
       })
+      if (vi.isFakeTimers()) {
+        vi.runOnlyPendingTimers()
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
       for (const [k, v] of Object.entries(saved)) {
         if (v === undefined) {
           delete g[k]

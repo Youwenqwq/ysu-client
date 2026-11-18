@@ -121,8 +121,8 @@ export const pluginManagerPlugin = definePlugin({
   inject: ["ui", "slots", "router", "i18n", "pluginManager", "packageRuntime"] as const,
   apply(ctx) {
     ctx.i18n.register({
-      zh: { plugins: pluginsDictionary.zh },
-      en: { plugins: pluginsDictionary.en },
+      zh: { ...pluginsDictionary.zh, plugins: pluginsDictionary.zh },
+      en: { ...pluginsDictionary.en, plugins: pluginsDictionary.en },
     })
 
     ctx.ui.registerPage(
@@ -130,7 +130,7 @@ export const pluginManagerPlugin = definePlugin({
         id: "plugins",
         route: "plugins",
         title: "插件",
-        titleKey: "plugins.title",
+        titleKey: "title",
         requiresProvider: false,
         parent: "me",
         dictionary: pluginsDictionary,
@@ -187,10 +187,10 @@ export const pluginManagerPlugin = definePlugin({
     ctx.ui.registerNavigation({
       id: "plugins",
       title: "插件",
-      titleKey: "plugins.title",
+      titleKey: "title",
       page: "plugins",
       icon: Puzzle,
-      group: "preferences",
+      group: "account",
       order: 90,
     })
   },

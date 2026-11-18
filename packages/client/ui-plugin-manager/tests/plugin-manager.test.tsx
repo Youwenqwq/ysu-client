@@ -375,12 +375,15 @@ describe("@orahako/ui-plugin-manager", () => {
       expect(pageEntry).toMatchObject({
         id: "plugins",
         route: "plugins",
+        titleKey: "title",
         requiresProvider: false,
         parent: "me",
       })
       expect(navEntry).toMatchObject({
         id: "plugins",
+        titleKey: "title",
         page: "plugins",
+        group: "account",
       })
 
       // Static SSR check

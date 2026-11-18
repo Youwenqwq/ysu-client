@@ -298,7 +298,11 @@ describe("@orahako/ui-network-activity", () => {
       const categoryEntry = settings.getSnapshot().find((c) => c.id === "network-activity")
       expect(stripEntry).toBeDefined()
       expect(mascotEntry).toBeDefined()
-      expect(categoryEntry).toBeDefined()
+      expect(categoryEntry).toMatchObject({
+        id: "network-activity",
+        titleKey: "settings.title",
+        descriptionKey: "settings.description",
+      })
 
       // Settings category renders bilingual labels cleanly
       const settingsHtmlZh = renderToStaticMarkup(
