@@ -1,0 +1,38 @@
+{
+  "name": "@orahako/ui-updater",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.1.0",
+    "@capgo/capacitor-updater": "^8.47.4",
+    "@orahako/sdk": "workspace:*",
+    "@orahako/ui-primitives": "workspace:*",
+    "lucide-react": "^1.17.0",
+    "react-markdown": "^10.1.0",
+    "semver": "^7.8.2",
+    "sonner": "^2.0.8"
+  },
+  "peerDependencies": {
+    "@cordisjs/core": "^3.18.1",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@cordisjs/core": "3.18.1",
+    "@orahako/kernel": "workspace:*",
+    "@orahako/runtime-i18n": "workspace:*",
+    "@orahako/runtime-native": "workspace:*",
+    "@orahako/runtime-slots": "workspace:*",
+    "@orahako/runtime-storage": "workspace:*",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "@types/semver": "^7.7.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}
