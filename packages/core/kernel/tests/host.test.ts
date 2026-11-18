@@ -7,6 +7,7 @@ import {
   type CompositionSource,
   type MarketplaceIndex,
   type PluginManifest,
+  type PluginPackageRuntime,
 } from "@orahako/sdk"
 import {
   beginPluginBoot,
@@ -333,6 +334,103 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
 
     await host.uninstall("ext.styled")
     expect(await store.read("ext.styled")).toBeUndefined()
+    host.dispose()
+  })
+
+  it("exposes sideload, uninstall, listInstalled, metadata, loadErrors, shell selection, and safeMode on packageRuntime", async () => {
+    let blobCounter = 0
+    vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      const code = blob instanceof Blob ? "export default { apply() {} }" : ""
+      return `data:text/javascript;base64,${btoa(code)}#pkg-${++blobCounter}`
+    })
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {})
+
+    const encoder = new TextEncoder()
+    const sideloadZip = zipSync({
+      "manifest.json": encoder.encode(
+        JSON.stringify({
+          id: "ext.sideloaded",
+          name: "Sideloaded",
+          version: "1.2.3",
+          apiVersion: 3,
+          kind: "feature",
+          entry: "index.js",
+        })
+      ),
+      "index.js": encoder.encode("export default { apply() {} }\n"),
+    })
+
+    let packageRuntime!: PluginPackageRuntime
+    const probePlugin = definePlugin({
+      manifest: makeManifest("app.probe"),
+      inject: ["packageRuntime"],
+      apply(ctx) {
+        packageRuntime = ctx.packageRuntime
+      },
+    })
+
+    const store = new PluginPackageStore({ backend: createMemoryPackageBackend() })
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.5",
+        appBuild: "b-runtime",
+        composition: {
+          id: "test.pkg-runtime",
+          version: 1,
+          defaults: { shell: "orahako.shell:default" },
+          market: { indexUrl: "https://market.example.com/index.json" },
+          plugins: [{ id: probePlugin.manifest.id }],
+        },
+        plugins: [probePlugin],
+      },
+      {
+        platformModules: { "@orahako/sdk": SdkNamespace },
+        packages: store,
+      }
+    )
+
+    await host.bootstrap()
+    expect(packageRuntime.appVersion?.()).toBe("0.17.5")
+    expect(packageRuntime.marketUrl?.()).toBe("https://market.example.com/index.json")
+    expect(packageRuntime.safeMode?.()).toBe(false)
+    expect(packageRuntime.getActiveShell?.()).toBeUndefined()
+
+    packageRuntime.setActiveShell?.("ext.sideloaded:alt")
+    expect(packageRuntime.getActiveShell?.()).toBe("ext.sideloaded:alt")
+
+    const manifest = await packageRuntime.installPackage!(sideloadZip)
+    expect(manifest).toMatchObject({ id: "ext.sideloaded", version: "1.2.3" })
+    const installed = await packageRuntime.listInstalled!()
+    expect(installed).toHaveLength(1)
+    expect(installed[0]?.manifest.id).toBe("ext.sideloaded")
+
+    // Failing sideload populates loadErrors()
+    vi.spyOn(URL, "createObjectURL").mockImplementationOnce(() => {
+      return `data:text/javascript;base64,${btoa(
+        `export default { apply() { throw new Error("sideload crash") } }`
+      )}`
+    })
+    const brokenZip = zipSync({
+      "manifest.json": encoder.encode(
+        JSON.stringify({
+          id: "ext.broken",
+          name: "Broken",
+          version: "1.0.0",
+          apiVersion: 3,
+          kind: "feature",
+          entry: "index.js",
+        })
+      ),
+      "index.js": encoder.encode(`export default { apply() { throw new Error("crash") } }\n`),
+    })
+    await expect(packageRuntime.installPackage!(brokenZip)).rejects.toThrow("sideload crash")
+    expect(packageRuntime.loadErrors?.().get("ext.broken")).toContain("sideload crash")
+
+    // Uninstalling ext.sideloaded resets activeShell belonging to it
+    await packageRuntime.uninstall!("ext.sideloaded")
+    expect(await packageRuntime.listInstalled!()).toHaveLength(0)
+    expect(packageRuntime.getActiveShell?.()).toBeUndefined()
+
     host.dispose()
   })
 })
