@@ -1,0 +1,297 @@
+import { Calendar, FileText } from "lucide-react"
+import { hasSlice, requireSlice, type Exam } from "@orahako/academic-sdk"
+import {
+  definePlugin,
+  PLUGIN_API_VERSION,
+  WIDGETS_EXAM_CAPABILITY,
+  WIDGETS_GENERIC_CAPABILITY,
+  type Context,
+  type PluginAssetService,
+  type PluginManifest,
+} from "@orahako/sdk"
+import { examsDictionary, type ExamsDictionary } from "./dictionary"
+import { UpcomingExamsWidget, type UpcomingExamsWidgetInject } from "./overview-widget"
+import { ExamsPage, type ExamsPageInject } from "./page"
+import {
+  ExamCompactSettingsWidget,
+  ExamNotificationContent,
+  ExamSettingsWidget,
+  type ExamWidgetPinInject,
+} from "./settings"
+import "./slots"
+import {
+  examsSettingsStore,
+  type ExamsSettingsState,
+  type ExamsSettingsStoreInstance,
+} from "./store"
+import {
+  clearExamWidgetSnapshots,
+  createParameterizedExamQueryController,
+  observeExamQueryForWidgets,
+  syncExamWidgetSnapshots,
+  type ExamWidgetId,
+} from "./widget-sync"
+
+export const EXAMS_PLUGIN_ID = "orahako.exams"
+
+export type { ExamsDictionary, ExamsSettingsState, ExamsSettingsStoreInstance, ExamWidgetId }
+
+const examsManifest: PluginManifest = {
+  id: EXAMS_PLUGIN_ID,
+  name: "考试安排",
+  version: "1.0.0",
+  apiVersion: PLUGIN_API_VERSION,
+  kind: "feature",
+  entry: "index.js",
+  description: "学期考试安排查询、倒计时、桌面小组件同步与考试提醒通道",
+  nativeCapabilities: [WIDGETS_GENERIC_CAPABILITY, WIDGETS_EXAM_CAPABILITY],
+  inject: [
+    "ui",
+    "slots",
+    "router",
+    "i18n",
+    "storage",
+    "provider",
+    "session",
+    "query",
+    "notifications",
+    "overview",
+    "native",
+    "widgets",
+  ],
+}
+
+export const examsPlugin = definePlugin({
+  manifest: examsManifest,
+  inject: [
+    "ui",
+    "slots",
+    "router",
+    "i18n",
+    "storage",
+    "provider",
+    "session",
+    "query",
+    "notifications",
+    "overview",
+    "native",
+    "widgets",
+  ] as const,
+  apply(ctx) {
+    const {
+      ui,
+      slots,
+      router,
+      i18n,
+      storage,
+      provider,
+      session,
+      query,
+      notifications,
+      overview,
+      widgets,
+    } = ctx
+
+    i18n.register(examsDictionary)
+    let disposed = false
+
+    const settingsStore = examsSettingsStore.create(storage)
+
+    const clearExamWidgets = (): Promise<void> => clearExamWidgetSnapshots(widgets)
+
+    const syncExamWidgets = (exams: readonly Exam[]): void => {
+      if (disposed) return
+      void syncExamWidgetSnapshots(widgets, exams)
+    }
+
+    let unregisterChannel: (() => void) | null = null
+    let lastNotifyExams = settingsStore.source.getSnapshot().notifyExams
+
+    const registerExamsChannel = (notifyExams: boolean): void => {
+      unregisterChannel?.()
+      unregisterChannel = notifications.registerChannel({
+        id: "exams",
+        slice: "exams",
+        toPollingFlag: (enabled) => {
+          const active = enabled && notifyExams
+          return {
+            checkExams: active,
+            exams: active,
+          }
+        },
+        onDisable: () => clearExamWidgets(),
+      })
+    }
+
+    registerExamsChannel(lastNotifyExams)
+    const detachSettings = settingsStore.source.subscribe(() => {
+      if (disposed) return
+      const current = settingsStore.source.getSnapshot().notifyExams
+      if (current !== lastNotifyExams) {
+        const disabledNow = lastNotifyExams && !current
+        lastNotifyExams = current
+        registerExamsChannel(current)
+        if (disabledNow) {
+          void clearExamWidgets()
+        }
+      }
+    })
+
+    const buildExamsSource = (semester: string) => {
+      const rawSource = query.source<Exam[], "exams">({
+        feature: "exams",
+        slice: "exams",
+        params: semester ? { semester } : undefined,
+        enabled: () =>
+          !disposed &&
+          session.getSnapshot().isAuthenticated &&
+          hasSlice(provider.getSnapshot().provider, "exams"),
+        fetcher: async (activeProvider) => {
+          const exams = await requireSlice(activeProvider, "exams").getExams(
+            semester ? { semester } : undefined
+          )
+          if (!semester && !disposed) {
+            syncExamWidgets(exams)
+          }
+          return exams
+        },
+      })
+      return semester ? rawSource : observeExamQueryForWidgets(rawSource, syncExamWidgets)
+    }
+
+    const defaultExamsSource = buildExamsSource("")
+    const pageExamsController = createParameterizedExamQueryController((semester) =>
+      semester ? buildExamsSource(semester) : defaultExamsSource
+    )
+
+    const resolveWidgetPreviewSrc = (fullCtx: Context, fileName: string): string => {
+      const assets: PluginAssetService | undefined = fullCtx.get("assets")
+      return assets?.url(`widgets/${fileName}`) ?? router.href(`/widgets/${fileName}`)
+    }
+
+    overview.registerWidget(
+      {
+        id: "upcoming-exams",
+        title: "近期考试",
+        titleKey: "widgets.upcomingExams.title",
+        description: "查看接下来的考试时间与地点。",
+        descriptionKey: "widgets.upcomingExams.description",
+        icon: Calendar,
+        region: "content",
+        defaultVisible: true,
+        order: 60,
+        slice: "exams",
+        dictionary: examsDictionary,
+        inject: (): UpcomingExamsWidgetInject => ({
+          hooks: {
+            exams: defaultExamsSource,
+          },
+          openExams: () => {
+            router.push({ route: "exams" })
+          },
+        }),
+      },
+      UpcomingExamsWidget
+    )
+
+    slots.inject("settings.notifications.content", () =>
+      slots.register(
+        {
+          id: "exams",
+          slot: "settings.notifications.content",
+          order: 20,
+          dictionary: examsDictionary,
+          store: settingsStore,
+          inject: () => ({
+            hooks: {
+              provider: provider.state,
+            },
+          }),
+        },
+        ExamNotificationContent
+      )
+    )
+
+    slots.inject("settings.widgets", () => {
+      const disposeExam = slots.register(
+        {
+          id: "exam",
+          slot: "settings.widgets",
+          order: 20,
+          dictionary: examsDictionary,
+          inject: (fullCtx: Context): ExamWidgetPinInject => ({
+            previewSrc: resolveWidgetPreviewSrc(fullCtx, "exam.png"),
+            requestPin: (widget) => widgets.requestPin(widget),
+          }),
+        },
+        ExamSettingsWidget
+      )
+      const disposeCompact = slots.register(
+        {
+          id: "exam-compact",
+          slot: "settings.widgets",
+          order: 20,
+          dictionary: examsDictionary,
+          inject: (fullCtx: Context): ExamWidgetPinInject => ({
+            previewSrc: resolveWidgetPreviewSrc(fullCtx, "exam-compact.png"),
+            requestPin: (widget) => widgets.requestPin(widget),
+          }),
+        },
+        ExamCompactSettingsWidget
+      )
+      return () => {
+        disposeCompact()
+        disposeExam()
+      }
+    })
+
+    ui.registerPage(
+      {
+        id: "index",
+        route: "exams",
+        title: "考试安排",
+        titleKey: "exams.title",
+        capability: "exams",
+        requiresProvider: true,
+        dictionary: examsDictionary,
+        inject: (): ExamsPageInject => ({
+          hooks: {
+            exams: pageExamsController.source,
+          },
+          queryBySemester: async (semester: string) => {
+            const trimmed = semester.trim()
+            if (trimmed === pageExamsController.getTerm()) {
+              await pageExamsController.refresh()
+              return
+            }
+            pageExamsController.setTerm(trimmed)
+          },
+        }),
+      },
+      ExamsPage
+    )
+
+    ui.registerNavigation({
+      id: "exams",
+      title: "考试安排",
+      titleKey: "navTitle",
+      page: "index",
+      icon: FileText,
+      group: "academic",
+      order: 30,
+      capability: "exams",
+    })
+
+    ctx.effect(() => () => {
+      disposed = true
+      detachSettings()
+      unregisterChannel?.()
+      unregisterChannel = null
+      pageExamsController.dispose()
+      settingsStore.dispose()
+      void clearExamWidgets()
+    })
+  },
+})
+
+export default examsPlugin

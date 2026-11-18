@@ -1,0 +1,61 @@
+import { defineDictionary } from "@orahako/sdk"
+
+export const makeupExamsDictionary = defineDictionary({
+  zh: {
+    navTitle: "补考查询",
+    updating: "正在更新数据...",
+    makeupExams: {
+      title: "补考查询",
+      description: "查看补考批次与可报名课程",
+      batch: "批次",
+      noBatch: "当前学期暂无补考批次",
+      signupWindow: "报名时间",
+      availableTab: "可报名",
+      registeredTab: "已报名",
+      noAvailable: "暂无可报名课程",
+      noRegistered: "暂无已报名课程",
+      credit: "学分",
+      hours: "学时",
+      department: "开课单位",
+      status: "报名状态",
+      note: "备注",
+      availableCount: "可报名 {count} 门",
+      registeredCount: "已报名 {count} 门",
+      signup: "报名",
+      signupTitle: "确认报名",
+      signupDesc: "确定要报名《{name}》的补考吗？报名后可在「已报名」中查看。",
+      signupSuccess: "报名成功",
+      cancel: "取消",
+    },
+  },
+  en: {
+    navTitle: "Makeup Exams",
+    updating: "Updating data...",
+    makeupExams: {
+      title: "Makeup Exams",
+      description: "View makeup exam batches and available courses",
+      batch: "Batch",
+      noBatch: "No makeup exam batch for the current term",
+      signupWindow: "Signup window",
+      availableTab: "Available",
+      registeredTab: "Registered",
+      noAvailable: "No courses available for signup",
+      noRegistered: "No registered courses",
+      credit: "Credit",
+      hours: "Hours",
+      department: "Department",
+      status: "Status",
+      note: "Note",
+      availableCount: "{count} available",
+      registeredCount: "{count} registered",
+      signup: "Sign up",
+      signupTitle: "Confirm signup",
+      signupDesc:
+        "Sign up for the makeup exam of {name}? You can find it under Registered afterwards.",
+      signupSuccess: "Signed up",
+      cancel: "Cancel",
+    },
+  },
+})
+
+export type MakeupExamsDictionary = typeof makeupExamsDictionary
