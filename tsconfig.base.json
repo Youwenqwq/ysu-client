@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "paths": {
+      "@orahako/sdk": ["./packages/core/sdk/src/index.ts"],
+      "@orahako/kernel": ["./packages/core/kernel/src/index.ts"],
+      "@orahako/ui-primitives": ["./packages/core/ui-primitives/src/index.ts"],
+      "@orahako/academic-sdk": ["./packages/edu/sdk/src/index.ts"],
+      "@orahako/academic-kit": ["./packages/edu/kit/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/*/src/**/*.ts",
+    "packages/*/*/src/**/*.tsx",
+    "packages/*/*/tests/**/*.ts",
+    "packages/*/*/tests/**/*.tsx"
+  ]
+}

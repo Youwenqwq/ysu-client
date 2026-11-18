@@ -1,6 +1,7 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2017",
+    "target": "ES2022",
     "lib": [
       "dom",
       "dom.iterable",
@@ -26,6 +27,21 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@orahako/sdk": [
+        "./packages/core/sdk/src/index.ts"
+      ],
+      "@orahako/kernel": [
+        "./packages/core/kernel/src/index.ts"
+      ],
+      "@orahako/ui-primitives": [
+        "./packages/core/ui-primitives/src/index.ts"
+      ],
+      "@orahako/academic-sdk": [
+        "./packages/edu/sdk/src/index.ts"
+      ],
+      "@orahako/academic-kit": [
+        "./packages/edu/kit/src/index.ts"
       ],
       "@orahako/plugin-sdk": [
         "./packages/plugin-sdk/index.ts"
@@ -59,6 +75,9 @@
   "exclude": [
     "node_modules",
     "website",
-    "android"
+    "android",
+    "packages/core",
+    "packages/edu",
+    "packages/plugins"
   ]
 }

@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "next typegen && tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit && tsc -p tsconfig.base.json --noEmit",
     "test": "vitest run",
     "plugin": "node --experimental-transform-types scripts/plugin.ts",
     "release": "bash scripts/release.sh"

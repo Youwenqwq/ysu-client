@@ -33,6 +33,10 @@ const eslintConfig = defineConfig([
         "warn",
         { argsIgnorePattern: "^_" },
       ],
+      "@typescript-eslint/no-empty-object-type": [
+        "error",
+        { allowInterfaces: "with-single-extends" },
+      ],
     },
   },
 ]);
