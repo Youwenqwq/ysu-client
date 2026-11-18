@@ -1,0 +1,27 @@
+{
+  "name": "@orahako/kernel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@orahako/sdk": "workspace:*",
+    "ajv": "^8.20.0",
+    "es-module-lexer": "^3.0.4",
+    "fflate": "^0.8.3",
+    "semver": "^7.8.2"
+  },
+  "peerDependencies": {
+    "@cordisjs/core": "^3.18.1"
+  },
+  "devDependencies": {
+    "@cordisjs/core": "3.18.1",
+    "@types/node": "^25.9.1",
+    "@types/semver": "^7.7.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}
