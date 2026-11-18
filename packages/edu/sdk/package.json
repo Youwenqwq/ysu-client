@@ -1,0 +1,24 @@
+{
+  "name": "@orahako/academic-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@orahako/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "@cordisjs/core": "^3.18.1",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@cordisjs/core": "3.18.1",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.15",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}
