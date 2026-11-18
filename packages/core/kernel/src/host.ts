@@ -179,6 +179,15 @@ export class PluginHost {
         this.applyPluginBundle(pluginIds, index),
       assetUrl: (pluginId: string, path: string) => this.external.get(pluginId)?.assets.get(path),
       nativeCapabilities: () => this.composition.nativeCapabilities ?? [],
+      installPackage: (input: Uint8Array | ArrayBuffer | Blob) => this.install(input),
+      uninstall: (id: string) => this.uninstall(id),
+      listInstalled: () => this.packages.list(),
+      marketUrl: () => this.composition.market?.indexUrl,
+      appVersion: () => this.appVersion,
+      loadErrors: () => this.loadErrors,
+      getActiveShell: () => this.preferences.getActiveShell(),
+      setActiveShell: (shellId: string | undefined) => this.preferences.setActiveShell(shellId),
+      safeMode: () => Boolean(this.recovery?.safeMode),
     })
 
     this.runtime.context.set("pluginManager", {

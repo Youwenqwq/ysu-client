@@ -40,6 +40,7 @@ export interface PluginInstallerService {
 
 export interface PluginManagerState {
   readonly manifest: PluginManifest
+  readonly source?: "builtin" | "external"
   readonly status: string
   readonly error?: string
 }
@@ -66,6 +67,16 @@ export interface PluginPackageRuntime {
   applyPluginBundle(pluginIds: readonly string[], index: MarketplaceIndex): Promise<PluginManifest>
   assetUrl(pluginId: string, path: string): string | undefined
   nativeCapabilities(): readonly string[]
+  /** Optional on minimal test/embedded runtimes; always provided by PluginHost. */
+  installPackage?(input: Uint8Array | ArrayBuffer | Blob): Promise<PluginManifest>
+  uninstall?(id: string): Promise<void>
+  listInstalled?(): Promise<readonly InstalledPluginSummary[]>
+  marketUrl?(): string | undefined
+  appVersion?(): string
+  loadErrors?(): ReadonlyMap<string, string>
+  getActiveShell?(): string | undefined
+  setActiveShell?(shellId: string | undefined): void
+  safeMode?(): boolean
 }
 
 export type AnalyticsTrackReason = "sent" | "disabled" | "duplicate" | "unavailable" | "failed"
