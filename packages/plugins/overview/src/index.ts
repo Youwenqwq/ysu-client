@@ -113,7 +113,8 @@ export const overviewPlugin = definePlugin({
     "query",
   ] as const,
   apply(ctx) {
-    const { ui, slots, settings, router, navigation, storage, provider, session, query } = ctx
+    const { ui, slots, settings, router, navigation, i18n, storage, provider, session, query } = ctx
+    i18n.register(overviewDictionary)
     let disposed = false
 
     const registry = new OverviewRegistry()

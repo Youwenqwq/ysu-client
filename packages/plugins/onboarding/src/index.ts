@@ -123,7 +123,8 @@ export const onboardingPlugin = definePlugin({
     "packageRuntime",
   ] as const,
   apply(ctx, config: OnboardingPluginConfig = {}) {
-    const { slots, storage, providers, provider, session, native, packageRuntime } = ctx
+    const { slots, i18n, storage, providers, provider, session, native, packageRuntime } = ctx
+    i18n.register(onboardingDictionary)
     let disposed = false
     const store = onboardingStore.create(storage)
     const providersRevision = createObservableSource(0)

@@ -108,7 +108,9 @@ export const notificationsPlugin = definePlugin({
     "widgets",
   ] as const,
   apply(ctx) {
-    const { slots, settings, storage, provider, session, notifications, native, widgets } = ctx
+    const { slots, settings, i18n, storage, provider, session, notifications, native, widgets } =
+      ctx
+    i18n.register(notificationsDictionary)
     const store = notificationSettingsStore.create(storage)
     const controller = new AcademicPollingController({
       store,

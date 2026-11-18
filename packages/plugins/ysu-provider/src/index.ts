@@ -77,6 +77,7 @@ export const ysuProviderPlugin = definePlugin({
     ctx.effect(() => () => endpointStore.dispose())
 
     ctx.i18n.register(ysuPluginTranslations)
+    ctx.i18n.register(ysuSettingsDictionary)
 
     ctx.http.activity.registerLabeler((url) =>
       labelYsuRequest(url, collectCustomHosts(endpointStore.source.getSnapshot()))

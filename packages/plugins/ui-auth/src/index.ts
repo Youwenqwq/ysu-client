@@ -171,6 +171,7 @@ export const authUiPlugin = definePlugin({
   apply(ctx, config: AuthUiPluginConfig = {}) {
     const { ui, slots, router, navigation, i18n, storage, providers, provider, session, query } =
       ctx
+    i18n.register(authUiDictionary)
     const t = i18n.translator(authUiDictionary)
     const rateLimiter = createLoginRateLimiter(storage)
     const rememberStore = rememberedCredentialsStore.create(storage)
