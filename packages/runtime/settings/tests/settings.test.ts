@@ -1,0 +1,266 @@
+import { describe, expect, it, vi } from "vitest"
+import { PluginRuntime } from "@orahako/kernel"
+import {
+  definePlugin,
+  defineStore,
+  PLUGIN_API_VERSION,
+  PLUGIN_SERVICE_SCOPE,
+  type PluginManifest,
+  type PluginSettingsService,
+  type PluginStorageService,
+  type ScopedPluginService,
+  type StoreInstance,
+} from "@orahako/sdk"
+import { PluginSlotRegistry } from "@orahako/runtime-slots"
+import { PluginSettingsRegistry, SETTINGS_RUNTIME_PLUGIN_ID, settingsRegistryPlugin } from "../src"
+
+declare module "@orahako/sdk" {
+  interface SlotMap {
+    "test.settings.subsection": {
+      kind: "list"
+      owner: Record<string, never>
+    }
+  }
+}
+
+function Icon() {
+  return null
+}
+
+function Panel() {
+  return null
+}
+
+function featureManifest(id: string): PluginManifest {
+  return {
+    id,
+    name: id,
+    version: "1.0.0",
+    apiVersion: PLUGIN_API_VERSION,
+    kind: "feature",
+    entry: "index.js",
+    inject: ["settings"],
+  }
+}
+
+describe("@orahako/runtime-settings", () => {
+  it("registers categories via both overloads, attributes pluginId, and sorts by order then id", () => {
+    const runtime = new PluginRuntime()
+    runtime.register(settingsRegistryPlugin, "builtin")
+    runtime.start(SETTINGS_RUNTIME_PLUGIN_ID)
+
+    const alpha = featureManifest("example.alpha")
+    const beta = featureManifest("example.beta")
+
+    runtime.register(
+      alpha,
+      (ctx) => {
+        ctx.settings.registerCategory({ id: "zeta", title: "Zeta", icon: Icon, order: 10 }, Panel)
+        ctx.settings.registerCategory({
+          id: "alpha",
+          title: "Alpha",
+          icon: Icon,
+          order: 20,
+          component: Panel,
+        })
+      },
+      "external"
+    )
+    runtime.register(
+      beta,
+      (ctx) => {
+        ctx.settings.registerCategory({ id: "gamma", title: "Gamma", icon: Icon, order: 20 }, Panel)
+        ctx.settings.registerCategory({ id: "beta", title: "Beta", icon: Icon }, Panel)
+      },
+      "external"
+    )
+
+    runtime.start(alpha.id)
+    runtime.start(beta.id)
+
+    const settings = runtime.context.get("settings") as PluginSettingsRegistry
+    const snapshot = settings.getSnapshot()
+    expect(snapshot.map((item) => item.id)).toEqual(["zeta", "alpha", "gamma", "beta"])
+    expect(snapshot.map((item) => item.pluginId)).toEqual([alpha.id, alpha.id, beta.id, beta.id])
+
+    runtime.stop(alpha.id)
+    expect(settings.getSnapshot().map((item) => item.id)).toEqual(["gamma", "beta"])
+
+    runtime.start(alpha.id)
+    expect(settings.getSnapshot().map((item) => item.id)).toEqual([
+      "zeta",
+      "alpha",
+      "gamma",
+      "beta",
+    ])
+    runtime.dispose()
+  })
+
+  it("rejects empty or duplicate category ids across plugins", async () => {
+    const registry = new PluginSettingsRegistry()
+    const runtime = new PluginRuntime()
+    runtime.context.set("settings", registry)
+
+    const alpha = featureManifest("example.alpha")
+    const beta = featureManifest("example.beta")
+    const empty = featureManifest("example.empty")
+
+    runtime.register(
+      alpha,
+      (ctx) => {
+        ctx.settings.registerCategory({ id: "shared", icon: Icon }, Panel)
+      },
+      "external"
+    )
+    runtime.register(
+      beta,
+      (ctx) => {
+        ctx.settings.registerCategory({ id: "shared", icon: Icon }, Panel)
+      },
+      "external"
+    )
+    runtime.register(
+      empty,
+      (ctx) => {
+        ctx.settings.registerCategory({ id: "", icon: Icon }, Panel)
+      },
+      "external"
+    )
+
+    runtime.start(alpha.id)
+    runtime.start(beta.id)
+    runtime.start(empty.id)
+
+    await vi.waitFor(() => expect(runtime.get(beta.id)?.status).toBe("failed"))
+    expect(runtime.get(beta.id)?.error).toContain("already registered: shared (example.alpha)")
+    await vi.waitFor(() => expect(runtime.get(empty.id)?.status).toBe("failed"))
+    expect(runtime.get(empty.id)?.error).toContain("id must not be empty")
+    runtime.dispose()
+  })
+
+  it("binds registrantCtx to inject, creates & disposes StoreDefinition with scoped storage, and manages child slots", async () => {
+    const persisted = new Map<string, string>()
+    const storageService: ScopedPluginService<PluginStorageService> = {
+      [PLUGIN_SERVICE_SCOPE](_ctx, manifest) {
+        const kv = {
+          getItem: async (k: string) => persisted.get(`${manifest.id}:${k}`) ?? null,
+          setItem: async (k: string, v: string) => {
+            persisted.set(`${manifest.id}:${k}`, v)
+          },
+          removeItem: async (k: string) => {
+            persisted.delete(`${manifest.id}:${k}`)
+          },
+        }
+        return { local: kv, secure: kv }
+      },
+    }
+
+    const slotsRegistry = new PluginSlotRegistry()
+    const settingsRegistry = new PluginSettingsRegistry()
+    const runtime = new PluginRuntime()
+    runtime.context.set("storage", storageService)
+    runtime.context.set("slots", slotsRegistry)
+    runtime.context.set("settings", settingsRegistry)
+
+    const categoryStore = defineStore({
+      init: () => ({ notificationsEnabled: false }),
+      persist: { key: "prefs" },
+      actions: {
+        enable(ctx) {
+          ctx.set({ notificationsEnabled: true })
+        },
+      },
+    })
+
+    let capturedInjectCtx: unknown
+    let capturedRegistrationCtx: unknown
+
+    const plugin = definePlugin({
+      manifest: {
+        id: "example.notifications",
+        name: "Notifications",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+      },
+      inject: ["settings"],
+      apply(ctx) {
+        capturedRegistrationCtx = ctx
+        ctx.settings.registerCategory(
+          {
+            id: "notifications",
+            titleKey: "settings.notifications",
+            icon: Icon,
+            children: {
+              "test.settings.subsection": { kind: "list" },
+            },
+            store: categoryStore,
+            inject: (innerCtx) => {
+              capturedInjectCtx = innerCtx
+              return { label: "notif" }
+            },
+          },
+          () => null
+        )
+      },
+    })
+
+    runtime.register(plugin, "builtin")
+    runtime.start(plugin.manifest.id)
+
+    const category = settingsRegistry.getSnapshot()[0]!
+    expect(category.id).toBe("notifications")
+    expect(
+      slotsRegistry.getSnapshot().declarations.some((d) => d.name === "test.settings.subsection")
+    ).toBe(true)
+
+    const injectResult = category.inject?.(runtime.context)
+    expect(injectResult).toEqual({ label: "notif" })
+    expect(capturedInjectCtx).toBe(capturedRegistrationCtx)
+
+    const storeInstance = category.store as StoreInstance<
+      { notificationsEnabled: boolean },
+      { enable(): void }
+    >
+    storeInstance.actions.enable()
+    expect(storeInstance.source.getSnapshot()).toEqual({ notificationsEnabled: true })
+    await vi.waitFor(() => expect(persisted.get("example.notifications:prefs")).toContain("true"))
+
+    // Stopping plugin disposes store (subsequent actions become no-ops) and tears down child slot
+    runtime.stop(plugin.manifest.id)
+    storeInstance.actions.enable()
+    expect(
+      slotsRegistry.getSnapshot().declarations.some((d) => d.name === "test.settings.subsection")
+    ).toBe(false)
+    expect(settingsRegistry.getSnapshot()).toEqual([])
+    runtime.dispose()
+  })
+
+  it("rejects leaked registrations from a disposed async continuation", async () => {
+    const registry = new PluginSettingsRegistry()
+    const runtime = new PluginRuntime()
+    runtime.context.set("settings", registry)
+
+    const gate = Promise.withResolvers<void>()
+    let leakedSettings: PluginSettingsService | undefined
+    const alpha = featureManifest("example.leaked")
+
+    runtime.register(
+      alpha,
+      async (ctx) => {
+        leakedSettings = ctx.settings
+        await gate.promise
+      },
+      "external"
+    )
+    runtime.start(alpha.id)
+    runtime.stop(alpha.id)
+    gate.resolve()
+    await Promise.resolve()
+
+    expect(() => leakedSettings?.registerCategory({ id: "late", icon: Icon }, Panel)).toThrow()
+    expect(registry.getSnapshot()).toEqual([])
+    runtime.dispose()
+  })
+})
