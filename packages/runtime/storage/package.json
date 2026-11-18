@@ -1,0 +1,24 @@
+{
+  "name": "@orahako/runtime-storage",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@aparajita/capacitor-secure-storage": "^8.0.0",
+    "@orahako/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "@cordisjs/core": "^3.18.1"
+  },
+  "devDependencies": {
+    "@cordisjs/core": "3.18.1",
+    "@orahako/kernel": "workspace:*",
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}
