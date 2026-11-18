@@ -474,6 +474,31 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0))
 
+  packages/edu/runtime:
+    dependencies:
+      '@orahako/academic-sdk':
+        specifier: workspace:*
+        version: link:../sdk
+      '@orahako/sdk':
+        specifier: workspace:*
+        version: link:../../core/sdk
+    devDependencies:
+      '@cordisjs/core':
+        specifier: 3.18.1
+        version: 3.18.1
+      '@orahako/kernel':
+        specifier: workspace:*
+        version: link:../../core/kernel
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0))
+
   packages/edu/sdk:
     dependencies:
       '@orahako/sdk':
@@ -549,6 +574,213 @@ importers:
       react:
         specifier: ^19.2.0
         version: 19.2.6
+
+  packages/runtime/http:
+    dependencies:
+      '@capacitor/core':
+        specifier: ^8.3.4
+        version: 8.3.4
+      '@orahako/sdk':
+        specifier: workspace:*
+        version: link:../../core/sdk
+    devDependencies:
+      '@cordisjs/core':
+        specifier: 3.18.1
+        version: 3.18.1
+      '@orahako/kernel':
+        specifier: workspace:*
+        version: link:../../core/kernel
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/runtime/i18n:
+    dependencies:
+      '@orahako/sdk':
+        specifier: workspace:*
+        version: link:../../core/sdk
+    devDependencies:
+      '@cordisjs/core':
+        specifier: 3.18.1
+        version: 3.18.1
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/runtime/native:
+    dependencies:
+      '@capacitor/core':
+        specifier: ^8.3.4
+        version: 8.3.4
+      '@orahako/sdk':
+        specifier: workspace:*
+        version: link:../../core/sdk
+    devDependencies:
+      '@cordisjs/core':
+        specifier: 3.18.1
+        version: 3.18.1
+      '@orahako/kernel':
+        specifier: workspace:*
+        version: link:../../core/kernel
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/runtime/packages:
+    dependencies:
+      '@orahako/sdk':
+        specifier: workspace:*
+        version: link:../../core/sdk
+    devDependencies:
+      '@capacitor/core':
+        specifier: ^8.3.4
+        version: 8.3.4
+      '@cordisjs/core':
+        specifier: 3.18.1
+        version: 3.18.1
+      '@orahako/kernel':
+        specifier: workspace:*
+        version: link:../../core/kernel
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/runtime/router:
+    dependencies:
+      '@capacitor/app':
+        specifier: ^8.1.0
+        version: 8.1.0(@capacitor/core@8.3.4)
+      '@orahako/sdk':
+        specifier: workspace:*
+        version: link:../../core/sdk
+    devDependencies:
+      '@cordisjs/core':
+        specifier: 3.18.1
+        version: 3.18.1
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/runtime/settings:
+    dependencies:
+      '@orahako/sdk':
+        specifier: workspace:*
+        version: link:../../core/sdk
+    devDependencies:
+      '@cordisjs/core':
+        specifier: 3.18.1
+        version: 3.18.1
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/runtime/slots:
+    dependencies:
+      '@orahako/sdk':
+        specifier: workspace:*
+        version: link:../../core/sdk
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+    devDependencies:
+      '@cordisjs/core':
+        specifier: 3.18.1
+        version: 3.18.1
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      '@types/react':
+        specifier: ^19.2.15
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.4(@types/react@19.2.15)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/runtime/storage:
+    dependencies:
+      '@aparajita/capacitor-secure-storage':
+        specifier: ^8.0.0
+        version: 8.0.0
+      '@orahako/sdk':
+        specifier: workspace:*
+        version: link:../../core/sdk
+    devDependencies:
+      '@cordisjs/core':
+        specifier: 3.18.1
+        version: 3.18.1
+      '@orahako/kernel':
+        specifier: workspace:*
+        version: link:../../core/kernel
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/runtime/ui:
+    dependencies:
+      '@orahako/sdk':
+        specifier: workspace:*
+        version: link:../../core/sdk
+    devDependencies:
+      '@cordisjs/core':
+        specifier: 3.18.1
+        version: 3.18.1
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0))
 
 packages:
 

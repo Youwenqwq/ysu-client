@@ -37,11 +37,41 @@
       "@orahako/ui-primitives": [
         "./packages/core/ui-primitives/src/index.ts"
       ],
+      "@orahako/runtime-slots": [
+        "./packages/runtime/slots/src/index.ts"
+      ],
+      "@orahako/runtime-router": [
+        "./packages/runtime/router/src/index.ts"
+      ],
+      "@orahako/runtime-ui": [
+        "./packages/runtime/ui/src/index.ts"
+      ],
+      "@orahako/runtime-i18n": [
+        "./packages/runtime/i18n/src/index.ts"
+      ],
+      "@orahako/runtime-settings": [
+        "./packages/runtime/settings/src/index.ts"
+      ],
+      "@orahako/runtime-storage": [
+        "./packages/runtime/storage/src/index.ts"
+      ],
+      "@orahako/runtime-http": [
+        "./packages/runtime/http/src/index.ts"
+      ],
+      "@orahako/runtime-native": [
+        "./packages/runtime/native/src/index.ts"
+      ],
+      "@orahako/runtime-packages": [
+        "./packages/runtime/packages/src/index.ts"
+      ],
       "@orahako/academic-sdk": [
         "./packages/edu/sdk/src/index.ts"
       ],
       "@orahako/academic-kit": [
         "./packages/edu/kit/src/index.ts"
+      ],
+      "@orahako/academic-runtime": [
+        "./packages/edu/runtime/src/index.ts"
       ],
       "@orahako/plugin-sdk": [
         "./packages/plugin-sdk/index.ts"
@@ -77,6 +107,7 @@
     "website",
     "android",
     "packages/core",
+    "packages/runtime",
     "packages/edu",
     "packages/plugins"
   ]
