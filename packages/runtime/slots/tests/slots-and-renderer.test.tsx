@@ -15,6 +15,7 @@ import {
   type ScopedPluginService,
 } from "@orahako/sdk"
 import { i18nRegistryPlugin, PluginI18nRegistry } from "@orahako/runtime-i18n"
+import { navigationRuntimePlugin, PluginRouter, routerRuntimePlugin } from "@orahako/runtime-router"
 import { PluginSettingsRegistry } from "@orahako/runtime-settings"
 import { PluginUIRegistry, uiRegistryPlugin } from "@orahako/runtime-ui"
 import {
@@ -946,6 +947,160 @@ describe("OrahakoApp root component (root slot, shell selection/fallback, Kernel
     await dom.render(<OrahakoApp host={host} />)
     expect(dom.container.toHtml()).toContain("data-kernel-recovery")
     expect(dom.container.textContent).toContain("应用界面未能加载")
+
+    activeUnmount = undefined
+    await dom.unmount()
+    host.dispose()
+  })
+
+  it("automatically resolves active pages, canonicalizes ?route=, redirects root landing, and localizes empty/crash states when children is omitted", async () => {
+    const dom = mountInteractiveDom()
+    activeUnmount = dom.unmount
+
+    const shellPlugin = definePlugin({
+      manifest: {
+        id: "orahako.shell.test",
+        name: "Test Shell",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "shell",
+        entry: "index.js",
+      },
+      inject: ["ui"],
+      apply(ctx) {
+        ctx.ui.registerShell({ id: "default", name: "Default" }, (props) => (
+          <div data-shell="host">{props.children}</div>
+        ))
+      },
+    })
+
+    const pagesDict = defineDictionary({
+      zh: { home: "首页内容", profile: "个人资料:{tab}" },
+      en: { home: "HomeContent", profile: "ProfileView:{tab}" },
+    })
+
+    const pagesPlugin = definePlugin({
+      manifest: {
+        id: "example.pages",
+        name: "Pages",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+      },
+      inject: ["ui", "router"],
+      apply(ctx) {
+        ctx.ui.registerPage(
+          {
+            id: "home",
+            route: "home",
+            primary: true,
+            requiresProvider: false,
+            dictionary: pagesDict,
+          },
+          (props) => <div>{props.t("home")}</div>
+        )
+        ctx.ui.registerPage(
+          {
+            id: "profile",
+            route: "profile",
+            requiresProvider: false,
+            dictionary: pagesDict,
+            inject: () => ({
+              hooks: {
+                location: ctx.router.current,
+              },
+            }),
+          },
+          (props) => {
+            const loc = props.useLocation()
+            return <div>{props.t("profile", { tab: loc.params.tab ?? "none" })}</div>
+          }
+        )
+        ctx.ui.registerPage(
+          {
+            id: "crash",
+            route: "crash",
+            requiresProvider: false,
+          },
+          () => {
+            throw new Error("page exploded")
+          }
+        )
+      },
+    })
+
+    const source: CompositionSource = {
+      appVersion: "0.16.0",
+      appBuild: "test-auto-page",
+      composition: {
+        id: "test.auto-page",
+        version: 1,
+        defaults: {
+          shell: "orahako.shell.test:default",
+          landing: "home",
+        },
+        plugins: [
+          { id: "orahako.runtime.slots", protected: true },
+          { id: "orahako.runtime.ui", protected: true },
+          { id: "orahako.runtime.i18n", protected: true },
+          { id: "orahako.runtime.router", protected: true, config: { initialHref: "/" } },
+          { id: "orahako.runtime.navigation", protected: true },
+          { id: "orahako.shell.test", protected: true },
+          { id: "example.pages" },
+        ],
+      },
+      plugins: [
+        slotRegistryPlugin,
+        uiRegistryPlugin,
+        i18nRegistryPlugin,
+        routerRuntimePlugin,
+        navigationRuntimePlugin,
+        shellPlugin,
+        pagesPlugin,
+      ],
+    }
+
+    const host = new PluginHost(source, { platformModules: {} })
+    await host.bootstrap()
+    const router = host.runtime.context.get("router") as PluginRouter
+
+    // 1. Omitted children at `/` redirects to `navigation.landing("home")` and renders `home` page!
+    await dom.render(<OrahakoApp host={host} />)
+    expect(dom.container.textContent).toContain("首页内容")
+    expect(router.current.getSnapshot().href).toBe("/?plugin=example.pages&page=home")
+
+    // 2. Navigating to semantic `?route=profile&tab=security` canonicalizes via router.replace preserving params!
+    await act(async () => {
+      router.push("/?route=profile&tab=security")
+    })
+    expect(dom.container.textContent).toContain("个人资料:security")
+    expect(router.current.getSnapshot().href).toBe(
+      "/?plugin=example.pages&page=profile&tab=security"
+    )
+
+    // 3. Navigating to missing page shows localized unavailable empty state (zh -> en)
+    await act(async () => {
+      router.push("/?plugin=missing.plugin&page=nope")
+    })
+    expect(dom.container.textContent).toContain("插件页面不可用")
+    await act(async () => {
+      host.i18n?.setLocale("en")
+    })
+    expect(dom.container.textContent).toContain("Plugin page unavailable")
+
+    // 4. Crashing page is caught by ContributionOutlet errorFallback without crashing the shell!
+    const prevErr = console.error
+    console.error = () => {}
+    try {
+      await act(async () => {
+        router.push("/?route=crash")
+      })
+    } finally {
+      console.error = prevErr
+    }
+    expect(dom.container.toHtml()).toContain('data-shell="host"')
+    expect(dom.container.textContent).toContain("Plugin page failed")
 
     activeUnmount = undefined
     await dom.unmount()
