@@ -1,0 +1,83 @@
+import { defineDictionary, defineStore, type StoreInstance } from "@orahako/sdk"
+
+export const onboardingDictionary = defineDictionary({
+  zh: {
+    title: "初次设置",
+    chooseSchool: "选择学校",
+    online: "在线插件",
+    continue: "继续",
+    installing: "正在获取",
+    installFailed: "获取失败，请重试",
+    permissions: "权限",
+    notifications: "通知",
+    exactAlarm: "精确提醒",
+    battery: "后台运行",
+    noPermissions: "暂无需要配置的权限",
+    allow: "允许",
+    enabled: "已允许",
+    retry: "重试",
+    back: "返回",
+    skip: "跳过",
+    finish: "完成",
+  },
+  en: {
+    title: "Setup",
+    chooseSchool: "Choose your school",
+    online: "Online plugin",
+    continue: "Continue",
+    installing: "Downloading",
+    installFailed: "Download failed. Try again.",
+    permissions: "Permissions",
+    notifications: "Notifications",
+    exactAlarm: "Exact reminders",
+    battery: "Background activity",
+    noPermissions: "No permissions to configure",
+    allow: "Allow",
+    enabled: "Allowed",
+    retry: "Retry",
+    back: "Back",
+    skip: "Skip",
+    finish: "Finish",
+  },
+})
+
+export type OnboardingDictionary = typeof onboardingDictionary
+
+export interface OnboardingState {
+  readonly completed: boolean
+  readonly selectedSchoolId: string | null
+}
+
+export const onboardingStore = defineStore({
+  init: (): OnboardingState => ({
+    completed: false,
+    selectedSchoolId: null,
+  }),
+  persist: {
+    key: "onboarding",
+    mode: "local",
+    version: 1,
+  },
+  actions: {
+    selectSchool(ctx, schoolId: string) {
+      ctx.set((prev) => ({
+        ...prev,
+        selectedSchoolId: schoolId,
+      }))
+    },
+    complete(ctx) {
+      ctx.set((prev) => ({
+        ...prev,
+        completed: true,
+      }))
+    },
+    reset(ctx) {
+      ctx.reset()
+    },
+  },
+})
+
+export type OnboardingStoreInstance = StoreInstance<
+  OnboardingState,
+  typeof onboardingStore.spec.actions
+>
