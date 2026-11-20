@@ -314,6 +314,89 @@ describe("QueryRuntimeService & queryRuntimePlugin", () => {
     query.dispose()
   })
 
+  it("releases transient query records and ignores late results", async () => {
+    const first = Promise.withResolvers<string[]>()
+    const second = Promise.withResolvers<string[]>()
+    const { query } = createQueryTestRig({ provider: makeProvider("ysu") })
+    await query.hydrated
+    const fetcher = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const descriptor = {
+      feature: "test-room-search",
+      params: { name: "301" },
+      releaseOnInactive: true,
+      fetcher,
+    }
+    const source = query.source<string[]>(descriptor)
+    const stop = source.subscribe(() => {})
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    stop()
+    const nextSource = query.source<string[]>(descriptor)
+    expect(nextSource).not.toBe(source)
+    const stopNext = nextSource.subscribe(() => {})
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    second.resolve(["new"])
+    first.resolve(["old"])
+    await vi.waitFor(() => expect(nextSource.getSnapshot().data).toEqual(["new"]))
+    stopNext()
+    query.dispose()
+  })
+
+  it("releases transient search records after the last subscriber and ignores late results", async () => {
+    const first = Promise.withResolvers<string[]>()
+    const second = Promise.withResolvers<string[]>()
+    const { query, getListenerCounts } = createQueryTestRig({ provider: makeProvider("ysu") })
+    await query.hydrated
+    const descriptor = {
+      feature: "test-room-search",
+      params: { name: "301" },
+      releaseOnInactive: true,
+      fetcher: vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise),
+    }
+    const source = query.source<string[]>(descriptor)
+    const stopFirst = source.subscribe(() => {})
+    const stopSecond = source.subscribe(() => {})
+    expect(descriptor.fetcher).toHaveBeenCalledTimes(1)
+    stopFirst()
+    expect(query.source<string[]>(descriptor)).toBe(source)
+    stopSecond()
+    expect(getListenerCounts()).toEqual({ providerListeners: 0, sessionListeners: 0 })
+
+    const rebound = query.source<string[]>(descriptor)
+    expect(rebound).not.toBe(source)
+    expect(rebound.getSnapshot().status).toBe("idle")
+    const stopRebound = rebound.subscribe(() => {})
+    expect(descriptor.fetcher).toHaveBeenCalledTimes(2)
+    second.resolve(["new"])
+    first.resolve(["old"])
+    await vi.waitFor(() => expect(rebound.getSnapshot().data).toEqual(["new"]))
+    stopRebound()
+    expect(query.source<string[]>(descriptor).getSnapshot().status).toBe("idle")
+    query.dispose()
+  })
+
+  it("deduplicates transient sources created before either source subscribes", async () => {
+    const { query } = createQueryTestRig({ provider: makeProvider("ysu") })
+    await query.hydrated
+    const descriptor = {
+      feature: "test-room-search",
+      params: { name: "301" },
+      releaseOnInactive: true,
+      fetcher: vi.fn(async () => [] as string[]),
+    }
+    const first = query.source<string[]>(descriptor)
+    const second = query.source<string[]>(descriptor)
+    expect(second).not.toBe(first)
+
+    const stopFirst = first.subscribe(() => {})
+    const stopSecond = second.subscribe(() => {})
+    expect(descriptor.fetcher).toHaveBeenCalledTimes(1)
+    stopFirst()
+    expect(query.source<string[]>(descriptor)).toBe(second)
+    stopSecond()
+    expect(query.source<string[]>(descriptor)).not.toBe(second)
+    query.dispose()
+  })
+
   it("deduplicates concurrent fetches, tracks upstream listeners only while active, and selectively invalidates", async () => {
     const gate = Promise.withResolvers<Grade[]>()
     const getGrades = vi.fn(() => gate.promise)

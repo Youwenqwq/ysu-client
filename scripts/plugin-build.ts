@@ -8,15 +8,15 @@ import tailwindcss from "@tailwindcss/postcss"
 import { build } from "esbuild"
 import { zipSync } from "fflate"
 import postcss from "postcss"
-import { SUPPORTED_HOST_MODULES } from "../packages/plugin-sdk/host-modules.ts"
-import { validatePluginManifest } from "../packages/plugin-sdk/manifest.ts"
-import { parsePluginPackage } from "../lib/plugins/plugin-package.ts"
+import { isJavaScriptPackagePath, parsePluginPackage } from "@orahako/kernel"
+import { PLATFORM_MODULES, validatePluginManifest } from "@orahako/sdk"
 
 const require = createRequire(import.meta.url)
 const HOST_ROOT = fileURLToPath(new URL("..", import.meta.url))
 const HOST_STYLESHEET = path.join(HOST_ROOT, "app/globals.css")
 const TAILWIND_THEME = require.resolve("tailwindcss/theme.css")
 const TAILWIND_ANIMATIONS = path.join(HOST_ROOT, "node_modules/tw-animate-css/dist/tw-animate.css")
+const platformModules = new Set<string>(PLATFORM_MODULES)
 
 /**
  * Stylesheet generated from the plugin's own Tailwind classes and appended to
@@ -56,7 +56,7 @@ export async function packPlugin(pluginDirectory: string, output?: string): Prom
   )
   if (!sourceEntry) throw new Error(`Missing plugin source entry in ${directory}`)
 
-  await build({
+  const { metafile, outputFiles } = await build({
     absWorkingDir: directory,
     entryPoints: [sourceEntry],
     bundle: true,
@@ -64,7 +64,19 @@ export async function packPlugin(pluginDirectory: string, output?: string): Prom
     platform: "browser",
     target: ["chrome111"],
     outdir: "dist",
-    external: [...SUPPORTED_HOST_MODULES],
+    write: false,
+    metafile: true,
+    plugins: [
+      {
+        name: "orahako-platform-modules",
+        setup(build) {
+          // esbuild's external package patterns also match subpaths.
+          build.onResolve({ filter: /^[^./]/ }, ({ path }) =>
+            platformModules.has(path) ? { path, external: true } : undefined
+          )
+        },
+      },
+    ],
     jsx: "automatic",
     loader: {
       ".png": "dataurl",
@@ -80,10 +92,23 @@ export async function packPlugin(pluginDirectory: string, output?: string): Prom
   })
 
   const files: Record<string, Uint8Array> = {}
-  await collectFiles(directory, path.join(directory, "dist"), files)
+  for (const file of outputFiles) {
+    files[path.relative(directory, file.path).split(path.sep).join("/")] = file.contents
+  }
+  // Metafile output keys are relative to absWorkingDir.
+  if (!metafile.outputs[manifest.entry]?.entryPoint || !isJavaScriptPackagePath(manifest.entry)) {
+    throw new Error(`Built JavaScript entry is missing: ${manifest.entry}`)
+  }
+  for (const [file, output] of Object.entries(metafile.outputs)) {
+    if (!isJavaScriptPackagePath(file)) continue
+    for (const { path, kind, external } of output.imports) {
+      if (external && (!platformModules.has(path) || kind === "require-call")) {
+        throw new Error(`Unsupported import "${path}" in ${file}`)
+      }
+    }
+  }
   const assetsDirectory = path.join(directory, "assets")
   if (existsSync(assetsDirectory)) await collectFiles(directory, assetsDirectory, files)
-  if (!files[manifest.entry]) throw new Error(`Built entry is missing: ${manifest.entry}`)
 
   const utilities = await buildPluginUtilities(directory)
   const styles = [...(manifest.styles ?? [])]
@@ -339,7 +364,7 @@ async function collectFiles(
     if (entry.isDirectory()) await collectFiles(root, absolute, files)
     else if (entry.isFile()) {
       const relative = path.relative(root, absolute).split(path.sep).join("/")
-      files[relative] = new Uint8Array(await readFile(absolute))
+      files[relative] = await readFile(absolute)
     }
   }
 }

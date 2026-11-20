@@ -9,14 +9,11 @@
  * forgot to ship its stylesheet.
  */
 @source "../app";
-@source "../components";
-@source "../hooks";
-@source "../lib";
-@source "../providers";
-@source "../plugins/official";
-@source "../packages/plugin-ui";
-@source "../packages/academic";
-@source "../packages/plugin-sdk";
+@source "../packages/core/*/src/**/*.{ts,tsx}";
+@source "../packages/runtime/*/src/**/*.{ts,tsx}";
+@source "../packages/edu/*/src/**/*.{ts,tsx}";
+@source "../packages/client/*/src/**/*.{ts,tsx}";
+@source "../packages/plugins/*/src/**/*.{ts,tsx}";
 
 @custom-variant dark (&:is(.dark *));
 

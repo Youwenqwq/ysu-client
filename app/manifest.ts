@@ -4,12 +4,11 @@ import { appIdentity } from "./composition/identity"
 export const dynamic = "force-static"
 
 /**
- * Semantic shortcut URLs: the manifest is static, so shortcuts point at stable
- * semantic deep-link destinations that the runtime resolves to the live plugin
- * page (see `lib/navigation/deep-link.ts`). No plugin ids are baked in here.
+ * Resolve against the manifest directory so root query routes work both at `/`
+ * and when deployed under a base path.
  */
 function semanticShortcutHref(id: string): string {
-  return `dashboard/plugin?route=${encodeURIComponent(id)}`
+  return `./?route=${encodeURIComponent(id)}`
 }
 
 type LocalizedManifest = MetadataRoute.Manifest & {
@@ -20,7 +19,7 @@ type LocalizedManifest = MetadataRoute.Manifest & {
 }
 
 export default function manifest(): LocalizedManifest {
-  const basePath = process.env.APP_BASE_PATH || ""
+  const basePath = process.env.NEXT_PUBLIC_APP_BASE_PATH || ""
 
   return {
     id: `${basePath}/`,
@@ -45,7 +44,7 @@ export default function manifest(): LocalizedManifest {
       url: semanticShortcutHref(shortcut.id),
       icons: [
         {
-          src: "icons/icon-192.png",
+          src: `${basePath}/icons/icon-192.png`,
           sizes: "192x192",
           type: "image/png",
         },
@@ -59,7 +58,7 @@ export default function manifest(): LocalizedManifest {
         url: semanticShortcutHref(shortcut.id),
         icons: [
           {
-            src: "icons/icon-192.png",
+            src: `${basePath}/icons/icon-192.png`,
             sizes: "192x192",
             type: "image/png",
           },
@@ -73,23 +72,23 @@ export default function manifest(): LocalizedManifest {
     theme_color: "#ffffff",
     icons: [
       {
-        src: "icons/icon-192.png",
+        src: `${basePath}/icons/icon-192.png`,
         sizes: "192x192",
         type: "image/png",
       },
       {
-        src: "icons/icon-512.png",
+        src: `${basePath}/icons/icon-512.png`,
         sizes: "512x512",
         type: "image/png",
       },
       {
-        src: "icons/icon-maskable-192.png",
+        src: `${basePath}/icons/icon-maskable-192.png`,
         sizes: "192x192",
         type: "image/png",
         purpose: "maskable",
       },
       {
-        src: "icons/icon-maskable-512.png",
+        src: `${basePath}/icons/icon-maskable-512.png`,
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

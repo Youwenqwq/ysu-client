@@ -1,4 +1,5 @@
-import { officialAppIdentity } from "@/plugins/official/app-config"
+import identity from "@orahako/bundle-ysu/identity"
+import type { CompositionIdentity } from "@orahako/sdk"
 
 /**
  * Static application identity for the Next.js metadata and web app manifest.
@@ -6,4 +7,4 @@ import { officialAppIdentity } from "@/plugins/official/app-config"
  * pulling the executable composition (and its client modules) into the server
  * bundle.
  */
-export const appIdentity = officialAppIdentity
+export const appIdentity: CompositionIdentity = identity

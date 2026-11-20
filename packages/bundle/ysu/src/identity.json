@@ -1,0 +1,14 @@
+{
+  "name": "酸橙盒",
+  "shortName": "酸橙盒",
+  "nameEn": "Orahako",
+  "description": "面向燕山大学教务系统的第三方客户端",
+  "descriptionEn": "A third-party client for the Yanshan University academic system.",
+  "applicationId": "me.uwen.orahako",
+  "deepLinkScheme": "orahako",
+  "shortcuts": [
+    { "id": "schedule", "name": "今日课表", "nameEn": "Schedule" },
+    { "id": "grades", "name": "成绩查询", "nameEn": "Grades" },
+    { "id": "exams", "name": "考试安排", "nameEn": "Exams" }
+  ]
+}

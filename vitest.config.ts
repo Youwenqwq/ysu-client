@@ -4,9 +4,6 @@ import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
 
 const root = fileURLToPath(new URL(".", import.meta.url))
-const sdk = `${root}packages/plugin-sdk/`
-const academic = `${root}packages/academic/`
-const pluginUi = `${root}packages/plugin-ui/`
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -70,27 +67,16 @@ const execArgv = process.allowedNodeEnvironmentFlags.has("--no-experimental-webs
 
 export default defineConfig({
   resolve: {
-    alias: [
-      { find: /^@\/(.*)$/, replacement: `${root}$1` },
-      ...discoverWorkspaceAliases(),
-      { find: /^@orahako\/plugin-sdk$/, replacement: `${sdk}index.ts` },
-      { find: /^@orahako\/plugin-sdk\/(.*)$/, replacement: `${sdk}$1` },
-      { find: /^@orahako\/academic$/, replacement: `${academic}index.ts` },
-      { find: /^@orahako\/academic\/(.*)$/, replacement: `${academic}$1` },
-      { find: /^@orahako\/plugin-ui$/, replacement: `${pluginUi}index.ts` },
-      { find: /^@orahako\/plugin-ui\/(.*)$/, replacement: `${pluginUi}$1` },
-    ],
+    alias: [{ find: /^@\/(.*)$/, replacement: `${root}$1` }, ...discoverWorkspaceAliases()],
   },
   test: {
     environment: "node",
     execArgv,
     include: [
-      "lib/**/*.test.ts",
       "app/**/*.test.ts",
       "packages/**/*.test.ts",
       "packages/*/*/tests/**/*.test.ts",
       "packages/*/*/tests/**/*.test.tsx",
-      "plugins/**/*.test.ts",
       "scripts/**/*.test.ts",
     ],
   },

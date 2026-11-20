@@ -330,7 +330,8 @@ export type ClassReminderSettingsProps = DerivedComponentProps<
 >
 
 export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = (props) => {
-  const { t, useStore, actions } = props
+  const { t, useStore, actions, checkExactAlarmPermission } = props
+  const { setClassLiveUpdateEnabled } = actions
   const providerSnap = props.useProvider()
   const classReminderEnabled = useStore((s) => s.classReminderEnabled)
   const classReminderMinutes = useStore((s) => s.classReminderMinutes)
@@ -356,12 +357,11 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
 
     const onReturnToApp = (): void => {
       if (document.visibilityState === "hidden" || !awaitingExactAlarmPermission.current) return
-      void props
-        .checkExactAlarmPermission()
+      void checkExactAlarmPermission()
         .then((granted) => {
           if (granted && awaitingExactAlarmPermission.current) {
             awaitingExactAlarmPermission.current = false
-            actions.setClassLiveUpdateEnabled(true)
+            setClassLiveUpdateEnabled(true)
           }
         })
         .catch(() => {})
@@ -381,7 +381,7 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
         document.removeEventListener("visibilitychange", onReturnToApp)
       }
     }
-  }, [actions, props, visible])
+  }, [checkExactAlarmPermission, setClassLiveUpdateEnabled, visible])
 
   if (!visible) return null
 
@@ -403,7 +403,7 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
   const handleLiveUpdateToggle = async (enabled: boolean): Promise<void> => {
     if (!enabled) {
       awaitingExactAlarmPermission.current = false
-      actions.setClassLiveUpdateEnabled(false)
+      setClassLiveUpdateEnabled(false)
       return
     }
     awaitingExactAlarmPermission.current = true
@@ -412,7 +412,7 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
       const granted = await props.requestExactAlarmPermission()
       if (granted) {
         awaitingExactAlarmPermission.current = false
-        actions.setClassLiveUpdateEnabled(true)
+        setClassLiveUpdateEnabled(true)
       } else {
         toast.info(t("settings.classLiveUpdateExactAlarmRequired"))
       }

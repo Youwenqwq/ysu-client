@@ -5,6 +5,7 @@ export {
   resolveAcademicWeek,
   type AcademicClock,
 } from "./academic-time"
+export { createMinuteClockSource, createParameterizedQuerySource } from "./schedule-sources"
 export {
   COURSE_BG_CLASSES,
   COURSE_PALETTE_SIZE,

@@ -64,6 +64,7 @@ import {
 import {
   FILTER_ALL,
   type SchoolScheduleFilterStoreInstance,
+  type SchoolScheduleTab,
   type SelectedClassroom,
   type SelectedSchoolClass,
 } from "./store"
@@ -75,6 +76,7 @@ export interface FreeRoomContext {
 }
 
 export interface SchoolSchedulePageInject {
+  readonly onTabChange: (tab: SchoolScheduleTab) => void
   readonly hooks: {
     readonly location: ObservableSource<RouteLocation>
     readonly clockTick: ObservableSource<number>
@@ -567,7 +569,7 @@ export const SchoolSchedulePage: SlotComponent<SchoolSchedulePageProps> = (props
     <div className="flex flex-col gap-6" data-page="school-schedule">
       <Tabs
         value={tab}
-        onValueChange={(value) => actions.setTab(value === "room" ? "room" : "class")}
+        onValueChange={(value) => props.onTabChange(value === "room" ? "room" : "class")}
       >
         <TabsList className="w-full">
           <TabsTrigger value="class">{t("classTab")}</TabsTrigger>

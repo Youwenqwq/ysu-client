@@ -3,12 +3,14 @@ import {
   getSlice,
   hasSlice,
   requireSlice,
+  supportsPlugin,
   type ClassPeriod,
   type Course,
   type CurrentWeek,
   type Exam,
   type TermCalendar,
 } from "@orahako/academic-sdk"
+import { createMinuteClockSource, createParameterizedQuerySource } from "@orahako/academic-kit"
 import {
   definePlugin,
   PLUGIN_API_VERSION,
@@ -68,8 +70,6 @@ import {
 } from "./settings"
 import "./slots"
 import {
-  createMinuteClockSource,
-  createParameterizedQuerySource,
   createSchedulePatchMutators,
   schedulePatchesStore,
   scheduleSettingsStore,
@@ -219,10 +219,15 @@ export const schedulePlugin = definePlugin({
     const viewStore = scheduleViewStore.create()
     const minuteClock = createMinuteClockSource()
 
-    const isTimetableEnabled = (): boolean =>
-      !disposed &&
-      session.getSnapshot().isAuthenticated &&
-      hasSlice(provider.getSnapshot().provider, "timetable")
+    const isTimetableEnabled = (): boolean => {
+      const activeProvider = provider.getSnapshot().provider
+      return (
+        !disposed &&
+        session.getSnapshot().isAuthenticated &&
+        supportsPlugin(activeProvider?.supportedPlugins, SCHEDULE_PLUGIN_ID) &&
+        hasSlice(activeProvider, "timetable")
+      )
+    }
 
     const createScheduleSourceForTerm = (semester: string | undefined) =>
       query.source<Course[], "timetable">({
@@ -248,8 +253,7 @@ export const schedulePlugin = definePlugin({
         slice: "timetable",
         params: semester ? { semester } : undefined,
         enabled: () =>
-          !disposed &&
-          session.getSnapshot().isAuthenticated &&
+          isTimetableEnabled() &&
           Boolean(provider.getSnapshot().provider?.slices.timetable?.getCurrentWeek),
         fetcher: async (activeProvider) => {
           const timetable = requireSlice(activeProvider, "timetable")
@@ -266,8 +270,7 @@ export const schedulePlugin = definePlugin({
         slice: "timetable",
         params: semester ? { semester } : undefined,
         enabled: () =>
-          !disposed &&
-          session.getSnapshot().isAuthenticated &&
+          isTimetableEnabled() &&
           Boolean(provider.getSnapshot().provider?.slices.timetable?.getTermCalendar),
         fetcher: async (activeProvider) => {
           const timetable = requireSlice(activeProvider, "timetable")
@@ -282,8 +285,7 @@ export const schedulePlugin = definePlugin({
       feature: "class-periods",
       slice: "timetable",
       enabled: () =>
-        !disposed &&
-        session.getSnapshot().isAuthenticated &&
+        isTimetableEnabled() &&
         Boolean(provider.getSnapshot().provider?.slices.timetable?.getClassPeriods),
       fetcher: async (activeProvider) => {
         const timetable = requireSlice(activeProvider, "timetable")
@@ -300,8 +302,7 @@ export const schedulePlugin = definePlugin({
         slice: "exams",
         params: semester ? { semester } : undefined,
         enabled: () =>
-          !disposed &&
-          session.getSnapshot().isAuthenticated &&
+          isTimetableEnabled() &&
           hasSlice(provider.getSnapshot().provider, "exams"),
         fetcher: (activeProvider) =>
           requireSlice(activeProvider, "exams").getExams(semester ? { semester } : undefined),
@@ -499,6 +500,7 @@ export const schedulePlugin = definePlugin({
             periods: periodsSource,
             exams: pageExamsSource,
           },
+          pluginId: SCHEDULE_PLUGIN_ID,
           patchMutators,
           mobileBridge,
           isNative: () => native.isNative,
@@ -640,6 +642,8 @@ export const schedulePlugin = definePlugin({
       )
     )
 
+    const checkExactAlarmPermission = () => controller.checkExactAlarmPermission()
+
     slots.inject("settings.notifications.reminders", () =>
       slots.register(
         {
@@ -657,7 +661,7 @@ export const schedulePlugin = definePlugin({
             isLiveUpdateSupported: () => detectLiveUpdateSupported(native.isNative),
             toggleClassReminder: (enabled) => controller.setClassReminderEnabled(enabled),
             requestExactAlarmPermission: () => native.requestExactAlarmPermission(),
-            checkExactAlarmPermission: () => controller.checkExactAlarmPermission(),
+            checkExactAlarmPermission,
           }),
         },
         ClassReminderSettings

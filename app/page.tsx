@@ -1,6 +1,6 @@
-import { AppHome } from "./composition"
+import { AppComposition } from "./composition/providers"
 
-/** Static root entry; landing behaviour is selected by the composition root. */
+/** All application destinations are resolved by the client plugin router. */
 export default function HomePage() {
-  return <AppHome />
+  return <AppComposition />
 }

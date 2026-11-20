@@ -29,6 +29,7 @@ import {
 } from "@orahako/sdk"
 import * as publicApi from "../src"
 import { SCHOOL_SCHEDULE_PLUGIN_ID, schoolSchedulePlugin } from "../src"
+import type { SchoolSchedulePageInject } from "../src"
 import { FILTER_ALL, type SchoolScheduleFilterStoreInstance } from "../src/store"
 
 vi.mock("@orahako/ui-primitives", async (importOriginal) => {
@@ -670,6 +671,23 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
       expect(store.source.getSnapshot().tab).toBe("room")
       expect(dom.container.textContent).toContain("正在查找第3周 · 星期二第5节 的空教室")
     })
+
+    const { onTabChange } = pageEntry.inject!(runtime.context) as SchoolSchedulePageInject
+    await act(async () => {
+      onTabChange("class")
+    })
+    expect(store.source.getSnapshot().tab).toBe("class")
+    expect(router.current.getSnapshot().params).toEqual({ week: "3", day: "2", section: "5" })
+
+    await act(async () => {
+      router.replace(router.current.getSnapshot().href)
+    })
+    expect(store.source.getSnapshot().tab).toBe("class")
+
+    await act(async () => {
+      router.push({ route: "school-schedule", params: { tab: "room", week: 3, day: 2, section: 5 } })
+    })
+    expect(store.source.getSnapshot().tab).toBe("room")
 
     // Switch locale to English and search classrooms
     await act(async () => {

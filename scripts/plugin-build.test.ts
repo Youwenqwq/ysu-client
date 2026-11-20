@@ -4,7 +4,7 @@ import path from "node:path"
 import { unzipSync } from "fflate"
 import postcss from "postcss"
 import { afterEach, describe, expect, it } from "vitest"
-import type { PluginManifest } from "@orahako/plugin-sdk/manifest"
+import type { PluginManifest } from "@orahako/sdk"
 import { PLUGIN_TAILWIND_STYLESHEET, packPlugin } from "./plugin-build"
 
 const created: string[] = []
@@ -23,7 +23,7 @@ async function packFixture(manifest: Partial<PluginManifest>, sources: Record<st
     id: "test.sample",
     name: "Sample",
     version: "1.0.0",
-    apiVersion: 2,
+    apiVersion: 3,
     minAppVersion: "0.16.0",
     kind: "feature",
     entry: "dist/index.js",
@@ -55,6 +55,46 @@ describe("plugin packaging styles", () => {
       }
     )
     expect(read("dist/index.js")).toContain("data:image/png")
+  })
+
+  it("keeps API v3 platform modules external in the packed entry", async () => {
+    const { manifest, read } = await packFixture(
+      {},
+      {
+        "src/index.tsx": [
+          'import { definePlugin } from "@orahako/sdk"',
+          'import { Button } from "@orahako/ui-primitives"',
+          'import manifest from "../manifest.json"',
+          "export default definePlugin({ manifest, apply() {} })",
+          'export const preview = <Button>{manifest.name}</Button>',
+        ].join("\n"),
+      }
+    )
+
+    expect(manifest).toMatchObject({ apiVersion: 3, kind: "feature", entry: "dist/index.js" })
+    const entry = read("dist/index.js")
+    expect(entry).toMatch(/from\s*["']@orahako\/sdk["']/)
+    expect(entry).toMatch(/from\s*["']@orahako\/ui-primitives["']/)
+    expect(entry).toMatch(/from\s*["']react\/jsx-runtime["']/)
+  })
+
+  it("rejects API versions older than v3", async () => {
+    await expect(
+      packFixture({ apiVersion: 2 }, { "src/index.ts": "export default null" })
+    ).rejects.toThrow("apiVersion must be 3")
+  })
+
+  it("does not externalize unexported platform package subpaths", async () => {
+    await expect(
+      packFixture(
+        {},
+        {
+          "src/index.ts": 'export { definePlugin as default } from "@orahako/sdk/internal"',
+          "node_modules/@orahako/sdk/package.json": JSON.stringify({ exports: "./index.js" }),
+          "node_modules/@orahako/sdk/index.js": "export function definePlugin() {}",
+        }
+      )
+    ).rejects.toThrow(/Could not resolve "@orahako\/sdk\/internal"/)
   })
 
   it("adds the plugin's Tailwind utilities next to its imported CSS", async () => {

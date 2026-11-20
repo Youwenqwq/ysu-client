@@ -30,8 +30,10 @@ import {
   type ScheduleSelection,
 } from "@orahako/academic-kit"
 import {
+  hasSlice,
   isProviderError,
   ProviderErrorCode,
+  supportsPlugin,
   type ClassPeriod,
   type Course,
   type CurrentWeek,
@@ -119,6 +121,7 @@ export interface SchedulePageInject {
   }
   readonly patchMutators: SchedulePatchMutators
   readonly mobileBridge: MobileLessonBridge
+  readonly pluginId: string
   readonly isNative: () => boolean
   readonly setCompactMode: (compact: boolean) => void
   readonly setWidgetAssistantHidden: (hidden: boolean) => void
@@ -473,6 +476,14 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     </div>
   )
 
+  const activeProvider = providerSnap.provider
+  if (
+    !supportsPlugin(activeProvider?.supportedPlugins, props.pluginId) ||
+    !hasSlice(activeProvider, "timetable")
+  ) {
+    return null
+  }
+
   if (loading && courses.length === 0) {
     return (
       <div className="flex flex-col gap-4" data-page="schedule-loading">
@@ -819,7 +830,14 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
 
   const onSchedulePage =
     location.route === "schedule" || location.pluginId === props.pluginId
-  if (!onSchedulePage) return null
+  const activeProvider = providerSnap.provider
+  if (
+    !onSchedulePage ||
+    !supportsPlugin(activeProvider?.supportedPlugins, props.pluginId) ||
+    !hasSlice(activeProvider, "timetable")
+  ) {
+    return null
+  }
 
   const snapshot = currentWeekQuery.data ?? null
   const rawCalendar = termCalendarQuery.data

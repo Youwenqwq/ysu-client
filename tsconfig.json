@@ -121,23 +121,59 @@
       "@orahako/plugin-ysu-provider": [
         "./packages/plugins/ysu-provider/src/index.ts"
       ],
-      "@orahako/plugin-sdk": [
-        "./packages/plugin-sdk/index.ts"
+      "@orahako/plugin-comprehensive": [
+        "./packages/plugins/comprehensive/src/index.ts"
       ],
-      "@orahako/plugin-sdk/*": [
-        "./packages/plugin-sdk/*"
+      "@orahako/plugin-credits": [
+        "./packages/plugins/credits/src/index.ts"
       ],
-      "@orahako/plugin-ui": [
-        "./packages/plugin-ui/index.ts"
+      "@orahako/plugin-ecard": [
+        "./packages/plugins/ecard/src/index.ts"
       ],
-      "@orahako/plugin-ui/*": [
-        "./packages/plugin-ui/*"
+      "@orahako/plugin-epay": [
+        "./packages/plugins/epay/src/index.ts"
       ],
-      "@orahako/academic": [
-        "./packages/academic/index.ts"
+      "@orahako/plugin-evaluation": [
+        "./packages/plugins/evaluation/src/index.ts"
       ],
-      "@orahako/academic/*": [
-        "./packages/academic/*"
+      "@orahako/plugin-exams": [
+        "./packages/plugins/exams/src/index.ts"
+      ],
+      "@orahako/plugin-grades": [
+        "./packages/plugins/grades/src/index.ts"
+      ],
+      "@orahako/plugin-labor": [
+        "./packages/plugins/labor/src/index.ts"
+      ],
+      "@orahako/plugin-makeup-exams": [
+        "./packages/plugins/makeup-exams/src/index.ts"
+      ],
+      "@orahako/plugin-meter": [
+        "./packages/plugins/meter/src/index.ts"
+      ],
+      "@orahako/plugin-student-info": [
+        "./packages/plugins/student-info/src/index.ts"
+      ],
+      "@orahako/plugin-training-plan": [
+        "./packages/plugins/training-plan/src/index.ts"
+      ],
+      "@orahako/plugin-schedule": [
+        "./packages/plugins/schedule/src/index.ts"
+      ],
+      "@orahako/plugin-school-schedule": [
+        "./packages/plugins/school-schedule/src/index.ts"
+      ],
+      "@orahako/bundle-platform": [
+        "./packages/bundle/platform/src/index.ts"
+      ],
+      "@orahako/bundle-academic": [
+        "./packages/bundle/academic/src/index.ts"
+      ],
+      "@orahako/bundle-ysu": [
+        "./packages/bundle/ysu/src/index.ts"
+      ],
+      "@orahako/bundle-ysu/identity": [
+        "./packages/bundle/ysu/src/identity.json"
       ]
     }
   },

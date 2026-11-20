@@ -2,8 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import "./globals.css"
-import { AppComposition, appIdentity } from "./composition"
-import { cn } from "@/lib/utils"
+import { appIdentity } from "./composition/identity"
 
 const geist = Geist({
   subsets: ["latin"],
@@ -26,6 +25,10 @@ export const metadata: Metadata = {
   applicationName: appIdentity.name,
   authors: [{ name: "orahako contributors" }],
   keywords: [appIdentity.name, appIdentity.nameEn],
+  icons: {
+    icon: `${process.env.NEXT_PUBLIC_APP_BASE_PATH ?? ""}/icon.svg`,
+    apple: `${process.env.NEXT_PUBLIC_APP_BASE_PATH ?? ""}/icons/icon-192.png`,
+  },
   appleWebApp: {
     capable: true,
     title: appIdentity.name,
@@ -50,11 +53,9 @@ export default function RootLayout({
     <html
       lang="zh-CN"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", geist.variable)}
+      className={`antialiased font-sans ${fontMono.variable} ${geist.variable}`}
     >
-      <body>
-        <AppComposition>{children}</AppComposition>
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

@@ -1,9 +1,9 @@
 import type { CapacitorConfig } from "@capacitor/cli"
-import { officialAppIdentity } from "./plugins/official/app-config"
+import { appIdentity } from "./app/composition/identity"
 
 const config: CapacitorConfig = {
-  appId: officialAppIdentity.applicationId,
-  appName: officialAppIdentity.name,
+  appId: appIdentity.applicationId,
+  appName: appIdentity.name,
   webDir: "dist",
   plugins: {
     CapacitorHttp: {

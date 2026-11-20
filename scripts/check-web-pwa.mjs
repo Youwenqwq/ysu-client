@@ -68,15 +68,19 @@ async function checkDeepLink(pathname) {
   }
 
   const final = await fetch(target, { method: 'GET', redirect: 'follow' });
+  const resolved = new URL(final.url);
+  const requested = new URL(target);
+  check(`${pathname} resolves to app root`, resolved.origin === origin.origin && resolved.pathname === '/app/', final.url);
+  check(`${pathname} preserves query`, resolved.search === requested.search, resolved.search);
   check(`${pathname} final response`, final.status === 200, describeResponse(final));
 }
 
-for (const pathname of ['/app', '/app/dashboard/plugin/?plugin=orahako.overview&page=index', '/app/dashboard/me']) {
+for (const pathname of ['/app', '/app/?route=overview', '/app/?plugin=orahako.overview&page=index']) {
   await attempt(`${pathname} deep link`, () => checkDeepLink(pathname));
 }
 
 let appHtml = '';
-for (const pathname of ['/app/', '/app/login/', '/app/dashboard/me/']) {
+for (const pathname of ['/app/', '/app/?route=login']) {
   await attempt(`${pathname} HTML`, async () => {
     const response = await fetch(url(pathname), { method: 'GET', redirect: 'follow' });
     const body = await response.text();
@@ -117,6 +121,19 @@ await attempt('manifest', async () => {
   check('manifest start_url', typeof manifest.start_url === 'string' && manifest.start_url.length > 0, JSON.stringify(manifest.start_url));
   check('manifest scope', typeof manifest.scope === 'string' && manifest.scope.length > 0, JSON.stringify(manifest.scope));
   check('manifest icons', Array.isArray(manifest.icons) && manifest.icons.length > 0, `${Array.isArray(manifest.icons) ? manifest.icons.length : 0} icon(s)`);
+
+  for (const shortcuts of [manifest.shortcuts, ...Object.values(manifest.shortcuts_localized ?? {})]) {
+    check('manifest defines shortcuts', Array.isArray(shortcuts) && shortcuts.length > 0);
+    if (!Array.isArray(shortcuts)) continue;
+    for (const shortcut of shortcuts) {
+      const target = new URL(shortcut.url, manifestUrl);
+      check(
+        `manifest shortcut ${shortcut.name}`,
+        target.origin === origin.origin && target.pathname === '/app/' && Boolean(target.searchParams.get('route')),
+        target.href,
+      );
+    }
+  }
 
   if (Array.isArray(manifest.icons)) {
     for (const [index, icon] of manifest.icons.entries()) {

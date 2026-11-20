@@ -1058,7 +1058,6 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     ).toBe(true)
 
     // Home-screen widgets ("schedule" and "tomorrow") automatically synced from default query sources!
-    console.error("BODY_CHILDREN:", dom.body.childNodes.length, "CONTAINER_CHILDREN:", dom.container.childNodes.length, "CONTAINER_TEXT:", dom.container.textContent)
     await vi.waitFor(() => {
       expect(widgetUpdates.has("schedule")).toBe(true)
       expect(widgetUpdates.has("tomorrow")).toBe(true)
@@ -1073,7 +1072,6 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       scheduleStore.actions.setClassVibrationEnabled(true)
     })
 
-    console.error("BODY_CHILDREN:", dom.body.childNodes.length, "CONTAINER_CHILDREN:", dom.container.childNodes.length, "CONTAINER_TEXT:", dom.container.textContent)
     await vi.waitFor(() => {
       expect(scheduledAlarms.length).toBeGreaterThanOrEqual(1)
       expect(scheduledAlarms[0]).toMatchObject({
@@ -1096,7 +1094,6 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       router.push({ route: "schedule" })
     })
     await dom.render(<ContributionOutlet entry={schedulePage} slots={slots} i18n={i18n} />)
-    console.error("BODY_CHILDREN:", dom.body.childNodes.length, "CONTAINER_CHILDREN:", dom.container.childNodes.length, "CONTAINER_TEXT:", dom.container.textContent)
     await vi.waitFor(() => {
       expect(dom.container.textContent).toContain("高等数学")
       expect(dom.container.textContent).toContain("英语分级考")
@@ -1173,7 +1170,6 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       .getSnapshot()
       .pages.find((p) => p.pluginId === OVERVIEW_PLUGIN_ID && p.id === "index")!
     await dom.render(<ContributionOutlet entry={overviewPage} slots={slots} i18n={i18n} />)
-    console.error("BODY_CHILDREN:", dom.body.childNodes.length, "CONTAINER_CHILDREN:", dom.container.childNodes.length, "CONTAINER_TEXT:", dom.container.textContent)
     await vi.waitFor(() => {
       expect(dom.container.textContent).toContain("下一节")
       expect(dom.container.textContent).toContain("今日课程")
@@ -1206,7 +1202,6 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       notifStore.actions.setChannelEnabled("schedule", false)
     })
 
-    console.error("BODY_CHILDREN:", dom.body.childNodes.length, "CONTAINER_CHILDREN:", dom.container.childNodes.length, "CONTAINER_TEXT:", dom.container.textContent)
     await vi.waitFor(() => {
       expect(scheduledAlarms).toEqual([])
       expect(widgetClears).toEqual(expect.arrayContaining(["schedule", "tomorrow"]))
@@ -1247,7 +1242,6 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       runtime.stop(SCHEDULE_PLUGIN_ID)
     })
 
-    console.error("BODY_CHILDREN:", dom.body.childNodes.length, "CONTAINER_CHILDREN:", dom.container.childNodes.length, "CONTAINER_TEXT:", dom.container.textContent)
     await vi.waitFor(() => {
       expect(alarmCancelCalls).toBeGreaterThan(prevCancels)
       expect(widgetClears).toEqual(expect.arrayContaining(["schedule", "tomorrow"]))

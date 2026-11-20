@@ -286,6 +286,7 @@ interface AnyDescriptor {
   readonly slice?: AcademicSliceKey
   readonly params?: unknown
   readonly enabled?: boolean | (() => boolean)
+  readonly releaseOnInactive?: boolean
   fetcher(provider: SchoolProvider): Promise<unknown>
 }
 
@@ -370,7 +371,7 @@ class QuerySourceHandle {
 
   private getSnapshot = (): QuerySnapshot<unknown> => {
     if (this.listeners.size === 0 && this.boundRecord.inFlight === null) {
-      const latestRecord = this.service.resolveRecordForDescriptor(this.descriptor)
+      const latestRecord = this.service.resolveRecordForDescriptor(this.descriptor, this.boundRecord)
       if (latestRecord !== this.boundRecord) {
         this.boundRecord = latestRecord
       }
@@ -604,6 +605,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
       slice: descriptor.slice,
       params: descriptor.params,
       enabled: descriptor.enabled,
+      releaseOnInactive: descriptor.releaseOnInactive,
       fetcher: (provider) => descriptor.fetcher(provider),
     }
     const resolved = this.resolveIdentity(anyDesc)
@@ -612,10 +614,11 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
       existing.updateDescriptor(anyDesc)
       return existing.source as ObservableSource<QuerySnapshot<T>>
     }
-
-    const record = this.getOrCreateRecord(resolved, anyDesc)
+    const record = anyDesc.releaseOnInactive
+      ? new QueryIdentityRecord(resolved, anyDesc.feature, anyDesc.slice)
+      : this.getOrCreateRecord(resolved, anyDesc)
     const handle = new QuerySourceHandle(this, resolved.recordKey, anyDesc, record)
-    this.handles.set(resolved.recordKey, handle)
+    if (!anyDesc.releaseOnInactive) this.handles.set(resolved.recordKey, handle)
     return handle.source as ObservableSource<QuerySnapshot<T>>
   };
 
@@ -666,13 +669,26 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     }
   }
 
-  resolveRecordForDescriptor(descriptor: AnyDescriptor): QueryIdentityRecord {
+  resolveRecordForDescriptor(
+    descriptor: AnyDescriptor,
+    passiveRecord?: QueryIdentityRecord
+  ): QueryIdentityRecord {
     const resolved = this.resolveIdentity(descriptor)
+    if (descriptor.releaseOnInactive) {
+      if (passiveRecord?.recordKey === resolved.recordKey) return passiveRecord
+      return new QueryIdentityRecord(resolved, descriptor.feature, descriptor.slice)
+    }
     return this.getOrCreateRecord(resolved, descriptor)
   }
 
   activateHandle(handle: QuerySourceHandle): void {
     this.activeHandles.add(handle)
+    if (handle.descriptor.releaseOnInactive) {
+      const existing = this.handles.get(handle.handleKey)
+      if (existing && existing !== handle) handle.rebindRecord(existing.currentRecord)
+      this.handles.set(handle.handleKey, handle)
+      this.records.set(handle.currentRecord.recordKey, handle.currentRecord)
+    }
     this.syncUpstreamSubscriptions()
     this.reconcileHandle(handle)
     this.recomputeActivity()
@@ -681,14 +697,28 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
   deactivateHandle(handle: QuerySourceHandle): void {
     this.activeHandles.delete(handle)
     this.syncUpstreamSubscriptions()
+    if (handle.descriptor.releaseOnInactive) this.releaseHandle(handle)
     this.recomputeActivity()
   }
 
+  private releaseHandle(handle: QuerySourceHandle): void {
+    if (this.handles.get(handle.handleKey) === handle) this.handles.delete(handle.handleKey)
+    this.releaseRecord(handle.currentRecord)
+  }
+
+  private releaseRecord(record: QueryIdentityRecord): void {
+    if (record.holderCount !== 0 || record.manualRefreshCount !== 0) return
+    if (this.records.get(record.recordKey) === record) this.records.delete(record.recordKey)
+    record.fetchEpoch += 1
+    record.inFlight = null
+  }
   reconcileHandle(handle: QuerySourceHandle): void {
     if (this.disposed) return
-    const targetRecord = this.resolveRecordForDescriptor(handle.descriptor)
-    if (targetRecord !== handle.currentRecord) {
+    const previousRecord = handle.currentRecord
+    const targetRecord = this.resolveRecordForDescriptor(handle.descriptor, previousRecord)
+    if (targetRecord !== previousRecord) {
       handle.rebindRecord(targetRecord)
+      if (handle.descriptor.releaseOnInactive) this.releaseRecord(previousRecord)
     }
     this.reconcileRecord(targetRecord, handle.descriptor)
     handle.syncAndNotify()
@@ -703,11 +733,12 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
       return undefined
     }
 
-    const targetRecord = this.resolveRecordForDescriptor(handle.descriptor)
-    if (targetRecord !== handle.currentRecord) {
+    const previousRecord = handle.currentRecord
+    const targetRecord = this.resolveRecordForDescriptor(handle.descriptor, previousRecord)
+    if (targetRecord !== previousRecord) {
       handle.rebindRecord(targetRecord)
+      if (handle.descriptor.releaseOnInactive) this.releaseRecord(previousRecord)
     }
-
     const providerSnap = this.provider.getSnapshot()
     const activeProvider = providerSnap.provider
 
@@ -736,6 +767,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
         targetRecord.notify()
       }
       handle.syncAndNotify()
+      if (handle.descriptor.releaseOnInactive) this.releaseRecord(targetRecord)
       return undefined
     }
 
@@ -744,6 +776,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     if (providerSnap.status !== "ready" || activeProvider === null) {
       this.reconcileRecord(targetRecord, handle.descriptor)
       handle.syncAndNotify()
+      if (handle.descriptor.releaseOnInactive) this.releaseRecord(targetRecord)
       return targetRecord.fields.data
     }
 
@@ -757,6 +790,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     } finally {
       targetRecord.manualRefreshCount = Math.max(0, targetRecord.manualRefreshCount - 1)
       this.activeRefreshCount = Math.max(0, this.activeRefreshCount - 1)
+      if (handle.descriptor.releaseOnInactive) this.releaseRecord(targetRecord)
       this.syncUpstreamSubscriptions()
       this.recomputeActivity()
     }
@@ -1142,7 +1176,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     const username = sessionSnap.username ?? null
     const paramsKey = stableStringify(descriptor.params ?? null)
     const sliceKey = descriptor.slice ?? ""
-    const recordKey = `${providerId}|${providerScope}|${username ?? ""}|${descriptor.feature}|${paramsKey}|${sliceKey}`
+    const recordKey = `${providerId}|${providerScope}|${username ?? ""}|${descriptor.feature}|${paramsKey}|${sliceKey}${descriptor.releaseOnInactive ? "|transient" : ""}`
     const persistentKey = username
       ? providerCacheKey(providerId, providerScope, username, descriptor.feature, descriptor.params)
       : null

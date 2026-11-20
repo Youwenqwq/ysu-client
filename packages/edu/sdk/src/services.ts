@@ -121,6 +121,8 @@ export interface QueryDescriptor<T, K extends AcademicSliceKey = AcademicSliceKe
   readonly slice?: K
   readonly params?: unknown
   readonly enabled?: boolean | (() => boolean)
+  /** Release this source's in-memory handle and record after its last subscriber detaches. */
+  readonly releaseOnInactive?: boolean
   fetcher(provider: SchoolProvider): Promise<T>
 }
 

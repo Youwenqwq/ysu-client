@@ -2,10 +2,10 @@
   "id": "example.shell",
   "name": "Community Shell",
   "version": "1.0.0",
-  "apiVersion": 2,
+  "apiVersion": 3,
   "minAppVersion": "0.16.0",
   "kind": "shell",
   "entry": "dist/index.js",
-  "inject": ["ui", "slots"],
+  "inject": ["ui", "router"],
   "description": "A complete replacement application shell example."
 }

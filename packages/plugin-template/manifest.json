@@ -2,12 +2,13 @@
   "id": "example.hello",
   "name": "Hello Plugin",
   "version": "1.0.0",
-  "apiVersion": 2,
+  "apiVersion": 3,
   "minAppVersion": "0.16.0",
   "kind": "feature",
   "entry": "dist/index.js",
   "styles": ["dist/index.css"],
-  "inject": ["ui", "slots", "i18n"],
+  "inject": ["ui", "slots"],
   "requires": { "orahako.shell": "^1.0.0" },
+  "providerIndependent": true,
   "description": "A complete feature plugin example."
 }

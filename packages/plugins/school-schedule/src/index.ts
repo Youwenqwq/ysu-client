@@ -2,6 +2,7 @@ import { CalendarDays } from "lucide-react"
 import {
   hasSlice,
   requireSlice,
+  supportsPlugin,
   type ClassPeriod,
   type ClassroomInfo,
   type ClassroomQueryOptions,
@@ -13,7 +14,8 @@ import {
   type SchoolClassQueryOptions,
   type TermCalendar,
 } from "@orahako/academic-sdk"
-import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/sdk"
+import { createMinuteClockSource, createParameterizedQuerySource } from "@orahako/academic-kit"
+import { definePlugin, PLUGIN_API_VERSION, type PluginManifest, type RouteLocation } from "@orahako/sdk"
 import { schoolScheduleDictionary, type SchoolScheduleDictionary } from "./dictionary"
 import {
   SchoolSchedulePage,
@@ -22,8 +24,6 @@ import {
   type SchoolSchedulePageProps,
 } from "./page"
 import {
-  createMinuteClockSource,
-  createParameterizedQuerySource,
   FILTER_ALL,
   schoolScheduleFilterStore,
   type SchoolScheduleFilterState,
@@ -72,14 +72,14 @@ export const schoolSchedulePlugin = definePlugin({
     const isSchoolScheduleEnabled = (): boolean =>
       !disposed &&
       session.getSnapshot().isAuthenticated &&
+      supportsPlugin(provider.getSnapshot().provider?.supportedPlugins, SCHOOL_SCHEDULE_PLUGIN_ID) &&
       hasSlice(provider.getSnapshot().provider, "schoolSchedule")
 
     const currentWeekSource = query.source<CurrentWeek, "timetable">({
       feature: "current-week",
       slice: "timetable",
       enabled: () =>
-        !disposed &&
-        session.getSnapshot().isAuthenticated &&
+        isSchoolScheduleEnabled() &&
         Boolean(provider.getSnapshot().provider?.slices.timetable?.getCurrentWeek),
       fetcher: async (activeProvider) => {
         const timetable = requireSlice(activeProvider, "timetable")
@@ -94,8 +94,7 @@ export const schoolSchedulePlugin = definePlugin({
       feature: "term-calendar",
       slice: "timetable",
       enabled: () =>
-        !disposed &&
-        session.getSnapshot().isAuthenticated &&
+        isSchoolScheduleEnabled() &&
         Boolean(provider.getSnapshot().provider?.slices.timetable?.getTermCalendar),
       fetcher: async (activeProvider) => {
         const timetable = requireSlice(activeProvider, "timetable")
@@ -110,8 +109,7 @@ export const schoolSchedulePlugin = definePlugin({
       feature: "class-periods",
       slice: "timetable",
       enabled: () =>
-        !disposed &&
-        session.getSnapshot().isAuthenticated &&
+        isSchoolScheduleEnabled() &&
         Boolean(provider.getSnapshot().provider?.slices.timetable?.getClassPeriods),
       fetcher: async (activeProvider) => {
         const timetable = requireSlice(activeProvider, "timetable")
@@ -151,6 +149,7 @@ export const schoolSchedulePlugin = definePlugin({
           feature: "school-majors",
           slice: "schoolSchedule",
           params: department,
+          releaseOnInactive: true,
           enabled: isSchoolScheduleEnabled,
           fetcher: (activeProvider) =>
             requireSlice(activeProvider, "schoolSchedule").getSchoolMajors(department),
@@ -183,6 +182,7 @@ export const schoolSchedulePlugin = definePlugin({
           feature: "school-classes",
           slice: "schoolSchedule",
           params: filter,
+          releaseOnInactive: true,
           enabled: isSchoolScheduleEnabled,
           fetcher: (activeProvider) =>
             requireSlice(activeProvider, "schoolSchedule").getSchoolClasses(filter),
@@ -204,6 +204,7 @@ export const schoolSchedulePlugin = definePlugin({
           feature: "school-class-schedule",
           slice: "schoolSchedule",
           params: [classId, undefined],
+          releaseOnInactive: true,
           enabled: isSchoolScheduleEnabled,
           fetcher: (activeProvider) =>
             requireSlice(activeProvider, "schoolSchedule").getSchoolClassSchedule(classId),
@@ -232,6 +233,7 @@ export const schoolSchedulePlugin = definePlugin({
           feature: "school-buildings",
           slice: "schoolSchedule",
           params: campus,
+          releaseOnInactive: true,
           enabled: isSchoolScheduleEnabled,
           fetcher: (activeProvider) =>
             requireSlice(activeProvider, "schoolSchedule").getSchoolBuildings(campus),
@@ -264,6 +266,7 @@ export const schoolSchedulePlugin = definePlugin({
           feature: "school-classrooms",
           slice: "schoolSchedule",
           params: filter,
+          releaseOnInactive: true,
           enabled: isSchoolScheduleEnabled,
           fetcher: (activeProvider) =>
             requireSlice(activeProvider, "schoolSchedule").getSchoolClassrooms(filter),
@@ -285,6 +288,7 @@ export const schoolSchedulePlugin = definePlugin({
           feature: "school-classroom-schedule",
           slice: "schoolSchedule",
           params: [code, undefined],
+          releaseOnInactive: true,
           enabled: isSchoolScheduleEnabled,
           fetcher: (activeProvider) =>
             requireSlice(activeProvider, "schoolSchedule").getSchoolClassroomSchedule(code),
@@ -292,19 +296,34 @@ export const schoolSchedulePlugin = definePlugin({
       },
     })
 
-    const syncRouteTab = () => {
-      if (router.current.getSnapshot().params.tab === "room") {
-        filterStore.actions.setTab("room")
-      }
+    const isOwnPage = (location: RouteLocation) =>
+      location.route === "school-schedule" || location.pluginId === SCHOOL_SCHEDULE_PLUGIN_ID
+
+    // Keep the route hint from overriding a tab choice on repeated location emissions.
+    let hadRoomTabHint = false
+    const syncRouteTab = (location: RouteLocation) => {
+      const hasRoomTabHint = isOwnPage(location) && location.params.tab === "room"
+      const enteredRoomTab = hasRoomTabHint && !hadRoomTabHint
+      hadRoomTabHint = hasRoomTabHint
+      if (enteredRoomTab) filterStore.actions.setTab("room")
     }
-    const unsubscribeRouteTab = router.current.subscribe(syncRouteTab)
-    syncRouteTab()
+
+    const changeTab = (tab: SchoolScheduleTab) => {
+      if (filterStore.source.getSnapshot().tab === tab) return
+      filterStore.actions.setTab(tab)
+      const location = router.current.getSnapshot()
+      if (!isOwnPage(location) || location.params.tab === undefined) return
+      const search = new URLSearchParams(location.search)
+      search.delete("tab")
+      router.replace(`?${search.toString()}`)
+    }
+    const syncCurrentRouteTab = () => syncRouteTab(router.current.getSnapshot())
+    const unsubscribeRouteTab = router.current.subscribe(syncCurrentRouteTab)
+    syncCurrentRouteTab()
 
     router.registerBackGuard(() => {
       const location = router.current.getSnapshot()
-      const onOwnPage =
-        location.route === "school-schedule" || location.pluginId === SCHOOL_SCHEDULE_PLUGIN_ID
-      if (!onOwnPage) return false
+      if (!isOwnPage(location)) return false
       const state = filterStore.source.getSnapshot()
       if (state.tab === "class" && state.selectedClass !== null) {
         filterStore.actions.selectClass(null)
@@ -328,6 +347,7 @@ export const schoolSchedulePlugin = definePlugin({
         dictionary: schoolScheduleDictionary,
         store: filterStore,
         inject: (): SchoolSchedulePageInject => ({
+          onTabChange: changeTab,
           hooks: {
             location: router.current,
             clockTick: minuteClock.source,
