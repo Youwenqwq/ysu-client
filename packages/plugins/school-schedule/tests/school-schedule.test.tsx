@@ -31,6 +31,17 @@ import * as publicApi from "../src"
 import { SCHOOL_SCHEDULE_PLUGIN_ID, schoolSchedulePlugin } from "../src"
 import { FILTER_ALL, type SchoolScheduleFilterStoreInstance } from "../src/store"
 
+vi.mock("@orahako/ui-primitives", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  return {
+    ...actual,
+    Tabs: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    TabsList: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    TabsTrigger: ({ children }: { children: ReactNode }) => <button>{children}</button>,
+    TabsContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  }
+})
+
 class MiniDomNode {
   readonly nodeType: number
   readonly nodeName: string

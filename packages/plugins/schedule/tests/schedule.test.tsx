@@ -73,6 +73,21 @@ import {
   type ScheduleSettingsStoreInstance,
 } from "../src/stores"
 
+vi.mock("@orahako/ui-primitives", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  const PassThrough = ({ children }: { children: ReactNode }) => <>{children}</>
+  return {
+    ...actual,
+    ResponsiveModal: PassThrough,
+    ResponsiveModalContent: PassThrough,
+    ResponsiveModalHeader: PassThrough,
+    ResponsiveModalTitle: PassThrough,
+    ResponsiveModalDescription: PassThrough,
+    ResponsiveModalBody: PassThrough,
+    ResponsiveModalFooter: PassThrough,
+  }
+})
+
 class MiniDomNode {
   readonly nodeType: number
   readonly nodeName: string
