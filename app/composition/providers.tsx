@@ -4,6 +4,8 @@ import { PluginHost } from "@orahako/kernel"
 import { KernelRecovery, OrahakoApp } from "@orahako/runtime-slots"
 import { useEffect, useState } from "react"
 
+import { BootSplash } from "./boot-splash"
+
 export function AppComposition() {
   const [host, setHost] = useState<PluginHost>()
   const [error, setError] = useState<string>()
@@ -49,9 +51,5 @@ export function AppComposition() {
 
   if (host) return <OrahakoApp host={host} />
   if (error !== undefined) return <KernelRecovery message={error} />
-  return (
-    <main className="grid min-h-dvh place-items-center p-6" role="status">
-      正在启动应用…
-    </main>
-  )
+  return <BootSplash />
 }
