@@ -10,6 +10,7 @@ import {
   type PluginManifest,
 } from "@orahako/sdk"
 import { examsDictionary, type ExamsDictionary } from "./dictionary"
+import { ExamsHeaderActions, type ExamsHeaderActionsInject } from "./header-actions"
 import { UpcomingExamsWidget, type UpcomingExamsWidgetInject } from "./overview-widget"
 import { ExamsPage, type ExamsPageInject } from "./page"
 import {
@@ -21,6 +22,7 @@ import {
 import "./slots"
 import {
   examsSettingsStore,
+  examsViewStore,
   type ExamsSettingsState,
   type ExamsSettingsStoreInstance,
 } from "./store"
@@ -96,6 +98,7 @@ export const examsPlugin = definePlugin({
     let disposed = false
 
     const settingsStore = examsSettingsStore.create(storage)
+    const viewStore = examsViewStore.create()
 
     const clearExamWidgets = (): Promise<void> => clearExamWidgetSnapshots(widgets)
 
@@ -245,6 +248,26 @@ export const examsPlugin = definePlugin({
       }
     })
 
+    slots.inject("shell.header.actions", () =>
+      slots.register(
+        {
+          id: "exams-header-actions",
+          slot: "shell.header.actions",
+          dictionary: examsDictionary,
+          store: viewStore,
+          inject: (): ExamsHeaderActionsInject => ({
+            hooks: {
+              location: router.current,
+              provider: provider.state,
+              queriedTerm: pageExamsController.term,
+            },
+            pluginId: EXAMS_PLUGIN_ID,
+          }),
+        },
+        ExamsHeaderActions
+      )
+    )
+
     ui.registerPage(
       {
         id: "index",
@@ -254,13 +277,15 @@ export const examsPlugin = definePlugin({
         capability: "exams",
         requiresProvider: true,
         dictionary: examsDictionary,
+        store: viewStore,
         inject: (): ExamsPageInject => ({
           hooks: {
             exams: pageExamsController.source,
+            queriedTerm: pageExamsController.term,
           },
           queryBySemester: async (semester: string) => {
             const trimmed = semester.trim()
-            if (trimmed === pageExamsController.getTerm()) {
+            if (trimmed === pageExamsController.term.getSnapshot()) {
               await pageExamsController.refresh()
               return
             }
@@ -288,6 +313,7 @@ export const examsPlugin = definePlugin({
       unregisterChannel?.()
       unregisterChannel = null
       pageExamsController.dispose()
+      viewStore.dispose()
       settingsStore.dispose()
       void clearExamWidgets()
     })

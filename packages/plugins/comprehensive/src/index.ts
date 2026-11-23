@@ -1,6 +1,7 @@
 import { Gauge } from "lucide-react"
 import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/sdk"
 import { comprehensiveDictionary, type ComprehensiveDictionary } from "./dictionary"
+import { ComprehensiveHeaderActions, type ComprehensiveHeaderActionsInject } from "./header-actions"
 import {
   ComprehensivePage,
   type ComprehensivePageInject,
@@ -11,6 +12,8 @@ import {
   type ComprehensiveSources,
   type ComprehensiveTermSelection,
 } from "./sources"
+import "./slots"
+import { comprehensiveViewStore } from "./view-store"
 
 export const COMPREHENSIVE_PLUGIN_ID = "orahako.comprehensive"
 
@@ -30,17 +33,39 @@ const comprehensiveManifest: PluginManifest = {
   kind: "feature",
   entry: "index.js",
   description: "综测成绩、指标对比、历年总览与学业成绩报告",
-  inject: ["ui", "i18n", "provider", "session", "query"],
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"],
 }
 
 export const comprehensivePlugin = definePlugin({
   manifest: comprehensiveManifest,
-  inject: ["ui", "i18n", "provider", "session", "query"] as const,
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"] as const,
   apply(ctx) {
-    const { ui, i18n, provider, session, query } = ctx
+    const { ui, slots, router, i18n, provider, session, query } = ctx
     i18n.register(comprehensiveDictionary)
 
     const sources = createComprehensiveSources({ query, provider, session })
+    const viewStore = comprehensiveViewStore.create()
+
+    slots.inject("shell.header.actions", () =>
+      slots.register(
+        {
+          id: "comprehensive-header-actions",
+          slot: "shell.header.actions",
+          dictionary: comprehensiveDictionary,
+          store: viewStore,
+          inject: (): ComprehensiveHeaderActionsInject => ({
+            hooks: {
+              location: router.current,
+              provider: provider.state,
+              terms: sources.termsSource,
+              selectedTerm: sources.selectedTermSource,
+            },
+            pluginId: COMPREHENSIVE_PLUGIN_ID,
+          }),
+        },
+        ComprehensiveHeaderActions
+      )
+    )
 
     ui.registerPage(
       {
@@ -50,6 +75,7 @@ export const comprehensivePlugin = definePlugin({
         titleKey: "pageTitle",
         capability: "comprehensive",
         dictionary: comprehensiveDictionary,
+        store: viewStore,
         inject: (): ComprehensivePageInject => ({
           hooks: {
             terms: sources.termsSource,
@@ -82,6 +108,7 @@ export const comprehensivePlugin = definePlugin({
 
     ctx.effect(() => () => {
       sources.dispose()
+      viewStore.dispose()
     })
   },
 })

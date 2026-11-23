@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import type {
   DerivedComponentProps,
   ObservableSource,
+  RouteLocation,
   SlotComponent,
   Translator,
 } from "@orahako/sdk"
@@ -48,6 +49,46 @@ export type MeterPageProps = DerivedComponentProps<
   MeterRoomStoreInstance,
   MeterPageInject
 >
+
+export interface MeterHeaderActionsInject {
+  readonly hooks: {
+    readonly location: ObservableSource<RouteLocation>
+    readonly meter: ObservableSource<MeterQuerySnapshot>
+  }
+  readonly pluginId: string
+  readonly refresh: () => Promise<void>
+}
+
+type MeterHeaderActionsProps = DerivedComponentProps<
+  Record<string, never>,
+  MeterDictionary,
+  undefined,
+  undefined,
+  MeterHeaderActionsInject
+>
+
+export const MeterHeaderActions: SlotComponent<MeterHeaderActionsProps> = (props) => {
+  const location = props.useLocation()
+  const isLoading = props.useMeter((state) => state.isLoading)
+  const onPage = location.route
+    ? location.route === "meter"
+    : location.pluginId === props.pluginId && (location.pageId ?? "index") === "index"
+  if (!onPage) return null
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className="md:hidden"
+      onClick={() => void props.refresh()}
+      disabled={isLoading}
+      aria-label={props.t("meter.refresh")}
+    >
+      <RefreshCw className={cn("size-4", isLoading && "animate-spin")} />
+    </Button>
+  )
+}
 
 function formatFailure(failure: MeterQueryFailure, t: Translator<MeterDictionary>): string {
   if (failure.kind === "not_bound") {
@@ -123,6 +164,7 @@ export const MeterPage: SlotComponent<MeterPageProps> = (props) => {
               type="button"
               variant="outline"
               size="icon"
+              className="hidden md:inline-flex"
               onClick={() => void refresh()}
               disabled={loading}
               aria-label={t("meter.refresh")}
@@ -177,7 +219,7 @@ export const MeterPage: SlotComponent<MeterPageProps> = (props) => {
 
   if (!storeHydrated || (!effectiveAccount && !session.hasHydrated)) {
     return (
-      <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-4">
         {selectorBar}
         <Skeleton className="h-44 w-full" />
         <Skeleton className="h-40 w-full" />
@@ -204,7 +246,7 @@ export const MeterPage: SlotComponent<MeterPageProps> = (props) => {
 
   if (!data && loading) {
     return (
-      <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-4">
         {selectorBar}
         <Skeleton className="h-44 w-full" />
         <Skeleton className="h-40 w-full" />
@@ -258,11 +300,11 @@ export const MeterPage: SlotComponent<MeterPageProps> = (props) => {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4" data-meter-page="">
+    <div className="flex flex-col gap-4" data-meter-page="">
       {selectorBar}
 
       {updatedAt ? (
-        <div className="flex items-center justify-end">
+        <div className="hidden items-center justify-end sm:flex">
           <span className="text-xs text-muted-foreground">
             {t("meter.updatedAt", {
               time: updatedAt.toLocaleTimeString([], {

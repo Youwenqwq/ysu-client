@@ -1,6 +1,53 @@
 import type { Grade } from "@orahako/academic-sdk"
 import { defineStore, type StoreInstance } from "@orahako/sdk"
 
+export const ALL_TERM = "__all__"
+
+type GradesSortMode = "default" | "asc" | "desc"
+
+export interface GradesViewState {
+  readonly term: string
+  readonly sortMode: GradesSortMode
+  readonly filterDrawerOpen: boolean
+}
+
+export const gradesViewStore = defineStore({
+  init: (): GradesViewState => ({ term: ALL_TERM, sortMode: "default", filterDrawerOpen: false }),
+  actions: {
+    setTerm(ctx, term: string) {
+      ctx.set((prev) => (prev.term === term ? prev : { ...prev, term }))
+    },
+    setDefaultTerm(ctx, term: string) {
+      if (term !== ALL_TERM) {
+        ctx.set((prev) => (prev.term === ALL_TERM ? { ...prev, term } : prev))
+      }
+    },
+    setSortMode(ctx, sortMode: GradesSortMode) {
+      ctx.set((prev) => (prev.sortMode === sortMode ? prev : { ...prev, sortMode }))
+    },
+    cycleSort(ctx) {
+      ctx.set((prev) => ({
+        ...prev,
+        sortMode:
+          prev.sortMode === "default" ? "desc" : prev.sortMode === "desc" ? "asc" : "default",
+      }))
+    },
+    setFilterDrawerOpen(ctx, filterDrawerOpen: boolean) {
+      ctx.set((prev) =>
+        prev.filterDrawerOpen === filterDrawerOpen ? prev : { ...prev, filterDrawerOpen }
+      )
+    },
+    reset(ctx) {
+      ctx.reset()
+    },
+  },
+})
+
+export type GradesViewStoreInstance = StoreInstance<
+  GradesViewState,
+  typeof gradesViewStore.spec.actions
+>
+
 export const ANONYMOUS_GRADE_USER = "__anonymous__"
 
 export function normalizeGradeUser(username: string | null | undefined): string {

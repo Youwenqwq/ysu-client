@@ -71,6 +71,7 @@ import {
   schedulePatchesStore,
   scheduleSettingsStore,
   type ScheduleSettingsStoreInstance,
+  type ScheduleViewStoreInstance,
 } from "../src/stores"
 
 vi.mock("@orahako/ui-primitives", async (importOriginal) => {
@@ -1088,7 +1089,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       .pages.find((p) => p.pluginId === SCHEDULE_PLUGIN_ID && p.id === "index")!
     expect(schedulePage.route).toBe("schedule")
     expect(schedulePage.primary).toBe(true)
-    expect(schedulePage.fullscreen).toBe(true)
+    expect(schedulePage.fullscreen).toBeUndefined()
 
     await act(async () => {
       router.push({ route: "schedule" })
@@ -1098,6 +1099,20 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       expect(dom.container.textContent).toContain("高等数学")
       expect(dom.container.textContent).toContain("英语分级考")
     })
+
+    const viewStore = schedulePage.store as ScheduleViewStoreInstance
+    await act(async () => {
+      viewStore.actions.setShowOriginal(true)
+      router.back()
+    })
+    expect(viewStore.source.getSnapshot().showOriginal).toBe(false)
+    expect(router.current.getSnapshot().route).toBe("schedule")
+
+    await act(async () => {
+      router.push({ route: "student-info" })
+      router.back()
+    })
+    expect(router.current.getSnapshot().route).toBe("schedule")
 
     // Verify mobileBridge sign-in executes location sign-in via native.geolocation@1 -> doStudentSign
     const injectedPage = schedulePage.inject!(runtime.context) as {

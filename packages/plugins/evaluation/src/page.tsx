@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react"
-import { ChevronDown, ChevronRight, ClipboardCheck, Sparkles } from "lucide-react"
+import { ChevronRight, ClipboardCheck, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import type {
   EvaluationAnswer,
@@ -30,10 +30,6 @@ import {
   CardTitle,
   Checkbox,
   cn,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Empty,
   EmptyHeader,
   EmptyMedia,
@@ -58,6 +54,7 @@ import {
   useErrorToast,
 } from "@orahako/ui-primitives"
 import type { EvaluationDictionary } from "./dictionary"
+import type { EvaluationViewStoreInstance } from "./view-store"
 import {
   autoFillMaxScore,
   createInitialAnswers,
@@ -113,12 +110,12 @@ export type EvaluationPageProps = DerivedComponentProps<
   Record<string, never>,
   EvaluationDictionary,
   undefined,
-  undefined,
+  EvaluationViewStoreInstance,
   EvaluationPageInject
 >
 
 export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
-  const { t } = props
+  const { t, useStore, actions } = props
   const typesQuery = props.useTypes()
   const selectedType = props.useSelectedType()
   const tasksQuery = props.useTasks()
@@ -136,15 +133,15 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
   const [previewOpen, setPreviewOpen] = useState(false)
 
   // Batch dialog states
-  const [batchSelectOpen, setBatchSelectOpen] = useState(false)
+  const batchSelectOpen = useStore((state) => state.batchSelectOpen)
+  const selectedTaskIds = useStore((state) => state.selectedTaskIds)
+  const batchTextAnswer = useStore((state) => state.batchTextAnswer)
   const [batchPreviewOpen, setBatchPreviewOpen] = useState(false)
   const [batchProgressOpen, setBatchProgressOpen] = useState(false)
-  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
   const [batchTasks, setBatchTasks] = useState<BatchTaskResult[]>([])
   const [batchCurrentIdx, setBatchCurrentIdx] = useState(0)
   const [batchPhase, setBatchPhase] = useState<"fill" | "submit">("fill")
   const [batchDetailIdx, setBatchDetailIdx] = useState<number | null>(null)
-  const [batchTextAnswer, setBatchTextAnswer] = useState("")
   const abortRef = useRef(false)
 
   const types = useMemo(() => typesQuery.data ?? [], [typesQuery.data])
@@ -154,10 +151,6 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
 
   useErrorToast(typesQuery.error ?? undefined, t("updating"))
   useErrorToast(tasksQuery.error ?? undefined, t("updating"))
-
-  const handleSelectType = async (code: string): Promise<void> => {
-    await props.selectType(code)
-  }
 
   const handleOpenTask = async (task: EvaluationTask): Promise<void> => {
     const status = getTaskStatus(task, t)
@@ -263,36 +256,26 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
     }
   }
 
-  const openBatchSelect = (): void => {
+  function openBatchSelect(): void {
     const activeTasks = tasks.filter((task) => getTaskStatus(task, t).active)
     if (activeTasks.length === 0) {
       toast.error(t("evaluation.noActiveTasks"))
       return
     }
-    setSelectedTaskIds(new Set())
-    setBatchTextAnswer("")
-    setBatchSelectOpen(true)
+    actions.openBatchSelect()
   }
 
   const toggleTaskSelection = (taskId: string): void => {
-    setSelectedTaskIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(taskId)) {
-        next.delete(taskId)
-      } else {
-        next.add(taskId)
-      }
-      return next
-    })
+    actions.toggleTaskSelection(taskId)
   }
 
   const selectAllTasks = (): void => {
     const activeTasks = tasks.filter((task) => getTaskStatus(task, t).active)
-    setSelectedTaskIds(new Set(activeTasks.map((task) => task.wid || "").filter(Boolean)))
+    actions.selectTasks(activeTasks.map((task) => task.wid || "").filter(Boolean))
   }
 
   const deselectAllTasks = (): void => {
-    setSelectedTaskIds(new Set())
+    actions.selectTasks([])
   }
 
   const runBatchFill = async (
@@ -381,7 +364,7 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
       toast.error(t("evaluation.noActiveTasks"))
       return
     }
-    setBatchSelectOpen(false)
+    actions.setBatchSelectOpen(false)
     const tasksToProcess = tasks.filter(
       (task) => selectedTaskIds.has(task.wid || "") && getTaskStatus(task, t).active
     )
@@ -457,7 +440,6 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
     toast.info(t("evaluation.cancel"))
   }
 
-  const selectedTypeObj = types.find((typ) => typ.code === selectedType)
   const hasBatchTasks = Boolean(selectedType) && tasks.some((task) => getTaskStatus(task, t).active)
 
   if (loadingTypes) {
@@ -471,46 +453,6 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
 
   return (
     <div className="flex flex-col gap-6">
-      {types.length > 0 && (
-        <div className="flex items-center justify-between gap-2 md:hidden">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 px-2.5 text-sm">
-                <span className="max-w-[10rem] truncate">
-                  {selectedTypeObj?.name || t("evaluation.title")}
-                </span>
-                <ChevronDown className="ml-1 size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[10rem]">
-              {types.map((type) => (
-                <DropdownMenuItem
-                  key={type.code ?? type.name}
-                  onSelect={() => void handleSelectType(type.code || "")}
-                  className="flex items-center justify-between gap-3"
-                >
-                  <span>{type.name}</span>
-                  {type.count > 0 && <Badge variant="secondary">{type.count}</Badge>}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {hasBatchTasks && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={openBatchSelect}
-              className="h-8 px-2.5"
-              aria-label={t("evaluation.batchAuto")}
-            >
-              <Sparkles data-icon="inline-start" />
-              {t("evaluation.batchAuto")}
-            </Button>
-          )}
-        </div>
-      )}
-
       <Card className="hidden md:block">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -533,7 +475,7 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
                 key={type.code ?? type.name}
                 data-evaluation-type={type.code ?? ""}
                 variant={selectedType === type.code ? "default" : "outline"}
-                onClick={() => void handleSelectType(type.code || "")}
+                onClick={() => void props.selectType(type.code || "")}
               >
                 {type.name}
                 {type.count > 0 && (
@@ -551,7 +493,9 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
         <Card>
           <CardHeader>
             <CardTitle>{t("evaluation.pendingTasks")}</CardTitle>
-            <CardDescription>{selectedTypeObj?.name}</CardDescription>
+            <CardDescription>
+              {types.find((type) => type.code === selectedType)?.name}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {loadingTasks ? (
@@ -790,7 +734,7 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
       </ResponsiveModal>
 
       {/* Batch selection dialog */}
-      <ResponsiveModal open={batchSelectOpen} onOpenChange={setBatchSelectOpen}>
+      <ResponsiveModal open={batchSelectOpen} onOpenChange={actions.setBatchSelectOpen}>
         <ResponsiveModalContent className="sm:max-w-2xl">
           <ResponsiveModalHeader>
             <ResponsiveModalTitle>{t("evaluation.batchSelectTitle")}</ResponsiveModalTitle>
@@ -806,7 +750,7 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
               <Input
                 id="batch-text-answer"
                 value={batchTextAnswer}
-                onChange={(e) => setBatchTextAnswer(e.target.value)}
+                onChange={(e) => actions.setBatchTextAnswer(e.target.value)}
                 placeholder={t("evaluation.batchTextAnswerPlaceholder")}
               />
             </Field>
@@ -847,7 +791,7 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
             </div>
           </ResponsiveModalBody>
           <ResponsiveModalFooter>
-            <Button variant="outline" onClick={() => setBatchSelectOpen(false)}>
+            <Button variant="outline" onClick={() => actions.setBatchSelectOpen(false)}>
               {t("evaluation.cancel")}
             </Button>
             <Button onClick={goToBatchPreview} disabled={selectedTaskIds.size === 0}>

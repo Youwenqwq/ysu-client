@@ -11,7 +11,12 @@ import {
   type QuerySnapshot,
   type SessionSnapshot,
 } from "@orahako/academic-sdk"
-import type { DerivedComponentProps, ObservableSource, SlotComponent } from "@orahako/sdk"
+import type {
+  DerivedComponentProps,
+  ObservableSource,
+  RouteLocation,
+  SlotComponent,
+} from "@orahako/sdk"
 import {
   Alert,
   AlertDescription,
@@ -48,6 +53,64 @@ export type EpayPageProps = DerivedComponentProps<
   EpayPageInject
 >
 
+export interface EpayHeaderActionsInject {
+  readonly hooks: EpayPageInject["hooks"] & {
+    readonly location: ObservableSource<RouteLocation>
+  }
+  readonly pluginId: string
+}
+
+type EpayHeaderActionsProps = DerivedComponentProps<
+  Record<string, never>,
+  EpayDictionary,
+  undefined,
+  undefined,
+  EpayHeaderActionsInject
+>
+
+function canQueryEpay(provider: ProviderRuntimeSnapshot, session: SessionSnapshot): boolean {
+  return (
+    provider.status === "ready" &&
+    hasSlice(provider.provider, "epay") &&
+    session.hasHydrated &&
+    Boolean(session.username) &&
+    Boolean(session.credential) &&
+    session.isAuthenticated
+  )
+}
+
+export const EpayHeaderActions: SlotComponent<EpayHeaderActionsProps> = (props) => {
+  const location = props.useLocation()
+  const onPage = location.route
+    ? location.route === "epay"
+    : location.pluginId === props.pluginId && (location.pageId ?? "index") === "index"
+  return onPage ? <EpayHeaderRefresh {...props} /> : null
+}
+
+function EpayHeaderRefresh({ t, useSession, useProvider, useEpay }: EpayHeaderActionsProps) {
+  const session = useSession()
+  const provider = useProvider()
+  const query = useEpay()
+  const canQuery = canQueryEpay(provider, session)
+  const loading = canQuery && (query.isLoading || query.isRefreshing)
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className="md:hidden"
+      onClick={() => {
+        if (canQuery) void query.refresh()
+      }}
+      disabled={loading}
+      aria-label={t("epay.refresh")}
+    >
+      <RefreshCw className={cn("size-4", loading && "animate-spin")} />
+    </Button>
+  )
+}
+
 function isAuthError(error: Error | null): boolean {
   if (!error) return false
   if (isProviderError(error)) {
@@ -70,14 +133,7 @@ export const EpayPage: SlotComponent<EpayPageProps> = (props) => {
   const epayQuery = props.useEpay()
 
   const isReady = providerSnap.status === "ready"
-  const available = hasSlice(providerSnap.provider, "epay")
-  const canQuery =
-    isReady &&
-    available &&
-    session.hasHydrated &&
-    Boolean(session.username) &&
-    Boolean(session.credential) &&
-    session.isAuthenticated
+  const canQuery = canQueryEpay(providerSnap, session)
 
   const records: readonly EpayRecord[] | null = canQuery ? (epayQuery.data?.records ?? null) : null
   const unpaid: readonly EpayRecord[] = canQuery ? (epayQuery.data?.unpaid ?? []) : []
@@ -147,7 +203,7 @@ export const EpayPage: SlotComponent<EpayPageProps> = (props) => {
 
   if (!session.hasHydrated || !isReady || (!records && loading)) {
     return (
-      <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-4">
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-28 w-full" />
@@ -175,7 +231,7 @@ export const EpayPage: SlotComponent<EpayPageProps> = (props) => {
 
   return (
     <div className="flex flex-col gap-4 p-4" data-epay-page="">
-      <div className="flex items-center justify-end gap-3">
+      <div className="hidden items-center justify-end gap-3 sm:flex">
         {updatedAt ? (
           <span className="text-xs text-muted-foreground">
             {t("epay.updatedAt", {
@@ -189,6 +245,7 @@ export const EpayPage: SlotComponent<EpayPageProps> = (props) => {
         <Button
           variant="outline"
           size="sm"
+          className="hidden md:inline-flex"
           onClick={handleRefresh}
           disabled={loading}
           aria-label={t("epay.refresh")}

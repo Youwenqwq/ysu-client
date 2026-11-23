@@ -27,6 +27,7 @@
     "@orahako/runtime-slots": "workspace:*",
     "@orahako/runtime-storage": "workspace:*",
     "@orahako/runtime-ui": "workspace:*",
+    "@orahako/runtime-router": "workspace:*",
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",

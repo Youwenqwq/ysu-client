@@ -283,7 +283,7 @@ export interface AccountActionsInject {
   readonly openLogin: () => void
 }
 
-export type AccountActionsCardProps = DerivedComponentProps<
+export type AccountActionsProps = DerivedComponentProps<
   Record<string, never>,
   AuthUiDictionary,
   undefined,
@@ -291,7 +291,7 @@ export type AccountActionsCardProps = DerivedComponentProps<
   AccountActionsInject
 >
 
-export const AccountActionsCard: SlotComponent<AccountActionsCardProps> = (props) => {
+export const AccountActions: SlotComponent<AccountActionsProps> = (props) => {
   const session = props.useSession()
   const providersRevision = props.useProvidersRevision()
   void providersRevision
@@ -304,19 +304,15 @@ export const AccountActionsCard: SlotComponent<AccountActionsCardProps> = (props
 
   if (!session.isAuthenticated) {
     return (
-      <Card data-account-actions="guest" className="py-0">
-        <CardContent className="flex flex-col py-1">
-          <button
-            type="button"
-            onClick={props.openLogin}
-            className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
-          >
-            <LogIn className="size-5 shrink-0 text-muted-foreground" />
-            <span className="flex-1 text-left text-sm">{props.t("session.signIn")}</span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </button>
-        </CardContent>
-      </Card>
+      <button
+        type="button"
+        onClick={props.openLogin}
+        className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
+      >
+        <LogIn className="size-5 shrink-0 text-muted-foreground" />
+        <span className="flex-1 text-left text-sm">{props.t("session.signIn")}</span>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+      </button>
     )
   }
 
@@ -345,47 +341,43 @@ export const AccountActionsCard: SlotComponent<AccountActionsCardProps> = (props
 
   return (
     <>
-      <Card data-account-actions="authenticated" className="py-0">
-        <CardContent className="flex flex-col py-1">
-          <button
-            type="button"
-            disabled={reloginBusy}
-            onClick={() => void handleRelogin()}
-            className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60 disabled:opacity-50"
-          >
-            <LogIn className="size-5 shrink-0 text-muted-foreground" />
-            <span className="flex-1 text-left text-sm">
-              {reloginBusy ? props.t("session.reloggingIn") : props.t("session.relogin")}
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </button>
+      <button
+        type="button"
+        disabled={reloginBusy}
+        onClick={() => void handleRelogin()}
+        className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60 disabled:opacity-50"
+      >
+        <LogIn className="size-5 shrink-0 text-muted-foreground" />
+        <span className="flex-1 text-left text-sm">
+          {reloginBusy ? props.t("session.reloggingIn") : props.t("session.relogin")}
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+      </button>
 
-          <button
-            type="button"
-            onClick={handleSwitchClick}
-            className="flex items-center gap-3 border-t border-border py-3 transition-colors active:bg-muted/60"
-          >
-            <ArrowLeftRight className="size-5 shrink-0 text-muted-foreground" />
-            <span className="flex-1 text-left text-sm">{props.t("session.switchSchool")}</span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </button>
+      <button
+        type="button"
+        onClick={handleSwitchClick}
+        className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
+      >
+        <ArrowLeftRight className="size-5 shrink-0 text-muted-foreground" />
+        <span className="flex-1 text-left text-sm">{props.t("session.switchSchool")}</span>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+      </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (props.showLogoutConfirm) {
-                setLogoutDialogOpen(true)
-              } else {
-                void handleLogoutConfirm()
-              }
-            }}
-            className="flex items-center gap-3 border-t border-border py-3 text-destructive transition-colors active:bg-destructive/10"
-          >
-            <LogOut className="size-5 shrink-0" />
-            <span className="flex-1 text-left text-sm">{props.t("session.logout")}</span>
-          </button>
-        </CardContent>
-      </Card>
+      <button
+        type="button"
+        onClick={() => {
+          if (props.showLogoutConfirm) {
+            setLogoutDialogOpen(true)
+          } else {
+            void handleLogoutConfirm()
+          }
+        }}
+        className="flex items-center gap-3 py-3 text-destructive transition-colors active:bg-destructive/10"
+      >
+        <LogOut className="size-5 shrink-0" />
+        <span className="flex-1 text-left text-sm">{props.t("session.logout")}</span>
+      </button>
 
       <Dialog open={schoolDialogOpen} onOpenChange={setSchoolDialogOpen}>
         <DialogContent>

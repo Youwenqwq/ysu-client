@@ -23,6 +23,7 @@
     "@orahako/kernel": "workspace:*",
     "@orahako/runtime-http": "workspace:*",
     "@orahako/runtime-i18n": "workspace:*",
+    "@orahako/runtime-router": "workspace:*",
     "@orahako/runtime-slots": "workspace:*",
     "@orahako/runtime-storage": "workspace:*",
     "@orahako/runtime-ui": "workspace:*",

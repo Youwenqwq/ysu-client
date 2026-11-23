@@ -54,7 +54,7 @@ export const creditsUiStore = defineStore({
   actions: {
     setTab(ctx, tab: string) {
       if (!isCreditsTab(tab)) return
-      ctx.set((prev) => (prev.tab === tab ? prev : { ...prev, tab }))
+      ctx.set((prev) => (prev.tab === tab ? prev : { ...prev, tab, filterDrawerOpen: false }))
     },
     setBatch(ctx, batch: string | undefined) {
       ctx.set((prev) => (prev.batch === batch ? prev : { ...prev, batch }))

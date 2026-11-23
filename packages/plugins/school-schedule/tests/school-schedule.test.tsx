@@ -419,7 +419,15 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
     const validated = validatePluginManifest(schoolSchedulePlugin.manifest)
     expect(validated.id).toBe("orahako.school-schedule")
     expect(validated.kind).toBe("feature")
-    expect(validated.inject).toEqual(["ui", "router", "i18n", "provider", "session", "query"])
+    expect(validated.inject).toEqual([
+      "ui",
+      "slots",
+      "router",
+      "i18n",
+      "provider",
+      "session",
+      "query",
+    ])
   })
 
   it("defers class/classroom queries until filters are chosen, renders class & classroom timetables, and supports free-room deep links", async () => {
@@ -583,6 +591,7 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
     const ui = runtime.context.get("ui")!
     const router = runtime.context.get("router")!
     const slots = runtime.context.get("slots") as PluginSlotRegistry
+    slots.declare({ name: "shell.header.actions", kind: "list" })
     const i18n = runtime.context.get("i18n") as PluginI18nRegistryService
     const session = runtime.context.get("session")!
     const providerRuntime = runtime.context.get("provider")!
@@ -619,6 +628,24 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
       />
     )
 
+    const headerEntry = slots
+      .select("shell.header.actions")
+      .find((entry) => entry.pluginId === SCHOOL_SCHEDULE_PLUGIN_ID)!
+    expect(
+      renderToStaticMarkup(<ContributionOutlet entry={headerEntry} slots={slots} i18n={i18n} />)
+    ).toContain("data-school-schedule-header-actions")
+
+    await act(async () => {
+      router.push({ route: "student-info" })
+    })
+    expect(
+      renderToStaticMarkup(<ContributionOutlet entry={headerEntry} slots={slots} i18n={i18n} />)
+    ).toBe("")
+    await act(async () => {
+      router.back()
+    })
+    expect(router.current.getSnapshot().route).toBe("school-schedule")
+
     // Before selecting any filter, full class/room lists are NOT queried!
     expect(dom.container.textContent).toContain("选择筛选条件后查询")
     expect(getSchoolClasses).not.toHaveBeenCalled()
@@ -654,10 +681,12 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
       expect(dom.container.textContent).toContain("信息馆301")
     })
 
-    // Router back pops selectedClass back to class list
+    // Router back pops selectedClass back to class list without leaving the page
+    const hrefBeforeBack = router.current.getSnapshot().href
     router.back()
     await act(async () => {})
     expect(store.source.getSnapshot().selectedClass).toBeNull()
+    expect(router.current.getSnapshot().href).toBe(hrefBeforeBack)
 
     // Navigating with free-room context deep link switches to room tab and shows context banner
     await act(async () => {

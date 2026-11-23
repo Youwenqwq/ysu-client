@@ -6,6 +6,7 @@
   "dependencies": {
     "@cordisjs/core": "3.18.1",
     "@orahako/sdk": "workspace:*",
+    "@orahako/ui-primitives": "workspace:*",
     "react": "^19.2.6"
   }
 }

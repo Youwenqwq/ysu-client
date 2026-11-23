@@ -11,7 +11,13 @@ import {
 import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/sdk"
 import { runEpayAutoCheck, type EpayAutoCheckOptions, type EpayCheckResult } from "./auto-check"
 import { epayDictionary, type EpayDictionary } from "./dictionary"
-import { EpayPage, type EpayPageInject, type EpayPageProps } from "./page"
+import {
+  EpayHeaderActions,
+  EpayPage,
+  type EpayHeaderActionsInject,
+  type EpayPageInject,
+  type EpayPageProps,
+} from "./page"
 import {
   EpayNotificationSettings,
   type EpayNotificationSettingsInject,
@@ -32,6 +38,7 @@ export type {
   EpayAutoCheckOptions,
   EpayCheckResult,
   EpayDictionary,
+  EpayHeaderActionsInject,
   EpayNotificationSettingsInject,
   EpayNotificationSettingsProps,
   EpayPageInject,
@@ -48,14 +55,14 @@ const epayManifest: PluginManifest = {
   kind: "feature",
   entry: "index.js",
   description: "学费与校园缴费状态查询及未缴费用自动提醒",
-  inject: ["ui", "slots", "i18n", "storage", "provider", "session", "query"],
+  inject: ["ui", "slots", "router", "i18n", "storage", "provider", "session", "query"],
 }
 
 export const epayPlugin = definePlugin({
   manifest: epayManifest,
-  inject: ["ui", "slots", "i18n", "storage", "provider", "session", "query"] as const,
+  inject: ["ui", "slots", "router", "i18n", "storage", "provider", "session", "query"] as const,
   apply(ctx) {
-    const { ui, slots, i18n, storage, provider, session, query } = ctx
+    const { ui, slots, router, i18n, storage, provider, session, query } = ctx
     i18n.register(epayDictionary)
     const translate = i18n.translator(epayDictionary)
 
@@ -110,6 +117,26 @@ export const epayPlugin = definePlugin({
       capability: "epay",
       order: 20,
     })
+
+    slots.inject("shell.header.actions", (slotCtx) =>
+      slotCtx.slots.register(
+        {
+          id: "epay-header-actions",
+          slot: "shell.header.actions",
+          dictionary: epayDictionary,
+          inject: (): EpayHeaderActionsInject => ({
+            hooks: {
+              location: router.current,
+              session: session.state,
+              provider: provider.state,
+              epay: epaySource,
+            },
+            pluginId: EPAY_PLUGIN_ID,
+          }),
+        },
+        EpayHeaderActions
+      )
+    )
 
     slots.inject("settings.notifications.appReminders", (slotCtx) =>
       slotCtx.slots.register(

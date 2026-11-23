@@ -9,12 +9,23 @@ import {
 import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/sdk"
 import { evaluationDictionary, type EvaluationDictionary } from "./dictionary"
 import {
+  EvaluationHeaderActions,
+  type EvaluationHeaderActionsInject,
+  type EvaluationHeaderActionsProps,
+} from "./header-actions"
+import {
   createEvaluationSources,
   type BatchTaskResult,
   type EvaluationSources,
   type TaskStatusDisplay,
 } from "./helpers"
 import { EvaluationPage, type EvaluationPageInject, type EvaluationPageProps } from "./page"
+import "./slots"
+import {
+  evaluationViewStore,
+  type EvaluationViewState,
+  type EvaluationViewStoreInstance,
+} from "./view-store"
 import {
   PENDING_EVALUATIONS_WIDGET_ID,
   PendingEvaluationsWidget,
@@ -27,9 +38,13 @@ export const EVALUATION_PLUGIN_ID = "orahako.evaluation"
 export type {
   BatchTaskResult,
   EvaluationDictionary,
+  EvaluationHeaderActionsInject,
+  EvaluationHeaderActionsProps,
   EvaluationPageInject,
   EvaluationPageProps,
   EvaluationSources,
+  EvaluationViewState,
+  EvaluationViewStoreInstance,
   PendingEvaluationsWidgetInject,
   PendingEvaluationsWidgetProps,
   TaskStatusDisplay,
@@ -37,6 +52,7 @@ export type {
 
 const EVALUATION_INJECT = [
   "ui",
+  "slots",
   "router",
   "i18n",
   "provider",
@@ -60,10 +76,11 @@ export const evaluationPlugin = definePlugin({
   manifest: evaluationManifest,
   inject: EVALUATION_INJECT,
   apply(ctx) {
-    const { ui, router, i18n, provider, session, query, overview } = ctx
+    const { ui, slots, router, i18n, provider, session, query, overview } = ctx
     i18n.register(evaluationDictionary)
 
     const sources = createEvaluationSources({ query, provider, session })
+    const viewStore = evaluationViewStore.create()
 
     const fetchDetail = async (detailQuery: EvaluationDetailQuery): Promise<EvaluationDetail> => {
       const slice = requireSlice(provider.getActive(), "evaluation")
@@ -114,6 +131,29 @@ export const evaluationPlugin = definePlugin({
       PendingEvaluationsWidget
     )
 
+    slots.inject("shell.header.actions", () =>
+      slots.register(
+        {
+          id: "evaluation-header-actions",
+          slot: "shell.header.actions",
+          dictionary: evaluationDictionary,
+          store: viewStore,
+          inject: (): EvaluationHeaderActionsInject => ({
+            hooks: {
+              location: router.current,
+              provider: provider.state,
+              types: sources.typesSource,
+              selectedType: sources.selectedTypeSource,
+              tasks: sources.pendingTasksSource,
+            },
+            pluginId: EVALUATION_PLUGIN_ID,
+            selectType: sources.selectType,
+          }),
+        },
+        EvaluationHeaderActions
+      )
+    )
+
     ui.registerPage(
       {
         id: "index",
@@ -122,6 +162,7 @@ export const evaluationPlugin = definePlugin({
         titleKey: "pageTitle",
         capability: "evaluation",
         dictionary: evaluationDictionary,
+        store: viewStore,
         inject: (): EvaluationPageInject => ({
           hooks: {
             types: sources.typesSource,
@@ -150,6 +191,7 @@ export const evaluationPlugin = definePlugin({
     })
 
     ctx.effect(() => () => {
+      viewStore.dispose()
       sources.dispose()
     })
   },

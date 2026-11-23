@@ -51,6 +51,36 @@ import {
 } from "../src/helpers"
 import { PENDING_EVALUATIONS_WIDGET_ID } from "../src/widgets"
 
+vi.mock("@orahako/ui-primitives", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  const PassThrough = ({ children }: { children: ReactNode }) => <>{children}</>
+  return {
+    ...actual,
+    ResponsiveModal: ({ open, children }: { open?: boolean; children: ReactNode }) =>
+      open ? <div role="dialog">{children}</div> : null,
+    ResponsiveModalContent: PassThrough,
+    ResponsiveModalHeader: PassThrough,
+    ResponsiveModalTitle: PassThrough,
+    ResponsiveModalDescription: PassThrough,
+    ResponsiveModalBody: PassThrough,
+    ResponsiveModalFooter: PassThrough,
+    Checkbox: ({
+      checked,
+      onCheckedChange,
+    }: {
+      checked?: boolean
+      onCheckedChange?: (checked: boolean) => void
+    }) => (
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={checked}
+        onClick={() => onCheckedChange?.(!checked)}
+      />
+    ),
+  }
+})
+
 class MiniDomNode {
   readonly nodeType: number
   readonly nodeName: string
@@ -60,8 +90,9 @@ class MiniDomNode {
   parentNode: MiniDomNode | null = null
   ownerDocument: MiniDomNode | null = null
   defaultView: unknown = undefined
-  activeElement: unknown = null
+  activeElement: MiniDomNode | null = null
   nodeValue?: string
+  id = ""
   readonly style: Record<string, unknown> = {
     setProperty(name: string, value: string) {
       this[name] = value
@@ -77,6 +108,10 @@ class MiniDomNode {
     this.nodeType = nodeType
     this.nodeName = nodeName
     if (nodeType === 1) this.tagName = nodeName
+  }
+
+  get children(): MiniDomNode[] {
+    return this.childNodes.filter((node) => node.nodeType === 1)
   }
 
   get firstChild(): MiniDomNode | null {
@@ -115,12 +150,60 @@ class MiniDomNode {
     return child
   }
 
+  contains(node: MiniDomNode | null): boolean {
+    for (let cursor = node; cursor; cursor = cursor.parentNode) {
+      if (cursor === this) return true
+    }
+    return false
+  }
+
+  insertAdjacentElement(position: string, node: MiniDomNode): void {
+    this.insertBefore(node, position === "afterbegin" ? this.firstChild : null)
+  }
+
+  getAttribute(name: string): string | null {
+    return this.attributes.get(name) ?? null
+  }
+
+  hasAttribute(name: string): boolean {
+    return this.attributes.has(name)
+  }
+
   setAttribute(name: string, value: string): void {
     this.attributes.set(name, String(value))
+    if (name === "id") this.id = String(value)
   }
 
   removeAttribute(name: string): void {
     this.attributes.delete(name)
+  }
+
+  focus(): void {
+    if (this.ownerDocument) this.ownerDocument.activeElement = this
+  }
+
+  blur(): void {
+    if (this.ownerDocument?.activeElement === this) this.ownerDocument.activeElement = null
+  }
+
+  querySelectorAll(): MiniDomNode[] {
+    return []
+  }
+
+  remove(): void {
+    this.parentNode?.removeChild(this)
+  }
+
+  querySelector(): MiniDomNode | null {
+    return null
+  }
+
+  dispatchEvent(): boolean {
+    return true
+  }
+
+  getBoundingClientRect() {
+    return { x: 0, y: 0, left: 0, top: 0, width: 160, height: 220, right: 160, bottom: 220 }
   }
 
   addEventListener(): void {}
@@ -164,18 +247,27 @@ function mountMiniDom() {
   const prevWindow = globalRecord.window
   const prevDocument = globalRecord.document
   const prevAct = globalRecord.IS_REACT_ACT_ENVIRONMENT
+  const doc = new MiniDomNode(9, "#document")
 
   const fakeWin = {
     event: undefined,
+    document: doc,
+    innerWidth: 390,
+    innerHeight: 844,
+    setTimeout,
+    clearTimeout,
+    requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0),
+    addEventListener() {},
+    removeEventListener() {},
+    getComputedStyle: () => ({ animationName: "none", display: "block" }),
     HTMLIFrameElement: class {},
-    location: { pathname: "/", search: "", reload: vi.fn() },
+    location: { pathname: "/", search: "", href: "/", reload: vi.fn() },
     matchMedia: () => ({
       matches: false,
       addEventListener: () => {},
       removeEventListener: () => {},
     }),
   }
-  const doc = new MiniDomNode(9, "#document")
   doc.defaultView = fakeWin
   const docWithFactories = Object.assign(doc, {
     createElement(tag: string) {
@@ -198,17 +290,48 @@ function mountMiniDom() {
       node.ownerDocument = docWithFactories
       return node
     },
+    createTreeWalker: () => ({ nextNode: () => null }),
+    getElementById: (id: string) => findNode(doc, (node) => node.id === id),
   })
+  const documentElement = docWithFactories.createElement("html")
+  const head = docWithFactories.createElement("head")
+  const body = docWithFactories.createElement("body")
+  documentElement.appendChild(head)
+  documentElement.appendChild(body)
+  doc.appendChild(documentElement)
+  Object.assign(doc, { documentElement, head, body, activeElement: body })
+
+  vi.stubGlobal("HTMLElement", MiniDomNode)
+  vi.stubGlobal("HTMLInputElement", class {})
+  vi.stubGlobal("Element", MiniDomNode)
+  vi.stubGlobal("Node", MiniDomNode)
+  vi.stubGlobal("getComputedStyle", fakeWin.getComputedStyle)
+  vi.stubGlobal("NodeFilter", { SHOW_ELEMENT: 1 })
+  vi.stubGlobal(
+    "CustomEvent",
+    class {
+      preventDefault() {}
+    }
+  )
+  vi.stubGlobal(
+    "MutationObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  )
 
   globalRecord.IS_REACT_ACT_ENVIRONMENT = true
   globalRecord.window = fakeWin
   globalRecord.document = docWithFactories
 
   const container = docWithFactories.createElement("div")
+  body.appendChild(container)
   const root = createRoot(container as never)
 
   return {
     container,
+    body,
     async render(node: ReactNode) {
       await act(async () => {
         root.render(node)
@@ -221,6 +344,7 @@ function mountMiniDom() {
       globalRecord.IS_REACT_ACT_ENVIRONMENT = prevAct
       globalRecord.window = prevWindow
       globalRecord.document = prevDocument
+      vi.unstubAllGlobals()
     },
   }
 }
@@ -500,6 +624,7 @@ describe("@orahako/plugin-evaluation", () => {
     const session = runtime.context.get("session")!
     const providerRuntime = runtime.context.get("provider")!
     const overview = runtime.context.get("overview")!
+    slots.declare({ name: "shell.header.actions", kind: "list" })
 
     const invalidatedFeatures: string[] = []
     runtime.context.on("query/invalidate", (identity) => {
@@ -543,19 +668,35 @@ describe("@orahako/plugin-evaluation", () => {
       .getSnapshot()
       .pages.find((entry) => entry.pluginId === OVERVIEW_PLUGIN_ID && entry.id === "index")!
 
+    const headerActions = slots.select("shell.header.actions")[0]!
+    router.push({ route: "grades" })
+
     // Render OverviewPage + EvaluationPage together to verify cross-view invalidation
     await dom.render(
       <div>
+        <header>
+          <ContributionOutlet entry={headerActions} slots={slots} i18n={i18n} />
+        </header>
         <ContributionOutlet entry={overviewPage} slots={slots} i18n={i18n} />
-        <ContributionOutlet entry={evalPage} slots={slots} i18n={i18n} />
+        <main>
+          <ContributionOutlet entry={evalPage} slots={slots} i18n={i18n} />
+        </main>
       </div>
     )
+    const header = findNode(dom.container, (node) => node.tagName === "HEADER")!
+    const main = findNode(dom.container, (node) => node.tagName === "MAIN")!
+    const isTypeMenu = (node: MiniDomNode) => node.attributes.get("aria-haspopup") === "menu"
+    const isBatchButton = (node: MiniDomNode) =>
+      node.attributes.get("aria-label") === "批量自动评教"
 
     await vi.waitFor(() => {
       expect(dom.container.textContent).toContain("你有 2 个待评教任务")
       expect(dom.container.textContent).toContain("计算机网络")
       expect(dom.container.textContent).toContain("王教授")
     })
+    expect(header.childNodes).toHaveLength(0)
+    expect(findNode(main, isTypeMenu)).toBeNull()
+    expect(findNode(main, isBatchButton)).toBeNull()
     expect(pendingCalls).toContain("01")
 
     // Click widget link to navigate to evaluation route
@@ -579,6 +720,34 @@ describe("@orahako/plugin-evaluation", () => {
       }
     })
     expect(router.current.getSnapshot().route).toBe("evaluation")
+    const batchButton = findNode(header, isBatchButton)!
+    const typeMenu = findNode(header, isTypeMenu)!
+    expect(typeMenu.textContent).toBe("期末评教")
+    expect(batchButton.textContent).toBe("")
+    expect(batchButton.nextSibling).toBe(typeMenu)
+
+    await act(async () => {
+      const onClick = getReactProps(batchButton)?.onClick
+      expect(typeof onClick).toBe("function")
+      if (typeof onClick === "function") onClick()
+    })
+    const dialog = findNode(dom.body, (node) => node.getAttribute("role") === "dialog")!
+    expect(dialog.textContent).toContain("请选择需要批量自动评教的任务")
+    expect(dialog.textContent).toContain("计算机网络")
+    expect(dialog.textContent).not.toContain("编译原理实验")
+    for (const label of ["全选", "取消"]) {
+      const button = findNode(
+        dialog,
+        (node) => node.tagName === "BUTTON" && node.textContent === label
+      )!
+      await act(async () => {
+        const onClick = getReactProps(button)?.onClick
+        expect(typeof onClick).toBe("function")
+        if (typeof onClick === "function") onClick()
+      })
+      if (label === "全选") expect(dialog.textContent).toContain("已选择 1 个")
+    }
+    expect(findNode(dom.body, (node) => node.getAttribute("role") === "dialog")).toBeNull()
 
     // Switch evaluation type to "02" via type button
     const type2Button = findNode(
@@ -598,6 +767,7 @@ describe("@orahako/plugin-evaluation", () => {
       expect(pendingCalls).toContain("02")
       expect(dom.container.textContent).toContain("编译原理实验")
       expect(dom.container.textContent).toContain("赵老师")
+      expect(typeMenu.textContent).toBe("实验评教")
     })
 
     // Exercise fetchDetail, calculateScore, and submitEvaluation via page inject contract
@@ -647,6 +817,7 @@ describe("@orahako/plugin-evaluation", () => {
     await vi.waitFor(() => {
       expect(dom.container.textContent).toContain("暂无待评任务")
       expect(dom.container.textContent).toContain("你有 1 个待评教任务")
+      expect(findNode(header, isBatchButton)).toBeNull()
     })
 
     // Submit the remaining task -> overview widget hides completely when 0 active tasks remain
@@ -667,10 +838,16 @@ describe("@orahako/plugin-evaluation", () => {
       expect(dom.container.textContent).not.toContain("待评教任务")
     })
 
+    await act(async () => router.push({ pluginId: EVALUATION_PLUGIN_ID, pageId: "missing" }))
+    expect(header.childNodes).toHaveLength(0)
+    await act(async () => router.push({ pluginId: EVALUATION_PLUGIN_ID }))
+    expect(findNode(header, isTypeMenu)?.textContent).toBe("实验评教")
+
     // Stop evaluationPlugin -> widget, page, and navigation are cleanly removed
     await act(async () => {
       runtime.stop(EVALUATION_PLUGIN_ID)
     })
+    expect(slots.select("shell.header.actions")).toEqual([])
 
     expect(overview.getSnapshot().some((item) => item.pluginId === EVALUATION_PLUGIN_ID)).toBe(
       false

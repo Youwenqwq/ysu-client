@@ -37,7 +37,6 @@ import {
   FieldGroup,
   FieldLabel,
   FilterDrawer,
-  FilterTrigger,
   Input,
   LoadingCards,
   ResponsiveModal,
@@ -51,16 +50,11 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-  useBackHandler,
   useErrorToast,
   useIsMobile,
   ValidatingList,
 } from "@orahako/ui-primitives"
-import {
-  buildSchoolScheduleLabels,
-  weekdayName,
-  type SchoolScheduleDictionary,
-} from "./dictionary"
+import { buildSchoolScheduleLabels, weekdayName, type SchoolScheduleDictionary } from "./dictionary"
 import {
   FILTER_ALL,
   type SchoolScheduleFilterStoreInstance,
@@ -180,9 +174,7 @@ function RoomRow({
       <div className="flex min-w-0 flex-col">
         <span className="truncate text-sm font-medium">{room.name}</span>
         <span className="truncate text-xs text-muted-foreground">
-          {[room.campusDisplay, room.buildingDisplay, room.typeDisplay]
-            .filter(Boolean)
-            .join(" · ")}
+          {[room.campusDisplay, room.buildingDisplay, room.typeDisplay].filter(Boolean).join(" · ")}
         </span>
       </div>
       <div className="flex shrink-0 gap-1">
@@ -422,9 +414,6 @@ export const SchoolSchedulePage: SlotComponent<SchoolSchedulePageProps> = (props
 
   const freeRoomContext = useMemo(() => parseFreeRoomContext(location), [location])
 
-  useBackHandler(() => actions.selectClass(null), selectedClass !== null)
-  useBackHandler(() => actions.selectRoom(null), selectedRoom !== null)
-
   useErrorToast(
     gradeYearsQuery.error ??
       departmentsQuery.error ??
@@ -448,26 +437,8 @@ export const SchoolSchedulePage: SlotComponent<SchoolSchedulePageProps> = (props
   const buildings = buildingsQuery.data ?? []
   const rooms = roomsQuery.data ?? []
 
-  const hasClassFilter =
-    grade !== FILTER_ALL || department !== FILTER_ALL || major !== FILTER_ALL
-  const classSummary = [
-    gradeYears.find((item) => item.id === grade)?.name,
-    departments.find((item) => item.id === department)?.name,
-    majors.find((item) => item.id === major)?.name,
-  ]
-    .filter(Boolean)
-    .join(" · ")
-
-  const hasRoomFilter =
-    searchedRoomName !== "" || campus !== FILTER_ALL || building !== FILTER_ALL
-  const roomSummary = [
-    campuses.find((item) => item.id === campus)?.name,
-    buildings.find((item) => item.id === building)?.name,
-    searchedRoomName || null,
-  ]
-    .filter(Boolean)
-    .join(" · ")
-
+  const hasClassFilter = grade !== FILTER_ALL || department !== FILTER_ALL || major !== FILTER_ALL
+  const hasRoomFilter = searchedRoomName !== "" || campus !== FILTER_ALL || building !== FILTER_ALL
   const classFilterControls = (
     <FieldGroup className="flex flex-col gap-3 md:flex-row">
       <Field className="flex-1">
@@ -594,12 +565,6 @@ export const SchoolSchedulePage: SlotComponent<SchoolSchedulePageProps> = (props
             />
           ) : (
             <div className="flex flex-col gap-4">
-              <div className="flex justify-end md:hidden">
-                <FilterTrigger
-                  label={classSummary || t("selectHint")}
-                  onClick={() => actions.setClassDrawerOpen(true)}
-                />
-              </div>
               <div className="hidden md:block">{classFilterControls}</div>
               <FilterDrawer
                 open={classDrawerOpen}
@@ -662,12 +627,6 @@ export const SchoolSchedulePage: SlotComponent<SchoolSchedulePageProps> = (props
                   </span>
                 </div>
               )}
-              <div className="flex justify-end md:hidden">
-                <FilterTrigger
-                  label={roomSummary || t("selectHint")}
-                  onClick={() => actions.setRoomDrawerOpen(true)}
-                />
-              </div>
               <div className="hidden md:block">{renderRoomFilterControls("room-desktop")}</div>
               <FilterDrawer
                 open={roomDrawerOpen}

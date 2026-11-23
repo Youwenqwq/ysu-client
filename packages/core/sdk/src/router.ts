@@ -26,7 +26,10 @@ export interface RouteLocation {
   readonly params: RouteParams
 }
 
+/** Return false after consuming back; return true to continue to the next guard/history. */
 export type RouterBackGuard = () => boolean | Promise<boolean>
+/** Resolve the parent/primary destination when application history is exhausted. */
+export type RouterBackFallback = () => RouteTargetInput | undefined
 
 export interface PluginRouterService {
   readonly current: ObservableSource<RouteLocation>
@@ -34,7 +37,8 @@ export interface PluginRouterService {
   replace(target: RouteTargetInput): void
   back(): void
   href(target: RouteTargetInput): string
-  registerBackGuard(guard: RouterBackGuard): () => void
+  registerBackGuard(guard: RouterBackGuard, priority?: number): () => void
+  registerBackFallback(fallback: RouterBackFallback): () => void
 }
 
 export function withAppBasePath(path: string, basePath = ""): string {

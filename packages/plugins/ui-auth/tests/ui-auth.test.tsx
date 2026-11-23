@@ -34,7 +34,7 @@ import {
   type PluginKeyValueStorage,
   type PluginRouterService,
 } from "@orahako/sdk"
-import { TooltipProvider } from "@orahako/ui-primitives"
+import { Card, CardContent, TooltipProvider } from "@orahako/ui-primitives"
 import {
   AUTH_UI_PLUGIN_ID,
   authUiPlugin,
@@ -587,7 +587,51 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     envOffline.runtime.dispose()
   })
 
-  it("renders shell.banner, shell.activity, profile.header, accountActions, and login page as pure derived-props components", async () => {
+  it.for(["profile.accountActions", "settings.account"] as const)(
+    "renders %s as direct rows in the host card for guests and authenticated users",
+    async (slot, { onTestFinished }) => {
+      const dom = mountMiniDom()
+      const { runtime } = setupAuthRuntime({ initialHref: "/?route=settings" })
+      onTestFinished(() => runtime.dispose())
+      onTestFinished(dom.unmount)
+      const slots = runtime.context.get("slots") as PluginSlotRegistry
+      const i18n = runtime.context.get("i18n") as PluginI18nRegistryService
+      const session = runtime.context.get("session")!
+      slots.declare({ name: slot, kind: "list" })
+      await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
+
+      const [entry] = slots.select(slot)
+      expect(entry).toBeDefined()
+      await dom.render(
+        <Card className="py-0">
+          <CardContent className="flex flex-col divide-y divide-border py-1">
+            <ContributionOutlet entry={entry!} slots={slots} i18n={i18n} />
+          </CardContent>
+        </Card>
+      )
+
+      function expectAccountRows(labels: string[]) {
+        const card = dom.container.firstChild!
+        const content = card.firstChild!
+        expect(card.attributes.get("data-slot")).toBe("card")
+        expect(content.attributes.get("data-slot")).toBe("card-content")
+        const rows = content.childNodes.filter((node) => node.nodeType === 1)
+        expect(rows.map((row) => [row.tagName, row.textContent])).toEqual(
+          labels.map((label) => ["BUTTON", label])
+        )
+      }
+
+      expectAccountRows(["去登录"])
+
+      await act(async () => {
+        session.setCredential({ schoolId: "demo", credential: "valid-tgc", username: "20260001" })
+      })
+
+      expectAccountRows(["重新登录", "切换学校", "退出登录"])
+    }
+  )
+
+  it("renders shell.banner, shell.activity, profile.header, and login page as pure derived-props components", async () => {
     const dom = mountMiniDom()
     activeUnmount = dom.unmount
 
@@ -600,8 +644,6 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     slots.declare({ name: "shell.banner", kind: "list" })
     slots.declare({ name: "shell.activity", kind: "list" })
     slots.declare({ name: "profile.header", kind: "single" })
-    slots.declare({ name: "profile.accountActions", kind: "list" })
-    slots.declare({ name: "settings.account", kind: "list" })
 
     await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
 
@@ -629,16 +671,12 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
 
     const bannerEntry = slots.select("shell.banner")[0]!
     const headerEntry = slots.select("profile.header")[0]!
-    const actionsEntry = slots.select("profile.accountActions")[0]!
-    const settingsAccountEntry = slots.select("settings.account")[0]!
 
     await dom.render(
       <TooltipProvider>
         <div>
           <ContributionOutlet entry={bannerEntry} slots={slots} i18n={i18n} />
           <ContributionOutlet entry={headerEntry} slots={slots} i18n={i18n} />
-          <ContributionOutlet entry={actionsEntry} slots={slots} i18n={i18n} />
-          <ContributionOutlet entry={settingsAccountEntry} slots={slots} i18n={i18n} />
         </div>
       </TooltipProvider>
     )
@@ -647,8 +685,6 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
       expect(dom.container.textContent).toContain("登录已过期，请重新登录")
       expect(dom.container.textContent).toContain("李青橙")
       expect(dom.container.textContent).toContain("20260001")
-      expect(dom.container.textContent).toContain("切换学校")
-      expect(dom.container.textContent).toContain("退出登录")
     })
 
     activeUnmount = undefined

@@ -148,6 +148,10 @@ dot-path translation keys when passed as `dictionary` to a UI registration.
 Use scoped `ctx.i18n.register(dictionary)` when registry metadata also needs
 translation keys.
 
+## Routing and back navigation
+
+`ctx.router` owns application history. `registerBackGuard` runs guards by descending priority and then newest registration first. Return `false` only after consuming back by closing an overlay or page-local state; return `true` when the guard is irrelevant to the active page so other guards and history can proceed. The default Shell bridges `BackLayerProvider` priorities into this API. A Shell can register an application back fallback to resolve a parent or primary page when history is exhausted; root pages deliberately have no fallback.
+
 ## HTTP and native boundaries
 
 Call `ctx.http.send` for platform transport and register middleware with

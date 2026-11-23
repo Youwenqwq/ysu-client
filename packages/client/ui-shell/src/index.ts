@@ -7,6 +7,7 @@ import {
   type PluginPageContribution,
   type PluginUIServiceSnapshot,
   type RouteLocation,
+  type RouteTargetInput,
 } from "@orahako/sdk"
 import "./slots-declare"
 import { AppearanceSettingsSection } from "./appearance-settings"
@@ -201,7 +202,9 @@ export const uiShellPlugin = definePlugin<
           )
         : getAppName(locale)
 
-      const showBack = activePage ? !isPagePrimary(activePage, uiSnapshot.navigation) : false
+      const showBack = activePage
+        ? !activePage.root && !isPagePrimary(activePage, uiSnapshot.navigation)
+        : false
       const fullscreen = Boolean(activePage?.fullscreen)
       const routeKey = activePage
         ? `${location.pathname}?${activePage.pluginId}:${activePage.id}`
@@ -254,26 +257,53 @@ export const uiShellPlugin = definePlugin<
       }
     }
 
-    const handleBack = (activePage: PluginPageContribution | undefined): void => {
-      const before = ctx.router.current.getSnapshot().href
-      ctx.router.back()
-      const after = ctx.router.current.getSnapshot().href
-      if (after === before && activePage?.parent) {
-        const parentInSamePlugin = ctx.ui
-          .getSnapshot()
-          .pages.find(
-            (candidate) =>
-              candidate.pluginId === activePage.pluginId && candidate.id === activePage.parent
-          )
+    const resolveBackFallback = (): RouteTargetInput | undefined => {
+      const location = ctx.router.current.getSnapshot()
+      const snapshot = ctx.ui.getSnapshot()
+      const activePage = resolveActivePageForLocation(
+        location,
+        snapshot.pages,
+        ctx.navigation,
+        store.source.getSnapshot().defaultLandingPage
+      )
+      if (!activePage || activePage.root || isPagePrimary(activePage, snapshot.navigation)) {
+        return undefined
+      }
+
+      if (activePage.parent) {
+        const parentInSamePlugin = snapshot.pages.find(
+          (candidate) =>
+            candidate.pluginId === activePage.pluginId && candidate.id === activePage.parent
+        )
         if (parentInSamePlugin) {
-          ctx.router.push({ pluginId: parentInSamePlugin.pluginId, pageId: parentInSamePlugin.id })
-          return
+          return { pluginId: parentInSamePlugin.pluginId, pageId: parentInSamePlugin.id }
         }
-        if (ctx.navigation.resolve(activePage.parent)) {
-          ctx.router.push({ route: activePage.parent })
+        const parentTarget = ctx.navigation.resolve(activePage.parent)
+        if (parentTarget) {
+          return { pluginId: parentTarget.pluginId, pageId: parentTarget.pageId }
         }
       }
+
+      const primaryTarget = ctx.navigation.primary()
+      if (
+        primaryTarget &&
+        (primaryTarget.pluginId !== activePage.pluginId || primaryTarget.pageId !== activePage.id)
+      ) {
+        return { pluginId: primaryTarget.pluginId, pageId: primaryTarget.pageId }
+      }
+      return undefined
     }
+    ctx.router.registerBackFallback(resolveBackFallback)
+
+    const handleBack = (_activePage: PluginPageContribution | undefined): void => {
+      ctx.router.back()
+    }
+
+    const registerBackHandler = (onBack: () => void, priority: number): (() => void) =>
+      ctx.router.registerBackGuard(() => {
+        onBack()
+        return false
+      }, priority)
 
     const applyLandingPreference = (landingRoute: string): void => {
       const current = ctx.router.current.getSnapshot()
@@ -307,6 +337,7 @@ export const uiShellPlugin = definePlugin<
             ctx.router.push({ route: "settings" })
           },
           handleBack,
+          registerBackHandler,
           applyLandingPreference,
         }),
       },

@@ -401,6 +401,9 @@ function mountInteractiveDom(screenWidth = 1024, screenHeight = 768) {
     createTreeWalker() {
       return { nextNode: () => null }
     },
+    getElementById(id: string) {
+      return doc.findAll((node) => node.id === id)[0] ?? null
+    },
     createDocumentFragment() {
       const frag = new MiniDomNode(11, "#document-fragment")
       frag.ownerDocument = docWithFactories
@@ -752,6 +755,7 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
     const overview = runtime.context.get("overview")!
 
     slots.declare({ name: "settings.notifications.content", kind: "list" })
+    slots.declare({ name: "shell.header.actions", kind: "list" })
 
     await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
     session.setCredential({
@@ -821,10 +825,64 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
     settingsStore.actions.setNotifyGrades(true)
 
     // Render GradesPage: GPA starts masked (`***`), then reveals `4.60` + custom 5.0 scale `A+` band
-    await dom.render(<ContributionOutlet entry={gradesPage} slots={slots} i18n={i18n} />)
+    const headerActions = slots.select("shell.header.actions")[0]!
+    await dom.render(
+      <>
+        <header>
+          <ContributionOutlet entry={headerActions} slots={slots} i18n={i18n} />
+        </header>
+        <main>
+          <ContributionOutlet entry={gradesPage} slots={slots} i18n={i18n} />
+        </main>
+      </>
+    )
+    const header = dom.container.findAll((node) => node.tagName === "HEADER")[0]!
+    const main = dom.container.findAll((node) => node.tagName === "MAIN")[0]!
+    const sortButtonsIn = (root: MiniDomNode) =>
+      root.findAll((node) => node.getAttribute("aria-label") === "排序")
+    const termButtonsIn = (root: MiniDomNode) =>
+      root.findAll(
+        (node) =>
+          node.tagName === "BUTTON" &&
+          node.getAttribute("data-variant") === "ghost" &&
+          node.textContent === "2025-2026-1"
+      )
+
+    await act(async () => router.push({ route: "evaluation" }))
+    expect(header.children).toHaveLength(0)
+    await act(async () => router.push({ pluginId: GRADES_PLUGIN_ID, pageId: "missing" }))
+    expect(header.children).toHaveLength(0)
+    await act(async () => router.push({ pluginId: GRADES_PLUGIN_ID }))
     await vi.waitFor(() => {
       expect(dom.container.textContent).toContain("抽象代数")
+      expect(termButtonsIn(header)).toHaveLength(1)
       expect(dom.container.textContent).toContain("***")
+    })
+
+    expect(sortButtonsIn(main)).toHaveLength(0)
+    expect(termButtonsIn(main)).toHaveLength(0)
+    expect(header.findAll((node) => node.tagName === "BUTTON")).toEqual([
+      sortButtonsIn(header)[0],
+      termButtonsIn(header)[0],
+    ])
+    const trigger = termButtonsIn(header)[0]!
+    await act(async () => {
+      const onClick = getReactProps(trigger).onClick
+      expect(typeof onClick).toBe("function")
+      if (typeof onClick === "function") onClick({ currentTarget: trigger })
+    })
+    const drawer = dom.bodyEl.findAll((node) => node.getAttribute("role") === "dialog")[0]!
+    expect(drawer.textContent).toContain("查看各学期课程成绩与绩点")
+    const searchButton = drawer.findAll(
+      (node) => node.tagName === "BUTTON" && node.textContent === "查询"
+    )[0]!
+    await act(async () => {
+      const onClick = getReactProps(searchButton).onClick
+      expect(typeof onClick).toBe("function")
+      if (typeof onClick === "function") onClick()
+    })
+    await vi.waitFor(() => {
+      expect(dom.bodyEl.findAll((node) => node.getAttribute("role") === "dialog")).toHaveLength(0)
     })
 
     await act(async () => {
@@ -886,6 +944,26 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       ).toHaveLength(1)
     })
 
+    const visibleCourses = () =>
+      main
+        .findAll((node) => node.hasAttribute("data-grade-card"))
+        .map((node) => node.getAttribute("data-grade-card"))
+    const clickSort = async () => {
+      await act(async () => {
+        const onClick = getReactProps(sortButtonsIn(header)[0]!).onClick
+        expect(typeof onClick).toBe("function")
+        if (typeof onClick === "function") onClick()
+      })
+    }
+    await clickSort()
+    expect(visibleCourses()).toEqual(["抽象代数", "音乐鉴赏"])
+    await clickSort()
+    expect(visibleCourses()).toEqual(["音乐鉴赏", "抽象代数"])
+    await act(async () => router.push({ route: "evaluation" }))
+    expect(header.children).toHaveLength(0)
+    await act(async () => router.push({ route: "grades" }))
+    expect(sortButtonsIn(header)).toHaveLength(1)
+
     // Render GradesSettingsPanel category via ContributionOutlet
     const settingsHtml = renderToStaticMarkup(
       <ContributionOutlet entry={gradesCategory} slots={slots} i18n={i18n} />
@@ -914,6 +992,7 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
     await act(async () => {
       runtime.stop(GRADES_PLUGIN_ID)
     })
+    expect(slots.select("shell.header.actions")).toEqual([])
     expect(ui.getSnapshot().pages.filter((p) => p.pluginId === GRADES_PLUGIN_ID)).toEqual([])
     expect(ui.getSnapshot().navigation.filter((n) => n.pluginId === GRADES_PLUGIN_ID)).toEqual([])
     expect(settings.getSnapshot().filter((c) => c.pluginId === GRADES_PLUGIN_ID)).toEqual([])

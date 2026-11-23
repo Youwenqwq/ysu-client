@@ -1243,6 +1243,9 @@ importers:
       '@orahako/sdk':
         specifier: workspace:*
         version: link:../core/sdk
+      '@orahako/ui-primitives':
+        specifier: workspace:*
+        version: link:../core/ui-primitives
       react:
         specifier: ^19.2.6
         version: 19.2.6
@@ -1368,6 +1371,9 @@ importers:
       '@orahako/runtime-i18n':
         specifier: workspace:*
         version: link:../../runtime/i18n
+      '@orahako/runtime-router':
+        specifier: workspace:*
+        version: link:../../runtime/router
       '@orahako/runtime-slots':
         specifier: workspace:*
         version: link:../../runtime/slots
@@ -1502,6 +1508,9 @@ importers:
       '@orahako/runtime-i18n':
         specifier: workspace:*
         version: link:../../runtime/i18n
+      '@orahako/runtime-router':
+        specifier: workspace:*
+        version: link:../../runtime/router
       '@orahako/runtime-slots':
         specifier: workspace:*
         version: link:../../runtime/slots
@@ -1937,6 +1946,9 @@ importers:
       '@orahako/runtime-i18n':
         specifier: workspace:*
         version: link:../../runtime/i18n
+      '@orahako/runtime-router':
+        specifier: workspace:*
+        version: link:../../runtime/router
       '@orahako/runtime-slots':
         specifier: workspace:*
         version: link:../../runtime/slots

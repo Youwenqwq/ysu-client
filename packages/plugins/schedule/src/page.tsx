@@ -570,7 +570,9 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     <div
       data-page="schedule"
       className={
-        isMobile ? "flex min-h-0 flex-1 flex-col" : "flex flex-col gap-6"
+        isMobile && (compactMode || mobileFullscreen)
+          ? "flex min-h-0 flex-1 flex-col"
+          : "flex flex-col gap-6"
       }
     >
       <Card className="hidden md:block">
@@ -655,7 +657,22 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
       >
         {(editor) =>
           isMobile ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div
+              className={cn(
+                mobileFullscreen
+                  ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+                  : "-mx-4 -mt-4 -mb-4 flex flex-col md:m-0",
+                compactMode && "min-h-0 flex-1 overflow-hidden"
+              )}
+              style={
+                compactMode || mobileFullscreen
+                  ? undefined
+                  : {
+                      minHeight:
+                        "calc(100dvh - 3rem - var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) - var(--mobile-bottom-nav-height, calc(4rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))))",
+                    }
+              }
+            >
               <ScheduleMobile
                 courses={courses}
                 exams={examsQuery.data}

@@ -26,7 +26,6 @@ import {
   FieldGroup,
   FieldLabel,
   FilterDrawer,
-  FilterTrigger,
   Input,
   ResponsiveModal,
   ResponsiveModalBody,
@@ -45,16 +44,18 @@ import type { GradesDictionary } from "./dictionary"
 import { GpaSummary } from "./gpa-summary"
 import { GradeGachaModal } from "./grade-gacha"
 import {
+  ALL_TERM,
   gradeKey,
   isGradeScored,
   normalizeGradeUser,
   toPendingGrade,
   type GradeGachaState,
   type GradesSettingsStoreInstance,
+  type GradesViewState,
+  type GradesViewStoreInstance,
   type PendingGrade,
 } from "./store"
 
-const ALL_TERM = "__all__"
 const ALL_COURSE_TYPE = "__all_type__"
 
 function numericValue(value: number | undefined, fallback?: string): number | undefined {
@@ -78,7 +79,9 @@ export interface GradesPageInject {
     readonly currentWeek: ObservableSource<QuerySnapshot<CurrentWeek>>
     readonly gacha: ObservableSource<GradeGachaState>
     readonly gachaHydrated: ObservableSource<boolean>
+    readonly view: ObservableSource<GradesViewState>
   }
+  readonly viewActions: GradesViewStoreInstance["actions"]
   readonly searchByCourseName: (courseName: string) => Promise<void>
   readonly fetchGradeAnalytics: (
     params: GradeAnalyticsQueryOptions
@@ -112,11 +115,11 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
   const gpaVisible = useStore((s) => s.gpaVisible)
   const gachaEnabled = useStore((s) => s.gradeGachaEnabled)
 
-  const [term, setTerm] = useState(ALL_TERM)
+  const { term, sortMode, filterDrawerOpen } = props.useView()
+  const { setTerm, setDefaultTerm, setSortMode, setFilterDrawerOpen, reset } = props.viewActions
   const [courseType, setCourseType] = useState(ALL_COURSE_TYPE)
   const [courseName, setCourseName] = useState("")
   const [queriedCourseName, setQueriedCourseName] = useState("")
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
   const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [statsLoading, setStatsLoading] = useState(false)
@@ -125,10 +128,16 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
   const [rankingResult, setRankingResult] = useState<GradeRanking | null>(null)
   const [statsError, setStatsError] = useState<string | null>(null)
   const [statsScope, setStatsScope] = useState<"class" | "course">("class")
-  const [sortMode, setSortMode] = useState<"default" | "asc" | "desc">("default")
   const [gachaOpen, setGachaOpen] = useState(false)
   const [playItems, setPlayItems] = useState<PendingGrade[] | null>(null)
   const didAutoSelectTerm = useRef(false)
+
+  useEffect(() => {
+    return () => {
+      didAutoSelectTerm.current = false
+      reset()
+    }
+  }, [reset])
 
   const activeGradesSlice = providerSnap.provider?.slices.grades
   const gpaScale = activeGradesSlice?.gpaScale
@@ -223,10 +232,8 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
 
   useEffect(() => {
     const sem = currentWeekQuery.data?.semester
-    if (sem) {
-      setTerm((prev) => (prev === ALL_TERM ? sem : prev))
-    }
-  }, [currentWeekQuery.data])
+    if (sem) setDefaultTerm(sem)
+  }, [currentWeekQuery.data, setDefaultTerm])
 
   useEffect(() => {
     if (terms.length > 0 && term === ALL_TERM && !didAutoSelectTerm.current) {
@@ -234,7 +241,7 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
       const latest = terms[terms.length - 1]
       if (latest) setTerm(latest)
     }
-  }, [terms, term])
+  }, [terms, term, setTerm])
 
   async function handleSearch(): Promise<void> {
     const nextCourseName = courseName.trim()
@@ -298,12 +305,6 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
     setStatsScope(scope)
     await fetchStatsForScope(selectedGrade, scope)
   }
-
-  function cycleSort(): void {
-    setSortMode((prev) => (prev === "default" ? "desc" : prev === "desc" ? "asc" : "default"))
-  }
-
-  const SortIcon = sortMode === "asc" ? ArrowUp : sortMode === "desc" ? ArrowDown : ArrowUpDown
 
   const filtered = useMemo(() => {
     return displayGrades.filter((grade) => {
@@ -442,23 +443,6 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
 
   return (
     <div data-page="grades" className="flex flex-col gap-6 md:gap-8">
-      <div className="flex items-center justify-end gap-1 md:hidden">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={cycleSort}
-          aria-label={t("grades.sortLabel")}
-          className={sortMode !== "default" ? "text-primary" : ""}
-        >
-          <SortIcon className="size-4" />
-        </Button>
-        <FilterTrigger
-          label={term === ALL_TERM ? t("grades.allTerms") : term}
-          onClick={() => setFilterDrawerOpen(true)}
-        />
-      </div>
-
       <GpaSummary
         gpa={gpaQuery.data}
         gpaScale={gpaScale}

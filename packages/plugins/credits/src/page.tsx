@@ -28,7 +28,6 @@ import {
   FilterChips,
   FilterDrawer,
   FilterOptionList,
-  FilterTrigger,
   Input,
   LoadingCards,
   Skeleton,
@@ -42,6 +41,7 @@ import {
 } from "@orahako/ui-primitives"
 import type { CreditsUiStoreInstance } from "./controller"
 import type { CreditsDictionary } from "./dictionary"
+import { CURRENT_BATCH_VALUE, getBatchFilters } from "./batch-filters"
 
 export interface CreditsPageInject {
   readonly hooks: {
@@ -200,8 +200,6 @@ function RecordGroup({
   )
 }
 
-const CURRENT_BATCH_VALUE = "__current"
-
 function RecordsPanel({
   batch,
   filterDrawerOpen,
@@ -227,29 +225,18 @@ function RecordsPanel({
   useErrorToast(batchesQuery.error ?? undefined)
   useErrorToast(recordsQuery.error ?? undefined)
 
-  const chips = [
-    { value: CURRENT_BATCH_VALUE, label: batches[0]?.name ?? t("credits.batch") },
-    { value: "all", label: t("credits.allBatches") },
-    ...batches.slice(1).map((item) => ({ value: item.batchId, label: item.name })),
-  ]
-  const activeValue = batch ?? CURRENT_BATCH_VALUE
-  const activeLabel = chips.find((chip) => chip.value === activeValue)?.label ?? t("credits.batch")
+  const { chips, activeValue } = getBatchFilters(batches, batch, t)
 
   return (
     <div className="flex flex-col gap-4">
       {batches.length > 0 && (
-        <>
-          <div className="flex justify-end md:hidden">
-            <FilterTrigger label={activeLabel} onClick={() => onFilterDrawerOpenChange(true)} />
-          </div>
-          <div className="hidden md:block">
-            <FilterChips
-              items={chips}
-              value={activeValue}
-              onChange={(val) => onBatchChange(val === CURRENT_BATCH_VALUE ? undefined : val)}
-            />
-          </div>
-        </>
+        <div className="hidden md:block">
+          <FilterChips
+            items={chips}
+            value={activeValue}
+            onChange={(val) => onBatchChange(val === CURRENT_BATCH_VALUE ? undefined : val)}
+          />
+        </div>
       )}
 
       <FilterDrawer

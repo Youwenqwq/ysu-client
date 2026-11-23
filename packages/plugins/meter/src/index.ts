@@ -9,7 +9,14 @@ import {
 } from "@orahako/sdk"
 import type { MeterData, MeterHttp } from "./client"
 import { meterDictionary, type MeterDictionary } from "./dictionary"
-import { MeterPage, type MeterPageInject, type MeterPageProps } from "./page"
+import {
+  MeterHeaderActions,
+  MeterPage,
+  type MeterHeaderActionsInject,
+  type MeterPageInject,
+  type MeterPageProps,
+} from "./page"
+import "./slots"
 import {
   createMeterController,
   meterRoomStore,
@@ -39,6 +46,7 @@ export type {
   MeterDevice,
   MeterDictionary,
   MeterHttp,
+  MeterHeaderActionsInject,
   MeterOverview,
   MeterPageInject,
   MeterPageProps,
@@ -88,14 +96,14 @@ const meterManifest: PluginManifest = {
   providerIndependent: true,
   entry: "index.js",
   description: "宿舍空调智能水电表余额、用电趋势与充值记录查询",
-  inject: ["ui", "i18n", "storage", "http"],
+  inject: ["ui", "slots", "router", "i18n", "storage", "http"],
 }
 
 export const meterPlugin = definePlugin({
   manifest: meterManifest,
-  inject: ["ui", "i18n", "storage", "http"] as const,
+  inject: ["ui", "slots", "router", "i18n", "storage", "http"] as const,
   apply(ctx) {
-    const { ui, i18n, storage, http } = ctx
+    const { ui, slots, router, i18n, storage, http } = ctx
     i18n.register(meterDictionary)
 
     const roomStore = meterRoomStore.create(storage)
@@ -159,6 +167,25 @@ export const meterPlugin = definePlugin({
         },
       },
       MeterPage
+    )
+
+    slots.inject("shell.header.actions", (slotCtx) =>
+      slotCtx.slots.register(
+        {
+          id: "meter-header-actions",
+          slot: "shell.header.actions",
+          dictionary: meterDictionary,
+          inject: (): MeterHeaderActionsInject => ({
+            hooks: {
+              location: router.current,
+              meter: controller.query,
+            },
+            pluginId: METER_PLUGIN_ID,
+            refresh: () => controller.refresh(),
+          }),
+        },
+        MeterHeaderActions
+      )
     )
 
     ui.registerNavigation({

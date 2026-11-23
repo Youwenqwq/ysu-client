@@ -20,7 +20,7 @@ import {
   type RouteLocation,
 } from "@orahako/sdk"
 import {
-  AccountActionsCard,
+  AccountActions,
   QueryActivityIndicators,
   RefreshIndicator,
   SessionExpiredBanner,
@@ -57,7 +57,7 @@ export interface AuthUiPluginConfig extends PluginConfig {
 }
 
 export {
-  AccountActionsCard,
+  AccountActions,
   authUiDictionary,
   createLoginRateLimiter,
   formatRateLimitMessage,
@@ -412,6 +412,7 @@ export const authUiPlugin = definePlugin({
         titleKey: "pageTitle",
         requiresProvider: false,
         fullscreen: true,
+        root: true,
         dictionary: authUiDictionary,
         store: rememberStore,
         inject: (fullCtx: Context): LoginPageInject => ({
@@ -528,7 +529,7 @@ export const authUiPlugin = definePlugin({
             },
           }),
         },
-        AccountActionsCard
+        AccountActions
       )
     )
 
@@ -554,7 +555,7 @@ export const authUiPlugin = definePlugin({
             },
           }),
         },
-        AccountActionsCard
+        AccountActions
       )
     )
 

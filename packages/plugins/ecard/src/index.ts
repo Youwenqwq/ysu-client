@@ -2,7 +2,14 @@ import { CreditCard } from "lucide-react"
 import { hasSlice, requireSlice, type EcardSessionStatus } from "@orahako/academic-sdk"
 import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/sdk"
 import { ecardDictionary, type EcardDictionary } from "./dictionary"
-import { EcardPage, type EcardPageInject, type EcardPageProps } from "./page"
+import {
+  EcardHeaderActions,
+  EcardPage,
+  type EcardHeaderActionsInject,
+  type EcardPageInject,
+  type EcardPageProps,
+} from "./page"
+import "./slots"
 import {
   ECARD_BALANCE_WIDGET_ID,
   EcardSummaryWidget,
@@ -14,6 +21,7 @@ export const ECARD_PLUGIN_ID = "orahako.ecard"
 
 export type {
   EcardDictionary,
+  EcardHeaderActionsInject,
   EcardPageInject,
   EcardPageProps,
   EcardSummaryWidgetInject,
@@ -28,14 +36,14 @@ const ecardManifest: PluginManifest = {
   kind: "feature",
   entry: "index.js",
   description: "校园一卡通余额、卡片状态查询与总览摘要卡片",
-  inject: ["ui", "router", "i18n", "provider", "session", "query", "overview"],
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query", "overview"],
 }
 
 export const ecardPlugin = definePlugin({
   manifest: ecardManifest,
-  inject: ["ui", "router", "i18n", "provider", "session", "query", "overview"] as const,
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query", "overview"] as const,
   apply(ctx) {
-    const { ui, router, i18n, provider, session, query, overview } = ctx
+    const { ui, slots, router, i18n, provider, session, query, overview } = ctx
     i18n.register(ecardDictionary)
     let disposed = false
 
@@ -68,6 +76,26 @@ export const ecardPlugin = definePlugin({
         }),
       },
       EcardPage
+    )
+
+    slots.inject("shell.header.actions", (slotCtx) =>
+      slotCtx.slots.register(
+        {
+          id: "ecard-header-actions",
+          slot: "shell.header.actions",
+          dictionary: ecardDictionary,
+          inject: (): EcardHeaderActionsInject => ({
+            hooks: {
+              location: router.current,
+              session: session.state,
+              provider: provider.state,
+              ecard: ecardSource,
+            },
+            pluginId: ECARD_PLUGIN_ID,
+          }),
+        },
+        EcardHeaderActions
+      )
     )
 
     ui.registerNavigation({

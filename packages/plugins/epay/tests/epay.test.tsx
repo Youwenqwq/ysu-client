@@ -27,6 +27,7 @@ import {
 import { PluginRuntime } from "@orahako/kernel"
 import { StatelessHttpService } from "@orahako/runtime-http"
 import { i18nRegistryPlugin } from "@orahako/runtime-i18n"
+import { routerRuntimePlugin } from "@orahako/runtime-router"
 import {
   ContributionOutlet,
   slotRegistryPlugin,
@@ -131,6 +132,15 @@ class MiniDomNode {
     if (this.nodeType === 8) return ""
     if (this.childNodes.length === 0) return this.rawText
     return this.childNodes.map((child) => child.textContent).join("")
+  }
+
+  findAll(predicate: (node: MiniDomNode) => boolean): MiniDomNode[] {
+    const found: MiniDomNode[] = []
+    if (predicate(this)) found.push(this)
+    for (const child of this.childNodes) {
+      found.push(...child.findAll(predicate))
+    }
+    return found
   }
 }
 
@@ -260,7 +270,7 @@ describe("@orahako/plugin-epay", () => {
     expect(epayPlugin.manifest.id).toBe("orahako.epay")
   })
 
-  it("renders unpaid/paid fee lists, contributes settings.notifications.appReminders slot, and triggers unpaid toast on provider/ready", async () => {
+  it("renders fee lists and a route-scoped mobile refresh, and contributes unpaid reminders", async () => {
     const dom = mountMiniDom()
     activeUnmount = dom.unmount
 
@@ -359,6 +369,7 @@ describe("@orahako/plugin-epay", () => {
       slotRegistryPlugin,
       uiRegistryPlugin,
       i18nRegistryPlugin,
+      routerRuntimePlugin,
       providerRegistryRuntimePlugin,
       sessionRuntimePlugin,
       providerRuntimePlugin,
@@ -382,6 +393,11 @@ describe("@orahako/plugin-epay", () => {
     const i18n = runtime.context.get("i18n") as PluginI18nRegistryService
     const session = runtime.context.get("session")!
     const providerRuntime = runtime.context.get("provider")!
+    const router = runtime.context.get("router")!
+
+    slots.declare({ name: "shell.header.actions", kind: "list" })
+    const [headerActions] = slots.select("shell.header.actions")
+    expect(headerActions?.pluginId).toBe(EPAY_PLUGIN_ID)
 
     // Declare appReminders slot (as notificationsPlugin does in production)
     slots.declare({ name: "settings.notifications.appReminders", kind: "list" })
@@ -421,8 +437,21 @@ describe("@orahako/plugin-epay", () => {
       expect(toastMocks.warning).toHaveBeenCalledWith("你有 1 笔费用待缴纳，合计 ¥1200.00")
     })
 
-    // Render EpayPage
-    await dom.render(<ContributionOutlet entry={epayPage} slots={slots} i18n={i18n} />)
+    await dom.render(
+      <>
+        <header>
+          <ContributionOutlet entry={headerActions!} slots={slots} i18n={i18n} />
+        </header>
+        <main>
+          <ContributionOutlet entry={epayPage} slots={slots} i18n={i18n} />
+        </main>
+      </>
+    )
+    const header = dom.container.findAll((node) => node.tagName === "HEADER")[0]!
+    const body = dom.container.findAll((node) => node.tagName === "MAIN")[0]!
+    const isRefresh = (node: MiniDomNode) => node.attributes.get("aria-label") === "刷新"
+    expect(header.findAll(isRefresh)).toEqual([])
+    await act(async () => router.push({ route: "epay" }))
     await vi.waitFor(() => {
       expect(dom.container.textContent).toContain("2026 学年住宿费")
       expect(dom.container.textContent).toContain("1 笔未缴")
@@ -430,6 +459,38 @@ describe("@orahako/plugin-epay", () => {
       expect(dom.container.textContent).toContain("2025 学年学费")
       expect(dom.container.textContent).toContain("已支付 · ¥4800")
     })
+
+    const headerButtons = header.findAll(isRefresh)
+    expect(headerButtons).toHaveLength(1)
+    const [headerRefresh] = headerButtons
+    expect(headerRefresh?.attributes.get("data-variant")).toBe("ghost")
+    expect(headerRefresh?.attributes.get("data-size")).toBe("icon-sm")
+    expect(headerRefresh?.attributes.get("class")?.split(" ")).toContain("md:hidden")
+    const bodyButtons = body.findAll(isRefresh)
+    expect(bodyButtons).toHaveLength(1)
+    const [bodyRefresh] = bodyButtons
+    expect(bodyRefresh?.attributes.get("class")?.split(" ")).toEqual(
+      expect.arrayContaining(["hidden", "md:inline-flex"])
+    )
+
+    const refreshPropsKey = Object.keys(headerRefresh!).find((key) =>
+      key.startsWith("__reactProps$")
+    )!
+    const refreshClick: unknown = Reflect.get(
+      Reflect.get(headerRefresh!, refreshPropsKey),
+      "onClick"
+    )
+    expect(typeof refreshClick).toBe("function")
+    const callsBeforeRefresh = fetchPayments.mock.calls.length
+    await act(async () => {
+      if (typeof refreshClick === "function") refreshClick()
+    })
+    expect(fetchPayments).toHaveBeenCalledTimes(callsBeforeRefresh + 1)
+
+    await act(async () => router.push({ pluginId: EPAY_PLUGIN_ID }))
+    expect(header.findAll(isRefresh)).toHaveLength(1)
+    await act(async () => router.push({ route: "meter" }))
+    expect(header.findAll(isRefresh)).toEqual([])
 
     // Render reminder settings contribution for epay-school (visible) then plain-school (hidden)
     await dom.render(
@@ -450,6 +511,7 @@ describe("@orahako/plugin-epay", () => {
     })
     expect(ui.getSnapshot().pages.some((p) => p.pluginId === EPAY_PLUGIN_ID)).toBe(false)
     expect(slots.select("settings.notifications.appReminders")).toEqual([])
+    expect(slots.select("shell.header.actions")).toEqual([])
 
     activeUnmount = undefined
     await dom.unmount()

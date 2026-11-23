@@ -12,6 +12,7 @@ import {
   type PluginManifest,
   type PluginRouterService,
   type RouteLocation,
+  type RouterBackFallback,
   type RouterBackGuard,
   type RouteTargetInput,
   type ScopedPluginService,
@@ -103,14 +104,15 @@ function readStateIndex(state: unknown): number | undefined {
 
 interface GuardEntry {
   readonly guard: RouterBackGuard
+  readonly priority: number
   active: boolean
 }
 
 /**
- * Reactive History API router with in-memory fallback, LIFO back guards, and
- * Capacitor hardware back button integration.
+ * Reactive History API router with in-memory fallback, prioritized back guards,
+ * and Capacitor hardware back button integration.
  *
- * `registerBackGuard` evaluates active guards in LIFO order before history back:
+ * `registerBackGuard` evaluates active guards by descending priority, then LIFO:
  * returning `false` (or a Promise resolving to `false`) intercepts/cancels
  * history navigation, while returning `true` allows navigation to proceed.
  */
@@ -121,6 +123,7 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
   private readonly browserWindow?: BrowserWindowLike
   private readonly entries: string[]
   private readonly backGuards: GuardEntry[] = []
+  private readonly backFallbacks: RouterBackFallback[] = []
   private index = 0
   private disposed = false
   private hardwareListener?: HardwareBackListenerHandle
@@ -188,8 +191,10 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
       replace: this.replace,
       back: this.back,
       href: this.href,
-      registerBackGuard: (guard) =>
-        trackPluginRegistration(ctx, () => this.registerBackGuard(guard)),
+      registerBackGuard: (guard, priority) =>
+        trackPluginRegistration(ctx, () => this.registerBackGuard(guard, priority)),
+      registerBackFallback: (fallback) =>
+        trackPluginRegistration(ctx, () => this.registerBackFallback(fallback)),
     }
   }
 
@@ -228,8 +233,8 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     this.currentSource.set(nextLocation)
   }
 
-  registerBackGuard = (guard: RouterBackGuard): (() => void) => {
-    const entry: GuardEntry = { guard, active: true }
+  registerBackGuard = (guard: RouterBackGuard, priority = 0): (() => void) => {
+    const entry: GuardEntry = { guard, priority, active: true }
     this.backGuards.push(entry)
     return () => {
       if (!entry.active) return
@@ -241,20 +246,32 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     }
   }
 
+  registerBackFallback = (fallback: RouterBackFallback): (() => void) => {
+    this.backFallbacks.push(fallback)
+    return () => {
+      const index = this.backFallbacks.lastIndexOf(fallback)
+      if (index >= 0) this.backFallbacks.splice(index, 1)
+    }
+  }
+
   back = (): void => {
     if (this.disposed) return
-    const snapshot = [...this.backGuards].reverse()
+    const snapshot = [...this.backGuards]
+      .reverse()
+      .sort((left, right) => right.priority - left.priority)
     this.runGuardsSyncOrAsync(snapshot, 0, () => {
       this.performHistoryBack()
     })
   }
 
   async dispatchHardwareBack(
-    canGoBack = false,
+    _canGoBack = false,
     onExit?: () => void | Promise<void>
   ): Promise<boolean> {
     if (this.disposed) return false
-    const snapshot = [...this.backGuards].reverse()
+    const snapshot = [...this.backGuards]
+      .reverse()
+      .sort((left, right) => right.priority - left.priority)
     for (const entry of snapshot) {
       if (!entry.active) continue
       const allowed = await entry.guard()
@@ -262,10 +279,7 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
         return true
       }
     }
-    if (this.index > 0 || (this.browserWindow && canGoBack)) {
-      this.performHistoryBack(canGoBack)
-      return true
-    }
+    if (this.performHistoryBack()) return true
     await onExit?.()
     return false
   }
@@ -274,6 +288,7 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     if (this.disposed) return
     this.disposed = true
     this.backGuards.length = 0
+    this.backFallbacks.length = 0
     if (this.browserWindow) {
       this.browserWindow.removeEventListener("popstate", this.handlePopState)
     }
@@ -305,8 +320,8 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     onAllowed()
   }
 
-  private performHistoryBack(browserCanGoBack = false): void {
-    if (this.disposed) return
+  private performHistoryBack(): boolean {
+    if (this.disposed) return false
     if (this.index > 0) {
       this.index -= 1
       const targetHref = this.entries[this.index]!
@@ -314,11 +329,16 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
         this.browserWindow.history.back()
       }
       this.currentSource.set(parseRouteLocation(targetHref))
-      return
+      return true
     }
-    if (this.browserWindow && browserCanGoBack) {
-      this.browserWindow.history.back()
+    for (let index = this.backFallbacks.length - 1; index >= 0; index -= 1) {
+      const fallback = this.backFallbacks[index]?.()
+      if (fallback !== undefined) {
+        this.replace(fallback)
+        return true
+      }
     }
+    return false
   }
 
   private attachHardwareBack(adapter: HardwareBackAdapter): void {

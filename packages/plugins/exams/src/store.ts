@@ -27,3 +27,19 @@ export type ExamsSettingsStoreInstance = StoreInstance<
   ExamsSettingsState,
   typeof examsSettingsStore.spec.actions
 >
+
+export const examsViewStore = defineStore({
+  init: () => ({ filterDrawerOpen: false }),
+  actions: {
+    setFilterDrawerOpen(ctx, filterDrawerOpen: boolean) {
+      ctx.set((state) =>
+        state.filterDrawerOpen === filterDrawerOpen ? state : { filterDrawerOpen }
+      )
+    },
+  },
+})
+
+export type ExamsViewStoreInstance = StoreInstance<
+  { readonly filterDrawerOpen: boolean },
+  typeof examsViewStore.spec.actions
+>

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, type ReactNode } from "react"
 import type {
   ComprehensiveIndicatorDetail,
   ComprehensiveRadarItem,
@@ -26,7 +26,6 @@ import {
   FilterChips,
   FilterDrawer,
   FilterOptionList,
-  FilterTrigger,
   LoadingCards,
   Skeleton,
   Tabs,
@@ -43,6 +42,7 @@ import {
   formatTermValue,
   type ComprehensiveTermSelection,
 } from "./sources"
+import type { ComprehensiveViewStoreInstance } from "./view-store"
 
 export interface ComprehensivePageInject {
   readonly hooks: {
@@ -64,7 +64,7 @@ export type ComprehensivePageProps = DerivedComponentProps<
   Record<string, never>,
   ComprehensiveDictionary,
   undefined,
-  undefined,
+  ComprehensiveViewStoreInstance,
   ComprehensivePageInject
 >
 
@@ -346,9 +346,14 @@ function ReportPanel({
 }
 
 export const ComprehensivePage: SlotComponent<ComprehensivePageProps> = (props) => {
-  const { t } = props
-  const [tab, setTab] = useState("result")
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
+  const { t, actions, useStore } = props
+  const tab = useStore((state) => state.tab)
+  const filterDrawerOpen = useStore((state) => state.filterDrawerOpen)
+  const { setTab, setFilterDrawerOpen, reset } = actions
+
+  useEffect(() => {
+    reset()
+  }, [reset])
 
   const termsQuery = props.useTerms()
   const selected = props.useSelectedTerm()
@@ -356,9 +361,6 @@ export const ComprehensivePage: SlotComponent<ComprehensivePageProps> = (props) 
 
   useErrorToast(termsQuery.error ?? undefined, t("updating"))
 
-  const selectedItem = terms.find(
-    (item) => selected !== null && item.year === selected.year && item.term === selected.term
-  )
   const termItems = terms.map((item) => ({
     value: formatTermValue(item),
     label: formatTermLabel(item),
@@ -385,23 +387,13 @@ export const ComprehensivePage: SlotComponent<ComprehensivePageProps> = (props) 
       {terms.length === 0 ? (
         <EmptyState title={t("comprehensive.noTerms")} />
       ) : (
-        <>
-          {(tab === "result" || tab === "radar") && (
-            <div className="flex justify-end md:hidden">
-              <FilterTrigger
-                label={selectedItem ? formatTermLabel(selectedItem) : t("comprehensive.title")}
-                onClick={() => setFilterDrawerOpen(true)}
-              />
-            </div>
-          )}
-          <div className="hidden md:block">
-            <FilterChips
-              items={termItems}
-              value={selected ? formatTermValue(selected) : undefined}
-              onChange={handleSelectTermValue}
-            />
-          </div>
-        </>
+        <div className="hidden md:block">
+          <FilterChips
+            items={termItems}
+            value={selected ? formatTermValue(selected) : undefined}
+            onChange={handleSelectTermValue}
+          />
+        </div>
       )}
 
       <FilterDrawer

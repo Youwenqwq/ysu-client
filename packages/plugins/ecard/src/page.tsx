@@ -8,7 +8,12 @@ import {
   type QuerySnapshot,
   type SessionSnapshot,
 } from "@orahako/academic-sdk"
-import type { DerivedComponentProps, ObservableSource, SlotComponent } from "@orahako/sdk"
+import type {
+  DerivedComponentProps,
+  ObservableSource,
+  RouteLocation,
+  SlotComponent,
+} from "@orahako/sdk"
 import {
   Alert,
   AlertDescription,
@@ -40,6 +45,62 @@ export type EcardPageProps = DerivedComponentProps<
   EcardPageInject
 >
 
+export interface EcardHeaderActionsInject {
+  readonly hooks: EcardPageInject["hooks"] & {
+    readonly location: ObservableSource<RouteLocation>
+  }
+  readonly pluginId: string
+}
+
+type EcardHeaderActionsProps = DerivedComponentProps<
+  Record<string, never>,
+  EcardDictionary,
+  undefined,
+  undefined,
+  EcardHeaderActionsInject
+>
+
+function canQueryEcard(provider: ProviderRuntimeSnapshot, session: SessionSnapshot): boolean {
+  return (
+    hasSlice(provider.provider, "ecard") &&
+    provider.status === "ready" &&
+    session.hasHydrated &&
+    Boolean(session.username) &&
+    Boolean(session.credential) &&
+    session.isAuthenticated
+  )
+}
+
+export const EcardHeaderActions: SlotComponent<EcardHeaderActionsProps> = (props) => {
+  const location = props.useLocation()
+  const onPage = location.route
+    ? location.route === "ecard"
+    : location.pluginId === props.pluginId && (location.pageId ?? "index") === "index"
+  return onPage ? <EcardHeaderRefresh {...props} /> : null
+}
+
+function EcardHeaderRefresh({ t, useSession, useProvider, useEcard }: EcardHeaderActionsProps) {
+  const session = useSession()
+  const provider = useProvider()
+  const query = useEcard()
+  const enabled = canQueryEcard(provider, session)
+  const loading = enabled && (query.isLoading || query.isRefreshing)
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className="md:hidden"
+      onClick={() => void query.refresh()}
+      disabled={!enabled || loading}
+      aria-label={t("ecard.refresh")}
+    >
+      <RefreshCw className={cn(loading && "animate-spin")} />
+    </Button>
+  )
+}
+
 export function isEcardAuthError(error: Error | null): boolean {
   if (!error) return false
   if (isProviderError(error)) {
@@ -70,13 +131,7 @@ export const EcardPage: SlotComponent<EcardPageProps> = (props) => {
   const noAccount = session.hasHydrated && !session.username
   const noAuth =
     !session.isAuthenticated || !session.credential || isEcardAuthError(ecardQuery.error)
-  const enabled =
-    available &&
-    providerSnap.status === "ready" &&
-    session.hasHydrated &&
-    Boolean(session.username) &&
-    Boolean(session.credential) &&
-    session.isAuthenticated
+  const enabled = canQueryEcard(providerSnap, session)
 
   const loading = enabled && (ecardQuery.isLoading || ecardQuery.isRefreshing)
   const balance = enabled ? (ecardQuery.data?.balance ?? null) : null
@@ -141,7 +196,7 @@ export const EcardPage: SlotComponent<EcardPageProps> = (props) => {
 
   if (!balance && loading) {
     return (
-      <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-4">
         <Skeleton className="h-36 w-full" />
         <Skeleton className="h-24 w-full" />
       </div>
@@ -168,10 +223,9 @@ export const EcardPage: SlotComponent<EcardPageProps> = (props) => {
 
   return (
     <div className="flex flex-col gap-4 p-4" data-ecard-page="">
-      <div className="flex justify-end">
+      <div className="hidden justify-end md:flex">
         <Button
           variant="outline"
-          size="sm"
           onClick={handleRefresh}
           disabled={loading}
           aria-label={t("ecard.refresh")}

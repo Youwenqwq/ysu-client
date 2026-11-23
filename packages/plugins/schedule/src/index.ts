@@ -461,17 +461,17 @@ export const schedulePlugin = definePlugin({
     router.registerBackGuard(() => {
       const loc = router.current.getSnapshot()
       const onOwnPage = loc.route === "schedule" || loc.pluginId === SCHEDULE_PLUGIN_ID
-      if (!onOwnPage) return false
+      if (!onOwnPage) return true
       const viewState = viewStore.source.getSnapshot()
       if (viewState.showOriginal) {
         viewStore.actions.setShowOriginal(false)
-        return true
+        return false
       }
       if (viewState.editScope !== null) {
         viewStore.actions.finishEditing()
-        return true
+        return false
       }
-      return false
+      return true
     })
 
     ui.registerPage(
@@ -482,7 +482,6 @@ export const schedulePlugin = definePlugin({
         titleKey: "pageTitle",
         capability: "timetable",
         primary: true,
-        fullscreen: true,
         requiresProvider: true,
         dictionary: scheduleDictionary,
         store: viewStore,

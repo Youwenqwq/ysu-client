@@ -20,17 +20,18 @@ import {
   FieldGroup,
   FieldLabel,
   FilterDrawer,
-  FilterTrigger,
   Input,
   Skeleton,
   Spinner,
 } from "@orahako/ui-primitives"
 import type { ExamsDictionary } from "./dictionary"
+import type { ExamsViewStoreInstance } from "./store"
 import { computeExamDayDiff } from "./widget-sync"
 
 export interface ExamsPageInject {
   readonly hooks: {
     readonly exams: ObservableSource<QuerySnapshot<Exam[]>>
+    readonly queriedTerm: ObservableSource<string>
   }
   readonly queryBySemester: (semester: string) => Promise<void>
 }
@@ -39,18 +40,25 @@ export type ExamsPageProps = DerivedComponentProps<
   Record<string, never>,
   ExamsDictionary,
   undefined,
-  undefined,
+  ExamsViewStoreInstance,
   ExamsPageInject
 >
 
 export const ExamsPage: SlotComponent<ExamsPageProps> = (props) => {
-  const { t } = props
+  const { t, actions, useStore } = props
   const examsQuery = props.useExams()
+  const queriedTerm = props.useQueriedTerm()
 
-  const [term, setTerm] = useState("")
-  const [queriedTerm, setQueriedTerm] = useState("")
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
+  const [term, setTerm] = useState(queriedTerm)
+  useEffect(() => {
+    setTerm(queriedTerm)
+  }, [queriedTerm])
+  const filterDrawerOpen = useStore((state) => state.filterDrawerOpen)
+  const { setFilterDrawerOpen } = actions
 
+  useEffect(() => {
+    return () => setFilterDrawerOpen(false)
+  }, [setFilterDrawerOpen])
   const exams = examsQuery.data ?? []
   const loading = examsQuery.isLoading || examsQuery.isRefreshing
   const now = new Date()
@@ -63,7 +71,6 @@ export const ExamsPage: SlotComponent<ExamsPageProps> = (props) => {
   async function handleQuery(): Promise<void> {
     const nextTerm = term.trim()
     setFilterDrawerOpen(false)
-    setQueriedTerm(nextTerm)
     await props.queryBySemester(nextTerm)
   }
 
@@ -85,6 +92,17 @@ export const ExamsPage: SlotComponent<ExamsPageProps> = (props) => {
     </FieldGroup>
   )
 
+  const filterDrawer = (
+    <FilterDrawer
+      open={filterDrawerOpen}
+      onOpenChange={setFilterDrawerOpen}
+      title={t("exams.title")}
+      description={t("exams.description")}
+    >
+      {renderFilterControls("exams-drawer")}
+    </FilterDrawer>
+  )
+
   const upcomingExams = exams
     .filter((exam) => !isExamCompleted(exam, now))
     .sort(compareExamStartTime)
@@ -95,25 +113,19 @@ export const ExamsPage: SlotComponent<ExamsPageProps> = (props) => {
   if (loading && exams.length === 0) {
     return (
       <div className="flex flex-col gap-4">
-        <Skeleton className="h-12" />
+        <Skeleton className="hidden h-12 md:block" />
         <div className="grid gap-4 md:grid-cols-2">
           {Array.from({ length: 4 }).map((_, idx) => (
             <Skeleton key={idx} className="h-32" />
           ))}
         </div>
+        {filterDrawer}
       </div>
     )
   }
 
   return (
     <div data-page="exams" className="flex flex-col gap-6">
-      <div className="flex items-center justify-end md:hidden">
-        <FilterTrigger
-          label={queriedTerm || t("exams.allTerms")}
-          onClick={() => setFilterDrawerOpen(true)}
-        />
-      </div>
-
       <Card className="hidden md:block">
         <CardHeader>
           <CardTitle>{t("exams.title")}</CardTitle>
@@ -122,14 +134,7 @@ export const ExamsPage: SlotComponent<ExamsPageProps> = (props) => {
         <CardContent>{renderFilterControls("exams-desktop")}</CardContent>
       </Card>
 
-      <FilterDrawer
-        open={filterDrawerOpen}
-        onOpenChange={setFilterDrawerOpen}
-        title={t("exams.title")}
-        description={t("exams.description")}
-      >
-        {renderFilterControls("exams-drawer")}
-      </FilterDrawer>
+      {filterDrawer}
 
       {exams.length === 0 ? (
         <Empty>

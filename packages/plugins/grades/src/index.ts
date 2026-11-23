@@ -10,18 +10,31 @@ import {
 import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/sdk"
 import { gradesDictionary, type GradesDictionary } from "./dictionary"
 import type { GachaTier, GradeLetterCandidate } from "./gpa-band"
+import {
+  GradesHeaderActions,
+  type GradesHeaderActionsInject,
+  type GradesHeaderActionsProps,
+} from "./header-actions"
 import { RecentGradesWidget, type RecentGradesWidgetInject } from "./overview-widget"
-import { GradesPage, type GradeAnalyticsResult, type GradesPageInject } from "./page"
+import {
+  GradesPage,
+  type GradeAnalyticsResult,
+  type GradesPageInject,
+  type GradesPageProps,
+} from "./page"
 import { createParameterizedQueryController } from "./query-source"
 import { GradeNotificationContent, GradesSettingsPanel } from "./settings"
 import "./slots"
 import {
   gradeGachaStore,
   gradesSettingsStore,
+  gradesViewStore,
   type GradeGachaState,
   type GradeGachaStoreInstance,
   type GradesSettingsState,
   type GradesSettingsStoreInstance,
+  type GradesViewState,
+  type GradesViewStoreInstance,
   type PendingGrade,
 } from "./store"
 
@@ -34,8 +47,14 @@ export type {
   GradeGachaStoreInstance,
   GradeLetterCandidate,
   GradesDictionary,
+  GradesHeaderActionsInject,
+  GradesHeaderActionsProps,
+  GradesPageInject,
+  GradesPageProps,
   GradesSettingsState,
   GradesSettingsStoreInstance,
+  GradesViewState,
+  GradesViewStoreInstance,
   PendingGrade,
 }
 
@@ -97,6 +116,7 @@ export const gradesPlugin = definePlugin({
 
     const settingsStore = gradesSettingsStore.create(storage)
     const gachaStore = gradeGachaStore.create(storage)
+    const viewStore = gradesViewStore.create()
 
     let unregisterChannel: (() => void) | null = null
     let lastNotifyGrades = settingsStore.source.getSnapshot().notifyGrades
@@ -261,6 +281,22 @@ export const gradesPlugin = definePlugin({
       )
     )
 
+    slots.inject("shell.header.actions", () =>
+      slots.register(
+        {
+          id: "grades-header-actions",
+          slot: "shell.header.actions",
+          dictionary: gradesDictionary,
+          store: viewStore,
+          inject: (): GradesHeaderActionsInject => ({
+            hooks: { location: router.current, provider: provider.state },
+            pluginId: GRADES_PLUGIN_ID,
+          }),
+        },
+        GradesHeaderActions
+      )
+    )
+
     ui.registerPage(
       {
         id: "index",
@@ -281,7 +317,9 @@ export const gradesPlugin = definePlugin({
             currentWeek: currentWeekSource,
             gacha: gachaStore.source,
             gachaHydrated: gachaStore.hydrated,
+            view: viewStore.source,
           },
+          viewActions: viewStore.actions,
           searchByCourseName: async (nextCourseName: string) => {
             const trimmed = nextCourseName.trim()
             if (trimmed === pageGradesController.getParams()) {
@@ -322,6 +360,7 @@ export const gradesPlugin = definePlugin({
       pageGradesController.dispose()
       settingsStore.dispose()
       gachaStore.dispose()
+      viewStore.dispose()
     })
   },
 })

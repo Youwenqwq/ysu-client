@@ -3,8 +3,6 @@ import { BarChart3 } from "lucide-react"
 import type { DerivedComponentProps, ObservableSource, SlotComponentOwner } from "@orahako/sdk"
 import {
   Button,
-  Card,
-  CardContent,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -84,22 +82,18 @@ export function AnalyticsSettingsToggle(props: AnalyticsSettingsToggleProps): Re
   const consent = useStore((state) => state.consent)
 
   return (
-    <Card className="py-0">
-      <CardContent className="flex flex-col py-1">
-        <div className="flex items-center gap-3 py-3">
-          <BarChart3 className="size-5 shrink-0 text-muted-foreground" />
-          <div className="flex flex-1 flex-col">
-            <span className="text-sm">{t("settings.analyticsEnabled")}</span>
-            <span className="text-xs text-muted-foreground">{t("settings.analyticsDesc")}</span>
-          </div>
-          <Switch
-            checked={consent}
-            onCheckedChange={(checked) => {
-              actions.setConsent(checked)
-            }}
-          />
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex items-center gap-3 py-3">
+      <BarChart3 className="size-5 shrink-0 text-muted-foreground" />
+      <div className="flex flex-1 flex-col">
+        <span className="text-sm">{t("settings.analyticsEnabled")}</span>
+        <span className="text-xs text-muted-foreground">{t("settings.analyticsDesc")}</span>
+      </div>
+      <Switch
+        checked={consent}
+        onCheckedChange={(checked) => {
+          actions.setConsent(checked)
+        }}
+      />
+    </div>
   )
 }

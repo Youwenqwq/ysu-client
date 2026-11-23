@@ -242,11 +242,11 @@ describe("@orahako/plugin-ecard", () => {
     expect(ecardPlugin.manifest.kind).toBe("feature")
   })
 
-  it("renders ecard balance page, registers ecard-balance summary overview widget, navigates via router, and cleans up on stop", async () => {
+  it("renders the balance and mobile refresh, navigates from the overview widget, and cleans up on stop", async () => {
     const dom = mountMiniDom(false)
     activeUnmount = dom.unmount
 
-    const fetchBalance = vi.fn<() => Promise<EcardSessionStatus>>().mockResolvedValue({
+    const cardBalance: EcardSessionStatus = {
       ready: true,
       balance: {
         balance: 128.6,
@@ -255,7 +255,8 @@ describe("@orahako/plugin-ecard", () => {
         cardStatusName: "正常",
         months: ["2026-11"],
       },
-    })
+    }
+    const fetchBalance = vi.fn<() => Promise<EcardSessionStatus>>().mockResolvedValue(cardBalance)
 
     const cardSchool: SchoolProvider = defineSchoolProvider({
       id: "card-school",
@@ -345,6 +346,9 @@ describe("@orahako/plugin-ecard", () => {
     const session = runtime.context.get("session")!
     const providerRuntime = runtime.context.get("provider")!
     const router = runtime.context.get("router")!
+    slots.declare({ name: "shell.header.actions", kind: "list" })
+    const [headerActions] = slots.select("shell.header.actions")
+    expect(headerActions?.pluginId).toBe(ECARD_PLUGIN_ID)
 
     const ecardPage = ui
       .getSnapshot()
@@ -436,6 +440,63 @@ describe("@orahako/plugin-ecard", () => {
     })
     expect(router.current.getSnapshot().route).toBe("ecard")
 
+    await dom.render(
+      <>
+        <header>
+          <ContributionOutlet entry={headerActions!} slots={slots} i18n={i18n} />
+        </header>
+        <main>
+          <ContributionOutlet entry={ecardPage} slots={slots} i18n={i18n} />
+        </main>
+      </>
+    )
+    const isRefresh = (node: MiniDomNode) => node.getAttribute("aria-label") === "刷新"
+    const header = dom.container.findAll((node) => node.tagName === "HEADER")[0]!
+    const body = dom.container.findAll((node) => node.tagName === "MAIN")[0]!
+    const headerButtons = header.findAll(isRefresh)
+    expect(headerButtons).toHaveLength(1)
+    const [headerRefresh] = headerButtons
+    expect(headerRefresh?.getAttribute("data-variant")).toBe("ghost")
+    expect(headerRefresh?.getAttribute("data-size")).toBe("icon-sm")
+    expect(headerRefresh?.getAttribute("class")?.split(" ")).toContain("md:hidden")
+    const bodyButtons = body.findAll(isRefresh)
+    expect(bodyButtons).toHaveLength(1)
+    const [bodyRefresh] = bodyButtons
+    expect(bodyRefresh?.parentNode?.getAttribute("class")?.split(" ")).toEqual(
+      expect.arrayContaining(["hidden", "md:flex"])
+    )
+
+    const refreshPropsKey = Object.keys(headerRefresh!).find((key) =>
+      key.startsWith("__reactProps$")
+    )!
+    const refreshClick: unknown = Reflect.get(
+      Reflect.get(headerRefresh!, refreshPropsKey),
+      "onClick"
+    )
+    expect(typeof refreshClick).toBe("function")
+    const pendingRefresh = Promise.withResolvers<EcardSessionStatus>()
+    fetchBalance.mockReturnValueOnce(pendingRefresh.promise)
+    const callsBeforeRefresh = fetchBalance.mock.calls.length
+    await act(async () => {
+      if (typeof refreshClick === "function") refreshClick()
+    })
+    expect(fetchBalance).toHaveBeenCalledTimes(callsBeforeRefresh + 1)
+    expect(headerRefresh?.getAttribute("disabled")).not.toBeNull()
+    expect(
+      headerRefresh?.findAll(
+        (node) => node.getAttribute("class")?.split(" ").includes("animate-spin") === true
+      )
+    ).toHaveLength(1)
+    await act(async () => pendingRefresh.resolve(cardBalance))
+    expect(headerRefresh?.getAttribute("disabled")).toBeNull()
+
+    await act(async () => router.push({ pluginId: ECARD_PLUGIN_ID }))
+    expect(header.findAll(isRefresh)).toHaveLength(1)
+    await act(async () => router.push({ pluginId: ECARD_PLUGIN_ID, pageId: "other" }))
+    expect(header.findAll(isRefresh)).toEqual([])
+    await act(async () => router.push({ route: "epay" }))
+    expect(header.findAll(isRefresh)).toEqual([])
+
     // Switch to provider without ecard slice -> unsupported provider message on page
     await dom.render(<ContributionOutlet entry={ecardPage} slots={slots} i18n={i18n} />)
     await act(async () => {
@@ -475,6 +536,7 @@ describe("@orahako/plugin-ecard", () => {
     expect(ui.getSnapshot().pages.some((p) => p.pluginId === ECARD_PLUGIN_ID)).toBe(false)
     expect(ui.getSnapshot().navigation.some((n) => n.pluginId === ECARD_PLUGIN_ID)).toBe(false)
     expect(overview.getSnapshot().some((w) => w.pluginId === ECARD_PLUGIN_ID)).toBe(false)
+    expect(slots.select("shell.header.actions")).toEqual([])
     expect(
       slots.select("overview.widget", `${ECARD_PLUGIN_ID}:${ECARD_BALANCE_WIDGET_ID}`)
     ).toEqual([])

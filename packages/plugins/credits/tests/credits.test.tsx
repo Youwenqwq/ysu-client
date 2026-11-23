@@ -33,6 +33,7 @@ import {
   type CreditQueryOptions,
   type SchoolProvider,
 } from "@orahako/academic-sdk"
+import { routerRuntimePlugin } from "@orahako/runtime-router"
 import { PluginRuntime } from "@orahako/kernel"
 import { StatelessHttpService } from "@orahako/runtime-http"
 import { i18nRegistryPlugin } from "@orahako/runtime-i18n"
@@ -438,6 +439,7 @@ describe("@orahako/plugin-credits", () => {
       providerRuntimePlugin,
       queryRuntimePlugin,
       providerPlugin,
+      routerRuntimePlugin,
       creditsPlugin,
     ]) {
       if (

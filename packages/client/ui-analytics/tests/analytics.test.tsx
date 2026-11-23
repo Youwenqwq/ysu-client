@@ -626,6 +626,7 @@ describe("@orahako/ui-analytics", () => {
         <ContributionOutlet entry={settingsEntry} slots={slots} i18n={i18n} />
       )
       expect(staticSettingsHtml).toContain('data-slot="switch"')
+      expect(staticSettingsHtml).not.toContain('data-slot="card"')
 
       const switchBtn = dom.container.findAll((n) => n.getAttribute("data-slot") === "switch")[0]!
       expect(switchBtn.getAttribute("aria-checked")).toBe("true")

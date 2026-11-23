@@ -245,6 +245,56 @@ describe("PluginRouter & routerRuntimePlugin", () => {
     runtime.dispose()
   })
 
+  it("runs overlay guards before page guards regardless of registration order", () => {
+    const router = new PluginRouter({ window: null, initialHref: "/?route=home" })
+    router.push("detail")
+    const order: string[] = []
+    router.registerBackGuard(() => {
+      order.push("page")
+      return true
+    })
+    const removeOverlay = router.registerBackGuard(() => {
+      order.push("overlay")
+      return false
+    }, 100)
+
+    router.back()
+    expect(order).toEqual(["overlay"])
+    expect(router.current.getSnapshot().route).toBe("detail")
+
+    removeOverlay()
+    router.back()
+    expect(order).toEqual(["overlay", "page"])
+    expect(router.current.getSnapshot().route).toBe("home")
+    router.dispose()
+  })
+
+  it("uses the page fallback before exiting when hardware history is exhausted", async () => {
+    const exitSpy = vi.fn(async () => {})
+    const router = new PluginRouter({
+      window: null,
+      initialHref: "/?route=student-info",
+      hardwareBack: null,
+    })
+    const removeFallback = router.registerBackFallback(() => ({ route: "overview" }))
+
+    await expect(router.dispatchHardwareBack(true, exitSpy)).resolves.toBe(true)
+    expect(router.current.getSnapshot().route).toBe("overview")
+    expect(exitSpy).not.toHaveBeenCalled()
+
+    const removeShellFallback = router.registerBackFallback(() => ({ route: "settings" }))
+    await router.dispatchHardwareBack(false, exitSpy)
+    expect(router.current.getSnapshot().route).toBe("settings")
+    removeShellFallback()
+    await router.dispatchHardwareBack(false, exitSpy)
+    expect(router.current.getSnapshot().route).toBe("overview")
+
+    removeFallback()
+    await expect(router.dispatchHardwareBack(true, exitSpy)).resolves.toBe(false)
+    expect(exitSpy).toHaveBeenCalledOnce()
+    router.dispose()
+  })
+
   it("integrates hardware back button adapter and calls exitApp at root", async () => {
     let hardwareCallback: ((event: { canGoBack: boolean }) => void) | undefined
     const removeSpy = vi.fn(async () => {})

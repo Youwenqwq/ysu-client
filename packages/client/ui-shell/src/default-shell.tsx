@@ -11,6 +11,7 @@ import {
 } from "react"
 import { ArrowLeft, GraduationCap, Moon, Settings, Sun } from "lucide-react"
 import {
+  BackLayerProvider,
   Button,
   cn,
   Sidebar,
@@ -30,6 +31,7 @@ import {
   TooltipProvider,
   useSidebar,
   type CSSCustomProperties,
+  type RegisterBackLayer,
 } from "@orahako/ui-primitives"
 import type {
   DerivedComponentProps,
@@ -93,6 +95,7 @@ export interface DefaultShellInject {
   readonly settingsHref: string
   readonly navigateToSettings: () => void
   readonly handleBack: (activePage: PluginPageContribution | undefined) => void
+  readonly registerBackHandler: RegisterBackLayer
   readonly applyLandingPreference: (landingRoute: string) => void
 }
 
@@ -433,6 +436,13 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
   )
 
   const hasBackground = Boolean(backgroundImage || backgroundUrl)
+  const showMobileThemeToggle = Boolean(
+    chrome.activePage?.primary &&
+    chrome.accountItems.some(
+      (item) =>
+        item.pluginId === chrome.activePage?.pluginId && item.pageId === chrome.activePage?.id
+    )
+  )
   const appName = props.getAppName(locale)
   const bannerNode = renderSlot("shell.banner")
   const activityNode = renderSlot("shell.activity")
@@ -566,7 +576,21 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
             <h1 className="truncate text-base font-semibold">{chrome.pageTitle}</h1>
             {activityNode}
           </div>
-          <div className="flex items-center gap-1">{headerActionsNode}</div>
+          <div className="flex items-center gap-1">
+            {showMobileThemeToggle && (
+              <Button
+                type="button"
+                data-shell-mobile-theme=""
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => actions.setColorMode(isDark ? "light" : "dark")}
+                aria-label={t("shell.toggleTheme")}
+              >
+                {isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
+              </Button>
+            )}
+            {headerActionsNode}
+          </div>
         </header>
 
         {bannerNode !== null && (
@@ -645,24 +669,26 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
   )
 
   return (
-    <TooltipProvider>
-      {selectedThemeEntry && selectedThemeEntry.css.trim().length > 0 && (
-        <style data-shell-theme={`${selectedThemeEntry.pluginId}:${selectedThemeEntry.id}`}>
-          {selectedThemeEntry.css}
-        </style>
-      )}
-      <BackgroundLayer
-        backgroundUrl={backgroundUrl}
-        hasBackground={hasBackground}
-        backgroundStyle={backgroundStyle}
-        overlayOpacity={overlayOpacity}
-        blurAmount={blurAmount}
-        cardStyle={cardStyle}
-        cardOpacity={cardOpacity}
-      />
-      {renderSlotChain("shell.gate", shellBody)}
-      {overlayNode}
-      <Toaster theme={isDark ? "dark" : "light"} />
-    </TooltipProvider>
+    <BackLayerProvider registerBackHandler={props.registerBackHandler}>
+      <TooltipProvider>
+        {selectedThemeEntry && selectedThemeEntry.css.trim().length > 0 && (
+          <style data-shell-theme={`${selectedThemeEntry.pluginId}:${selectedThemeEntry.id}`}>
+            {selectedThemeEntry.css}
+          </style>
+        )}
+        <BackgroundLayer
+          backgroundUrl={backgroundUrl}
+          hasBackground={hasBackground}
+          backgroundStyle={backgroundStyle}
+          overlayOpacity={overlayOpacity}
+          blurAmount={blurAmount}
+          cardStyle={cardStyle}
+          cardOpacity={cardOpacity}
+        />
+        {renderSlotChain("shell.gate", shellBody)}
+        {overlayNode}
+        <Toaster theme={isDark ? "dark" : "light"} />
+      </TooltipProvider>
+    </BackLayerProvider>
   )
 }

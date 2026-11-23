@@ -44,6 +44,7 @@ export const studentInfoPlugin = definePlugin({
         title: "学生信息",
         titleKey: "pageTitle",
         capability: "studentProfile",
+        parent: "me",
         dictionary: studentInfoDictionary,
         inject: (): StudentInfoPageInject => ({
           hooks: {

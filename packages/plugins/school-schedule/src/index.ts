@@ -15,8 +15,17 @@ import {
   type TermCalendar,
 } from "@orahako/academic-sdk"
 import { createMinuteClockSource, createParameterizedQuerySource } from "@orahako/academic-kit"
-import { definePlugin, PLUGIN_API_VERSION, type PluginManifest, type RouteLocation } from "@orahako/sdk"
+import {
+  definePlugin,
+  PLUGIN_API_VERSION,
+  type PluginManifest,
+  type RouteLocation,
+} from "@orahako/sdk"
 import { schoolScheduleDictionary, type SchoolScheduleDictionary } from "./dictionary"
+import {
+  SchoolScheduleHeaderActions,
+  type SchoolScheduleHeaderActionsInject,
+} from "./header-actions"
 import {
   SchoolSchedulePage,
   type FreeRoomContext,
@@ -32,6 +41,7 @@ import {
   type SelectedClassroom,
   type SelectedSchoolClass,
 } from "./store"
+import "./slots"
 
 export const SCHOOL_SCHEDULE_PLUGIN_ID = "orahako.school-schedule"
 
@@ -40,6 +50,7 @@ export type {
   SchoolScheduleDictionary,
   SchoolScheduleFilterState,
   SchoolScheduleFilterStoreInstance,
+  SchoolScheduleHeaderActionsInject,
   SchoolSchedulePageInject,
   SchoolSchedulePageProps,
   SchoolScheduleTab,
@@ -55,14 +66,14 @@ const schoolScheduleManifest: PluginManifest = {
   kind: "feature",
   entry: "index.js",
   description: "查询行政班与教室的课表",
-  inject: ["ui", "router", "i18n", "provider", "session", "query"],
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"],
 }
 
 export const schoolSchedulePlugin = definePlugin({
   manifest: schoolScheduleManifest,
-  inject: ["ui", "router", "i18n", "provider", "session", "query"] as const,
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"] as const,
   apply(ctx) {
-    const { ui, router, i18n, provider, session, query } = ctx
+    const { ui, slots, router, i18n, provider, session, query } = ctx
     i18n.register(schoolScheduleDictionary)
 
     let disposed = false
@@ -72,7 +83,10 @@ export const schoolSchedulePlugin = definePlugin({
     const isSchoolScheduleEnabled = (): boolean =>
       !disposed &&
       session.getSnapshot().isAuthenticated &&
-      supportsPlugin(provider.getSnapshot().provider?.supportedPlugins, SCHOOL_SCHEDULE_PLUGIN_ID) &&
+      supportsPlugin(
+        provider.getSnapshot().provider?.supportedPlugins,
+        SCHOOL_SCHEDULE_PLUGIN_ID
+      ) &&
       hasSlice(provider.getSnapshot().provider, "schoolSchedule")
 
     const currentWeekSource = query.source<CurrentWeek, "timetable">({
@@ -323,17 +337,17 @@ export const schoolSchedulePlugin = definePlugin({
 
     router.registerBackGuard(() => {
       const location = router.current.getSnapshot()
-      if (!isOwnPage(location)) return false
+      if (!isOwnPage(location)) return true
       const state = filterStore.source.getSnapshot()
       if (state.tab === "class" && state.selectedClass !== null) {
         filterStore.actions.selectClass(null)
-        return true
+        return false
       }
       if (state.tab === "room" && state.selectedRoom !== null) {
         filterStore.actions.selectRoom(null)
-        return true
+        return false
       }
-      return false
+      return true
     })
 
     ui.registerPage(
@@ -367,6 +381,30 @@ export const schoolSchedulePlugin = definePlugin({
         }),
       },
       SchoolSchedulePage
+    )
+
+    slots.inject("shell.header.actions", () =>
+      slots.register(
+        {
+          id: "school-schedule-header-actions",
+          slot: "shell.header.actions",
+          order: 10,
+          dictionary: schoolScheduleDictionary,
+          store: filterStore,
+          inject: (): SchoolScheduleHeaderActionsInject => ({
+            hooks: {
+              location: router.current,
+              gradeYears: gradeYearsSource,
+              departments: departmentsSource,
+              majors: majorsSource,
+              campuses: campusesSource,
+              buildings: buildingsSource,
+            },
+            pluginId: SCHOOL_SCHEDULE_PLUGIN_ID,
+          }),
+        },
+        SchoolScheduleHeaderActions
+      )
     )
 
     ui.registerNavigation({

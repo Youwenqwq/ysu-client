@@ -1,4 +1,4 @@
-import { act } from "react"
+import { act, useState } from "react"
 import { createRoot } from "react-dom/client"
 import { renderToStaticMarkup } from "react-dom/server"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -21,6 +21,7 @@ import { OrahakoApp, slotRegistryPlugin } from "@orahako/runtime-slots"
 import { storageRuntimePlugin } from "@orahako/runtime-storage"
 import { uiRegistryPlugin } from "@orahako/runtime-ui"
 import { themeDefaultPlugin } from "@orahako/theme-default"
+import { useBackLayer } from "@orahako/ui-primitives"
 import { PROFILE_PLUGIN_ID, uiProfilePlugin } from "@orahako/ui-profile"
 import { SETTINGS_PLUGIN_ID, uiSettingsPlugin } from "@orahako/ui-settings"
 import {
@@ -329,6 +330,12 @@ function DummyIcon() {
   return null
 }
 
+function BackLayerProbe() {
+  const [open, setOpen] = useState(true)
+  useBackLayer(() => setOpen(false), open)
+  return <span>{open ? "BACK_LAYER_OPEN" : "BACK_LAYER_CLOSED"}</span>
+}
+
 describe("@orahako/ui-shell unit helpers", () => {
   it("validates manifest, appearance store, card CSS variables, and background media controller", async () => {
     const validated = validatePluginManifest(manifest)
@@ -553,7 +560,11 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
             fullscreen: true,
             dictionary: communityDict,
           },
-          (props) => <div>FORUM_CHAT:{props.t("chat")}</div>
+          (props) => (
+            <div>
+              FORUM_CHAT:{props.t("chat")}:<BackLayerProbe />
+            </div>
+          )
         )
 
         ctx.ui.registerNavigation({
@@ -705,6 +716,19 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     expect(dom.container.textContent).toContain("FORUM_CHAT:讨论组")
     expect(dom.container.findByAttr("data-shell-back")).toBeDefined()
     expect(dom.container.findByAttr("data-shell-bottom-nav")).toBeUndefined()
+    expect(dom.container.textContent).toContain("BACK_LAYER_OPEN")
+
+    await act(async () => {
+      router.back()
+    })
+    expect(dom.container.textContent).toContain("BACK_LAYER_CLOSED")
+    expect(router.current.getSnapshot().pageId).toBe("chat")
+
+    await act(async () => {
+      router.back()
+    })
+    expect(router.current.getSnapshot().pageId).toBe("board")
+    expect(dom.container.findByAttr("data-shell-bottom-nav")).toBeDefined()
 
     // 3. Navigate to semantic `?route=settings` -> canonicalizes & renders appearance controls (from ui-shell + ui-profile), custom theme selector ("樱花粉"), and community category!
     await act(async () => {
@@ -731,11 +755,16 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     expect(dom.container.textContent).toContain("背景图设置")
     expect(dom.container.textContent).toContain("毛玻璃遮罩")
 
+    await act(async () => {
+      router.push({ route: "me" })
+    })
+    expect(dom.container.findByAttr("data-shell-mobile-theme")).toBeDefined()
+
     // 6. Switch locale to English -> full app re-renders in English!
     await act(async () => {
       host.i18n?.setLocale("en")
     })
-    expect(renderToStaticMarkup(<OrahakoApp host={host} />)).toContain("Background Settings")
+    expect(renderToStaticMarkup(<OrahakoApp host={host} />)).toContain("Preferences")
 
     activeUnmount = undefined
     await dom.unmount()

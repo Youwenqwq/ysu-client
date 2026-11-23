@@ -315,6 +315,7 @@ describe("@orahako/plugin-student-info", () => {
     expect(page).toBeDefined()
     expect(page?.route).toBe("student-info")
     expect(page?.capability).toBe("studentProfile")
+    expect(page?.parent).toBe("me")
 
     const nav = ui
       .getSnapshot()

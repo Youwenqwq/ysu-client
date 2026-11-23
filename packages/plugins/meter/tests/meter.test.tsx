@@ -12,6 +12,7 @@ vi.mock("sonner", () => ({
 
 import { PluginRuntime } from "@orahako/kernel"
 import { i18nRegistryPlugin } from "@orahako/runtime-i18n"
+import { routerRuntimePlugin } from "@orahako/runtime-router"
 import {
   ContributionOutlet,
   slotRegistryPlugin,
@@ -341,7 +342,14 @@ describe("@orahako/plugin-meter", () => {
     expect(meterEntry.default).toBe(meterPlugin)
     expect(meterPlugin.manifest.id).toBe("orahako.meter")
     expect(meterPlugin.manifest.providerIndependent).toBe(true)
-    expect(meterPlugin.manifest.inject).toEqual(["ui", "i18n", "storage", "http"])
+    expect(meterPlugin.manifest.inject).toEqual([
+      "ui",
+      "slots",
+      "router",
+      "i18n",
+      "storage",
+      "http",
+    ])
   })
 
   it("manages room history in meterRoomStore cleanly", () => {
@@ -369,7 +377,7 @@ describe("@orahako/plugin-meter", () => {
     store.dispose()
   })
 
-  it("starts and renders in a pure non-academic runtime without provider/session/query and persists room history", async () => {
+  it("renders a route-scoped mobile refresh and persists room history in a non-academic runtime", async () => {
     const dom = mountMiniDom()
     activeUnmount = dom.unmount
 
@@ -384,14 +392,19 @@ describe("@orahako/plugin-meter", () => {
         secure: secureMem.backend,
       })
     )
-    runtime.context.set(
-      "http",
-      makeEncryptedHttp({
-        "202411040369": { roomName: "西校区_四组团B座_526房间", remaining: 68.5 },
-      })
-    )
+    const http = makeEncryptedHttp({
+      "202411040369": { roomName: "西校区_四组团B座_526房间", remaining: 68.5 },
+    })
+    const send = vi.spyOn(http, "send")
+    runtime.context.set("http", http)
 
-    for (const plugin of [slotRegistryPlugin, uiRegistryPlugin, i18nRegistryPlugin, meterPlugin]) {
+    for (const plugin of [
+      slotRegistryPlugin,
+      uiRegistryPlugin,
+      i18nRegistryPlugin,
+      routerRuntimePlugin,
+      meterPlugin,
+    ]) {
       runtime.register(plugin, "builtin")
       runtime.start(plugin.manifest.id)
     }
@@ -399,6 +412,11 @@ describe("@orahako/plugin-meter", () => {
     const ui = runtime.context.get("ui")!
     const slots = runtime.context.get("slots") as PluginSlotRegistry
     const i18n = runtime.context.get("i18n") as PluginI18nRegistryService
+    const router = runtime.context.get("router")!
+
+    slots.declare({ name: "shell.header.actions", kind: "list" })
+    const [headerActions] = slots.select("shell.header.actions")
+    expect(headerActions?.pluginId).toBe(METER_PLUGIN_ID)
 
     const meterPage = ui
       .getSnapshot()
@@ -415,7 +433,22 @@ describe("@orahako/plugin-meter", () => {
       group: "fees",
     })
 
-    await dom.render(<ContributionOutlet entry={meterPage} slots={slots} i18n={i18n} />)
+    await dom.render(
+      <>
+        <header>
+          <ContributionOutlet entry={headerActions!} slots={slots} i18n={i18n} />
+        </header>
+        <main>
+          <ContributionOutlet entry={meterPage} slots={slots} i18n={i18n} />
+        </main>
+      </>
+    )
+    const header = dom.container.findAll((node) => node.tagName === "HEADER")[0]!
+    const body = dom.container.findAll((node) => node.tagName === "MAIN")[0]!
+    const isRefresh = (node: MiniDomNode) => node.attributes.get("aria-label") === "刷新"
+    expect(header.findAll(isRefresh)).toEqual([])
+    await act(async () => router.push({ pluginId: METER_PLUGIN_ID }))
+    expect(header.findAll(isRefresh)).toHaveLength(1)
     await vi.waitFor(() => {
       expect(dom.container.textContent).toContain("请输入学号查询宿舍空调电表")
     })
@@ -441,6 +474,40 @@ describe("@orahako/plugin-meter", () => {
       expect(dom.container.textContent).toContain("常用房间")
     })
 
+    const headerButtons = header.findAll(isRefresh)
+    expect(headerButtons).toHaveLength(1)
+    const [headerRefresh] = headerButtons
+    expect(headerRefresh?.attributes.get("data-variant")).toBe("ghost")
+    expect(headerRefresh?.attributes.get("data-size")).toBe("icon-sm")
+    expect(headerRefresh?.attributes.get("class")?.split(" ")).toContain("md:hidden")
+    const bodyButtons = body.findAll(isRefresh)
+    expect(bodyButtons).toHaveLength(1)
+    const [bodyRefresh] = bodyButtons
+    expect(bodyRefresh?.attributes.get("class")?.split(" ")).toEqual(
+      expect.arrayContaining(["hidden", "md:inline-flex"])
+    )
+
+    const refreshPropsKey = Object.keys(headerRefresh!).find((key) =>
+      key.startsWith("__reactProps$")
+    )!
+    const refreshClick: unknown = Reflect.get(
+      Reflect.get(headerRefresh!, refreshPropsKey),
+      "onClick"
+    )
+    expect(typeof refreshClick).toBe("function")
+    send.mockClear()
+    await act(async () => {
+      if (typeof refreshClick === "function") refreshClick()
+    })
+    expect(
+      send.mock.calls.map(([request]) => new URLSearchParams(String(request.body)).get("method"))
+    ).toContain("getbindroom")
+
+    await act(async () => router.push({ route: "meter" }))
+    expect(header.findAll(isRefresh)).toHaveLength(1)
+    await act(async () => router.push({ route: "ecard" }))
+    expect(header.findAll(isRefresh)).toEqual([])
+
     // Verify room history persisted into namespaced local storage
     await vi.waitFor(() => {
       expect(localMem.map.get("orahako-plugin:orahako.meter:meter-rooms")).toContain(
@@ -459,6 +526,7 @@ describe("@orahako/plugin-meter", () => {
       runtime.stop(METER_PLUGIN_ID)
     })
     expect(ui.getSnapshot().pages.some((p) => p.pluginId === METER_PLUGIN_ID)).toBe(false)
+    expect(slots.select("shell.header.actions")).toEqual([])
 
     activeUnmount = undefined
     await dom.unmount()

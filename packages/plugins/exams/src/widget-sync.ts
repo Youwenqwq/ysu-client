@@ -1,6 +1,11 @@
 import { buildExamWidgetSnapshot, getAcademicClock, getExamStartTime } from "@orahako/academic-kit"
 import type { Exam, QuerySnapshot } from "@orahako/academic-sdk"
-import type { ObservableSource, PluginWidgetService, WidgetSnapshot } from "@orahako/sdk"
+import {
+  createObservableSource,
+  type ObservableSource,
+  type PluginWidgetService,
+  type WidgetSnapshot,
+} from "@orahako/sdk"
 
 export const EXAM_WIDGET_IDS = ["exam", "exam-compact"] as const
 export type ExamWidgetId = (typeof EXAM_WIDGET_IDS)[number]
@@ -35,7 +40,7 @@ export async function clearExamWidgetSnapshots(widgets: PluginWidgetService): Pr
 
 export interface ParameterizedExamQueryController {
   readonly source: ObservableSource<QuerySnapshot<Exam[]>>
-  getTerm(): string
+  readonly term: ObservableSource<string>
   setTerm(nextTerm: string): void
   refresh(): Promise<Exam[] | undefined>
   dispose(): void
@@ -44,7 +49,7 @@ export interface ParameterizedExamQueryController {
 export function createParameterizedExamQueryController(
   buildSource: (term: string) => ObservableSource<QuerySnapshot<Exam[]>>
 ): ParameterizedExamQueryController {
-  let currentTerm = ""
+  const term = createObservableSource("")
   let currentSource = buildSource("")
   let detachCurrent: (() => void) | null = null
   let disposed = false
@@ -86,12 +91,12 @@ export function createParameterizedExamQueryController(
         }
       },
     },
-    getTerm: () => currentTerm,
+    term,
     setTerm: (nextTerm) => {
-      if (disposed || currentTerm === nextTerm) return
-      currentTerm = nextTerm
+      if (disposed || term.getSnapshot() === nextTerm) return
       currentSource = buildSource(nextTerm)
       rebind()
+      term.set(nextTerm)
       notify()
     },
     refresh: () => currentSource.getSnapshot().refresh(),

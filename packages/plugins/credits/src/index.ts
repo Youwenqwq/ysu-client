@@ -9,7 +9,9 @@ import {
   type CreditsUiStoreInstance,
 } from "./controller"
 import { creditsDictionary, type CreditsDictionary } from "./dictionary"
+import { CreditsHeaderActions, type CreditsHeaderActionsInject } from "./header-actions"
 import { CreditsPage, type CreditsPageInject, type CreditsPageProps } from "./page"
+import "./slots"
 
 export const CREDITS_PLUGIN_ID = "orahako.credits"
 
@@ -32,14 +34,14 @@ const creditsManifest: PluginManifest = {
   kind: "feature",
   entry: "index.js",
   description: "创新创业学分汇总、申报记录、认定记录与竞赛活动库查询",
-  inject: ["ui", "i18n", "provider", "session", "query"],
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"],
 }
 
 export const creditsPlugin = definePlugin({
   manifest: creditsManifest,
-  inject: ["ui", "i18n", "provider", "session", "query"] as const,
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"] as const,
   apply(ctx) {
-    const { ui, i18n, provider, session, query } = ctx
+    const { ui, slots, router, i18n, provider, session, query } = ctx
     i18n.register(creditsDictionary)
 
     const controller = createCreditsController({
@@ -47,6 +49,26 @@ export const creditsPlugin = definePlugin({
       session,
       query,
     })
+
+    slots.inject("shell.header.actions", () =>
+      slots.register(
+        {
+          id: "credits-header-actions",
+          slot: "shell.header.actions",
+          dictionary: creditsDictionary,
+          store: controller.uiStore,
+          inject: (): CreditsHeaderActionsInject => ({
+            hooks: {
+              location: router.current,
+              provider: provider.state,
+              batches: controller.batchesSource,
+            },
+            pluginId: CREDITS_PLUGIN_ID,
+          }),
+        },
+        CreditsHeaderActions
+      )
+    )
 
     ui.registerPage(
       {
