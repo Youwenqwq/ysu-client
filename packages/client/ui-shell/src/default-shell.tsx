@@ -593,11 +593,12 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
           </div>
         </header>
 
-        {bannerNode !== null && (
-          <div className="mx-4 mt-4 flex flex-col gap-3 md:mx-6 md:mt-6" data-shell-banners="">
-            {bannerNode}
-          </div>
-        )}
+        <div
+          className="mx-4 mt-4 flex flex-col gap-3 empty:hidden md:mx-6 md:mt-6"
+          data-shell-banners=""
+        >
+          {bannerNode}
+        </div>
 
         {/* Desktop Header */}
         <header

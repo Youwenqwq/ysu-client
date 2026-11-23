@@ -704,6 +704,9 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     expect(dom.container.textContent).toContain("社区盒")
     expect(dom.container.textContent).toContain("FORUM_BOARD:社区广场")
     expect(dom.container.textContent).toContain("COMMUNITY_BANNER")
+    expect(dom.container.findByAttr("data-shell-banners")?.getAttribute("class")).toContain(
+      "empty:hidden"
+    )
     expect(dom.container.textContent).toContain("ACTIVITY_DOT")
     expect(dom.container.textContent).toContain("COMMUNITY_OVERLAY")
     // Plugin-scoped mobile bottom nav shows both `社区广场` and `讨论组` tabs while `community.forum` is active!

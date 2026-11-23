@@ -134,11 +134,7 @@ export const SessionExpiredBanner: SlotComponent<SessionExpiredBannerProps> = (p
   }
 
   return (
-    <Alert
-      data-session-expired-banner=""
-      variant="destructive"
-      className="mx-4 mt-4 w-auto md:mx-6 md:mt-6"
-    >
+    <Alert data-session-expired-banner="" variant="destructive" className="w-auto">
       <TriangleAlert />
       <AlertTitle className="flex flex-wrap items-center gap-3">
         <span>{props.t("session.expired")}</span>
