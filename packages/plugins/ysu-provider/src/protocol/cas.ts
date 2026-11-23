@@ -929,7 +929,12 @@ export function createCAS(ctx: YSUContext): CASProtocol {
     const res = typeof parsed["res"] === "string" ? parsed["res"] : ""
     const msg = typeof parsed["returnMessage"] === "string" ? parsed["returnMessage"] : ""
 
-    if (res === "success" || res === "cpdaily_success" || res === "wechat_success") {
+    if (
+      res === "success" ||
+      res === "cpdaily_success" ||
+      res === "wechat_success" ||
+      res === "other_success"
+    ) {
       return {
         method,
         methodCode: typeCode,

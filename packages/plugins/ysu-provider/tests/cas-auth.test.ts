@@ -51,6 +51,35 @@ describe("CAS auth wrapper", () => {
     })
   })
 
+  it("accepts the current cpdaily send-code success response", async () => {
+    const fetchWithJar = vi.fn(async (_jar, req) => {
+      if (req.url.includes("/authserver/reAuthCheck/changeReAuthType.do")) {
+        return textResponse(req.url, JSON.stringify({ code: "1" }))
+      }
+      if (req.url.includes("/authserver/dynamicCode/getDynamicCodeByReauth.do")) {
+        return textResponse(
+          req.url,
+          JSON.stringify({
+            res: "other_success",
+            returnMessage: "动态口令已发送成功",
+            codeTime: 120,
+          })
+        )
+      }
+      throw new Error(`Unexpected request: ${req.url}`)
+    })
+    const { ctx } = createTestContext({ fetchWithJar })
+    const auth = createCasAuth(ctx, createCAS(ctx))
+
+    await expect(auth.requestMFACode("20260001", "cpdaily")).resolves.toMatchObject({
+      method: "cpdaily",
+      methodCode: "5",
+      username: "20260001",
+      raw: { res: "other_success", codeTime: 120 },
+    })
+    expect(fetchWithJar).toHaveBeenCalledTimes(2)
+  })
+
   it("rejects unsupported MFA methods with FEATURE_NOT_SUPPORTED", async () => {
     const { ctx } = createTestContext()
     const auth = createCasAuth(ctx, createCAS(ctx))
