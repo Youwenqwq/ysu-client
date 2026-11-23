@@ -62,14 +62,11 @@ describe("official composition", () => {
     })
     expect(configs.get("orahako.auth-ui")).toMatchObject({
       defaultLanding: "overview",
-      schools: [
-        { id: "ysu", name: "燕山大学", nameEn: "Yanshan University" },
-        { id: "zmu", name: "遵义医科大学", nameEn: "Zunyi Medical University" },
-      ],
+      schools: [{ id: "ysu", name: "燕山大学", nameEn: "Yanshan University" }],
     })
     expect(configs.get("orahako.onboarding")).toMatchObject({
       marketUrl: composition.market?.indexUrl,
-      schools: [{ id: "ysu", builtin: true }, { id: "zmu" }],
+      schools: [{ id: "ysu", builtin: true }],
     })
   })
 

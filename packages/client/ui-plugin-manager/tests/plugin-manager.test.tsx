@@ -318,6 +318,19 @@ describe("@orahako/ui-plugin-manager", () => {
       apply() {},
     })
 
+    const requiredFeature = definePlugin({
+      manifest: {
+        id: "demo.required",
+        name: "必需插件",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+        required: true,
+      },
+      apply() {},
+    })
+
     const providerState = createObservableSource({
       schoolId: "ysu",
       provider: { id: "ysu", supportedPlugins: ["demo.grades"] },
@@ -340,6 +353,7 @@ describe("@orahako/ui-plugin-manager", () => {
             { id: storageRuntimePlugin.manifest.id, protected: true },
             { id: shellA.manifest.id, protected: true },
             { id: optionalFeature.manifest.id },
+            { id: requiredFeature.manifest.id },
             { id: pluginManagerPlugin.manifest.id, protected: true },
           ],
         },
@@ -351,6 +365,7 @@ describe("@orahako/ui-plugin-manager", () => {
           storageRuntimePlugin,
           shellA,
           optionalFeature,
+          requiredFeature,
           pluginManagerPlugin,
         ],
       },
@@ -393,6 +408,8 @@ describe("@orahako/ui-plugin-manager", () => {
       expect(staticHtml).toContain("已安装插件")
       expect(staticHtml).toContain("酸橙盒默认")
       expect(staticHtml).toContain("紧凑界面")
+      // `required` in a manifest does not self-grant protection; only composition policy does.
+      expect(staticHtml).toContain('aria-label="启用或停用 必需插件"')
 
       // Interactive mount loads installed packages, market v3 releases, update badge, and school bundle
       const dom = mountDom()

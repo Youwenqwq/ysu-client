@@ -1,7 +1,5 @@
-import { renderToStaticMarkup } from "react-dom/server"
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import {
-  defineSchoolProvider,
   type MfaService,
   type QueryService,
   type QuerySnapshot,
@@ -12,7 +10,6 @@ import { providerRegistryRuntimePlugin, providerRuntimePlugin } from "@orahako/a
 import { PluginRuntime } from "@orahako/kernel"
 import { PluginI18nRegistry } from "@orahako/runtime-i18n"
 import { settingsRegistryPlugin } from "@orahako/runtime-settings"
-import { ContributionOutlet, PluginSlotRegistry } from "@orahako/runtime-slots"
 import { NamespacedStorageService } from "@orahako/runtime-storage"
 import {
   createObservableSource,
@@ -33,14 +30,9 @@ import {
 import pkgJson from "../package.json"
 import {
   definition,
-  isValidHttpBaseUrl,
   manifest,
-  normalizeEndpointBaseUrl,
-  resolveYsuEndpointUrls,
   YSU_CONFIG,
-  YSU_ENDPOINTS_CATEGORY_ID,
   YSU_PROVIDER_PLUGIN_ID,
-  ysuEndpointStore,
   ysuProviderPlugin,
 } from "../src"
 import { TestCookieJar, textResponse } from "./test-helper"
@@ -182,17 +174,6 @@ function createTestRuntimeEnvironment(options?: {
           location: "https://cer.example.edu.cn/personalInfo/index.html",
         })
       }
-      if (req.url.includes("xsjbxx.do") || req.url.includes("cxxsjbxx.do")) {
-        return textResponse(
-          req.url,
-          JSON.stringify({
-            code: "0",
-            datas: { cxxsjbxx: { rows: [{ XM: "测试学生", XH: "20239999" }] } },
-          }),
-          200,
-          { "content-type": "application/json" }
-        )
-      }
       return textResponse(req.url, "", 200)
     },
   }
@@ -245,7 +226,6 @@ function createTestRuntimeEnvironment(options?: {
   }
 
   const i18nRegistry = new PluginI18nRegistry()
-  const slotRegistry = new PluginSlotRegistry()
 
   const kernel = new PluginRuntime()
   kernel.context.set(
@@ -253,7 +233,6 @@ function createTestRuntimeEnvironment(options?: {
     new NamespacedStorageService({ local: local.backend, secure: secure.backend })
   )
   kernel.context.set("i18n", i18nRegistry)
-  kernel.context.set("slots", slotRegistry)
   kernel.context.set("http", scopedHttp)
   kernel.context.set("session", session)
   kernel.context.set("query", query)
@@ -268,7 +247,6 @@ function createTestRuntimeEnvironment(options?: {
   return {
     kernel,
     i18nRegistry,
-    slotRegistry,
     local,
     secure,
     fetchUrls,
@@ -302,8 +280,8 @@ async function startAllBuiltins(kernel: PluginRuntime): Promise<void> {
   }
 }
 
-describe("ysu.provider manifest, plugin lifecycle, endpoint store & settings category", () => {
-  it("exports API v3 manifest and registers/cleans up provider, i18n, activity hooks, and settings category", async () => {
+describe("ysu.provider manifest & plugin lifecycle", () => {
+  it("exports API v3 manifest and registers/cleans up provider, i18n, and activity hooks without a settings category", async () => {
     expect(definition).toBe(ysuProviderPlugin)
     expect(manifest).toEqual({
       id: "ysu.provider",
@@ -314,17 +292,7 @@ describe("ysu.provider manifest, plugin lifecycle, endpoint store & settings cat
       required: true,
       entry: "index.js",
       description: "燕山大学 CAS / 教务 / 移动端 / 缴费平台 Provider",
-      inject: [
-        "i18n",
-        "settings",
-        "storage",
-        "providers",
-        "http",
-        "session",
-        "query",
-        "native",
-        "mfa",
-      ],
+      inject: ["i18n", "storage", "providers", "http", "session", "query", "native", "mfa"],
     })
     expect(manifest.apiVersion).toBe(3)
 
@@ -339,15 +307,9 @@ describe("ysu.provider manifest, plugin lifecycle, endpoint store & settings cat
     providerRuntime.selectSchool("ysu")
     expect(providerRuntime.getSnapshot().schoolId).toBe("ysu")
     expect(providerRuntime.getSnapshot().provider?.id).toBe("ysu")
-
-    const categories = settings.getSnapshot()
-    const ysuCategory = categories.find((c) => c.id === YSU_ENDPOINTS_CATEGORY_ID)
-    expect(ysuCategory).toMatchObject({
-      id: YSU_ENDPOINTS_CATEGORY_ID,
-      pluginId: YSU_PROVIDER_PLUGIN_ID,
-      titleKey: "categoryTitle",
-      descriptionKey: "categoryDescription",
-    })
+    expect(
+      settings.getSnapshot().some((category) => category.pluginId === YSU_PROVIDER_PLUGIN_ID)
+    ).toBe(false)
 
     expect(
       env.i18nRegistry.translate(YSU_PROVIDER_PLUGIN_ID, "networkActivity.ysu.grades", "zh")
@@ -360,171 +322,48 @@ describe("ysu.provider manifest, plugin lifecycle, endpoint store & settings cat
       "networkActivity.ysu.grades"
     )
     expect(env.classifyUrl("https://cer.ysu.edu.cn/authserver/login")).toBe("auth")
+    expect(
+      env.labelUrl("https://jwxt.custom.example.org/jwapp/sys/cjcx/modules/cjcx/xscjcx.do")
+    ).toBeUndefined()
 
-    // Stopping ysu.provider revokes provider, settings category, translations, and activity hooks
     await env.kernel.stop(YSU_PROVIDER_PLUGIN_ID)
     expect(providers.hasProvider("ysu")).toBe(false)
     expect(
       env.i18nRegistry.translate(YSU_PROVIDER_PLUGIN_ID, "networkActivity.ysu.grades", "zh")
     ).toBe("networkActivity.ysu.grades")
     expect(providerRuntime.getSnapshot().status).toBe("unavailable")
-    expect(settings.getSnapshot().map((c) => c.id)).not.toContain(YSU_ENDPOINTS_CATEGORY_ID)
+    expect(
+      settings.getSnapshot().some((category) => category.pluginId === YSU_PROVIDER_PLUGIN_ID)
+    ).toBe(false)
     expect(env.labelers.size).toBe(0)
     expect(env.classifiers.size).toBe(0)
 
     env.kernel.dispose()
   })
 
-  it("normalizes and persists custom CAS/JWXT endpoints and applies overrides across protocol, diagnostics, and nativePolling", async () => {
-    expect(
-      normalizeEndpointBaseUrl("  https://cas.mirror.edu.cn/// ", YSU_CONFIG.cas.cerBaseUrl)
-    ).toBe("https://cas.mirror.edu.cn")
-    expect(normalizeEndpointBaseUrl("   ", YSU_CONFIG.cas.cerBaseUrl)).toBe(
-      YSU_CONFIG.cas.cerBaseUrl
-    )
-    expect(isValidHttpBaseUrl("")).toBe(true)
-    expect(isValidHttpBaseUrl("https://cas.mirror.edu.cn")).toBe(true)
-    expect(isValidHttpBaseUrl("ftp://cas.mirror.edu.cn")).toBe(false)
-    expect(isValidHttpBaseUrl("not a url")).toBe(false)
+  it("pins provider endpoints to YSU_CONFIG and ignores legacy custom endpoint storage", async () => {
+    const localMap = new Map<string, string>([
+      [
+        `orahako-plugin:${YSU_PROVIDER_PLUGIN_ID}:endpoints`,
+        JSON.stringify({
+          customCerBaseUrl: "https://cas.custom.example.org",
+          customJwxtBaseUrl: "https://jwxt.custom.example.org",
+        }),
+      ],
+    ])
+    const env = createTestRuntimeEnvironment({ localMap })
+    await startAllBuiltins(env.kernel)
 
-    expect(
-      resolveYsuEndpointUrls({
-        customCerBaseUrl: " https://cas.mirror.edu.cn/ ",
-        customJwxtBaseUrl: "",
-      })
-    ).toEqual({
-      cerBaseUrl: "https://cas.mirror.edu.cn",
+    const providerRuntime = env.kernel.context.get("provider")!
+    const provider = providerRuntime.selectSchool("ysu")
+
+    expect(provider.slices.nativePolling!.getServerConfig()).toMatchObject({
+      cerBaseUrl: YSU_CONFIG.cas.cerBaseUrl,
       jwxtBaseUrl: YSU_CONFIG.jwxt.jwxtBaseUrl,
     })
-
-    const env = createTestRuntimeEnvironment()
-    await startAllBuiltins(env.kernel)
-
-    const settings = env.kernel.context.get("settings")!
-    const providerRuntime = env.kernel.context.get("provider")!
-    const category = settings.getSnapshot().find((c) => c.id === YSU_ENDPOINTS_CATEGORY_ID)!
-    expect(category).toBeDefined()
-
-    // Pre-populate custom endpoints via a scoped store backed by the same storage
-    const store = ysuEndpointStore.create({
-      local: {
-        getItem: (k) => env.local.backend.getItem(`orahako-plugin:${YSU_PROVIDER_PLUGIN_ID}:${k}`),
-        setItem: (k, v) =>
-          env.local.backend.setItem(`orahako-plugin:${YSU_PROVIDER_PLUGIN_ID}:${k}`, v),
-        removeItem: (k) =>
-          env.local.backend.removeItem(`orahako-plugin:${YSU_PROVIDER_PLUGIN_ID}:${k}`),
-      },
-      secure: env.secure.backend,
-    })
-    store.actions.setEndpoints({
-      customCerBaseUrl: "https://cas.custom.example.org/",
-      customJwxtBaseUrl: "https://jwxt.custom.example.org///",
-    })
-    await Promise.resolve()
-    expect(env.local.map.has(`orahako-plugin:${YSU_PROVIDER_PLUGIN_ID}:endpoints`)).toBe(true)
-    store.dispose()
-
-    // Restart plugin so its internal store hydrates the persisted custom endpoints
-    await env.kernel.stop(YSU_PROVIDER_PLUGIN_ID)
-    await env.kernel.startAndWait(YSU_PROVIDER_PLUGIN_ID)
-    await new Promise((resolve) => setTimeout(resolve, 10))
-
-    const activeProvider = await providerRuntime.initialize()
-    env.fetchUrls.length = 0
-
-    // 1. nativePolling.getServerConfig() reflects overridden URLs
-    const pollingCfg = activeProvider.slices.nativePolling!.getServerConfig()
-    expect(pollingCfg).toMatchObject({
-      cerBaseUrl: "https://cas.custom.example.org",
-      jwxtBaseUrl: "https://jwxt.custom.example.org",
-    })
-
-    // 2. diagnostics.checkAuth() hits custom CAS base URL
-    await activeProvider.diagnostics!.checkAuth()
-    expect(
-      env.fetchUrls.some((u) => u.startsWith("https://cas.custom.example.org/authserver/index.do"))
-    ).toBe(true)
-
-    // 3. Custom host activity labeling & classification work dynamically
     expect(
       env.labelUrl("https://jwxt.custom.example.org/jwapp/sys/cjcx/modules/cjcx/xscjcx.do")
-    ).toBe("networkActivity.ysu.grades")
-    expect(env.classifyUrl("https://cas.custom.example.org/authserver/login")).toBe("auth")
-
-    env.kernel.dispose()
-  })
-
-  it("renders YsuEndpointSettingsPanel via ContributionOutlet in zh/en and resets active YSU provider on endpoint change", async () => {
-    const env = createTestRuntimeEnvironment()
-    await startAllBuiltins(env.kernel)
-
-    const settings = env.kernel.context.get("settings")!
-    const providers = env.kernel.context.get("providers")!
-    const providerRuntime = env.kernel.context.get("provider")!
-
-    const category = settings.getSnapshot().find((c) => c.id === YSU_ENDPOINTS_CATEGORY_ID)!
-
-    // Render in Chinese
-    const zhHtml = renderToStaticMarkup(
-      <ContributionOutlet entry={category} slots={env.slotRegistry} i18n={env.i18nRegistry} />
-    )
-    expect(zhHtml).toContain("服务器地址覆盖")
-    expect(zhHtml).toContain("统一身份认证（CAS）")
-    expect(zhHtml).toContain("教务系统（JWXT）")
-    expect(zhHtml).toContain(YSU_CONFIG.cas.cerBaseUrl)
-    expect(zhHtml).toContain(YSU_CONFIG.jwxt.jwxtBaseUrl)
-
-    // Render in English
-    env.i18nRegistry.setLocale("en")
-    const enHtml = renderToStaticMarkup(
-      <ContributionOutlet entry={category} slots={env.slotRegistry} i18n={env.i18nRegistry} />
-    )
-    expect(enHtml).toContain("Endpoint Overrides")
-    expect(enHtml).toContain("CAS Authentication Server")
-    expect(enHtml).toContain("Save &amp; Reconnect")
-
-    // Initialize YSU provider to "ready", then invoke category's injected onEndpointsChanged()
-    await providerRuntime.initialize()
-    expect(providerRuntime.getSnapshot().status).toBe("ready")
-    const genBefore = providerRuntime.getSnapshot().generation
-
-    const resetSpy = vi.spyOn(providerRuntime, "reset")
-    const initSpy = vi.spyOn(providerRuntime, "initialize")
-
-    const injected = category.inject?.(env.kernel.context) as {
-      readonly defaultCerBaseUrl: string
-      readonly defaultJwxtBaseUrl: string
-      readonly onEndpointsChanged: () => Promise<void>
-    }
-    expect(injected.defaultCerBaseUrl).toBe(YSU_CONFIG.cas.cerBaseUrl)
-    expect(injected.defaultJwxtBaseUrl).toBe(YSU_CONFIG.jwxt.jwxtBaseUrl)
-
-    await injected.onEndpointsChanged()
-    expect(resetSpy).toHaveBeenCalledTimes(1)
-    expect(initSpy).toHaveBeenCalledTimes(1)
-    expect(providerRuntime.getSnapshot().generation).toBeGreaterThan(genBefore)
-    expect(providerRuntime.getSnapshot().status).toBe("ready")
-
-    // When another school ("zmu") is active, onEndpointsChanged() must NOT reset it
-    const zmuReset = vi.fn(async () => {})
-    providers.registerProvider("zmu", () =>
-      defineSchoolProvider({
-        id: "zmu",
-        name: "ZMU",
-        slices: {},
-        initialize: async () => {},
-        reset: zmuReset,
-        logout: async () => {},
-        relogin: async () => false,
-      })
-    )
-    providerRuntime.selectSchool("zmu")
-    await providerRuntime.initialize()
-
-    resetSpy.mockClear()
-    await injected.onEndpointsChanged()
-    expect(resetSpy).not.toHaveBeenCalled()
-    expect(zmuReset).not.toHaveBeenCalled()
+    ).toBeUndefined()
 
     env.kernel.dispose()
   })
@@ -621,15 +460,15 @@ describe("package architecture & hygiene gates", () => {
     expect(srcFiles.length).toBeGreaterThan(0)
     expect(testFiles.length).toBeGreaterThan(0)
 
-    const allowedRuntimePackages = new Set([
-      "@orahako/sdk",
-      "@orahako/academic-sdk",
-      "@orahako/ui-primitives",
-      "@cordisjs/core",
-      "react",
-      "lucide-react",
-      "sonner",
-    ])
+    const allowedRuntimePackages: Record<string, true> = {
+      "@orahako/sdk": true,
+      "@orahako/academic-sdk": true,
+      "@orahako/ui-primitives": true,
+      "@cordisjs/core": true,
+      "react": true,
+      "lucide-react": true,
+      "sonner": true,
+    }
 
     const importPattern = /(?:import|export)\s+(?:type\s+)?(?:[^"']*?\s+from\s+)?["']([^"']+)["']/g
     const asUnknownToken = ["as", "unknown"].join("\\s+")
@@ -655,7 +494,7 @@ describe("package architecture & hygiene gates", () => {
 
         if (srcFiles.includes(file) && !spec.startsWith("./") && !spec.startsWith("../")) {
           expect(
-            allowedRuntimePackages.has(spec),
+            Object.hasOwn(allowedRuntimePackages, spec),
             `Disallowed runtime import in ${file}: ${spec}`
           ).toBe(true)
         }

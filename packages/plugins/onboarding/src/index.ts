@@ -3,7 +3,7 @@ import {
   definePlugin,
   loadPluginMarket,
   PLUGIN_API_VERSION,
-  type MarketplaceIndex,
+  type MarketplacePlugin,
   type PluginConfig,
   type PluginPackageRuntime,
 } from "@orahako/sdk"
@@ -19,6 +19,8 @@ import { OnboardingWizard, type OnboardingSchoolChoice } from "./wizard"
 
 export const ONBOARDING_PLUGIN_ID = "orahako.onboarding"
 const DEFAULT_MARKET_URL = "https://ysu.welain.com/updates/plugins.json"
+const PROVIDER_CATEGORY = "provider"
+const PROVIDER_PLUGIN_SUFFIX = ".provider"
 
 export interface OnboardingPluginConfig extends PluginConfig {
   readonly schools?: readonly OnboardingSchoolChoice[]
@@ -48,25 +50,30 @@ function resolveRuntimeMarketUrl(
   return configuredUrl ?? DEFAULT_MARKET_URL
 }
 
-function resolveBundlePluginIds(
-  school: OnboardingSchoolChoice,
-  index: MarketplaceIndex
-): readonly string[] | undefined {
-  const bundles = index.bundles ?? []
-  if (school.bundleId) {
-    const matchedById = bundles.find((bundle) => bundle.id === school.bundleId)
-    if (matchedById && matchedById.pluginIds.length > 0) {
-      return matchedById.pluginIds
-    }
+function resolveProviderSchoolId(plugin: MarketplacePlugin): string | undefined {
+  if (!plugin.categories.includes(PROVIDER_CATEGORY)) return undefined
+  if (!plugin.id.endsWith(PROVIDER_PLUGIN_SUFFIX)) return undefined
+  const schoolId = plugin.id.slice(0, -PROVIDER_PLUGIN_SUFFIX.length)
+  return schoolId.length > 0 ? schoolId : undefined
+}
+
+function mergeDiscoveredSchools(
+  base: readonly OnboardingSchoolChoice[],
+  plugins: readonly MarketplacePlugin[]
+): readonly OnboardingSchoolChoice[] {
+  const known = new Set(base.map((school) => school.id))
+  const discovered: OnboardingSchoolChoice[] = []
+  for (const plugin of plugins) {
+    const schoolId = resolveProviderSchoolId(plugin)
+    if (!schoolId || known.has(schoolId)) continue
+    known.add(schoolId)
+    discovered.push({
+      id: schoolId,
+      name: plugin.name,
+      bundleId: plugin.id,
+    })
   }
-  const matchedBySchool = bundles.find((bundle) => bundle.schoolId === school.id)
-  if (matchedBySchool && matchedBySchool.pluginIds.length > 0) {
-    return matchedBySchool.pluginIds
-  }
-  if (school.bundleId && index.plugins.some((plugin) => plugin.id === school.bundleId)) {
-    return [school.bundleId]
-  }
-  return undefined
+  return discovered.length > 0 ? [...base, ...discovered] : base
 }
 
 export const onboardingPlugin = definePlugin({
@@ -78,7 +85,7 @@ export const onboardingPlugin = definePlugin({
     kind: "feature",
     providerIndependent: true,
     entry: "index.js",
-    description: "首次启动学校选择、市场推荐组合安装与系统权限引导",
+    description: "首次启动学校选择、市场 Provider 发现与安装、系统权限引导",
     inject: [
       "slots",
       "i18n",
@@ -126,36 +133,57 @@ export const onboardingPlugin = definePlugin({
     const { slots, i18n, storage, providers, provider, session, native, packageRuntime } = ctx
     i18n.register(onboardingDictionary)
     let disposed = false
+    let discoveryGeneration = 0
     const store = onboardingStore.create(storage)
-    const providersRevision = createObservableSource(0)
-    const detachProviders = providers.subscribe(() => {
+
+    const configuredSchools: readonly OnboardingSchoolChoice[] =
+      config.schools && config.schools.length > 0
+        ? config.schools
+        : providers.listProviders().map((id) => ({
+            id,
+            name: id,
+            builtin: true,
+          }))
+
+    const schools = createObservableSource<readonly OnboardingSchoolChoice[]>(configuredSchools)
+    const schoolsLoading = createObservableSource(false)
+    const schoolsError = createObservableSource<string | null>(null)
+
+    const discoverSchools = async (): Promise<void> => {
       if (disposed) return
-      providersRevision.set(providersRevision.getSnapshot() + 1)
-    })
-
-    const resolveSchools = (): readonly OnboardingSchoolChoice[] => {
-      if (config.schools && config.schools.length > 0) {
-        return config.schools
-      }
-      return providers.listProviders().map((id) => ({
-        id,
-        name: id,
-        builtin: true,
-      }))
-    }
-
-    const activateSchoolChoice = async (school: OnboardingSchoolChoice): Promise<void> => {
-      const needsBundleInstall =
-        !providers.hasProvider(school.id) || (Boolean(school.bundleId) && !school.builtin)
-
-      if (needsBundleInstall) {
+      const generation = ++discoveryGeneration
+      schoolsLoading.set(true)
+      schoolsError.set(null)
+      try {
         const { index } = await loadPluginMarket(
           resolveRuntimeMarketUrl(packageRuntime, config.marketUrl)
         )
-        const bundlePluginIds = resolveBundlePluginIds(school, index)
-        if (bundlePluginIds && bundlePluginIds.length > 0) {
-          await packageRuntime.applyPluginBundle(bundlePluginIds, index)
+        if (disposed || generation !== discoveryGeneration) return
+        schools.set(mergeDiscoveredSchools(configuredSchools, index.plugins))
+      } catch (error) {
+        if (disposed || generation !== discoveryGeneration) return
+        schoolsError.set(error instanceof Error ? error.message : String(error))
+      } finally {
+        if (!disposed && generation === discoveryGeneration) {
+          schoolsLoading.set(false)
         }
+      }
+    }
+
+    void discoverSchools()
+
+    const activateSchoolChoice = async (school: OnboardingSchoolChoice): Promise<void> => {
+      const builtinReady = school.builtin === true && providers.hasProvider(school.id)
+
+      if (!builtinReady) {
+        const pluginId = school.bundleId ?? `${school.id}${PROVIDER_PLUGIN_SUFFIX}`
+        const { index } = await loadPluginMarket(
+          resolveRuntimeMarketUrl(packageRuntime, config.marketUrl)
+        )
+        if (!index.plugins.some((plugin) => plugin.id === pluginId)) {
+          throw new Error(`School provider plugin is unavailable: ${pluginId}`)
+        }
+        await packageRuntime.applyPluginBundle([pluginId], index)
       }
 
       if (!providers.hasProvider(school.id)) {
@@ -178,9 +206,13 @@ export const onboardingPlugin = definePlugin({
             hooks: {
               storeHydrated: store.hydrated,
               session: session.state,
-              providersRevision,
+              schools,
+              schoolsLoading,
+              schoolsError,
             },
-            schools: resolveSchools(),
+            retrySchoolDiscovery: () => {
+              void discoverSchools()
+            },
             isNative: () => native.isNative,
             hasProvider: (schoolId: string) => providers.hasProvider(schoolId),
             activateSchoolChoice,
@@ -195,7 +227,6 @@ export const onboardingPlugin = definePlugin({
 
     ctx.effect(() => () => {
       disposed = true
-      detachProviders()
       store.dispose()
     })
   },

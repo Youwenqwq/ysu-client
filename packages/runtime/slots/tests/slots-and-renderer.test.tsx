@@ -886,11 +886,35 @@ describe("OrahakoApp root component (root slot, shell selection/fallback, Kernel
 
     await dom.render(<OrahakoApp host={host}>PAGE_BODY</OrahakoApp>)
 
-    // Default shell + theme <style data-plugin-theme>
+    // Default shell renders, but no theme is injected until the host preference selects one.
     expect(dom.container.textContent).toContain("DefaultShell:PAGE_BODY")
+    expect(dom.container.toHtml()).not.toContain("data-plugin-theme")
+
+    // The host preference is the single theme source; a registered non-empty theme is not auto-applied.
+    await act(async () => {
+      host.preferences.setActiveTheme("orahako.shell.default:sakura")
+    })
     expect(dom.container.toHtml()).toContain(
       '<style data-plugin-theme="orahako.shell.default:sakura">:root { --primary: hotpink; }</style>'
     )
+
+    // Clearing the preference removes the theme again.
+    await act(async () => {
+      host.preferences.setActiveTheme("")
+    })
+    expect(dom.container.toHtml()).not.toContain("data-plugin-theme")
+
+    // OrahakoApp subscribes to preferences.state, so an external shell change applies immediately.
+    await act(async () => {
+      host.preferences.setActiveShell("orahako.shell.alt:pro")
+    })
+    expect(dom.container.textContent).toContain("AltShell:PAGE_BODY")
+
+    // Switch back to the default shell via the shell-provided callback.
+    await act(async () => {
+      selectShellFn?.()
+    })
+    expect(dom.container.textContent).toContain("DefaultShell:PAGE_BODY")
 
     // Switch to alt shell via selectShell
     await act(async () => {

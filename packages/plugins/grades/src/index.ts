@@ -301,8 +301,8 @@ export const gradesPlugin = definePlugin({
       {
         id: "index",
         route: "grades",
-        title: "成绩查询",
-        titleKey: "grades.title",
+        title: "成绩",
+        titleKey: "navTitle",
         capability: "grades",
         primary: true,
         requiresProvider: true,

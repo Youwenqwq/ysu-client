@@ -1,10 +1,13 @@
 import type { Context } from "@cordisjs/core"
 import {
   createObservableSource,
+  declareContributionChildren,
   definePlugin,
   isScopedPluginService,
+  isStoreDefinition,
   PLUGIN_API_VERSION,
   PLUGIN_SERVICE_SCOPE,
+  resolvePluginStorage,
   trackPluginRegistration,
   type ChildrenSpec,
   type DerivedComponentProps,
@@ -12,15 +15,10 @@ import {
   type PluginManifest,
   type PluginSettingsCategory,
   type PluginSettingsService,
-  type PluginSlotDeclaration,
-  type PluginSlotRegistryService,
   type PluginSlotService,
-  type PluginStorageService,
   type ScopedPluginService,
   type SettingsCategorySpec,
   type SlotComponent,
-  type SlotName,
-  type StoreDefinition,
   type StoreInstance,
 } from "@orahako/sdk"
 
@@ -32,23 +30,6 @@ declare module "@orahako/sdk" {
 
 const DEFAULT_CATEGORY_ORDER = 100
 export const SETTINGS_RUNTIME_PLUGIN_ID = "orahako.runtime.settings"
-
-function isPluginStorageService(value: unknown): value is PluginStorageService {
-  return typeof value === "object" && value !== null && "local" in value && "secure" in value
-}
-
-function resolveRegistrantStorage(
-  ctx: Context,
-  manifest: PluginManifest
-): PluginStorageService | undefined {
-  const raw: unknown = ctx.get("storage")
-  if (!raw) return undefined
-  if (isScopedPluginService(raw)) {
-    const scoped = raw[PLUGIN_SERVICE_SCOPE](ctx, manifest)
-    return isPluginStorageService(scoped) ? scoped : undefined
-  }
-  return isPluginStorageService(raw) ? raw : undefined
-}
 
 function isPluginSlotService(value: unknown): value is PluginSlotService {
   return (
@@ -72,84 +53,6 @@ function resolveRegistrantSlots(
     return isPluginSlotService(scoped) ? scoped : undefined
   }
   return isPluginSlotService(raw) ? raw : undefined
-}
-
-function isStoreDefinition(
-  value: unknown
-): value is StoreDefinition<unknown, Record<string, never>> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "create" in value &&
-    typeof value.create === "function"
-  )
-}
-
-function isSlotRegistryService(value: unknown): value is PluginSlotRegistryService {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "declare" in value &&
-    typeof value.declare === "function"
-  )
-}
-
-function declareContributionChildren(
-  ctx: Context | undefined,
-  children: ChildrenSpec | undefined
-): () => void {
-  if (!ctx || !children) return () => {}
-  const entries: PluginSlotDeclaration[] = []
-  for (const [name, spec] of Object.entries(children)) {
-    if (spec) {
-      entries.push({ name: name as SlotName, kind: spec.kind })
-    }
-  }
-  if (entries.length === 0) return () => {}
-
-  let disposed = false
-  let childDisposers: Array<() => void> = []
-  let stopServiceListener: (() => void) | undefined
-
-  const applyDeclarations = (slots: PluginSlotRegistryService): void => {
-    const created: Array<() => void> = []
-    try {
-      for (const entry of entries) {
-        created.push(slots.declare(entry))
-      }
-      childDisposers = created
-    } catch (error) {
-      for (let i = created.length - 1; i >= 0; i -= 1) {
-        created[i]?.()
-      }
-      throw error
-    }
-  }
-
-  const rootSlots: unknown = ctx.root.get("slots")
-  if (isSlotRegistryService(rootSlots)) {
-    applyDeclarations(rootSlots)
-  } else {
-    stopServiceListener = ctx.on("internal/service", (serviceName: string) => {
-      if (disposed || serviceName !== "slots" || childDisposers.length > 0) return
-      const lateSlots: unknown = ctx.root.get("slots")
-      if (isSlotRegistryService(lateSlots)) {
-        applyDeclarations(lateSlots)
-      }
-    })
-  }
-
-  return () => {
-    if (disposed) return
-    disposed = true
-    stopServiceListener?.()
-    stopServiceListener = undefined
-    const toDispose = childDisposers
-    childDisposers = []
-    for (let i = toDispose.length - 1; i >= 0; i -= 1) {
-      toDispose[i]?.()
-    }
-  }
 }
 
 export class PluginSettingsRegistry
@@ -283,7 +186,7 @@ export class PluginSettingsRegistry
     let resolvedStore: unknown = spec.store
     if (isStoreDefinition(spec.store)) {
       const storage =
-        registrantCtx && manifest ? resolveRegistrantStorage(registrantCtx, manifest) : undefined
+        registrantCtx && manifest ? resolvePluginStorage(registrantCtx, manifest) : undefined
       ownedStore = spec.store.create(storage)
       resolvedStore = ownedStore
     }

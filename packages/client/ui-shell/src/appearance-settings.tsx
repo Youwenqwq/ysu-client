@@ -4,6 +4,7 @@ import { ToggleGroup, ToggleGroupItem } from "@orahako/ui-primitives"
 import type {
   DerivedComponentProps,
   ObservableSource,
+  PluginHostPreferenceSnapshot,
   PluginUIServiceSnapshot,
   SlotComponent,
 } from "@orahako/sdk"
@@ -14,7 +15,10 @@ import type { AppearanceStoreInstance, ColorMode } from "./store"
 export interface AppearanceSettingsInject {
   readonly hooks: {
     readonly ui: ObservableSource<PluginUIServiceSnapshot>
+    readonly preference: ObservableSource<PluginHostPreferenceSnapshot>
   }
+  readonly getActiveTheme: () => string
+  readonly setActiveTheme: (themeId: string | undefined) => void
   readonly backgroundHref: string
   readonly navigateToBackground: () => void
 }
@@ -47,10 +51,11 @@ function handleSpaClick(event: MouseEvent<HTMLAnchorElement>, navigate: () => vo
 }
 
 export const AppearanceSettingsSection: SlotComponent<AppearanceSettingsProps> = (props) => {
-  const { t, useStore, actions } = props
+  const { t, useStore, actions, getActiveTheme, setActiveTheme } = props
   const uiSnapshot = props.useUi()
+  const preference = props.usePreference()
   const colorMode = useStore((s) => s.colorMode)
-  const activeTheme = useStore((s) => s.activeTheme)
+  const activeTheme = preference.activeTheme ?? getActiveTheme()
 
   const customThemes = uiSnapshot.themes.filter((theme) => theme.css.trim().length > 0)
 
@@ -91,7 +96,7 @@ export const AppearanceSettingsSection: SlotComponent<AppearanceSettingsProps> =
             value={activeTheme || "__default__"}
             onValueChange={(value) => {
               if (!value) return
-              actions.setActiveTheme(value === "__default__" ? "" : value)
+              setActiveTheme(value === "__default__" ? undefined : value)
             }}
             variant="outline"
             size="sm"

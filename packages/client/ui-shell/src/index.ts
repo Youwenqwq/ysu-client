@@ -2,12 +2,15 @@ import {
   definePlugin,
   parseRouteLocation,
   PLUGIN_API_VERSION,
+  type ObservableSource,
+  type PluginHostPreferenceSnapshot,
   type PluginLocale,
   type PluginManifest,
   type PluginPageContribution,
   type PluginUIServiceSnapshot,
   type RouteLocation,
   type RouteTargetInput,
+  type SlotName,
 } from "@orahako/sdk"
 import "./slots-declare"
 import { AppearanceSettingsSection } from "./appearance-settings"
@@ -83,6 +86,13 @@ export {
 export const SHELL_PLUGIN_ID = "orahako.shell"
 export const DEFAULT_SHELL_ID = "default"
 
+const EMPTY_PREFERENCE_SNAPSHOT: PluginHostPreferenceSnapshot = {}
+
+const STATIC_PREFERENCE_SOURCE: ObservableSource<PluginHostPreferenceSnapshot> = {
+  getSnapshot: () => EMPTY_PREFERENCE_SNAPSHOT,
+  subscribe: () => () => {},
+}
+
 export interface ShellPluginConfig {
   readonly appName?: string
   readonly appNameEn?: string
@@ -98,15 +108,42 @@ export const manifest: PluginManifest = {
   kind: "shell",
   entry: "index.js",
   required: true,
-  inject: ["ui", "slots", "router", "navigation", "i18n", "storage", "native"],
+  inject: [
+    "ui",
+    "slots",
+    "router",
+    "navigation",
+    "i18n",
+    "storage",
+    "native",
+    "packageRuntime",
+  ],
 }
 
 export const uiShellPlugin = definePlugin<
-  readonly ["ui", "slots", "router", "navigation", "i18n", "storage", "native"],
+  readonly [
+    "ui",
+    "slots",
+    "router",
+    "navigation",
+    "i18n",
+    "storage",
+    "native",
+    "packageRuntime",
+  ],
   ShellPluginConfig
 >({
   manifest,
-  inject: ["ui", "slots", "router", "navigation", "i18n", "storage", "native"] as const,
+  inject: [
+    "ui",
+    "slots",
+    "router",
+    "navigation",
+    "i18n",
+    "storage",
+    "native",
+    "packageRuntime",
+  ] as const,
   configSchema: {
     type: "object",
     properties: {
@@ -315,12 +352,17 @@ export const uiShellPlugin = definePlugin<
       }
     }
 
+    for (const [name, spec] of Object.entries(defaultShellChildren)) {
+      ctx.slots.declare({ name: name as SlotName, kind: spec.kind })
+    }
+
     ctx.ui.registerShell(
       {
         id: DEFAULT_SHELL_ID,
         name: appNameZh,
         dictionary: shellDictionary,
         children: defaultShellChildren,
+        declareChildren: false,
         store,
         inject: () => ({
           hooks: {
@@ -376,7 +418,11 @@ export const uiShellPlugin = definePlugin<
           inject: () => ({
             hooks: {
               ui: ctx.ui.state,
+              preference: ctx.packageRuntime.preferenceState ?? STATIC_PREFERENCE_SOURCE,
             },
+            getActiveTheme: () => ctx.packageRuntime.getActiveTheme?.() ?? "",
+            setActiveTheme: (themeId: string | undefined) =>
+              ctx.packageRuntime.setActiveTheme?.(themeId),
             backgroundHref: ctx.router.href({ route: "background" }),
             navigateToBackground: () => {
               ctx.router.push({ route: "background" })

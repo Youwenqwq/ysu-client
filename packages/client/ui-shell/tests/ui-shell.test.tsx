@@ -350,6 +350,7 @@ describe("@orahako/ui-shell unit helpers", () => {
       "i18n",
       "storage",
       "native",
+      "packageRuntime",
     ])
 
     const store = appearanceStore.create()
@@ -711,6 +712,18 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     expect(dom.container.textContent).toContain("COMMUNITY_OVERLAY")
     // Plugin-scoped mobile bottom nav shows both `社区广场` and `讨论组` tabs while `community.forum` is active!
     expect(dom.container.textContent).toContain("讨论组")
+
+    // Theme selection is a single host preference rendered by OrahakoApp, not a shell-local channel.
+    await act(async () => {
+      host.preferences.setActiveTheme("community.forum:sakura")
+    })
+    expect(dom.container.toHtml()).toContain('data-plugin-theme="community.forum:sakura"')
+    expect(dom.container.toHtml()).toContain('--primary: oklch(0.7 0.2 350)')
+    expect(dom.container.toHtml()).not.toContain("data-shell-theme")
+    await act(async () => {
+      host.preferences.setActiveTheme("")
+    })
+    expect(dom.container.toHtml()).not.toContain("data-plugin-theme")
 
     // 2. Navigate to fullscreen subpage `chat` -> hides mobile bottom nav & shows back button!
     await act(async () => {

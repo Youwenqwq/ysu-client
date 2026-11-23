@@ -123,6 +123,7 @@ export interface SchedulePageInject {
   readonly mobileBridge: MobileLessonBridge
   readonly pluginId: string
   readonly isNative: () => boolean
+  readonly assistantSrc: string
   readonly setCompactMode: (compact: boolean) => void
   readonly setWidgetAssistantHidden: (hidden: boolean) => void
   readonly setWidgetAssistantPosition: (position: WidgetAssistantPosition | null) => void
@@ -787,6 +788,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         hidden={settings.widgetAssistantHidden}
         position={settings.widgetAssistantPosition}
         suspended={mobileFullscreen || editing || showOriginal}
+        assistantSrc={props.assistantSrc}
         widgetsSettingsHref={props.widgetsSettingsHref}
         t={t}
         onSetHidden={props.setWidgetAssistantHidden}

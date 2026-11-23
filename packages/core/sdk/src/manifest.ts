@@ -41,7 +41,7 @@ export interface PluginManifest {
   configSchema?: Record<string, unknown>
   /** Versioned Android capabilities required by this package, when applicable. */
   nativeCapabilities?: string[]
-  /** Core providers can be replaced but not disabled from the plugin manager. */
+  /** Marks provider-like functionality as always supported; manager protection comes from composition. */
   required?: boolean
   /**
    * Feature plugins that are global UI/tools rather than provider features.

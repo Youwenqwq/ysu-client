@@ -20,6 +20,10 @@ declare module "@orahako/sdk" {
       kind: "list"
       owner: Record<string, never>
     }
+    "test.settings.shared": {
+      kind: "list"
+      owner: Record<string, never>
+    }
   }
 }
 
@@ -135,6 +139,36 @@ describe("@orahako/runtime-settings", () => {
     expect(runtime.get(beta.id)?.error).toContain("already registered: shared (example.alpha)")
     await vi.waitFor(() => expect(runtime.get(empty.id)?.status).toBe("failed"))
     expect(runtime.get(empty.id)?.error).toContain("id must not be empty")
+    runtime.dispose()
+  })
+
+  it("rejects duplicate child slot declarations across settings categories", async () => {
+    const slots = new PluginSlotRegistry()
+    const settings = new PluginSettingsRegistry()
+    const runtime = new PluginRuntime()
+    runtime.context.set("slots", slots)
+    runtime.context.set("settings", settings)
+
+    const alpha = featureManifest("example.alpha")
+    const beta = featureManifest("example.beta")
+    const children = { "test.settings.shared": { kind: "list" } } as const
+
+    for (const manifest of [alpha, beta]) {
+      runtime.register(
+        manifest,
+        (ctx) => {
+          ctx.settings.registerCategory({ id: manifest.id, icon: Icon, children }, Panel)
+        },
+        "external"
+      )
+    }
+
+    runtime.start(alpha.id)
+    runtime.start(beta.id)
+    await vi.waitFor(() => expect(runtime.get(beta.id)?.status).toBe("failed"))
+    expect(runtime.get(beta.id)?.error).toContain(
+      "Plugin slot already declared: test.settings.shared"
+    )
     runtime.dispose()
   })
 

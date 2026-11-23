@@ -1,12 +1,7 @@
 import { CapacitorUpdater } from "@capgo/capacitor-updater"
 import { toast } from "sonner"
 import { definePlugin, PLUGIN_API_VERSION, type UpdateInfo, type UpdateMirror } from "@orahako/sdk"
-import {
-  UpdaterAboutSection,
-  UpdaterSettingsControl,
-  type UpdaterAboutSectionProps,
-  type UpdaterSettingsControlProps,
-} from "./controls"
+import { UpdaterAboutSection, type UpdaterAboutSectionProps } from "./controls"
 import { updaterDictionary, type UpdaterDictionary } from "./dictionary"
 import { UpdaterOverlay, type UpdaterOverlayProps } from "./overlay"
 import {
@@ -37,7 +32,6 @@ import {
 declare module "@orahako/sdk" {
   interface SlotMap {
     "shell.overlay": { kind: "list"; owner: Record<string, never> }
-    "settings.general": { kind: "list"; owner: Record<string, never> }
     "about.extra": { kind: "list"; owner: Record<string, never> }
   }
 }
@@ -55,7 +49,6 @@ export {
   UpdaterOverlay,
   updaterPreferencesStore,
   updaterRuntimeStore,
-  UpdaterSettingsControl,
   type BeforeInstallPromptEvent,
   type ConfiguredUpdateOptions,
   type PwaController,
@@ -68,7 +61,6 @@ export {
   type UpdaterPreferencesStore,
   type UpdaterRuntimeState,
   type UpdaterRuntimeStore,
-  type UpdaterSettingsControlProps,
 }
 
 export type UpdaterPluginConfig = {
@@ -212,24 +204,6 @@ export const updaterPlugin = definePlugin<
           }),
         },
         UpdaterOverlay
-      )
-    )
-
-    ctx.slots.inject("settings.general", () =>
-      ctx.slots.register(
-        {
-          id: "updater-settings",
-          slot: "settings.general",
-          order: 40,
-          dictionary: updaterDictionary,
-          store: preferencesStore,
-          inject: () => ({
-            updater: service,
-            isNative: () => ctx.native.isNative,
-            onPresentUpdate: (info: UpdateInfo) => runtimeStore.actions.presentUpdate(info),
-          }),
-        },
-        UpdaterSettingsControl
       )
     )
 

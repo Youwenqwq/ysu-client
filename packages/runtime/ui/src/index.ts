@@ -1,10 +1,13 @@
 import type { Context } from "@cordisjs/core"
 import {
+  assertContributionChildrenDeclared,
   createObservableSource,
+  declareContributionChildren,
   definePlugin,
-  isScopedPluginService,
+  isStoreDefinition,
   PLUGIN_API_VERSION,
   PLUGIN_SERVICE_SCOPE,
+  resolvePluginStorage,
   trackPluginRegistration,
   type ChildrenSpec,
   type DerivedComponentProps,
@@ -15,9 +18,6 @@ import {
   type PluginNavigationDefinition,
   type PluginPageContribution,
   type PluginShellContribution,
-  type PluginSlotDeclaration,
-  type PluginSlotRegistryService,
-  type PluginStorageService,
   type PluginThemeContribution,
   type PluginThemeDefinition,
   type PluginUIRegistryService,
@@ -27,8 +27,6 @@ import {
   type ShellOwnerProps,
   type ShellSpec,
   type SlotComponent,
-  type SlotName,
-  type StoreDefinition,
   type StoreInstance,
 } from "@orahako/sdk"
 
@@ -41,101 +39,6 @@ const EMPTY_UI_SNAPSHOT: PluginUIServiceSnapshot = {
   shells: [],
 }
 
-function isPluginStorageService(value: unknown): value is PluginStorageService {
-  return typeof value === "object" && value !== null && "local" in value && "secure" in value
-}
-
-function resolveRegistrantStorage(
-  ctx: Context,
-  manifest: PluginManifest
-): PluginStorageService | undefined {
-  const raw: unknown = ctx.get("storage")
-  if (!raw) return undefined
-  if (isScopedPluginService(raw)) {
-    const scoped = raw[PLUGIN_SERVICE_SCOPE](ctx, manifest)
-    return isPluginStorageService(scoped) ? scoped : undefined
-  }
-  return isPluginStorageService(raw) ? raw : undefined
-}
-
-function isStoreDefinition(
-  value: unknown
-): value is StoreDefinition<unknown, Record<string, never>> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "create" in value &&
-    typeof value.create === "function"
-  )
-}
-
-function isSlotRegistryService(value: unknown): value is PluginSlotRegistryService {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "declare" in value &&
-    typeof value.declare === "function"
-  )
-}
-
-function declareContributionChildren(
-  ctx: Context | undefined,
-  children: ChildrenSpec | undefined
-): () => void {
-  if (!ctx || !children) return () => {}
-  const entries: PluginSlotDeclaration[] = []
-  for (const [name, spec] of Object.entries(children)) {
-    if (spec) {
-      entries.push({ name: name as SlotName, kind: spec.kind })
-    }
-  }
-  if (entries.length === 0) return () => {}
-
-  let disposed = false
-  let childDisposers: Array<() => void> = []
-  let stopServiceListener: (() => void) | undefined
-
-  const applyDeclarations = (slots: PluginSlotRegistryService): void => {
-    const created: Array<() => void> = []
-    try {
-      for (const entry of entries) {
-        created.push(slots.declare(entry))
-      }
-      childDisposers = created
-    } catch (error) {
-      for (let i = created.length - 1; i >= 0; i -= 1) {
-        created[i]?.()
-      }
-      throw error
-    }
-  }
-
-  const rootSlots: unknown = ctx.root.get("slots")
-  if (isSlotRegistryService(rootSlots)) {
-    applyDeclarations(rootSlots)
-  } else {
-    stopServiceListener = ctx.on("internal/service", (serviceName: string) => {
-      if (disposed || serviceName !== "slots" || childDisposers.length > 0) return
-      const lateSlots: unknown = ctx.root.get("slots")
-      if (isSlotRegistryService(lateSlots)) {
-        applyDeclarations(lateSlots)
-      }
-    })
-  }
-
-  return () => {
-    if (disposed) return
-    disposed = true
-    stopServiceListener?.()
-    stopServiceListener = undefined
-    const toDispose = childDisposers
-    childDisposers = []
-    for (let i = toDispose.length - 1; i >= 0; i -= 1) {
-      toDispose[i]?.()
-    }
-  }
-}
-
 export class PluginUIRegistry
   implements PluginUIRegistryService, ScopedPluginService<PluginUIService>
 {
@@ -145,6 +48,7 @@ export class PluginUIRegistry
   private readonly navigation = new Map<string, PluginNavigationContribution>()
   private readonly themes = new Map<string, PluginThemeContribution>()
   private readonly shells = new Map<string, PluginShellContribution>()
+  private generation = 0
 
   constructor() {
     this.state = {
@@ -270,7 +174,7 @@ export class PluginUIRegistry
     let resolvedStore: unknown = spec.store
     if (isStoreDefinition(spec.store)) {
       try {
-        ownedStore = spec.store.create(resolveRegistrantStorage(registrantCtx, manifest))
+        ownedStore = spec.store.create(resolvePluginStorage(registrantCtx, manifest))
         resolvedStore = ownedStore
       } catch (error) {
         disposeChildren()
@@ -299,6 +203,7 @@ export class PluginUIRegistry
       ...(resolvedStore !== undefined ? { store: resolvedStore } : {}),
       ...(boundInject !== undefined ? { inject: boundInject } : {}),
       component: resolvedComponent as SlotComponent<never>,
+      generation: ++this.generation,
     }
 
     this.pages.set(key, registered)
@@ -377,13 +282,19 @@ export class PluginUIRegistry
       throw new Error(`Plugin UI contribution already registered: ${key}`)
     }
 
-    const disposeChildren = declareContributionChildren(registrantCtx, spec.children)
+    let disposeChildren: () => void
+    if (spec.declareChildren === false) {
+      assertContributionChildrenDeclared(registrantCtx, spec.children)
+      disposeChildren = () => {}
+    } else {
+      disposeChildren = declareContributionChildren(registrantCtx, spec.children)
+    }
 
     let ownedStore: StoreInstance<unknown, Record<string, never>> | undefined
     let resolvedStore: unknown = spec.store
     if (isStoreDefinition(spec.store)) {
       try {
-        ownedStore = spec.store.create(resolveRegistrantStorage(registrantCtx, manifest))
+        ownedStore = spec.store.create(resolvePluginStorage(registrantCtx, manifest))
         resolvedStore = ownedStore
       } catch (error) {
         disposeChildren()
@@ -404,6 +315,7 @@ export class PluginUIRegistry
       ...(resolvedStore !== undefined ? { store: resolvedStore } : {}),
       ...(boundInject !== undefined ? { inject: boundInject } : {}),
       component: resolvedComponent as SlotComponent<never>,
+      generation: ++this.generation,
     }
 
     this.shells.set(key, registered)

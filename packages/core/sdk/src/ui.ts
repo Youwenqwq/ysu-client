@@ -47,6 +47,7 @@ export interface PluginPageContribution {
   readonly store?: unknown
   readonly inject?: (ctx: Context) => unknown
   readonly component: SlotComponent<never>
+  readonly generation: number
 }
 
 export type PluginNavigationGroup = string
@@ -115,6 +116,12 @@ export interface ShellSpec<
   readonly name: string
   readonly dictionary?: Dict
   readonly children?: Children
+  /**
+   * When false, the shell validates that every child slot is already declared
+   * instead of declaring it. Public shell slots shared by multiple shells should
+   * be claimed through `ctx.slots.declare` and registered with `false`.
+   */
+  readonly declareChildren?: boolean
   readonly store?: Store
   readonly inject?: (ctx: Context) => ValidInject<I>
 }
@@ -128,6 +135,7 @@ export interface PluginShellContribution {
   readonly store?: unknown
   readonly inject?: (ctx: Context) => unknown
   readonly component: SlotComponent<never>
+  readonly generation: number
 }
 
 export interface PluginUIServiceSnapshot {

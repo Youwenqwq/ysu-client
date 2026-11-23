@@ -16,7 +16,6 @@ import {
   type PluginLocale,
 } from "@orahako/sdk"
 import { createYSUContext, type YSUContext } from "../src/context"
-import type { YsuEndpointState } from "../src/endpoints"
 import { YSU_CONFIG, type YSUConfig } from "../src/ysu-config"
 
 export interface MutableSessionState {
@@ -116,7 +115,6 @@ export interface TestContextOptions {
   readonly httpSend?: (request: HttpRequest) => Promise<HttpResponse>
   readonly mfaShow?: () => Promise<MfaResult>
   readonly config?: YSUConfig
-  readonly getEndpoints?: () => Partial<YsuEndpointState> | undefined
   readonly isNative?: boolean
 }
 
@@ -220,7 +218,6 @@ export function createTestContext(options: TestContextOptions = {}): TestContext
 
   const ctx = createYSUContext({
     config,
-    getEndpoints: options.getEndpoints,
     session,
     http: {
       send: (req) => httpSend(req),

@@ -4,7 +4,6 @@ import { defineDictionary, type Translator } from "@orahako/sdk"
 export const scheduleDictionary = defineDictionary({
   zh: {
     navTitle: "日程",
-    pageTitle: "日程查询",
     schoolScheduleEntry: "全校课表",
     freeRoomEntry: "查空教室",
     updating: "正在更新数据...",
@@ -274,7 +273,6 @@ export const scheduleDictionary = defineDictionary({
   },
   en: {
     navTitle: "Schedule",
-    pageTitle: "Schedule",
     schoolScheduleEntry: "School Schedules",
     freeRoomEntry: "Find free rooms",
     updating: "Updating data...",

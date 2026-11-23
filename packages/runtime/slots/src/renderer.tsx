@@ -19,6 +19,7 @@ import {
   type DictionaryMessages,
   type ObservableSource,
   type PluginI18nRegistryService,
+  type PluginHostPreferenceSnapshot,
   type PluginLocale,
   type PluginNavigationService,
   type PluginPageContribution,
@@ -81,8 +82,10 @@ const STATIC_EMPTY_ARRAY_SOURCE: ObservableSource<readonly unknown[]> = {
   subscribe: NOOP_SUBSCRIBE,
 }
 
-const STATIC_UNDEFINED_STRING_SOURCE: ObservableSource<string | null | undefined> = {
-  getSnapshot: () => undefined,
+const STATIC_EMPTY_PREFERENCE_SNAPSHOT: PluginHostPreferenceSnapshot = {}
+
+const STATIC_EMPTY_PREFERENCE_SOURCE: ObservableSource<PluginHostPreferenceSnapshot> = {
+  getSnapshot: () => STATIC_EMPTY_PREFERENCE_SNAPSHOT,
   subscribe: NOOP_SUBSCRIBE,
 }
 
@@ -558,6 +561,10 @@ function shellQualifiedKey(shell: PluginShellContribution): string {
   return `${shell.pluginId}:${shell.id}`
 }
 
+function shellBoundaryKey(shell: PluginShellContribution): string {
+  return `${shellQualifiedKey(shell)}:${shell.generation}`
+}
+
 export interface ShellErrorBoundaryProps {
   readonly shell: PluginShellContribution
   readonly fallback?: PluginShellContribution
@@ -587,7 +594,7 @@ export class ShellErrorBoundary extends Component<
     props: ShellErrorBoundaryProps,
     state: ShellErrorBoundaryState
   ): Partial<ShellErrorBoundaryState> | null {
-    const key = shellQualifiedKey(props.shell)
+    const key = shellBoundaryKey(props.shell)
     if (state.failedKey !== null && state.failedKey !== "__failed__" && state.failedKey !== key) {
       return { failedKey: null }
     }
@@ -595,19 +602,19 @@ export class ShellErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error): void {
-    this.setState({ failedKey: shellQualifiedKey(this.props.shell) })
+    this.setState({ failedKey: shellBoundaryKey(this.props.shell) })
     this.props.onFailure?.(error)
   }
 
   render(): ReactNode {
-    const key = shellQualifiedKey(this.props.shell)
+    const key = shellBoundaryKey(this.props.shell)
     if (this.state.failedKey === "__failed__" || this.state.failedKey === key) {
       if (!this.props.fallback) {
         return <KernelRecovery message={this.props.recoveryMessage} />
       }
       return (
         <ShellErrorBoundary
-          key={shellQualifiedKey(this.props.fallback)}
+          key={shellBoundaryKey(this.props.fallback)}
           shell={this.props.fallback}
           slots={this.props.slots}
           i18n={this.props.i18n}
@@ -743,9 +750,11 @@ function PageStatusView({
 }
 
 export interface OrahakoHostPreferencesLike {
+  readonly state?: ObservableSource<PluginHostPreferenceSnapshot>
   getActiveShell(): string | undefined
   setActiveShell(shellId: string | undefined): void
   getActiveTheme?(): string | undefined
+  setActiveTheme?(themeId: string | undefined): void
 }
 
 export interface OrahakoHostLike {
@@ -770,7 +779,6 @@ export interface OrahakoAppProps {
   readonly children?: ReactNode
   readonly activeShell?: string
   readonly onSelectShell?: (shellId: string | undefined) => void
-  readonly activeTheme?: string | null | ObservableSource<string | null | undefined>
 }
 
 export function OrahakoApp({
@@ -778,7 +786,6 @@ export function OrahakoApp({
   children,
   activeShell: controlledShell,
   onSelectShell,
-  activeTheme,
 }: OrahakoAppProps): ReactNode {
   const runtimeStates = useObservable(host.runtime?.state ?? STATIC_EMPTY_ARRAY_SOURCE)
 
@@ -816,32 +823,31 @@ export function OrahakoApp({
   void navRevision
   void i18nRevision
 
-  const themeSource = isObservableSource<string | null | undefined>(activeTheme)
-    ? activeTheme
-    : STATIC_UNDEFINED_STRING_SOURCE
-  const observedTheme = useObservable(themeSource)
-  const effectiveThemeInput = isObservableSource(activeTheme) ? observedTheme : activeTheme
+  const preferences = host.preferences
+  const preferenceState = preferences?.state
+  const preferenceSnapshot = useObservable(
+    preferenceState ?? STATIC_EMPTY_PREFERENCE_SOURCE
+  )
 
-  const [preferenceTick, setPreferenceTick] = useState(0)
   const [memoryShell, setMemoryShell] = useState<string | undefined>(() =>
-    host.preferences?.getActiveShell()
+    preferences?.getActiveShell()
   )
 
   const selectShell = useCallback(
     (shellId?: string) => {
-      host.preferences?.setActiveShell(shellId)
-      setMemoryShell(shellId)
-      setPreferenceTick((tick) => tick + 1)
+      preferences?.setActiveShell(shellId)
+      if (!preferenceState) setMemoryShell(shellId)
       onSelectShell?.(shellId)
     },
-    [host.preferences, onSelectShell]
+    [preferenceState, preferences, onSelectShell]
   )
 
-  void preferenceTick
   const preferredShellId =
     controlledShell !== undefined
       ? controlledShell
-      : (host.preferences?.getActiveShell() ?? memoryShell)
+      : preferenceState
+        ? preferenceSnapshot.activeShell
+        : (preferences?.getActiveShell() ?? memoryShell)
 
   const defaultLanding = host.composition.defaults.landing ?? ""
 
@@ -919,19 +925,15 @@ export function OrahakoApp({
   ])
 
   const activeThemeEntry = useMemo(() => {
-    const themes = uiSnapshot.themes
-    if (themes.length === 0) return undefined
-    if (effectiveThemeInput === null || effectiveThemeInput === "") {
-      return undefined
-    }
-    const requestedTheme = effectiveThemeInput ?? host.preferences?.getActiveTheme?.()
-    if (requestedTheme !== undefined) {
-      return themes.find(
-        (item) => `${item.pluginId}:${item.id}` === requestedTheme || item.id === requestedTheme
-      )
-    }
-    return themes.find((item) => item.css.trim().length > 0)
-  }, [effectiveThemeInput, host.preferences, uiSnapshot.themes])
+    const requestedTheme = preferenceState
+      ? preferenceSnapshot.activeTheme
+      : preferences?.getActiveTheme?.()
+    if (!requestedTheme) return undefined
+    const matched = uiSnapshot.themes.find(
+      (item) => `${item.pluginId}:${item.id}` === requestedTheme || item.id === requestedTheme
+    )
+    return matched && matched.css.trim().length > 0 ? matched : undefined
+  }, [preferenceSnapshot.activeTheme, preferenceState, preferences, uiSnapshot.themes])
 
   const themeElement = activeThemeEntry ? (
     <style data-plugin-theme={`${activeThemeEntry.pluginId}:${activeThemeEntry.id}`}>
@@ -992,7 +994,7 @@ export function OrahakoApp({
       children
     ) : activePage ? (
       <ContributionOutlet
-        key={`${activePage.pluginId}:${activePage.id}`}
+        key={`${activePage.pluginId}:${activePage.id}:${activePage.generation}`}
         entry={activePage}
         owner={{}}
         slots={slots}
@@ -1011,7 +1013,7 @@ export function OrahakoApp({
     <Fragment>
       {themeElement}
       <ShellErrorBoundary
-        key={shellQualifiedKey(activeShellEntry)}
+        key={shellBoundaryKey(activeShellEntry)}
         shell={activeShellEntry}
         fallback={fallbackShell}
         slots={slots}

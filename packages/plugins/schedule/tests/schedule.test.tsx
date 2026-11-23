@@ -566,6 +566,7 @@ describe("@orahako/plugin-schedule export discipline & manifest", () => {
       "overview",
       "native",
       "widgets",
+      "assets",
     ])
   })
 })
@@ -819,6 +820,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     const runtime = new PluginRuntime()
     runtime.context.set("storage", new NamespacedStorageService({ local, secure }))
     runtime.context.set("http", new StatelessHttpService())
+    runtime.context.set("assets", { url: (path) => `/widgets/${path}` })
 
     let permissionGranted = true
     let exactAlarmGranted = true
@@ -1090,6 +1092,8 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     expect(schedulePage.route).toBe("schedule")
     expect(schedulePage.primary).toBe(true)
     expect(schedulePage.fullscreen).toBeUndefined()
+    expect(schedulePage.title).toBe("日程")
+    expect(schedulePage.titleKey).toBe("navTitle")
 
     await act(async () => {
       router.push({ route: "schedule" })
@@ -1098,6 +1102,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     await vi.waitFor(() => {
       expect(dom.container.textContent).toContain("高等数学")
       expect(dom.container.textContent).toContain("英语分级考")
+      expect(dom.container.textContent).toContain("日程查询")
     })
 
     const viewStore = schedulePage.store as ScheduleViewStoreInstance
@@ -1197,6 +1202,16 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     )
     expect(widgetsHtml).toContain("今日课表")
     expect(widgetsHtml).toContain("明日课表")
+
+    const assistantSlotEntry = slots
+      .select("settings.widgets")
+      .find((s) => s.pluginId === SCHEDULE_PLUGIN_ID && s.id === "widget-assistant")!
+    expect(assistantSlotEntry).toBeDefined()
+    const assistantSettingsHtml = renderToStaticMarkup(
+      <ContributionOutlet entry={assistantSlotEntry} slots={slots} i18n={i18n} />
+    )
+    expect(assistantSettingsHtml).toContain("日程页小组件助手")
+    expect(assistantSettingsHtml).toContain("/widgets/buro.png")
 
     const reminderSlotEntry = slots
       .select("settings.notifications.reminders")
@@ -1425,6 +1440,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
           isNative={true}
           hidden={false}
           position={{ x: 0.85, y: 0.8 }}
+          assistantSrc="/widgets/buro.png"
           widgetsSettingsHref="/?plugin=orahako.settings&page=category&category=widgets"
           t={t}
           onSetHidden={() => {}}
@@ -1448,6 +1464,16 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       node.hasAttribute("data-widget-discovery-trigger")
     )[0]
     expect(triggerBtn).toBeDefined()
+
+    const assistantAvatar = dom.body.findAll((node) =>
+      node.hasAttribute("data-widget-assistant-avatar")
+    )[0]
+    expect(assistantAvatar).toBeDefined()
+    expect(assistantAvatar!.getAttribute("src")).toBe("/widgets/buro.png")
+
+    // The detail box carries teacher/classroom/weeks/sections, so the header must not repeat them.
+    expect(dom.body.textContent).not.toContain("张老师 · A101")
+    expect(dom.body.textContent).toContain("1-16周")
 
     activeUnmount = undefined
     await dom.unmount()

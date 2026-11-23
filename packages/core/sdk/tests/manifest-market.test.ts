@@ -157,6 +157,21 @@ describe("marketplace index validation & v3 release selection", () => {
     ).toThrow("Invalid release")
   })
 
+  it("rejects release minAppVersion values that are not valid SemVer", () => {
+    const release = mixedPlugin.versions[1]!
+    expect(() =>
+      validateMarketplaceIndex({
+        ...marketJson,
+        plugins: [
+          {
+            ...mixedPlugin,
+            versions: [{ ...release, minAppVersion: "0.20" }],
+          },
+        ],
+      })
+    ).toThrow("Invalid release for plugin zmu.provider")
+  })
+
   it("strictly filters release.apiVersion === 3 in selectCompatibleRelease and findAvailableUpdates", () => {
     // 3.0.0 has apiVersion 2 -> must be ignored!
     // 2.2.0 requires app 0.20.0 -> ignored on 0.16.0!

@@ -2,8 +2,9 @@
  * YSU-owned runtime context.
  *
  * Every provider instance derives its URLs and service handles from the
- * injected plugin context and dynamic endpoint store. Protocol state is never
- * stored at module scope, so two provider instances can never share a session.
+ * injected plugin context and the static YSU configuration. Protocol state is
+ * never stored at module scope, so two provider instances can never share a
+ * session.
  */
 import type { MfaService, QueryService, SessionService } from "@orahako/academic-sdk"
 import type {
@@ -13,7 +14,6 @@ import type {
   PluginStorageService,
 } from "@orahako/sdk"
 import { createAuthTransitionQueue, type AuthTransitionQueue } from "./auth-transition"
-import { resolveYsuEndpointUrls, type YsuEndpointState } from "./endpoints"
 import { YSU_CONFIG, type YSUConfig } from "./ysu-config"
 
 export interface YSUCasUrls {
@@ -61,10 +61,9 @@ function hostOf(url: string, fallback: string): string {
   }
 }
 
-export function createYSUUrls(config: YSUConfig, endpoints?: Partial<YsuEndpointState>): YSUUrls {
-  const resolved = resolveYsuEndpointUrls(endpoints, config)
-  const cerBase = resolved.cerBaseUrl
-  const jwxtBase = resolved.jwxtBaseUrl
+export function createYSUUrls(config: YSUConfig): YSUUrls {
+  const cerBase = config.cas.cerBaseUrl.trim().replace(/\/+$/, "")
+  const jwxtBase = config.jwxt.jwxtBaseUrl.trim().replace(/\/+$/, "")
   const jwxtCookieDomain = hostOf(jwxtBase, "jwxt.ysu.edu.cn")
 
   return {
@@ -123,42 +122,19 @@ export interface YSUContextSource {
   readonly query: QueryService
   readonly mfa: MfaService
   readonly config?: YSUConfig
-  readonly getEndpoints?: () => Partial<YsuEndpointState> | undefined
   readonly transition?: AuthTransitionQueue
   readonly appVersion?: string
 }
 
-/** Binds the plugin context and dynamic endpoint resolver to the YSU configuration. */
+/** Binds the plugin context to the YSU configuration. */
 export function createYSUContext(source: YSUContextSource): YSUContext {
   const config = source.config ?? YSU_CONFIG
   const transition = source.transition ?? createAuthTransitionQueue()
   const appVersion = source.appVersion ?? "1.0.0"
 
-  let cachedCer = ""
-  let cachedJwxt = ""
-  let cachedUrls: YSUUrls | null = null
-
-  function resolveCurrentUrls(): YSUUrls {
-    const endpoints = source.getEndpoints?.()
-    const resolved = resolveYsuEndpointUrls(endpoints, config)
-    if (
-      cachedUrls !== null &&
-      cachedCer === resolved.cerBaseUrl &&
-      cachedJwxt === resolved.jwxtBaseUrl
-    ) {
-      return cachedUrls
-    }
-    cachedCer = resolved.cerBaseUrl
-    cachedJwxt = resolved.jwxtBaseUrl
-    cachedUrls = createYSUUrls(config, endpoints)
-    return cachedUrls
-  }
-
   return {
     config,
-    get urls(): YSUUrls {
-      return resolveCurrentUrls()
-    },
+    urls: createYSUUrls(config),
     session: source.session,
     http: source.http,
     storage: source.storage,

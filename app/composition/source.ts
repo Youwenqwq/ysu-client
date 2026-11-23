@@ -11,10 +11,7 @@ const basePath = process.env.NEXT_PUBLIC_APP_BASE_PATH ?? ""
 const marketUrl = ysuBundle.market.indexUrl
 const { name: appName, nameEn: appNameEn, deepLinkScheme } = appIdentity
 const repoUrl = "https://github.com/Youwenqwq/orahako"
-const schools = [
-  { id: "ysu", name: "燕山大学", nameEn: "Yanshan University" },
-  { id: "zmu", name: "遵义医科大学", nameEn: "Zunyi Medical University" },
-] as const
+const schools = [{ id: "ysu", name: "燕山大学", nameEn: "Yanshan University" }] as const
 
 const deployment: CompositionLayer = {
   id: "orahako.official.deployment",

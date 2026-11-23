@@ -271,6 +271,7 @@ export const ScheduleWidgetsCategoryPanel: SlotComponent<ScheduleWidgetsCategory
 
 export interface ScheduleWidgetAssistantSettingsInject {
   readonly isNative: () => boolean
+  readonly assistantSrc: string
 }
 
 export type ScheduleWidgetAssistantSettingsProps = DerivedComponentProps<
@@ -292,7 +293,7 @@ export const ScheduleWidgetAssistantSettings: SlotComponent<
   return (
     <Card data-schedule-widget-assistant-settings="">
       <CardContent className="flex items-center gap-3 py-1">
-        <WidgetAssistantAvatar className="size-11 shrink-0" />
+        <WidgetAssistantAvatar src={props.assistantSrc} className="size-11 shrink-0" />
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-sm font-medium">{t("desktopWidgets.assistantToggle")}</span>
           <span className="text-xs text-muted-foreground">

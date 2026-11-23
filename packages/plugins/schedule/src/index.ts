@@ -174,6 +174,7 @@ const scheduleManifest: PluginManifest = {
     "overview",
     "native",
     "widgets",
+    "assets",
   ],
 }
 
@@ -193,6 +194,7 @@ export const schedulePlugin = definePlugin({
     "overview",
     "native",
     "widgets",
+    "assets",
   ] as const,
   apply(ctx) {
     const {
@@ -209,9 +211,14 @@ export const schedulePlugin = definePlugin({
       overview,
       native,
       widgets,
+      assets,
     } = ctx
 
     i18n.register(scheduleDictionary)
+
+    const resolveWidgetAssetSrc = (fileName: string): string =>
+      assets.url(`widgets/${fileName}`) ?? router.href(`/widgets/${fileName}`)
+    const widgetAssistantSrc = resolveWidgetAssetSrc("buro.png")
 
     let disposed = false
     const settingsStore = scheduleSettingsStore.create(storage)
@@ -478,8 +485,8 @@ export const schedulePlugin = definePlugin({
       {
         id: "index",
         route: "schedule",
-        title: "日程查询",
-        titleKey: "pageTitle",
+        title: "日程",
+        titleKey: "navTitle",
         capability: "timetable",
         primary: true,
         requiresProvider: true,
@@ -503,6 +510,7 @@ export const schedulePlugin = definePlugin({
           patchMutators,
           mobileBridge,
           isNative: () => native.isNative,
+          assistantSrc: widgetAssistantSrc,
           setCompactMode: (compact) => settingsStore.actions.setCompactMode(compact),
           setWidgetAssistantHidden: (hidden) =>
             settingsStore.actions.setWidgetAssistantHidden(hidden),
@@ -635,6 +643,7 @@ export const schedulePlugin = definePlugin({
           store: settingsStore,
           inject: (): ScheduleWidgetAssistantSettingsInject => ({
             isNative: () => native.isNative,
+            assistantSrc: widgetAssistantSrc,
           }),
         },
         ScheduleWidgetAssistantSettings

@@ -114,10 +114,7 @@ export function defineStore<S, A extends StoreActionsShape<NoInfer<S>>>(
           state: snapshot,
         })
         writeQueue = writeQueue
-          .then(() => {
-            if (disposed) return
-            return backend.setItem(persistConfig.key, payload)
-          })
+          .then(() => backend.setItem(persistConfig.key, payload))
           .catch(() => {
             // Persistence failures must not crash synchronous UI transitions.
           })

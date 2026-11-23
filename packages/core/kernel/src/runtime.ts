@@ -88,6 +88,26 @@ function invokeExecutable(
 }
 
 /**
+ * Shadow `ctx.set` so `provides` is validated against services this plugin
+ * actually published, not a root service that already happened to exist.
+ * The tracking context delegates every other member to the scoped context.
+ */
+function trackProvidedServices(ctx: Context, provided: Set<string>): Context {
+  return new Proxy(ctx, {
+    get(target, property, receiver) {
+      if (property === "set") {
+        return (name: string, value: unknown): (() => void) => {
+          const dispose = target.set(name, value)
+          if (value !== undefined && value !== null) provided.add(name)
+          return dispose
+        }
+      }
+      return Reflect.get(target, property, receiver)
+    },
+  })
+}
+
+/**
  * Cordis-native plugin runtime.
  *
  * Enabled plugins mount directly into Cordis with `cordisPlugin.inject` so
@@ -206,17 +226,22 @@ export class PluginRuntime {
         }
       }
 
-      // Isolate every scoped service first so facades capture the final plugin context.
+      const provided = new Set<string>()
+      const pluginCtx = trackProvidedServices(scoped, provided)
+
+      // Facades observe the exact final context passed to apply; service writes
+      // themselves stay outside `provides` tracking because they are dependencies.
       for (const { name, service } of scopedServices) {
-        scoped.set(name, service[PLUGIN_SERVICE_SCOPE](scoped, current.manifest))
+        scoped.set(name, service[PLUGIN_SERVICE_SCOPE](pluginCtx, current.manifest))
       }
 
       this.contexts.set(ctx, { plugin: current, generation })
       this.contexts.set(scoped, { plugin: current, generation })
+      this.contexts.set(pluginCtx, { plugin: current, generation })
 
       let result: void | Promise<void>
       try {
-        result = invokeExecutable(current.executable, scoped, resolvedConfig)
+        result = invokeExecutable(current.executable, pluginCtx, resolvedConfig)
       } catch (error) {
         current.status = "failed"
         current.error = errorMessage(error)
@@ -233,7 +258,7 @@ export class PluginRuntime {
           try {
             await result
             if (current.generation !== generation || !current.mounted) return
-            this.assertProvides(current)
+            this.assertProvides(current, provided)
           } catch (error) {
             if (current.generation === generation && current.mounted) {
               current.status = "failed"
@@ -250,7 +275,7 @@ export class PluginRuntime {
         })
       } else {
         try {
-          this.assertProvides(current)
+          this.assertProvides(current, provided)
         } catch (error) {
           current.status = "failed"
           current.error = errorMessage(error)
@@ -350,55 +375,61 @@ export class PluginRuntime {
     const plugin = this.plugins.get(id)!
     const generation = plugin.generation
 
-    await new Promise<void>((resolve, reject) => {
-      let unsubscribe = () => {}
-      const timer = setTimeout(() => {
-        unsubscribe()
-        if (plugin.generation === generation && plugin.mounted) {
-          const missing = this.missingInjectedServices(plugin)
-          const message =
-            missing.length > 0
-              ? `Plugin startup timed out waiting for services (${missing.join(", ")}): ${id}`
-              : `Plugin startup timed out: ${id}`
-          plugin.generation += 1
-          plugin.mounted = false
-          plugin.pendingCount = 0
-          plugin.scope?.dispose()
-          this.context.registry.delete(plugin.cordisPlugin)
-          plugin.scope = undefined
-          plugin.status = "failed"
-          plugin.error = message
-          this.publish()
-          reject(new Error(message))
-        }
-      }, timeoutMs)
-
-      const check = () => {
-        const current = this.get(id)
-        if (!current || plugin.generation !== generation) {
-          clearTimeout(timer)
-          unsubscribe()
-          reject(new Error(`Plugin ${id} was stopped during startup`))
-          return
-        }
-        if (current.status === "active") {
-          clearTimeout(timer)
-          unsubscribe()
-          resolve()
-        } else if (current.status === "failed") {
-          clearTimeout(timer)
-          unsubscribe()
-          reject(new Error(current.error ?? `Plugin failed: ${id}`))
-        } else if (current.status === "disabled") {
-          clearTimeout(timer)
-          unsubscribe()
-          reject(new Error(`Plugin was disabled during startup: ${id}`))
-        }
+    const { promise, resolve, reject } = Promise.withResolvers<void>()
+    let unsubscribe = () => {}
+    let settled = false
+    const settle = (error?: Error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      unsubscribe()
+      if (error) reject(error)
+      else resolve()
+    }
+    const timer = setTimeout(() => {
+      if (settled) return
+      if (plugin.generation !== generation || !plugin.mounted) {
+        settle(new Error(`Plugin ${id} was stopped during startup`))
+        return
       }
+      const missing = this.missingInjectedServices(plugin)
+      const message =
+        missing.length > 0
+          ? `Plugin startup timed out waiting for services (${missing.join(", ")}): ${id}`
+          : `Plugin startup timed out: ${id}`
+      plugin.generation += 1
+      plugin.mounted = false
+      plugin.pendingCount = 0
+      plugin.scope?.dispose()
+      this.context.registry.delete(plugin.cordisPlugin)
+      plugin.scope = undefined
+      plugin.status = "failed"
+      plugin.error = message
+      // Unsubscribe before publishing the generation change; otherwise the
+      // listener reports a generic stop instead of this timeout.
+      settle(new Error(message))
+      this.publish()
+    }, timeoutMs)
 
-      unsubscribe = this.subscribe(check)
-      check()
-    })
+    const check = () => {
+      if (settled) return
+      const current = this.get(id)
+      if (!current || plugin.generation !== generation) {
+        settle(new Error(`Plugin ${id} was stopped during startup`))
+        return
+      }
+      if (current.status === "active") {
+        settle()
+      } else if (current.status === "failed") {
+        settle(new Error(current.error ?? `Plugin failed: ${id}`))
+      } else if (current.status === "disabled") {
+        settle(new Error(`Plugin was disabled during startup: ${id}`))
+      }
+    }
+
+    unsubscribe = this.subscribe(check)
+    check()
+    await promise
   }
 
   async flush(): Promise<void> {
@@ -496,11 +527,10 @@ export class PluginRuntime {
     plugin.status = "active"
   }
 
-  private assertProvides(plugin: RegisteredPlugin): void {
+  private assertProvides(plugin: RegisteredPlugin, provided: ReadonlySet<string>): void {
     for (const name of plugin.manifest.provides ?? []) {
-      if (this.context.get(name) == null) {
-        throw new Error(`Plugin ${plugin.manifest.id} did not provide declared service: ${name}`)
-      }
+      if (provided.has(name) && this.context.get(name) != null) continue
+      throw new Error(`Plugin ${plugin.manifest.id} did not provide declared service: ${name}`)
     }
   }
 

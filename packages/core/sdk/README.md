@@ -124,6 +124,54 @@ as needed. The sole `ui-renderer` derives four shares:
 (`useSyncExternalStore`). Components should remain ordinary, testable React
 functions and should not use business React contexts or direct `useSWR`.
 
+## Shell replacement and host preferences
+
+A replacement shell registers the same public child slots as the default shell
+(`shell.gate`, `shell.banner`, `shell.activity`, `shell.header.actions`,
+`shell.sidebar.footer`, `shell.overlay`) and renders them through its derived
+`renderSlot` / `renderSlotChain` props. Public shell slots are claimed in the
+plugin scope and are reference-counted, so multiple shells may coexist:
+
+```ts
+const children = {
+  "shell.gate": { kind: "chain" },
+  "shell.banner": { kind: "list" },
+  "shell.activity": { kind: "list" },
+  "shell.header.actions": { kind: "list" },
+  "shell.sidebar.footer": { kind: "list" },
+  "shell.overlay": { kind: "list" },
+} as const
+
+apply(ctx) {
+  for (const [name, spec] of Object.entries(children)) {
+    ctx.slots.declare({ name: name as SlotName, kind: spec.kind })
+  }
+  ctx.ui.registerShell(
+    { id: "community", name: "Community", children, declareChildren: false },
+    CommunityShell
+  )
+}
+```
+
+`ShellSpec.declareChildren` defaults to `true`; in that mode the shell owns its
+children and a duplicate declaration throws. With `false`, the runtime only
+verifies that each declared child slot already exists with the requested kind.
+Pages and settings categories continue to declare their own children and still
+reject duplicates.
+
+Shell and page contributions carry a monotonically increasing `generation`.
+Error boundaries use it as their key/reset key, so a plugin that re-registers a
+contribution after a failure gets a clean boundary instead of the old fallback.
+
+The active shell and theme are host preferences, not shell-local state. The host
+exposes `packageRuntime.preferenceState` (a `PluginHostPreferenceSnapshot` with
+optional `activeShell` / `activeTheme`), plus
+`getActiveShell` / `setActiveShell` and `getActiveTheme` / `setActiveTheme`.
+`OrahakoApp` subscribes to that snapshot, so a shell change made by the plugin
+manager applies immediately. Shells must not keep their own theme store or emit
+a second theme `<style>` channel. When `activeTheme` is unset or empty, no theme
+is injected; there is no fallback to the first registered non-empty theme.
+
 ## Stores and dictionaries
 
 `defineStore` creates a factory, not a module singleton:

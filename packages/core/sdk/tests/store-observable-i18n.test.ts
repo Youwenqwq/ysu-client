@@ -160,6 +160,41 @@ describe("defineStore", () => {
     instance.actions.setToken("ignored")
     expect(instance.source.getSnapshot().token).toBe("abc")
   })
+
+  it("drains queued persistence writes after dispose but rejects new writes", async () => {
+    const drainStore = defineStore({
+      init: () => ({ count: 0 }),
+      persist: { key: "drain", mode: "local" },
+      actions: {
+        increment(ctx) {
+          ctx.set((state) => ({ count: state.count + 1 }))
+        },
+      },
+    })
+    const setItem = vi.fn(async (_key: string, _value: string) => {})
+    const createBackend = (): PluginKeyValueStorage => ({
+      async getItem() {
+        return null
+      },
+      setItem,
+      async removeItem() {},
+    })
+    const service: PluginStorageService = { local: createBackend(), secure: createBackend() }
+
+    const instance = drainStore.create(service)
+    await vi.waitFor(() => expect(instance.hydrated.getSnapshot()).toBe(true))
+
+    instance.actions.increment()
+    instance.dispose()
+
+    await vi.waitFor(() => expect(setItem).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(setItem.mock.calls[0]![1])).toEqual({ version: 1, state: { count: 1 } })
+
+    instance.actions.increment()
+    await Promise.resolve()
+    expect(setItem).toHaveBeenCalledTimes(1)
+    expect(instance.source.getSnapshot().count).toBe(1)
+  })
 })
 
 describe("defineDictionary & typed Translator", () => {

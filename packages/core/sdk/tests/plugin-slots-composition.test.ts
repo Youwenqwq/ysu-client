@@ -175,6 +175,9 @@ describe("SlotMap & 4-share derived component props", () => {
       inject() {
         return () => {}
       },
+      declare() {
+        return () => {}
+      },
     }
 
     fakeSlots.register(

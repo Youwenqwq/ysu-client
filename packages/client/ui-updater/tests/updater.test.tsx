@@ -266,17 +266,10 @@ describe("@orahako/ui-updater", () => {
       slots.declare({ name: "about.extra", kind: "list" })
 
       const overlayEntry = slots.select("shell.overlay")[0]!
-      const settingsEntry = slots.select("settings.general")[0]!
       const aboutEntry = slots.select("about.extra")[0]!
       expect(overlayEntry).toBeDefined()
-      expect(settingsEntry).toBeDefined()
       expect(aboutEntry).toBeDefined()
-
-      const settingsHtml = renderToStaticMarkup(
-        <ContributionOutlet entry={settingsEntry} slots={slots} i18n={i18n} />
-      )
-      expect(settingsHtml).toContain("更新通道")
-      expect(settingsHtml).toContain("连接设置")
+      expect(slots.select("settings.general")).toHaveLength(0)
 
       const aboutHtml = renderToStaticMarkup(
         <ContributionOutlet entry={aboutEntry} slots={slots} i18n={i18n} />

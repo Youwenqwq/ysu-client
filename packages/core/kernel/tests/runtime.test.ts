@@ -186,6 +186,67 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
     runtime.dispose()
   })
 
+  it("validates provides against services the plugin actually published", async () => {
+    const runtime = new PluginRuntime()
+    runtime.context.set("shared.analytics", { endpoint: "pre-existing" })
+
+    const freeloader = makeManifest("example.freeloader", {
+      kind: "runtime",
+      provides: ["shared.analytics"],
+    })
+    runtime.register(freeloader, () => {}, "builtin")
+    await expect(runtime.startAndWait(freeloader.id)).rejects.toThrow(
+      "did not provide declared service: shared.analytics"
+    )
+    expect(runtime.get(freeloader.id)?.status).toBe("failed")
+
+    const syncProvider = makeManifest("example.sync-provider", {
+      kind: "runtime",
+      provides: ["sync.value"],
+    })
+    runtime.register(syncProvider, (ctx) => ctx.set("sync.value", { n: 1 }), "builtin")
+    await runtime.startAndWait(syncProvider.id)
+    expect(runtime.get(syncProvider.id)?.status).toBe("active")
+
+    const asyncProvider = makeManifest("example.async-provider", {
+      kind: "runtime",
+      provides: ["async.value"],
+    })
+    runtime.register(
+      asyncProvider,
+      async (ctx) => {
+        await Promise.resolve()
+        ctx.set("async.value", { n: 2 })
+      },
+      "builtin"
+    )
+    await runtime.startAndWait(asyncProvider.id)
+    expect(runtime.get(asyncProvider.id)?.status).toBe("active")
+    runtime.dispose()
+  })
+
+  it("settles startAndWait when the startup timer fires after the plugin was stopped", async () => {
+    vi.useFakeTimers()
+    const runtime = new PluginRuntime()
+    const consumer = makeManifest("example.abandoned", { inject: ["ui"] })
+    runtime.register(consumer, () => {}, "external")
+    runtime.start(consumer.id)
+
+    // A throwing listener prevents the subscription check from observing stop().
+    const unsubscribeThrowing = runtime.subscribe(() => {
+      throw new Error("listener failure")
+    })
+    const pending = runtime.startAndWait(consumer.id, 500)
+    const assertion = expect(pending).rejects.toThrow("was stopped during startup")
+    expect(() => runtime.stop(consumer.id)).toThrow("listener failure")
+    unsubscribeThrowing()
+
+    await vi.advanceTimersByTimeAsync(500)
+    await assertion
+    runtime.dispose()
+    vi.useRealTimers()
+  })
+
   it("enforces package requires SemVer ranges, cascades stop, and does not leak registry entries", () => {
     const runtime = new PluginRuntime()
     const base = makeManifest("example.base", { version: "1.2.0" })

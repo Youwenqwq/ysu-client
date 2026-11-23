@@ -27,6 +27,23 @@ export interface PluginAssetService {
   url(path: string): string | undefined
 }
 
+/** Observable host preference values shared by the kernel and UI runtimes. */
+export interface PluginHostPreferenceSnapshot {
+  readonly activeShell?: string
+  readonly activeTheme?: string
+}
+
+/** Host-owned, persisted preference facade exposed to the app runtime. */
+export interface PluginHostPreferences {
+  readonly state: ObservableSource<PluginHostPreferenceSnapshot>
+  isPluginDisabled(id: string): boolean
+  setPluginDisabled(id: string, disabled: boolean): void
+  getActiveShell(): string | undefined
+  setActiveShell(shellId: string | undefined): void
+  getActiveTheme(): string | undefined
+  setActiveTheme(themeId: string | undefined): void
+}
+
 export interface InstalledPluginSummary {
   readonly manifest: PluginManifest
   readonly installedAt: number
@@ -76,6 +93,10 @@ export interface PluginPackageRuntime {
   loadErrors?(): ReadonlyMap<string, string>
   getActiveShell?(): string | undefined
   setActiveShell?(shellId: string | undefined): void
+  /** Optional on minimal test/embedded runtimes; always provided by PluginHost. */
+  preferenceState?: ObservableSource<PluginHostPreferenceSnapshot>
+  getActiveTheme?(): string | undefined
+  setActiveTheme?(themeId: string | undefined): void
   safeMode?(): boolean
 }
 

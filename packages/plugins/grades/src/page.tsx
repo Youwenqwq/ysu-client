@@ -64,6 +64,12 @@ function numericValue(value: number | undefined, fallback?: string): number | un
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+function scorePercentOf(grade: Grade): number | undefined {
+  const score = numericValue(grade.numericScore, grade.score)
+  if (score === undefined) return undefined
+  return Math.max(0, Math.min(100, score))
+}
+
 export interface GradeAnalyticsResult {
   readonly statistics: GradeStatistics | null
   readonly distribution: GradeDistribution[] | null
@@ -346,6 +352,8 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
     return (totalWeightedPoints / totalCredits).toFixed(4)
   }, [filtered, term])
 
+  const detailScorePercent = selectedGrade ? scorePercentOf(selectedGrade) : undefined
+
   if (loading && grades.length === 0) {
     return (
       <div className="flex flex-col gap-8">
@@ -553,58 +561,110 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
           </ResponsiveModalHeader>
           <ResponsiveModalBody className="flex flex-col gap-5 pb-4">
             {selectedGrade && (
-              <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-semibold">{t("grades.detail.sectionInfo")}</h3>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="flex flex-col gap-0.5 rounded-md border p-2">
-                    <span className="text-muted-foreground">{t("grades.table.term")}</span>
-                    <span className="font-medium">{selectedGrade.semester || "-"}</span>
-                  </div>
-                  <div className="flex flex-col gap-0.5 rounded-md border p-2">
-                    <span className="text-muted-foreground">{t("grades.table.score")}</span>
-                    <span className="font-medium tabular-nums">
-                      {[selectedGrade.score, selectedGrade.gradeLevel]
-                        .filter(Boolean)
-                        .join(" / ") || "-"}
+              <section data-grade-detail="" className="flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {t("grades.table.score")}
                     </span>
+                    <div className="flex items-baseline gap-2">
+                      <span
+                        data-grade-detail-score=""
+                        className="text-4xl leading-none font-semibold tabular-nums"
+                      >
+                        {selectedGrade.score || selectedGrade.gradeLevel || "-"}
+                      </span>
+                      {selectedGrade.score && selectedGrade.gradeLevel && (
+                        <span className="text-base font-medium text-muted-foreground">
+                          {selectedGrade.gradeLevel}
+                        </span>
+                      )}
+                    </div>
+                    {detailScorePercent !== undefined && (
+                      <div
+                        aria-hidden="true"
+                        className="mt-1 h-1.5 w-40 max-w-full overflow-hidden rounded-full bg-muted"
+                      >
+                        <div
+                          className="h-full rounded-full bg-primary"
+                          style={{ width: `${detailScorePercent}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    {selectedGrade.isDegreeCourse && (
+                      <Badge variant="outline" className="text-[10px]">
+                        {t("grades.degreeCourse")}
+                      </Badge>
+                    )}
+                    {selectedGrade.isPass ? (
+                      <Badge variant="default" className="text-[10px]">
+                        {t("grades.table.pass")}
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" className="text-[10px]">
+                        {t("grades.table.fail")}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {(selectedGrade.credit || selectedGrade.gradePoint) && (
+                  <dl data-grade-detail-metrics="" className="grid grid-cols-2 gap-4 border-y py-3">
+                    {selectedGrade.credit && (
+                      <div className="flex flex-col gap-0.5">
+                        <dt className="text-xs text-muted-foreground">
+                          {t("grades.table.credit")}
+                        </dt>
+                        <dd className="text-lg leading-none font-semibold tabular-nums">
+                          {selectedGrade.credit}
+                        </dd>
+                      </div>
+                    )}
+                    {selectedGrade.gradePoint && (
+                      <div className="flex flex-col gap-0.5">
+                        <dt className="text-xs text-muted-foreground">
+                          {t("grades.table.gradePoint")}
+                        </dt>
+                        <dd className="text-lg leading-none font-semibold tabular-nums">
+                          {selectedGrade.gradePoint}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                )}
+
+                <dl data-grade-detail-meta="" className="grid grid-cols-1 gap-1.5 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-muted-foreground">{t("grades.table.term")}</dt>
+                    <dd className="font-medium">{selectedGrade.semester || "-"}</dd>
                   </div>
                   {selectedGrade.courseCode && (
-                    <div className="flex flex-col gap-0.5 rounded-md border p-2">
-                      <span className="text-muted-foreground">{t("grades.table.courseCode")}</span>
-                      <span className="font-medium">{selectedGrade.courseCode}</span>
-                    </div>
-                  )}
-                  {selectedGrade.credit && (
-                    <div className="flex flex-col gap-0.5 rounded-md border p-2">
-                      <span className="text-muted-foreground">{t("grades.table.credit")}</span>
-                      <span className="font-medium tabular-nums">{selectedGrade.credit}</span>
-                    </div>
-                  )}
-                  {selectedGrade.gradePoint && (
-                    <div className="flex flex-col gap-0.5 rounded-md border p-2">
-                      <span className="text-muted-foreground">{t("grades.table.gradePoint")}</span>
-                      <span className="font-medium tabular-nums">{selectedGrade.gradePoint}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">{t("grades.table.courseCode")}</dt>
+                      <dd className="font-mono font-medium">{selectedGrade.courseCode}</dd>
                     </div>
                   )}
                   {selectedGrade.courseType && (
-                    <div className="flex flex-col gap-0.5 rounded-md border p-2">
-                      <span className="text-muted-foreground">{t("grades.table.type")}</span>
-                      <span className="font-medium">{selectedGrade.courseType}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">{t("grades.table.type")}</dt>
+                      <dd className="font-medium">{selectedGrade.courseType}</dd>
                     </div>
                   )}
                   {selectedGrade.department && (
-                    <div className="flex flex-col gap-0.5 rounded-md border p-2">
-                      <span className="text-muted-foreground">{t("grades.table.department")}</span>
-                      <span className="font-medium">{selectedGrade.department}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">{t("grades.table.department")}</dt>
+                      <dd className="truncate font-medium">{selectedGrade.department}</dd>
                     </div>
                   )}
                   {selectedGrade.examType && (
-                    <div className="flex flex-col gap-0.5 rounded-md border p-2">
-                      <span className="text-muted-foreground">{t("grades.table.examType")}</span>
-                      <span className="font-medium">{selectedGrade.examType}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">{t("grades.table.examType")}</dt>
+                      <dd className="font-medium">{selectedGrade.examType}</dd>
                     </div>
                   )}
-                </div>
+                </dl>
               </section>
             )}
 
@@ -652,28 +712,28 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
                         {t("grades.stats.sectionStatistics")}
                       </h3>
                       {statsResult ? (
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="flex flex-col gap-1 rounded-md border p-2.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-col gap-1">
                             <span className="text-[10px] text-muted-foreground">
                               {t("grades.stats.highest")}
                             </span>
-                            <span className="text-base font-semibold tabular-nums">
+                            <span className="text-lg leading-none font-semibold tabular-nums">
                               {statsResult.highestScore?.toFixed(1) ?? "-"}
                             </span>
                           </div>
-                          <div className="flex flex-col gap-1 rounded-md border p-2.5">
+                          <div className="flex flex-col gap-1">
                             <span className="text-[10px] text-muted-foreground">
                               {t("grades.stats.lowest")}
                             </span>
-                            <span className="text-base font-semibold tabular-nums">
+                            <span className="text-lg leading-none font-semibold tabular-nums">
                               {statsResult.lowestScore?.toFixed(1) ?? "-"}
                             </span>
                           </div>
-                          <div className="flex flex-col gap-1 rounded-md border p-2.5">
+                          <div className="flex flex-col gap-1 text-right">
                             <span className="text-[10px] text-muted-foreground">
                               {t("grades.stats.average")}
                             </span>
-                            <span className="text-base font-semibold tabular-nums">
+                            <span className="text-lg leading-none font-semibold tabular-nums">
                               {statsResult.averageScore?.toFixed(1) ?? "-"}
                             </span>
                           </div>
@@ -729,20 +789,20 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
                     <section className="flex flex-col gap-2">
                       <h3 className="text-sm font-semibold">{t("grades.stats.sectionRanking")}</h3>
                       {rankingResult ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="flex flex-col gap-1 rounded-md border p-2.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-col gap-1">
                             <span className="text-[10px] text-muted-foreground">
                               {t("grades.stats.myScore")}
                             </span>
-                            <span className="text-base font-semibold tabular-nums">
+                            <span className="text-lg leading-none font-semibold tabular-nums">
                               {rankingResult.score?.toFixed(1) ?? "-"}
                             </span>
                           </div>
-                          <div className="flex flex-col gap-1 rounded-md border p-2.5">
+                          <div className="flex flex-col gap-1 text-right">
                             <span className="text-[10px] text-muted-foreground">
                               {t("grades.stats.rank")}
                             </span>
-                            <span className="text-base font-semibold tabular-nums">
+                            <span className="text-lg leading-none font-semibold tabular-nums">
                               {t("grades.stats.rankFormat", {
                                 rank: rankingResult.rank,
                                 total: rankingResult.total,

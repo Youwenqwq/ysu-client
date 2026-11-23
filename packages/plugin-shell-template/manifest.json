@@ -6,6 +6,6 @@
   "minAppVersion": "0.16.0",
   "kind": "shell",
   "entry": "dist/index.js",
-  "inject": ["ui", "router"],
+  "inject": ["ui", "slots", "router"],
   "description": "A complete replacement application shell example."
 }

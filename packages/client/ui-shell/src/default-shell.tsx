@@ -351,10 +351,8 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
   const navRevision = props.useNavRevision()
   const backgroundUrl = props.useBackgroundUrl()
   const storeHydrated = props.useStoreHydrated()
-  void navRevision
 
   const colorMode: ColorMode = useStore((s) => s.colorMode)
-  const activeTheme = useStore((s) => s.activeTheme)
   const backgroundImage = useStore((s) => s.backgroundImage)
   const backgroundStyle = useStore((s) => s.backgroundStyle)
   const overlayOpacity = useStore((s) => s.backgroundOverlayOpacity)
@@ -417,23 +415,12 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
     }
   }, [defaultLandingPage, location.pluginId, location.route, props, storeHydrated])
 
-  const selectedThemeEntry = useMemo(() => {
-    if (!activeTheme) return undefined
-    return uiSnapshot.themes.find(
-      (item) => `${item.pluginId}:${item.id}` === activeTheme || item.id === activeTheme
-    )
-  }, [activeTheme, uiSnapshot.themes])
-
-  useEffect(() => {
-    if (storeHydrated && activeTheme && uiSnapshot.themes.length > 0 && !selectedThemeEntry) {
-      actions.setActiveTheme("")
-    }
-  }, [actions, activeTheme, selectedThemeEntry, storeHydrated, uiSnapshot.themes.length])
-
-  const chrome = useMemo(
-    () => props.resolveChrome(location, uiSnapshot, locale),
-    [locale, location, props, uiSnapshot]
-  )
+  const chrome = useMemo(() => {
+    // Navigation filters and the landing preference live outside uiSnapshot.
+    void navRevision
+    void defaultLandingPage
+    return props.resolveChrome(location, uiSnapshot, locale)
+  }, [defaultLandingPage, locale, location, navRevision, props, uiSnapshot])
 
   const hasBackground = Boolean(backgroundImage || backgroundUrl)
   const showMobileThemeToggle = Boolean(
@@ -672,11 +659,6 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
   return (
     <BackLayerProvider registerBackHandler={props.registerBackHandler}>
       <TooltipProvider>
-        {selectedThemeEntry && selectedThemeEntry.css.trim().length > 0 && (
-          <style data-shell-theme={`${selectedThemeEntry.pluginId}:${selectedThemeEntry.id}`}>
-            {selectedThemeEntry.css}
-          </style>
-        )}
         <BackgroundLayer
           backgroundUrl={backgroundUrl}
           hasBackground={hasBackground}

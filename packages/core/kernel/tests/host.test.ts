@@ -7,11 +7,13 @@ import {
   type CompositionSource,
   type MarketplaceIndex,
   type PluginManifest,
+  type PluginNativeService,
   type PluginPackageRuntime,
 } from "@orahako/sdk"
 import {
   beginPluginBoot,
   createMemoryPackageBackend,
+  createPluginHostPreferences,
   finishPluginBoot,
   nextPluginBootState,
   PluginHost,
@@ -431,6 +433,291 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
     expect(await packageRuntime.listInstalled!()).toHaveLength(0)
     expect(packageRuntime.getActiveShell?.()).toBeUndefined()
 
+    host.dispose()
+  })
+
+  it("rejects shadowing installs before writing storage and keeps the builtin registration", async () => {
+    const encoder = new TextEncoder()
+    const store = new PluginPackageStore({ backend: createMemoryPackageBackend() })
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b-shadow",
+        composition: { id: "test.shadow", version: 1, defaults: {}, plugins: [] },
+        plugins: [],
+      },
+      { platformModules: {}, packages: store }
+    )
+
+    const shadowZip = zipSync({
+      "manifest.json": encoder.encode(
+        JSON.stringify({
+          id: "ext.shadow",
+          name: "Shadow",
+          version: "1.0.0",
+          apiVersion: 3,
+          kind: "feature",
+          entry: "index.js",
+        })
+      ),
+      "index.js": encoder.encode("export default { apply() {} }\n"),
+    })
+
+    host.runtime.register(makeManifest("ext.shadow"), () => {}, "builtin")
+    host.runtime.start("ext.shadow")
+
+    await expect(host.install(shadowZip)).rejects.toThrow(
+      "External plugin cannot shadow a composition module: ext.shadow"
+    )
+    expect(host.runtime.get("ext.shadow")?.source).toBe("builtin")
+    expect(await store.read("ext.shadow")).toBeUndefined()
+    expect(await store.list()).toHaveLength(0)
+    host.dispose()
+  })
+
+  it("rejects installs whose minAppVersion is newer than the running app", async () => {
+    const encoder = new TextEncoder()
+    const store = new PluginPackageStore({ backend: createMemoryPackageBackend() })
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b-min-app",
+        composition: { id: "test.min-app", version: 1, defaults: {}, plugins: [] },
+        plugins: [],
+      },
+      { platformModules: {}, packages: store }
+    )
+
+    const futureZip = zipSync({
+      "manifest.json": encoder.encode(
+        JSON.stringify({
+          id: "ext.future",
+          name: "Future",
+          version: "1.0.0",
+          apiVersion: 3,
+          kind: "feature",
+          entry: "index.js",
+          minAppVersion: "9.0.0",
+        })
+      ),
+      "index.js": encoder.encode("export default { apply() {} }\n"),
+    })
+
+    await expect(host.install(futureZip)).rejects.toThrow("requires app 9.0.0 or newer")
+    expect(await store.read("ext.future")).toBeUndefined()
+    host.dispose()
+  })
+
+  it("records stale installed manifests per plugin without blocking valid packages", async () => {
+    let blobCounter = 0
+    vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      const code = blob instanceof Blob ? "export default { apply() {} }" : ""
+      return `data:text/javascript;base64,${btoa(code)}#stale-${++blobCounter}`
+    })
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {})
+
+    const encoder = new TextEncoder()
+    const backend = createMemoryPackageBackend()
+    const store = new PluginPackageStore({ backend })
+    const validZip = zipSync({
+      "manifest.json": encoder.encode(
+        JSON.stringify({
+          id: "ext.valid",
+          name: "ext.valid",
+          version: "1.0.0",
+          apiVersion: 3,
+          kind: "feature",
+          entry: "index.js",
+        })
+      ),
+      "index.js": encoder.encode("export default { apply() {} }\n"),
+    })
+    await store.install(validZip)
+
+    const files = [{ path: "index.js", data: encoder.encode("export default { apply() {} }\n") }]
+    await backend.put({
+      manifest: { ...makeManifest("ext.stale"), apiVersion: 2 },
+      files,
+      installedAt: 1,
+    })
+    await backend.put({
+      manifest: makeManifest("ext.newer", { minAppVersion: "9.0.0" }),
+      files,
+      installedAt: 2,
+    })
+
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b-stale",
+        composition: { id: "test.stale", version: 1, defaults: {}, plugins: [] },
+        plugins: [],
+      },
+      {
+        platformModules: { "@orahako/sdk": SdkNamespace },
+        packages: store,
+      }
+    )
+
+    await host.bootstrap()
+    expect(host.loadErrors.get("ext.stale")).toContain("apiVersion must be 3")
+    expect(host.loadErrors.get("ext.newer")).toContain("requires app 9.0.0")
+    expect(host.loadErrors.get("ext.valid")).toBeUndefined()
+    expect(host.runtime.get("ext.valid")?.status).toBe("active")
+    expect(host.runtime.get("ext.stale")).toBeUndefined()
+    host.dispose()
+  })
+
+  it("bounds async composition startup and ignores late apply side effects", async () => {
+    const { promise: gate, resolve: release } = Promise.withResolvers<void>()
+    const slowPlugin = definePlugin({
+      manifest: makeManifest("app.slow", { kind: "runtime", provides: ["analytics"] }),
+      apply: async (ctx) => {
+        await gate
+        ctx.set("analytics", {
+          endpoint: null,
+          track: async () => ({ tracked: false, reason: "disabled", date: null }),
+        })
+      },
+    })
+
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b-slow",
+        composition: {
+          id: "test.slow",
+          version: 1,
+          defaults: {},
+          plugins: [{ id: slowPlugin.manifest.id }],
+        },
+        plugins: [slowPlugin],
+      },
+      {
+        platformModules: { "@orahako/sdk": SdkNamespace },
+        packages: new PluginPackageStore({ backend: createMemoryPackageBackend() }),
+        pluginStartTimeoutMs: 10,
+      }
+    )
+
+    await host.bootstrap()
+    expect(host.loadErrors.get("app.slow")).toContain("startup timed out")
+    expect(host.runtime.get("app.slow")?.status).toBe("failed")
+
+    release()
+    await host.runtime.flush()
+    expect(host.runtime.context.get("analytics")).toBeUndefined()
+    expect(host.runtime.get("app.slow")?.status).toBe("failed")
+    host.dispose()
+  })
+
+  it("records native capability failures in safe mode but still fails a normal boot", async () => {
+    const storage = new Map<string, string>([
+      [
+        "orahako-plugin-recovery",
+        JSON.stringify({
+          phase: "starting",
+          build: "safe-build",
+          crashStreak: 2,
+          safeMode: false,
+        }),
+      ],
+    ])
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => void storage.set(key, String(value)),
+      removeItem: (key: string) => void storage.delete(key),
+    })
+
+    const native = {
+      isNative: true,
+      capabilities: { list: () => [] },
+    } as unknown as PluginNativeService
+    const source: CompositionSource = {
+      appVersion: "0.17.0",
+      appBuild: "safe-build",
+      composition: {
+        id: "test.safe-mode",
+        version: 1,
+        defaults: {},
+        nativeCapabilities: ["widgets.schedule@1"],
+        plugins: [],
+      },
+      plugins: [],
+    }
+
+    const safeHost = new PluginHost(source, { platformModules: {} })
+    safeHost.runtime.context.set("native", native)
+    await safeHost.bootstrap()
+    expect(safeHost.recovery?.safeMode).toBe(true)
+    expect(safeHost.bootstrapError).toContain("not implemented")
+    expect(safeHost.runtime.context.get("pluginManager")).toBeDefined()
+    safeHost.dispose()
+
+    vi.unstubAllGlobals()
+    const normalHost = new PluginHost(source, { platformModules: {} })
+    normalHost.runtime.context.set("native", native)
+    await expect(normalHost.bootstrap()).rejects.toThrow(
+      "Composition native capabilities are not implemented"
+    )
+    normalHost.dispose()
+  })
+
+  it("publishes shared preference snapshots only for shell and theme writes", () => {
+    const storage = new Map<string, string>()
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => void storage.set(key, String(value)),
+      removeItem: (key: string) => void storage.delete(key),
+    })
+
+    const preferences = createPluginHostPreferences("test-preferences")
+    expect(preferences.state.getSnapshot()).toEqual({})
+    const listener = vi.fn()
+    const unsubscribe = preferences.state.subscribe(listener)
+
+    preferences.setActiveShell("app.shell:default")
+    expect(preferences.state.getSnapshot()).toEqual({ activeShell: "app.shell:default" })
+    preferences.setActiveTheme("app.theme:dark")
+    expect(preferences.state.getSnapshot()).toEqual({
+      activeShell: "app.shell:default",
+      activeTheme: "app.theme:dark",
+    })
+    expect(listener).toHaveBeenCalledTimes(2)
+
+    preferences.setPluginDisabled("ext.demo", true)
+    expect(listener).toHaveBeenCalledTimes(2)
+    expect(preferences.state.getSnapshot()).toEqual({
+      activeShell: "app.shell:default",
+      activeTheme: "app.theme:dark",
+    })
+    expect(preferences.getActiveTheme()).toBe("app.theme:dark")
+    expect(JSON.parse(storage.get("test-preferences")!)).toEqual({
+      disabledPluginIds: ["ext.demo"],
+      activeShell: "app.shell:default",
+      activeTheme: "app.theme:dark",
+    })
+    unsubscribe()
+  })
+
+  it("exposes the preference source through packageRuntime", () => {
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b-preferences",
+        composition: { id: "test.preferences", version: 1, defaults: {}, plugins: [] },
+        plugins: [],
+      },
+      { platformModules: {} }
+    )
+    const packageRuntime = host.runtime.context.get("packageRuntime")!
+    expect(packageRuntime.preferenceState).toBe(host.preferences.state)
+
+    packageRuntime.setActiveTheme?.("app.theme:dark")
+    expect(host.preferences.getActiveTheme()).toBe("app.theme:dark")
+    expect(packageRuntime.preferenceState?.getSnapshot()).toEqual({
+      activeTheme: "app.theme:dark",
+    })
     host.dispose()
   })
 })

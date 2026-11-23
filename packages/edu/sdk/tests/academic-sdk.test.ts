@@ -62,6 +62,39 @@ describe("ProviderError & wrapError", () => {
     const wrappedString = wrapError("plain string error")
     expect(wrappedString.message).toBe("plain string error")
   })
+
+  it("recognizes a structurally identical ProviderError copy from a ZIP bundle", () => {
+    class BundledProviderError extends Error {
+      readonly code: string
+      readonly status?: number
+
+      constructor(code: string, message: string, status?: number) {
+        super(message)
+        this.name = "ProviderError"
+        this.code = code
+        this.status = status
+      }
+    }
+
+    const bundledExpired = new BundledProviderError(
+      ProviderErrorCode.AUTH_SESSION_EXPIRED,
+      "JWXT expired in bundled provider",
+      401
+    )
+    expect(bundledExpired).not.toBeInstanceOf(ProviderError)
+    expect(isProviderError(bundledExpired)).toBe(true)
+    expect(wrapError(bundledExpired)).toBe(bundledExpired)
+    expect(wrapError(bundledExpired).code).toBe(ProviderErrorCode.AUTH_SESSION_EXPIRED)
+
+    const genericError = new Error("not a provider error")
+    ;(genericError as Error & { name: string }).name = "ProviderError"
+    ;(genericError as Error & { code?: string }).code = "NOT_A_PROVIDER_CODE"
+    expect(isProviderError(genericError)).toBe(false)
+    expect(wrapError(genericError).code).toBe(ProviderErrorCode.UNKNOWN)
+
+    expect(isProviderError({ name: "ProviderError", message: "x", code: "UNKNOWN" })).toBe(false)
+    expect(isProviderError(null)).toBe(false)
+  })
 })
 
 describe("SchoolProvider & AcademicSliceMap helpers", () => {

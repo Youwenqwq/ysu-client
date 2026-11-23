@@ -10,7 +10,6 @@ export const MAX_SIDEBAR_WIDTH = 384
 
 export interface AppearanceStoreState {
   readonly colorMode: ColorMode
-  readonly activeTheme: string
   readonly backgroundImage: string
   readonly backgroundStyle: BackgroundStyle
   readonly backgroundOverlayOpacity: number
@@ -58,7 +57,6 @@ export function buildCardStyleCss(cardStyle: CardStyle, cardOpacity: number): st
 export const appearanceStore = defineStore({
   init: (): AppearanceStoreState => ({
     colorMode: "system",
-    activeTheme: "",
     backgroundImage: "",
     backgroundStyle: "overlay",
     backgroundOverlayOpacity: 75,
@@ -76,9 +74,6 @@ export const appearanceStore = defineStore({
   actions: {
     setColorMode(ctx, colorMode: ColorMode) {
       ctx.set((prev) => ({ ...prev, colorMode }))
-    },
-    setActiveTheme(ctx, activeTheme: string) {
-      ctx.set((prev) => ({ ...prev, activeTheme }))
     },
     setBackgroundImage(ctx, backgroundImage: string) {
       ctx.set((prev) => ({ ...prev, backgroundImage }))

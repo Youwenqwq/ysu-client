@@ -25,9 +25,11 @@ export interface OnboardingWizardInject {
   readonly hooks: {
     readonly storeHydrated: ObservableSource<boolean>
     readonly session: ObservableSource<SessionSnapshot>
-    readonly providersRevision: ObservableSource<number>
+    readonly schools: ObservableSource<readonly OnboardingSchoolChoice[]>
+    readonly schoolsLoading: ObservableSource<boolean>
+    readonly schoolsError: ObservableSource<string | null>
   }
-  readonly schools: readonly OnboardingSchoolChoice[]
+  readonly retrySchoolDiscovery: () => void
   readonly isNative: () => boolean
   readonly hasProvider: (schoolId: string) => boolean
   readonly activateSchoolChoice: (school: OnboardingSchoolChoice) => Promise<void>
@@ -45,11 +47,13 @@ export type OnboardingWizardProps = DerivedComponentProps<
 >
 
 export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) => {
-  const { t, locale, useStore, actions, schools } = props
+  const { t, locale, useStore, actions } = props
   const storeHydrated = props.useStoreHydrated()
   const session = props.useSession()
-  const providersRevision = props.useProvidersRevision()
-  void providersRevision
+  const schools = props.useSchools()
+  const schoolsLoading = props.useSchoolsLoading()
+  const schoolsError = props.useSchoolsError()
+  const retrySchoolDiscovery = props.retrySchoolDiscovery
 
   const completed = useStore((state) => state.completed)
   const storedSchoolId = useStore((state) => state.selectedSchoolId)
@@ -179,6 +183,23 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
                 )
               })}
             </div>
+            {schoolsLoading && (
+              <p role="status" className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                <Spinner data-icon="inline-start" />
+                {t("loadingSchools")}
+              </p>
+            )}
+            {schoolsError && (
+              <div
+                role="alert"
+                className="mt-4 flex items-center justify-between gap-3 text-sm text-destructive"
+              >
+                <span>{t("discoveryFailed")}</span>
+                <Button variant="outline" size="sm" onClick={() => retrySchoolDiscovery()}>
+                  {t("retry")}
+                </Button>
+              </div>
+            )}
             {error && (
               <p role="alert" className="mt-4 text-sm text-destructive">
                 {t("installFailed")}

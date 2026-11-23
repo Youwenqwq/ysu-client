@@ -20,6 +20,14 @@ declare module "@orahako/sdk" {
       kind: "single"
       owner: Record<string, never>
     }
+    "test.ui.shared": {
+      kind: "list"
+      owner: Record<string, never>
+    }
+    "test.ui.page-child": {
+      kind: "list"
+      owner: Record<string, never>
+    }
   }
 }
 
@@ -96,6 +104,10 @@ describe("@orahako/runtime-ui", () => {
       { pluginId: baseManifest.id, id: "ocean", name: "Ocean", css: ":root { --accent: cyan }" },
     ])
     expect(snap.shells).toHaveLength(1)
+    const firstPageGeneration = snap.pages[0]!.generation
+    const firstShellGeneration = snap.shells[0]!.generation
+    expect(firstPageGeneration).toBeGreaterThan(0)
+    expect(firstShellGeneration).toBeGreaterThan(0)
 
     runtime.stop(baseManifest.id)
     expect(ui.getSnapshot()).toEqual({
@@ -104,6 +116,11 @@ describe("@orahako/runtime-ui", () => {
       themes: [],
       shells: [],
     })
+
+    runtime.start(baseManifest.id)
+    const restarted = ui.getSnapshot()
+    expect(restarted.pages[0]!.generation).toBeGreaterThan(firstPageGeneration)
+    expect(restarted.shells[0]!.generation).toBeGreaterThan(firstShellGeneration)
     runtime.dispose()
   })
 
@@ -249,6 +266,112 @@ describe("@orahako/runtime-ui", () => {
     expect(pStore.source.getSnapshot()).toEqual({ count: 1 })
     expect(sStore.source.getSnapshot()).toEqual({ collapsed: true })
     expect(slots.getSnapshot().declarations.map((d) => d.name)).toEqual(["root"])
+    runtime.dispose()
+  })
+
+  it("shares claimed shell child slots across shells and rejects implicit duplicates", async () => {
+    const slots = new PluginSlotRegistry()
+    const ui = new PluginUIRegistry()
+    const runtime = new PluginRuntime()
+    runtime.context.set("slots", slots)
+    runtime.context.set("ui", ui)
+
+    const children = { "test.ui.shared": { kind: "list" } } as const
+
+    const shellPlugin = (id: string) =>
+      definePlugin({
+        manifest: {
+          id,
+          name: id,
+          version: "1.0.0",
+          apiVersion: PLUGIN_API_VERSION,
+          kind: "shell",
+          entry: "index.js",
+        },
+        inject: ["ui", "slots"],
+        apply(ctx) {
+          ctx.slots.declare({ name: "test.ui.shared", kind: "list" })
+          ctx.ui.registerShell(
+            { id: "main", name: id, children, declareChildren: false },
+            BlankView
+          )
+        },
+      })
+
+    const alpha = shellPlugin("example.shell.alpha")
+    const beta = shellPlugin("example.shell.beta")
+    runtime.register(alpha, "builtin")
+    runtime.register(beta, "external")
+    runtime.start(alpha.manifest.id)
+    runtime.start(beta.manifest.id)
+
+    expect(ui.getSnapshot().shells).toHaveLength(2)
+    expect(
+      slots.getSnapshot().declarations.filter((d) => d.name === "test.ui.shared")
+    ).toHaveLength(1)
+
+    runtime.stop(alpha.manifest.id)
+    expect(
+      slots.getSnapshot().declarations.some((d) => d.name === "test.ui.shared")
+    ).toBe(true)
+    runtime.stop(beta.manifest.id)
+    expect(
+      slots.getSnapshot().declarations.some((d) => d.name === "test.ui.shared")
+    ).toBe(false)
+
+    const undeclared = definePlugin({
+      manifest: {
+        id: "example.shell.undeclared",
+        name: "Undeclared",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "shell",
+        entry: "index.js",
+      },
+      inject: ["ui"],
+      apply(ctx) {
+        ctx.ui.registerShell(
+          { id: "main", name: "Undeclared", children, declareChildren: false },
+          BlankView
+        )
+      },
+    })
+    runtime.register(undeclared, "external")
+    runtime.start(undeclared.manifest.id)
+    await vi.waitFor(() => expect(runtime.get(undeclared.manifest.id)?.status).toBe("failed"))
+    expect(runtime.get(undeclared.manifest.id)?.error).toContain(
+      "Plugin slot is not declared: test.ui.shared"
+    )
+
+    const duplicatePageChildren = definePlugin({
+      manifest: {
+        id: "example.page.duplicate-children",
+        name: "Duplicate Children",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+      },
+      inject: ["ui"],
+      apply(ctx) {
+        ctx.ui.registerPage(
+          { id: "first", children: { "test.ui.page-child": { kind: "list" } } },
+          BlankView
+        )
+        ctx.ui.registerPage(
+          { id: "second", children: { "test.ui.page-child": { kind: "list" } } },
+          BlankView
+        )
+      },
+    })
+    runtime.register(duplicatePageChildren, "external")
+    runtime.start(duplicatePageChildren.manifest.id)
+    await vi.waitFor(() =>
+      expect(runtime.get(duplicatePageChildren.manifest.id)?.status).toBe("failed")
+    )
+    expect(runtime.get(duplicatePageChildren.manifest.id)?.error).toContain(
+      "Plugin slot already declared: test.ui.page-child"
+    )
     runtime.dispose()
   })
 })

@@ -72,9 +72,6 @@ export const gradesDictionary = defineDictionary({
       degreeWeightedAvg: "学位课加权",
       termWeightedGpa: "本学期加权绩点",
       degreeCourse: "学位课",
-      detail: {
-        sectionInfo: "课程详情",
-      },
       stats: {
         title: "成绩详情与统计",
         description: "查看课程成绩详情、统计、分布与排名",
@@ -200,9 +197,6 @@ export const gradesDictionary = defineDictionary({
       degreeWeightedAvg: "Degree Weighted",
       termWeightedGpa: "Term Weighted GPA",
       degreeCourse: "Degree Course",
-      detail: {
-        sectionInfo: "Course Details",
-      },
       stats: {
         title: "Grade Details & Statistics",
         description: "View details, statistics, distribution, and ranking for a course",

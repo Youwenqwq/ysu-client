@@ -770,6 +770,8 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       .pages.find((p) => p.pluginId === GRADES_PLUGIN_ID && p.id === "index")!
     expect(gradesPage).toMatchObject({
       route: "grades",
+      title: "成绩",
+      titleKey: "navTitle",
       capability: "grades",
       primary: true,
     })
@@ -912,6 +914,17 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       expect(dom.bodyEl.textContent).toContain("99.0")
       expect(dom.bodyEl.textContent).toContain("2 / 45")
     })
+
+    // Course detail renders a single hierarchy: hero score, key metrics, meta rows.
+    const detailHero = dom.bodyEl.findAll((n) => n.hasAttribute("data-grade-detail"))[0]
+    expect(detailHero).toBeDefined()
+    const detailScore = dom.bodyEl.findAll((n) => n.hasAttribute("data-grade-detail-score"))[0]
+    expect(detailScore?.textContent).toBe("96")
+    const detailMetrics = dom.bodyEl.findAll((n) => n.hasAttribute("data-grade-detail-metrics"))[0]
+    expect(detailMetrics?.textContent).toContain("4.8")
+    const detailMeta = dom.bodyEl.findAll((n) => n.hasAttribute("data-grade-detail-meta"))[0]
+    expect(detailMeta?.textContent).toContain("MATH301")
+    expect(detailMeta?.textContent).toContain("专业必修")
 
     // Publish a second grade -> triggers gacha modal & hides unrevealed grade from list until collected
     liveGrades = [...SAMPLE_GRADES]

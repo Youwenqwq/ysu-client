@@ -1,13 +1,17 @@
 import semver from "semver"
 import {
   composeApplication,
+  createObservableSource,
   isCapacitor,
   selectCompatibleRelease,
+  validatePluginManifest,
   type AppComposition,
   type CompositionPlugin,
   type CompositionSource,
   type MarketplaceIndex,
   type MarketplaceRelease,
+  type PluginHostPreferences,
+  type PluginHostPreferenceSnapshot,
   type PluginI18nRegistryService,
   type PluginManifest,
   type PluginNativeService,
@@ -39,16 +43,10 @@ import { PluginRuntime, type RuntimePluginExecutable } from "./runtime"
 
 const DEFAULT_PREFERENCES_KEY = "orahako-plugin-preferences"
 
-export interface PluginHostPreferences {
-  isPluginDisabled(id: string): boolean
-  setPluginDisabled(id: string, disabled: boolean): void
-  getActiveShell(): string | undefined
-  setActiveShell(shellId: string | undefined): void
-}
-
 interface StoredHostPreferences {
   disabledPluginIds: string[]
   activeShell?: string
+  activeTheme?: string
 }
 
 export function createPluginHostPreferences(
@@ -56,6 +54,7 @@ export function createPluginHostPreferences(
 ): PluginHostPreferences {
   let memoryDisabled = new Set<string>()
   let memoryActiveShell: string | undefined
+  let memoryActiveTheme: string | undefined
 
   const read = (): StoredHostPreferences => {
     try {
@@ -72,9 +71,14 @@ export function createPluginHostPreferences(
               "activeShell" in parsed && typeof parsed.activeShell === "string"
                 ? parsed.activeShell
                 : undefined
+            const activeTheme =
+              "activeTheme" in parsed && typeof parsed.activeTheme === "string"
+                ? parsed.activeTheme
+                : undefined
             return {
               disabledPluginIds: disabled,
               ...(activeShell !== undefined ? { activeShell } : {}),
+              ...(activeTheme !== undefined ? { activeTheme } : {}),
             }
           }
         }
@@ -85,12 +89,14 @@ export function createPluginHostPreferences(
     return {
       disabledPluginIds: Array.from(memoryDisabled),
       ...(memoryActiveShell !== undefined ? { activeShell: memoryActiveShell } : {}),
+      ...(memoryActiveTheme !== undefined ? { activeTheme: memoryActiveTheme } : {}),
     }
   }
 
   const write = (next: StoredHostPreferences): void => {
     memoryDisabled = new Set(next.disabledPluginIds)
     memoryActiveShell = next.activeShell
+    memoryActiveTheme = next.activeTheme
     try {
       if (typeof localStorage !== "undefined") {
         localStorage.setItem(storageKey, JSON.stringify(next))
@@ -100,7 +106,21 @@ export function createPluginHostPreferences(
     }
   }
 
+  const snapshot = (preferences: StoredHostPreferences): PluginHostPreferenceSnapshot => ({
+    ...(preferences.activeShell !== undefined ? { activeShell: preferences.activeShell } : {}),
+    ...(preferences.activeTheme !== undefined ? { activeTheme: preferences.activeTheme } : {}),
+  })
+  const stateSource = createObservableSource<PluginHostPreferenceSnapshot>(snapshot(read()))
+  const commit = (next: StoredHostPreferences, publish: boolean): void => {
+    write(next)
+    if (publish) stateSource.set(snapshot(next))
+  }
+
   return {
+    state: {
+      getSnapshot: stateSource.getSnapshot,
+      subscribe: stateSource.subscribe,
+    },
     isPluginDisabled(id: string): boolean {
       return read().disabledPluginIds.includes(id)
     },
@@ -109,17 +129,36 @@ export function createPluginHostPreferences(
       const nextIds = disabled
         ? Array.from(new Set([...current.disabledPluginIds, id]))
         : current.disabledPluginIds.filter((item) => item !== id)
-      write({ ...current, disabledPluginIds: nextIds })
+      // Disabling only affects boot policy; the preference snapshot stays stable.
+      commit({ ...current, disabledPluginIds: nextIds }, false)
     },
     getActiveShell(): string | undefined {
       return read().activeShell
     },
     setActiveShell(shellId: string | undefined): void {
       const current = read()
-      write({
-        disabledPluginIds: current.disabledPluginIds,
-        ...(shellId !== undefined ? { activeShell: shellId } : {}),
-      })
+      commit(
+        {
+          disabledPluginIds: current.disabledPluginIds,
+          ...(shellId !== undefined ? { activeShell: shellId } : {}),
+          ...(current.activeTheme !== undefined ? { activeTheme: current.activeTheme } : {}),
+        },
+        true
+      )
+    },
+    getActiveTheme(): string | undefined {
+      return read().activeTheme
+    },
+    setActiveTheme(themeId: string | undefined): void {
+      const current = read()
+      commit(
+        {
+          disabledPluginIds: current.disabledPluginIds,
+          ...(current.activeShell !== undefined ? { activeShell: current.activeShell } : {}),
+          ...(themeId !== undefined ? { activeTheme: themeId } : {}),
+        },
+        true
+      )
     },
   }
 }
@@ -129,6 +168,7 @@ export interface PluginHostOptions {
   readonly packages?: PluginPackageStore
   readonly preferences?: PluginHostPreferences
   readonly bootFinishDelayMs?: number
+  readonly pluginStartTimeoutMs?: number
 }
 
 function toRuntimeExecutable(plugin: CompositionPlugin): RuntimePluginExecutable {
@@ -152,6 +192,7 @@ export class PluginHost {
   private hostModules?: HostModuleRegistry
   private readonly platformModules: Readonly<Record<string, object>>
   private readonly bootFinishDelayMs: number
+  private readonly pluginStartTimeoutMs: number
   private readonly external = new Map<string, LoadedExternalPlugin>()
   private readonly styleElements = new Map<string, HTMLStyleElement[]>()
   private readonly compositionPlugins: ReadonlyMap<string, CompositionPlugin>
@@ -171,6 +212,7 @@ export class PluginHost {
     this.packages = options.packages ?? new PluginPackageStore()
     this.preferences = options.preferences ?? createPluginHostPreferences()
     this.bootFinishDelayMs = options.bootFinishDelayMs ?? 2000
+    this.pluginStartTimeoutMs = options.pluginStartTimeoutMs ?? 10_000
 
     this.runtime.context.set("packageRuntime", {
       installFromUrl: (url: string, sha256: string, expected: { id: string; version: string }) =>
@@ -185,8 +227,11 @@ export class PluginHost {
       marketUrl: () => this.composition.market?.indexUrl,
       appVersion: () => this.appVersion,
       loadErrors: () => this.loadErrors,
+      preferenceState: this.preferences.state,
       getActiveShell: () => this.preferences.getActiveShell(),
       setActiveShell: (shellId: string | undefined) => this.preferences.setActiveShell(shellId),
+      getActiveTheme: () => this.preferences.getActiveTheme(),
+      setActiveTheme: (themeId: string | undefined) => this.preferences.setActiveTheme(themeId),
       safeMode: () => Boolean(this.recovery?.safeMode),
     })
 
@@ -262,6 +307,13 @@ export class PluginHost {
     if (expected && (manifest.id !== expected.id || manifest.version !== expected.version)) {
       throw new Error("Plugin package identity does not match the market release")
     }
+    if (
+      this.compositionPlugins.has(manifest.id) ||
+      this.runtime.get(manifest.id)?.source === "builtin"
+    ) {
+      throw new Error(`External plugin cannot shadow a composition module: ${manifest.id}`)
+    }
+    this.assertAppCompatible(manifest)
     const previousSnapshot = await this.packages.read(manifest.id)
     const wasDisabled = this.preferences.isPluginDisabled(manifest.id)
     const snapshot = await this.packages.install(bytes)
@@ -356,6 +408,7 @@ export class PluginHost {
     markPluginStarted(id)
     await this.runtime.startAndWait(id)
     this.applyStyles(id)
+    this.loadErrors.delete(id)
     this.preferences.setPluginDisabled(id, false)
   }
 
@@ -378,6 +431,19 @@ export class PluginHost {
     this.hostModules = undefined
     this.packages.close()
     this.runtime.dispose()
+  }
+
+  private assertAppCompatible(manifest: PluginManifest): void {
+    const minimum = manifest.minAppVersion
+    if (minimum === undefined) return
+    if (!semver.valid(this.appVersion)) {
+      throw new Error(`Host app version is not valid SemVer: ${this.appVersion}`)
+    }
+    if (semver.lt(this.appVersion, minimum)) {
+      throw new Error(
+        `Plugin ${manifest.id}@${manifest.version} requires app ${minimum} or newer (current ${this.appVersion})`
+      )
+    }
   }
 
   private availableNativeCapabilities(): readonly string[] {
@@ -496,7 +562,7 @@ export class PluginHost {
     wasDisabled: boolean
   ): Promise<void> {
     this.preferences.setPluginDisabled(id, wasDisabled)
-    if (this.runtime.get(id)) this.runtime.unregister(id)
+    if (this.runtime.get(id)?.source === "external") this.runtime.unregister(id)
     this.external.get(id)?.dispose()
     this.external.delete(id)
     this.removeStyles(id)
@@ -537,16 +603,19 @@ export class PluginHost {
 
   private async mountGroup(ids: readonly string[]): Promise<void> {
     const ordered = this.orderByPackageRequires(ids)
-    for (const id of ordered) {
-      try {
+    const results = await Promise.allSettled(
+      ordered.map(async (id) => {
         markPluginStarted(id)
-        this.runtime.start(id)
-      } catch (error) {
-        this.loadErrors.set(id, errorMessage(error))
+        await this.runtime.startAndWait(id, this.pluginStartTimeoutMs)
+      })
+    )
+    for (const [index, result] of results.entries()) {
+      if (result.status === "rejected") {
+        this.loadErrors.set(ordered[index]!, errorMessage(result.reason))
       }
     }
-    await this.runtime.flush()
     for (const id of ordered) {
+      if (this.loadErrors.has(id)) continue
       const state = this.runtime.get(id)
       if (!state) continue
       if (state.status === "failed") {
@@ -588,7 +657,15 @@ export class PluginHost {
     }
 
     await this.mountGroup(enabledIds)
-    this.validateNativeCapabilityProfile()
+    if (this.recovery.safeMode) {
+      try {
+        this.validateNativeCapabilityProfile()
+      } catch (error) {
+        this.bootstrapError = errorMessage(error)
+      }
+    } else {
+      this.validateNativeCapabilityProfile()
+    }
 
     if (!this.recovery.safeMode) {
       try {
@@ -628,9 +705,13 @@ export class PluginHost {
     this.loadErrors.delete(id)
     const snapshot = await this.packages.read(id)
     if (!snapshot) throw new Error(`Installed plugin not found: ${id}`)
-    if (this.runtime.get(id)?.source === "builtin") {
+    if (this.compositionPlugins.has(id) || this.runtime.get(id)?.source === "builtin") {
       throw new Error(`External plugin cannot shadow a composition module: ${id}`)
     }
+    // Re-validate on every load so packages written for an older host API can
+    // never bypass the current manifest contract after a host upgrade.
+    const manifest = validatePluginManifest(snapshot.manifest)
+    this.assertAppCompatible(manifest)
     const loaded = await loadExternalPlugin(snapshot, {
       hostModules: this.getHostModules(),
     })
@@ -640,14 +721,14 @@ export class PluginHost {
     this.removeStyles(id)
     try {
       this.runtime.register(
-        loaded.manifest,
+        manifest,
         loaded.definition as RuntimePluginExecutable,
         "external",
-        validatePluginConfig(loaded.manifest)
+        validatePluginConfig(manifest)
       )
       if (shouldStart) {
         markPluginStarted(id)
-        await this.runtime.startAndWait(id)
+        await this.runtime.startAndWait(id, this.pluginStartTimeoutMs)
         this.applyStyles(id)
       }
     } catch (error) {

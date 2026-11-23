@@ -47,7 +47,7 @@ packages/bundle/{platform,academic,ysu}
 
 `definePlugin` 的泛型根据 `inject` 静态裁剪 `ctx`。`inject` 是必须存在的 Cordis 根服务；`provides` 要求 `apply` 完成后已通过 `ctx.set` 注册服务；`requires` 是插件 ID 到 SemVer 范围的依赖，不能用 `inject` 替代。服务实例归属提供方 Cordis 作用域，停用、更新或卸载会释放实例与注册项；消费者因服务替换停止后可在新服务就绪时重启。
 
-注册必须在 `apply` 中完成，并通过 disposer/`ctx.effect` 绑定作用域。不要依赖模块级单例、手搓 `while (pending)` 启动轮询或 `as unknown as` 逃避契约。Cordis 的 `effect`、`on`、`once`、`serial`、`parallel`、`waterfall` 构成生命周期与事件边界。
+注册必须在 `apply` 中完成，并通过 disposer/`ctx.effect` 绑定作用域。不要依赖模块级单例、手搓 `while (pending)` 启动轮询或 `as unknown as` 逃避契约。Cordis 的 `effect`、`on`、`once`、`serial`、`parallel`、`waterfall` 构成生命周期与事件边界。启动对异步 `apply` 使用有界等待；超时或停用后，迟到的 continuation 不得重新发布服务或贡献。
 
 通用服务属于 composition 中的普通运行时插件：
 
@@ -60,11 +60,13 @@ packages/bundle/{platform,academic,ysu}
 | `native` | `runtime/native` | 版本化宿主能力 |
 | `assets` / `plugins` | `runtime/packages` | 包内资源和市场安装 |
 
-教务运行时是可选服务：Provider 通过 `ctx.providers.registerProvider(schoolId, factory)` 注册；`SchoolProvider` 以正交 `AcademicSliceMap` 组合认证和业务切片，不恢复单体 Provider。Provider 的能力声明与 `supportedPlugins` 同时决定查询、页面、导航和功能插件是否可用。
+教务运行时是可选服务：Provider 通过 `ctx.providers.registerProvider(schoolId, factory)` 注册；`SchoolProvider` 以正交 `AcademicSliceMap` 组合认证和业务切片，不恢复单体 Provider。Provider 的能力声明与 `supportedPlugins` 同时决定查询、页面、导航和功能插件是否可用。官方组合只内置 YSU 学校元数据；初始化向导会从当前市场的 `provider` 类别发现其他学校，约定插件 ID 为 `<schoolId>.provider`，选择时安装该插件并验证对应 Provider 已注册，不在部署配置中枚举社区学校。
 
 ## Slot、UI 与四份派生 Props
 
-`root`（`single`）是唯一预置 Slot。其他 Slot 由插件扩展 `SlotMap` 并在运行时声明；`children` 只授权当前组件渲染所声明的子 Slot。用 `slots.inject` 等待可选 Slot，并在声明撤销时清理贡献。`single` 与 `keyed` 选最低优先级，同一目标同优先级会报错；`list` 与 `chain` 按 `order` 排列。
+`root`（`single`）是唯一预置 Slot。其他 Slot 由插件扩展 `SlotMap` 并在运行时声明；`children` 只授权当前组件渲染所声明的子 Slot。用 `slots.inject` 等待可选 Slot，并在声明撤销时清理贡献。`single` 与 `keyed` 选最低优先级，同一目标同优先级会报错；`list` 与 `chain` 按 `order` 排列。普通贡献仍遵守单声明者原则；替代 Shell 可对已预声明的公共 `shell.*` Slot 使用 `declareChildren: false`，取得渲染授权而不重复声明。
+
+宿主偏好中的 Shell 与主题选择是同一份 Observable 状态，插件管理器和 `OrahakoApp` 通过它同步切换。主题 CSS 只由宿主按 `activeTheme` 注入；空值表示默认主题，Shell 不再维护第二份主题状态或自行注入另一份全局 CSS。
 
 页面、Shell、设置和 Slot 组件都用注册点声明 `children`、`store`、`inject`，不得读取 `ctx`、业务 React Context、`useSyncExternalStore` 或直接 `useSWR`。唯一 `ui-renderer` 自动派生：
 
@@ -95,7 +97,7 @@ ZIP 不能新增原生模块或权限。新增能力需同步 Kotlin 工厂、�
 
 ## 安装、恢复与信任
 
-内核校验 ZIP 与清单，从 IndexedDB 加载已安装插件，再解析 Blob ESM 模块图。市场选择另检查平台、应用版本、原生能力，下载包校验 SHA-256。更新失败时尝试恢复旧包；启动失败仍保留管理入口；安全模式跳过外部插件。外部包不能以同 ID 覆盖内置插件，也不能覆盖已有的核心服务。
+内核校验 ZIP 与清单，从 IndexedDB 加载已安装插件，再解析 Blob ESM 模块图。侧载与每次加载都会复核 API 和 `minAppVersion`；市场选择另检查平台、应用版本、原生能力，下载包校验 SHA-256。更新失败时尝试恢复旧包；启动失败仍保留管理入口；安全模式跳过外部插件，并允许原生能力组合 mismatch 降级为可诊断状态。外部包不能以同 ID 覆盖内置插件，同 ID 拒绝发生在写库前，失败回滚不会注销内置运行时。
 
 插件可访问凭据、教务会话、个人数据、网络和 Native API。SHA-256 只证明包与索引字节一致，不证明发布者可信；安装与更新必须按同等风险评估。
 

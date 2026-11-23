@@ -587,6 +587,40 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     envOffline.runtime.dispose()
   })
 
+  it("marks sessionExpired for a structurally identical ProviderError copy from a ZIP bundle", async () => {
+    class BundledProviderError extends Error {
+      readonly code: string
+      readonly status?: number
+
+      constructor(code: string, message: string, status?: number) {
+        super(message)
+        this.name = "ProviderError"
+        this.code = code
+        this.status = status
+      }
+    }
+
+    const foreignError = new BundledProviderError("AUTH_SESSION_EXPIRED", "bundled CAS expired")
+    expect(foreignError).not.toBeInstanceOf(ProviderError)
+
+    const env = setupAuthRuntime({
+      initialHref: "/?route=settings",
+      checkAuthStatus: async () => {
+        throw foreignError
+      },
+    })
+    const session = env.runtime.context.get("session")!
+    await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
+    session.setCredential({ schoolId: "demo", credential: "tgc-foreign", username: "20260001" })
+
+    await vi.waitFor(() => {
+      expect(session.getSnapshot().sessionExpired).toBe(true)
+    })
+    expect(session.getSnapshot().isAuthenticated).toBe(true)
+    expect(env.logoutSpy).not.toHaveBeenCalled()
+    env.runtime.dispose()
+  })
+
   it.for(["profile.accountActions", "settings.account"] as const)(
     "renders %s as direct rows in the host card for guests and authenticated users",
     async (slot, { onTestFinished }) => {

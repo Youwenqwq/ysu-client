@@ -233,6 +233,12 @@ export interface PluginSlotService {
    * when that declaration is disposed, and re-runs if `slotName` is redeclared.
    */
   inject<S extends SlotName>(slotName: S, callback: SlotInjectCallback): () => void
+  /**
+   * Claims a slot declaration in the calling plugin's scope. Claims are
+   * reference-counted: an existing declaration with the same kind is shared,
+   * and the slot is removed only after every claim is disposed.
+   */
+  declare(slot: PluginSlotDeclaration): () => void
 }
 
 export interface PluginSlotRegistrySnapshot {
@@ -242,7 +248,6 @@ export interface PluginSlotRegistrySnapshot {
 
 export interface PluginSlotRegistryService extends PluginSlotService {
   readonly state: ObservableSource<PluginSlotRegistrySnapshot>
-  declare(slot: PluginSlotDeclaration): () => void
   getSnapshot(): PluginSlotRegistrySnapshot
   subscribe(listener: () => void): () => void
   select(name: SlotName, itemKey?: string): readonly SlotContribution[]

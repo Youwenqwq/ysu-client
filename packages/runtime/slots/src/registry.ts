@@ -1,10 +1,12 @@
 import { Context } from "@cordisjs/core"
 import {
   createObservableSource,
+  declareContributionChildren,
   definePlugin,
-  isScopedPluginService,
+  isStoreDefinition,
   PLUGIN_API_VERSION,
   PLUGIN_SERVICE_SCOPE,
+  resolvePluginStorage,
   trackPluginRegistration,
   type ChildrenSpec,
   type DerivedComponentProps,
@@ -14,7 +16,6 @@ import {
   type PluginSlotRegistryService,
   type PluginSlotRegistrySnapshot,
   type PluginSlotService,
-  type PluginStorageService,
   type ScopedPluginService,
   type SlotComponent,
   type SlotComponentOwner,
@@ -23,7 +24,6 @@ import {
   type SlotKind,
   type SlotName,
   type SlotRegistrationSpec,
-  type StoreDefinition,
   type StoreInstance,
 } from "@orahako/sdk"
 
@@ -32,37 +32,10 @@ const DEFAULT_PRIORITY = 100
 const DEFAULT_ORDER = 100
 const VALID_SLOT_KINDS = new Set<SlotKind>(["single", "list", "keyed", "chain"])
 
-function isPluginStorageService(value: unknown): value is PluginStorageService {
-  return typeof value === "object" && value !== null && "local" in value && "secure" in value
-}
-
-function resolveRegistrantStorage(
-  ctx: Context,
-  manifest: PluginManifest
-): PluginStorageService | undefined {
-  const raw: unknown = ctx.get("storage")
-  if (!raw) return undefined
-  if (isScopedPluginService(raw)) {
-    const scoped = raw[PLUGIN_SERVICE_SCOPE](ctx, manifest)
-    return isPluginStorageService(scoped) ? scoped : undefined
-  }
-  return isPluginStorageService(raw) ? raw : undefined
-}
-
-function isStoreDefinition(
-  value: unknown
-): value is StoreDefinition<unknown, Record<string, never>> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "create" in value &&
-    typeof value.create === "function"
-  )
-}
-
 interface InternalDeclaration {
   readonly name: SlotName
   readonly kind: SlotKind
+  refs: number
 }
 
 interface InternalContribution {
@@ -97,7 +70,7 @@ export class PluginSlotRegistry
   private batchDirty = false
 
   constructor() {
-    const rootDeclaration: InternalDeclaration = { name: "root", kind: "single" }
+    const rootDeclaration: InternalDeclaration = { name: "root", kind: "single", refs: 1 }
     this.declarations.set("root", rootDeclaration)
     this.stateSource = createObservableSource<PluginSlotRegistrySnapshot>({
       declarations: [{ name: "root", kind: "single" }],
@@ -132,6 +105,8 @@ export class PluginSlotRegistry
       register: registerScoped as PluginSlotService["register"],
       inject: <S extends SlotName>(slotName: S, callback: SlotInjectCallback): (() => void) =>
         trackPluginRegistration(ctx, () => this.injectInternal(slotName, callback, ctx)),
+      declare: (slot: PluginSlotDeclaration): (() => void) =>
+        trackPluginRegistration(ctx, () => this.claimDeclaration(slot)),
     }
   }
 
@@ -144,10 +119,15 @@ export class PluginSlotRegistry
   }
 
   declare = (slot: PluginSlotDeclaration): (() => void) => {
+    return this.createDeclaration(slot)
+  }
+
+  private createDeclaration(slot: PluginSlotDeclaration): () => void {
     this.validateSlotDeclaration(slot.name, slot.kind)
     const registered: InternalDeclaration = {
       name: slot.name,
       kind: slot.kind,
+      refs: 1,
     }
 
     this.withBatch(() => {
@@ -160,9 +140,38 @@ export class PluginSlotRegistry
     return () => {
       if (disposed) return
       disposed = true
-      if (this.declarations.get(slot.name) !== registered) return
-      this.teardownDeclaration(slot.name, registered)
+      this.releaseDeclaration(slot.name, registered)
     }
+  }
+
+  /**
+   * Scoped declaration claim: an existing declaration with the same kind is
+   * shared by reference count so multiple shells can take over public slots.
+   */
+  private claimDeclaration(slot: PluginSlotDeclaration): () => void {
+    const existing = this.declarations.get(slot.name)
+    if (!existing) {
+      return this.createDeclaration(slot)
+    }
+    if (existing.kind !== slot.kind) {
+      throw new Error(
+        `Plugin slot already declared with kind ${existing.kind}: ${slot.name} (requested ${slot.kind})`
+      )
+    }
+    existing.refs += 1
+    let disposed = false
+    return () => {
+      if (disposed) return
+      disposed = true
+      this.releaseDeclaration(slot.name, existing)
+    }
+  }
+
+  private releaseDeclaration(name: SlotName, expected: InternalDeclaration): void {
+    if (this.declarations.get(name) !== expected) return
+    expected.refs -= 1
+    if (expected.refs > 0) return
+    this.teardownDeclaration(name, expected)
   }
 
   select = (name: SlotName, itemKey?: string): readonly SlotContribution[] => {
@@ -283,28 +292,11 @@ export class PluginSlotRegistry
 
     this.assertUnambiguous(declaration, spec.slot, spec.key, spec.priority)
 
-    const childDeclarations: PluginSlotDeclaration[] = []
-    if (spec.children) {
-      const seenChildNames = new Set<string>()
-      for (const [childName, childSpec] of Object.entries(spec.children)) {
-        if (!childSpec) continue
-        if (seenChildNames.has(childName)) {
-          throw new Error(`Duplicate child slot declaration: ${childName}`)
-        }
-        seenChildNames.add(childName)
-        this.validateSlotDeclaration(childName as SlotName, childSpec.kind)
-        childDeclarations.push({
-          name: childName as SlotName,
-          kind: childSpec.kind,
-        })
-      }
-    }
-
     let ownedStore: StoreInstance<unknown, Record<string, never>> | undefined
     let resolvedStore: unknown = spec.store
     if (isStoreDefinition(spec.store)) {
       const storage =
-        registrantCtx && manifest ? resolveRegistrantStorage(registrantCtx, manifest) : undefined
+        registrantCtx && manifest ? resolvePluginStorage(registrantCtx, manifest) : undefined
       ownedStore = spec.store.create(storage)
       resolvedStore = ownedStore
     }
@@ -328,7 +320,7 @@ export class PluginSlotRegistry
       generation: ++this.generation,
     }
 
-    let childDisposers: Array<() => void> = []
+    let disposeChildren: (() => void) | undefined
     let cleanedUp = false
 
     const record: InternalContribution = {
@@ -338,11 +330,9 @@ export class PluginSlotRegistry
         if (cleanedUp) return
         cleanedUp = true
         this.withBatch(() => {
-          const toDispose = childDisposers
-          childDisposers = []
-          for (let i = toDispose.length - 1; i >= 0; i -= 1) {
-            toDispose[i]?.()
-          }
+          const releaseChildren = disposeChildren
+          disposeChildren = undefined
+          releaseChildren?.()
           ownedStore?.dispose()
           ownedStore = undefined
           if (this.contributions.get(contributionKey) === record) {
@@ -357,9 +347,9 @@ export class PluginSlotRegistry
       this.contributions.set(contributionKey, record)
       this.markDirty()
       try {
-        for (const childDecl of childDeclarations) {
-          childDisposers.push(this.declare(childDecl))
-        }
+        disposeChildren = registrantCtx
+          ? declareContributionChildren(registrantCtx, spec.children)
+          : this.declareChildrenDirect(spec.children)
       } catch (error) {
         record.cleanup()
         throw error
@@ -369,6 +359,27 @@ export class PluginSlotRegistry
     return () => {
       record.cleanup()
     }
+  }
+
+  private declareChildrenDirect(children: ChildrenSpec | undefined): () => void {
+    if (!children) return () => {}
+    const disposers: Array<() => void> = []
+    const release = (): void => {
+      for (let i = disposers.length - 1; i >= 0; i -= 1) {
+        disposers[i]?.()
+      }
+      disposers.length = 0
+    }
+    try {
+      for (const [childName, childSpec] of Object.entries(children)) {
+        if (!childSpec) continue
+        disposers.push(this.declare({ name: childName as SlotName, kind: childSpec.kind }))
+      }
+    } catch (error) {
+      release()
+      throw error
+    }
+    return release
   }
 
   private injectInternal(

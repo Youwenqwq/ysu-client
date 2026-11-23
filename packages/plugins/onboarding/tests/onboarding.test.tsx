@@ -21,12 +21,18 @@ import {
   definePlugin,
   PLUGIN_API_VERSION,
   type MarketplaceIndex,
+  type MarketplacePlugin,
+  type ObservableSource,
   type PluginI18nRegistryService,
   type PluginKeyValueStorage,
   type PluginManifest,
   type PluginPackageRuntime,
 } from "@orahako/sdk"
-import { ONBOARDING_PLUGIN_ID, onboardingPlugin } from "../src"
+import {
+  ONBOARDING_PLUGIN_ID,
+  onboardingPlugin,
+  type OnboardingSchoolChoice,
+} from "../src"
 
 class MiniDomNode {
   readonly nodeType: number
@@ -118,15 +124,6 @@ class MiniDomNode {
     if (this.childNodes.length === 0) return this.rawText
     return this.childNodes.map((child) => child.textContent).join("")
   }
-
-  findButtons(): MiniDomNode[] {
-    const result: MiniDomNode[] = []
-    if (this.tagName === "BUTTON") result.push(this)
-    for (const child of this.childNodes) {
-      result.push(...child.findButtons())
-    }
-    return result
-  }
 }
 
 function mountMiniDom() {
@@ -196,6 +193,7 @@ afterEach(async () => {
     activeUnmount = undefined
     await fn()
   }
+  vi.restoreAllMocks()
 })
 
 function createMemoryStorage(): PluginKeyValueStorage {
@@ -211,118 +209,100 @@ function createMemoryStorage(): PluginKeyValueStorage {
   }
 }
 
-describe("@orahako/plugin-onboarding", () => {
-  it("installs market bundle on online school choice, requests native permissions, and persists completed in scoped storage.local", async () => {
-    const dom = mountMiniDom()
-    activeUnmount = dom.unmount
+const YSU_SCHOOL: OnboardingSchoolChoice = {
+  id: "ysu",
+  name: "燕山大学",
+  nameEn: "Yanshan University",
+  builtin: true,
+}
+const ZMU_NAME = "遵义医科大学教务"
 
-    const localBackend = createMemoryStorage()
-    const secureBackend = createMemoryStorage()
-    const runtime = new PluginRuntime()
+let marketSequence = 0
 
-    runtime.context.set(
-      "storage",
-      new NamespacedStorageService({
-        local: localBackend,
-        secure: secureBackend,
-      })
-    )
-    runtime.context.set("http", new StatelessHttpService())
+function providerPlugin(
+  id: string,
+  name: string,
+  categories: readonly string[] = ["provider"]
+): MarketplacePlugin {
+  return {
+    id,
+    name,
+    summary: "",
+    author: "",
+    categories: [...categories],
+    versions: [],
+  }
+}
 
-    const mockMarketIndex: MarketplaceIndex = {
-      schemaVersion: 1,
-      updatedAt: "2026-11-18T00:00:00Z",
-      plugins: [],
-      bundles: [
-        {
-          id: "bundle.zmu",
-          name: "ZMU Recommended",
-          schoolId: "zmu",
-          pluginIds: ["zmu.provider", "zmu.extra"],
-        },
-      ],
-    }
+function marketIndex(plugins: readonly MarketplacePlugin[]): MarketplaceIndex {
+  return {
+    schemaVersion: 1,
+    updatedAt: "2026-11-23T00:00:00Z",
+    plugins: [...plugins],
+  }
+}
 
-    const applyPluginBundle = vi.fn(
-      async (pluginIds: readonly string[]): Promise<PluginManifest> => {
-        if (pluginIds.includes("zmu.provider")) {
-          runtime.context.get("providers")?.registerProvider("zmu", () =>
-            defineSchoolProvider({
-              id: "zmu",
-              name: "遵义医科大学",
-              slices: {},
-              async initialize() {},
-              async reset() {},
-              async logout() {},
-              async relogin() {
-                return false
-              },
-            })
-          )
-        }
-        return {
-          id: pluginIds[0]!,
-          name: "ZMU Provider",
-          version: "1.0.0",
-          apiVersion: PLUGIN_API_VERSION,
-          kind: "provider",
-          entry: "index.js",
-        }
-      }
-    )
+function jsonResponse(payload: unknown): Response {
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  })
+}
 
-    const packageRuntime: PluginPackageRuntime = {
-      installFromUrl: vi.fn(),
-      applyPluginBundle,
-      assetUrl: () => undefined,
-      nativeCapabilities: () => [],
-    }
-    runtime.context.set("packageRuntime", packageRuntime)
+interface TestSchoolHooks {
+  readonly storeHydrated: ObservableSource<boolean>
+  readonly schools: ObservableSource<readonly OnboardingSchoolChoice[]>
+  readonly schoolsLoading: ObservableSource<boolean>
+  readonly schoolsError: ObservableSource<string | null>
+}
 
-    const nativeInvoke = vi.fn(async (_id: string, method: string) => {
-      if (method === "checkPermissions" || method === "checkExactAlarmPermission") {
-        return { granted: false }
-      }
-      if (method === "requestPermissions" || method === "requestExactAlarmPermission") {
-        return { granted: true }
-      }
-      if (method === "checkBatteryOptimization") {
-        return { ignored: false }
-      }
-      if (method === "requestIgnoreBatteryOptimization") {
-        return { ignored: true }
-      }
-      return {}
+interface TestInjected {
+  readonly hooks: TestSchoolHooks
+  retrySchoolDiscovery(): void
+  activateSchoolChoice(school: OnboardingSchoolChoice): Promise<void>
+  requestNotificationPermission(): Promise<boolean>
+  requestExactAlarmPermission(): Promise<boolean>
+  requestBatteryOptimizationExemption(): Promise<boolean>
+}
+
+interface TestStoreInstance {
+  readonly hydrated: { getSnapshot(): boolean }
+  readonly source: { getSnapshot(): { completed: boolean; selectedSchoolId: string | null } }
+  readonly actions: { complete(): void; selectSchool(id: string): void }
+}
+
+function createOnboardingEnv(options: {
+  schools?: readonly OnboardingSchoolChoice[]
+  index?: MarketplaceIndex
+  fetch?: () => Promise<Response>
+  registerOnlineProviders?: readonly string[]
+}) {
+  const dom = mountMiniDom()
+  const localBackend = createMemoryStorage()
+  const secureBackend = createMemoryStorage()
+  const runtime = new PluginRuntime()
+
+  runtime.context.set(
+    "storage",
+    new NamespacedStorageService({
+      local: localBackend,
+      secure: secureBackend,
     })
+  )
+  runtime.context.set("http", new StatelessHttpService())
 
-    const nativeService = createNativeService({
-      isNative: () => true,
-      loadCapabilities: async () => [],
-      capabilities: {
-        list: () => [],
-        has: () => true,
-        acquire: async () => async () => {},
-        invoke: nativeInvoke as never,
-      },
-    })
-    runtime.context.set("native", nativeService)
-
-    const builtinProviderPlugin = definePlugin({
-      manifest: {
-        id: "ysu.provider",
-        name: "YSU",
-        version: "1.0.0",
-        apiVersion: PLUGIN_API_VERSION,
-        kind: "provider",
-        entry: "index.js",
-        inject: ["providers"],
-      },
-      inject: ["providers"] as const,
-      apply(ctx) {
-        ctx.providers.registerProvider("ysu", () =>
+  const registerOnlineProviders = options.registerOnlineProviders ?? []
+  const applyPluginBundle = vi.fn(
+    async (pluginIds: readonly string[], _index: MarketplaceIndex): Promise<PluginManifest> => {
+      const primary = pluginIds[0]!
+      const schoolId = primary.endsWith(".provider")
+        ? primary.slice(0, -".provider".length)
+        : primary
+      if (registerOnlineProviders.includes(primary)) {
+        runtime.context.get("providers")?.registerProvider(schoolId, () =>
           defineSchoolProvider({
-            id: "ysu",
-            name: "燕山大学",
+            id: schoolId,
+            name: schoolId,
             slices: {},
             async initialize() {},
             async reset() {},
@@ -332,113 +312,300 @@ describe("@orahako/plugin-onboarding", () => {
             },
           })
         )
-      },
-    })
-
-    for (const p of [
-      slotRegistryPlugin,
-      i18nRegistryPlugin,
-      providerRegistryRuntimePlugin,
-      sessionRuntimePlugin,
-      providerRuntimePlugin,
-      builtinProviderPlugin,
-    ]) {
-      runtime.register(p, "builtin")
-      runtime.start(p.manifest.id)
+      }
+      return {
+        id: primary,
+        name: "Market Provider",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "provider",
+        entry: "index.js",
+      }
     }
+  )
 
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify(mockMarketIndex), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })
+  const packageRuntime: PluginPackageRuntime = {
+    installFromUrl: vi.fn(),
+    applyPluginBundle,
+    assetUrl: () => undefined,
+    nativeCapabilities: () => [],
+  }
+  runtime.context.set("packageRuntime", packageRuntime)
+
+  const nativeInvoke = vi.fn(async (_id: string, method: string) => {
+    if (method === "checkPermissions" || method === "checkExactAlarmPermission") {
+      return { granted: false }
+    }
+    if (method === "requestPermissions" || method === "requestExactAlarmPermission") {
+      return { granted: true }
+    }
+    if (method === "checkBatteryOptimization") {
+      return { ignored: false }
+    }
+    if (method === "requestIgnoreBatteryOptimization") {
+      return { ignored: true }
+    }
+    return {}
+  })
+
+  const nativeService = createNativeService({
+    isNative: () => true,
+    loadCapabilities: async () => [],
+    capabilities: {
+      list: () => [],
+      has: () => true,
+      acquire: async () => async () => {},
+      invoke: nativeInvoke as never,
+    },
+  })
+  runtime.context.set("native", nativeService)
+
+  const builtinProviderPlugin = definePlugin({
+    manifest: {
+      id: "ysu.provider",
+      name: "YSU",
+      version: "1.0.0",
+      apiVersion: PLUGIN_API_VERSION,
+      kind: "provider",
+      entry: "index.js",
+      inject: ["providers"],
+    },
+    inject: ["providers"] as const,
+    apply(ctx) {
+      ctx.providers.registerProvider("ysu", () =>
+        defineSchoolProvider({
+          id: "ysu",
+          name: "燕山大学",
+          slices: {},
+          async initialize() {},
+          async reset() {},
+          async logout() {},
+          async relogin() {
+            return false
+          },
+        })
+      )
+    },
+  })
+
+  for (const p of [
+    slotRegistryPlugin,
+    i18nRegistryPlugin,
+    providerRegistryRuntimePlugin,
+    sessionRuntimePlugin,
+    providerRuntimePlugin,
+    builtinProviderPlugin,
+  ]) {
+    runtime.register(p, "builtin")
+    runtime.start(p.manifest.id)
+  }
+
+  const fetchMock = options.fetch
+    ? vi.fn(options.fetch)
+    : vi.fn(async () => jsonResponse(options.index ?? marketIndex([])))
+  vi.spyOn(globalThis, "fetch").mockImplementation(fetchMock as unknown as typeof fetch)
+
+  const marketUrl = `https://market.example/${++marketSequence}/plugins.json`
+  runtime.register(onboardingPlugin, "builtin", {
+    marketUrl,
+    schools: options.schools ?? [YSU_SCHOOL],
+  })
+  runtime.start(ONBOARDING_PLUGIN_ID)
+
+  const slots = runtime.context.get("slots") as PluginSlotRegistry
+  const disposeOverlay = slots.declare({ name: "shell.overlay", kind: "list" })
+  const entry = slots.select("shell.overlay")[0]!
+  const injected = entry.inject!(runtime.context) as TestInjected
+  const storeInstance = entry.store as TestStoreInstance
+
+  let runtimeDisposed = false
+  const disposeRuntime = () => {
+    if (runtimeDisposed) return
+    runtimeDisposed = true
+    runtime.dispose()
+  }
+
+  return {
+    dom,
+    runtime,
+    localBackend,
+    fetchMock,
+    applyPluginBundle,
+    slots,
+    entry,
+    injected,
+    storeInstance,
+    disposeRuntime,
+    async cleanup() {
+      disposeOverlay()
+      disposeRuntime()
+      await dom.unmount()
+    },
+  }
+}
+
+describe("@orahako/plugin-onboarding", () => {
+  it("merges market provider plugins with configured schools and renders them through derived hooks", async () => {
+    const marketDeferred = Promise.withResolvers<Response>()
+    const env = createOnboardingEnv({ fetch: () => marketDeferred.promise })
+    activeUnmount = env.cleanup
+
+    expect(env.slots.select("shell.overlay")).toHaveLength(1)
+    await vi.waitFor(() => expect(env.storeInstance.hydrated.getSnapshot()).toBe(true))
+    await vi.waitFor(() =>
+      expect(env.runtime.context.get("session")?.getSnapshot().hasHydrated).toBe(true)
     )
 
-    runtime.register(onboardingPlugin, "builtin", {
-      marketUrl: "https://market.example/plugins.json",
-      schools: [
-        { id: "ysu", name: "燕山大学", nameEn: "Yanshan University", builtin: true },
-        {
-          id: "zmu",
-          name: "遵义医科大学",
-          nameEn: "Zunyi Medical University",
-          bundleId: "bundle.zmu",
-        },
-      ],
+    const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
+    await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
+
+    expect(env.dom.container.textContent).toContain("初次设置")
+    expect(env.dom.container.textContent).toContain("燕山大学")
+    expect(env.dom.container.textContent).not.toContain(ZMU_NAME)
+    expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(true)
+
+    await act(async () => {
+      marketDeferred.resolve(
+        jsonResponse(
+          marketIndex([
+            providerPlugin("ysu.provider", "YSU Online"),
+            providerPlugin("zmu.provider", ZMU_NAME),
+            providerPlugin("zmu.essentials", "ZMU Essentials", ["feature"]),
+            providerPlugin("provider", "Nameless Provider"),
+          ])
+        )
+      )
+      await vi.waitFor(() => expect(env.injected.hooks.schools.getSnapshot()).toHaveLength(2))
     })
-    runtime.start(ONBOARDING_PLUGIN_ID)
 
-    const slots = runtime.context.get("slots") as PluginSlotRegistry
-    const i18n = runtime.context.get("i18n") as PluginI18nRegistryService
+    expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(false)
+    expect(env.injected.hooks.schoolsError.getSnapshot()).toBeNull()
+    expect(env.injected.hooks.schools.getSnapshot()).toEqual([
+      YSU_SCHOOL,
+      { id: "zmu", name: ZMU_NAME, bundleId: "zmu.provider" },
+    ])
+    expect(env.dom.container.textContent).toContain(ZMU_NAME)
+    expect(env.dom.container.textContent).toContain("在线插件")
+  })
 
-    // Deferred until shell.overlay is declared
-    expect(slots.select("shell.overlay")).toEqual([])
-    const disposeOverlay = slots.declare({ name: "shell.overlay", kind: "list" })
-    expect(slots.select("shell.overlay")).toHaveLength(1)
+  it("keeps configured schools and exposes a retry when market discovery fails", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("market offline"))
+      .mockResolvedValueOnce(
+        jsonResponse(marketIndex([providerPlugin("zmu.provider", ZMU_NAME)]))
+      )
+    const env = createOnboardingEnv({ fetch: fetchMock })
+    activeUnmount = env.cleanup
+
+    await vi.waitFor(() => {
+      expect(env.injected.hooks.schoolsError.getSnapshot()).toBe("market offline")
+      expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(false)
+    })
+    expect(env.injected.hooks.schools.getSnapshot()).toEqual([YSU_SCHOOL])
+
+    env.injected.retrySchoolDiscovery()
+
+    await vi.waitFor(() => {
+      expect(env.injected.hooks.schools.getSnapshot()).toHaveLength(2)
+      expect(env.injected.hooks.schoolsError.getSnapshot()).toBeNull()
+      expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(false)
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it("installs the matching provider plugin on online selection and verifies registration", async () => {
+    const env = createOnboardingEnv({
+      index: marketIndex([
+        providerPlugin("zmu.provider", ZMU_NAME),
+        providerPlugin("ghost.provider", "Ghost University"),
+      ]),
+      registerOnlineProviders: ["zmu.provider"],
+    })
+    activeUnmount = env.cleanup
 
     await vi.waitFor(() =>
-      expect(runtime.context.get("session")?.getSnapshot().hasHydrated).toBe(true)
+      expect(env.injected.hooks.schools.getSnapshot()).toHaveLength(3)
+    )
+    const schools = env.injected.hooks.schools.getSnapshot()
+    const zmu = schools.find((school) => school.id === "zmu")!
+    const ghost = schools.find((school) => school.id === "ghost")!
+    const ysu = schools.find((school) => school.id === "ysu")!
+
+    await env.injected.activateSchoolChoice(zmu)
+
+    expect(env.applyPluginBundle).toHaveBeenCalledTimes(1)
+    expect(env.applyPluginBundle.mock.calls[0]?.[0]).toEqual(["zmu.provider"])
+    expect(env.runtime.context.get("provider")?.getSnapshot().schoolId).toBe("zmu")
+
+    await expect(env.injected.activateSchoolChoice(ghost)).rejects.toThrow(
+      "School provider is not registered: ghost"
     )
 
-    const entry = slots.select("shell.overlay")[0]!
-    const storeInstance = entry.store as {
-      hydrated: { getSnapshot(): boolean }
-      source: { getSnapshot(): { completed: boolean; selectedSchoolId: string | null } }
-      actions: { complete(): void; selectSchool(id: string): void }
-    }
-    await vi.waitFor(() => expect(storeInstance.hydrated.getSnapshot()).toBe(true))
+    await env.injected.activateSchoolChoice(ysu)
+    expect(env.applyPluginBundle).toHaveBeenCalledTimes(2)
+    expect(env.runtime.context.get("provider")?.getSnapshot().schoolId).toBe("ysu")
+  })
 
-    await dom.render(<ContributionOutlet entry={entry} slots={slots} i18n={i18n} />)
-    expect(dom.container.textContent).toContain("初次设置")
-    expect(dom.container.textContent).toContain("选择学校")
-    expect(dom.container.textContent).toContain("在线插件")
+  it("ignores market discovery results that arrive after the plugin scope is disposed", async () => {
+    const marketDeferred = Promise.withResolvers<Response>()
+    const env = createOnboardingEnv({ fetch: () => marketDeferred.promise })
+    activeUnmount = env.cleanup
 
-    // Test activateSchoolChoice via injected prop (simulating ZMU selection & Continue)
-    const injected = entry.inject!(runtime.context) as {
-      activateSchoolChoice: (s: {
-        id: string
-        name: string
-        bundleId?: string
-        builtin?: boolean
-      }) => Promise<void>
-      requestNotificationPermission: () => Promise<boolean>
-      requestExactAlarmPermission: () => Promise<boolean>
-      requestBatteryOptimizationExemption: () => Promise<boolean>
-    }
+    expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(true)
+
+    env.disposeRuntime()
+    marketDeferred.resolve(
+      jsonResponse(marketIndex([providerPlugin("zmu.provider", ZMU_NAME)]))
+    )
+    const tick = Promise.withResolvers<void>()
+    setTimeout(tick.resolve, 0)
+    await tick.promise
+
+    expect(env.injected.hooks.schools.getSnapshot()).toEqual([YSU_SCHOOL])
+    expect(env.injected.hooks.schoolsError.getSnapshot()).toBeNull()
+    expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(true)
+  })
+
+  it("completes builtin YSU onboarding, requests native permissions, and persists completion", async () => {
+    const env = createOnboardingEnv({})
+    activeUnmount = env.cleanup
+
+    await vi.waitFor(() =>
+      expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(false)
+    )
+    await vi.waitFor(() => expect(env.storeInstance.hydrated.getSnapshot()).toBe(true))
+    await vi.waitFor(() =>
+      expect(env.runtime.context.get("session")?.getSnapshot().hasHydrated).toBe(true)
+    )
+
+    const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
+    await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
+    expect(env.dom.container.textContent).toContain("初次设置")
+    expect(env.dom.container.textContent).toContain("选择学校")
+
+    await env.injected.activateSchoolChoice(YSU_SCHOOL)
+    expect(env.runtime.context.get("provider")?.getSnapshot().schoolId).toBe("ysu")
+    expect(env.applyPluginBundle).not.toHaveBeenCalled()
 
     await act(async () => {
-      await injected.activateSchoolChoice({
-        id: "zmu",
-        name: "遵义医科大学",
-        bundleId: "bundle.zmu",
-      })
-      storeInstance.actions.selectSchool("zmu")
+      env.storeInstance.actions.selectSchool("ysu")
     })
 
-    expect(applyPluginBundle).toHaveBeenCalledWith(["zmu.provider", "zmu.extra"], mockMarketIndex)
-    expect(runtime.context.get("provider")?.getSnapshot().schoolId).toBe("zmu")
-
-    await expect(injected.requestNotificationPermission()).resolves.toBe(true)
-    await expect(injected.requestExactAlarmPermission()).resolves.toBe(true)
-    await expect(injected.requestBatteryOptimizationExemption()).resolves.toBe(true)
+    await expect(env.injected.requestNotificationPermission()).resolves.toBe(true)
+    await expect(env.injected.requestExactAlarmPermission()).resolves.toBe(true)
+    await expect(env.injected.requestBatteryOptimizationExemption()).resolves.toBe(true)
 
     await act(async () => {
-      storeInstance.actions.complete()
+      env.storeInstance.actions.complete()
     })
+    expect(env.dom.container.textContent).toBe("")
 
-    expect(dom.container.textContent).toBe("")
     await vi.waitFor(async () => {
-      const persisted = await localBackend.getItem(
+      const persisted = await env.localBackend.getItem(
         formatPluginStorageKey(ONBOARDING_PLUGIN_ID, "onboarding")
       )
       expect(persisted).toContain('"completed":true')
     })
-
-    expect(fetchSpy).toHaveBeenCalled()
-    fetchSpy.mockRestore()
-    disposeOverlay()
-    activeUnmount = undefined
-    await dom.unmount()
-    runtime.dispose()
   })
 })

@@ -36,8 +36,28 @@ export class ProviderError extends Error {
   }
 }
 
+const PROVIDER_ERROR_CODES: ReadonlySet<string> = new Set(Object.values(ProviderErrorCode))
+
+function isProviderErrorCode(value: unknown): value is ProviderErrorCode {
+  return typeof value === "string" && PROVIDER_ERROR_CODES.has(value)
+}
+
+/**
+ * Recognizes `ProviderError` values regardless of which copy of this package
+ * produced them. ZIP-bundled providers ship their own SDK copy, so an
+ * `instanceof` check alone would drop a real `AUTH_SESSION_EXPIRED` (or any
+ * other code) at the host boundary. Non-`ProviderError` instances are rejected
+ * structurally by `name`, `message`, and `code`.
+ */
 export function isProviderError(error: unknown): error is ProviderError {
-  return error instanceof ProviderError
+  if (error instanceof ProviderError) return true
+  if (!(error instanceof Error)) return false
+  const candidate = error as Error & { readonly code?: unknown }
+  return (
+    candidate.name === "ProviderError" &&
+    typeof candidate.message === "string" &&
+    isProviderErrorCode(candidate.code)
+  )
 }
 
 export function wrapError(error: unknown): ProviderError {

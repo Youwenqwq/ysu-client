@@ -7,8 +7,13 @@ import {
   type PluginUIServiceSnapshot,
   type ShellOwnerProps,
   type SlotComponent,
+  type SlotName,
 } from "@orahako/sdk"
-import { BackLayerProvider, type RegisterBackLayer } from "@orahako/ui-primitives"
+import {
+  BackLayerProvider,
+  Toaster,
+  type RegisterBackLayer,
+} from "@orahako/ui-primitives"
 import manifest from "../manifest.json"
 
 const communityDictionary = defineDictionary({
@@ -24,6 +29,16 @@ const communityDictionary = defineDictionary({
   },
 })
 
+/** Public shell slots shared by every replacement shell. */
+const shellChildren = {
+  "shell.gate": { kind: "chain" },
+  "shell.banner": { kind: "list" },
+  "shell.activity": { kind: "list" },
+  "shell.header.actions": { kind: "list" },
+  "shell.sidebar.footer": { kind: "list" },
+  "shell.overlay": { kind: "list" },
+} as const
+
 interface CommunityShellInject {
   readonly hooks: {
     readonly ui: ObservableSource<PluginUIServiceSnapshot>
@@ -35,45 +50,56 @@ interface CommunityShellInject {
 type CommunityShellProps = DerivedComponentProps<
   ShellOwnerProps,
   typeof communityDictionary,
-  undefined,
+  typeof shellChildren,
   undefined,
   CommunityShellInject
 >
+
+const sectionStyle = { minWidth: 0, padding: 20 } as const
 
 const CommunityShell: SlotComponent<CommunityShellProps> = ({
   children,
   selectShell,
   t,
+  renderSlot,
+  renderSlotChain,
   useUi,
   openPage,
   registerBackHandler,
 }: CommunityShellProps) => {
   const { navigation } = useUi()
-  return (
-    <BackLayerProvider registerBackHandler={registerBackHandler}>
-      <main
+  const bannerNode = renderSlot("shell.banner")
+  const activityNode = renderSlot("shell.activity")
+  const headerActionsNode = renderSlot("shell.header.actions")
+  const sidebarFooterNode = renderSlot("shell.sidebar.footer")
+  const overlayNode = renderSlot("shell.overlay")
+
+  const shellBody = (
+    <main
+      style={{
+        minHeight: "100svh",
+        background: "#101114",
+        color: "#f4f4f5",
+        fontFamily: "system-ui",
+      }}
+    >
+      <header
         style={{
-          minHeight: "100svh",
-          background: "#101114",
-          color: "#f4f4f5",
-          fontFamily: "system-ui",
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          padding: "16px 20px",
+          borderBottom: "1px solid #303038",
         }}
       >
-        <header
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            padding: "16px 20px",
-            borderBottom: "1px solid #303038",
-          }}
-        >
-          <strong>{t("shell.title")}</strong>
+        <strong>{t("shell.title")}</strong>
+        {activityNode}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+          {headerActionsNode}
           <button
             type="button"
             onClick={() => selectShell()}
             style={{
-              marginLeft: "auto",
               color: "inherit",
               background: "transparent",
               border: "1px solid #3f3f46",
@@ -84,15 +110,25 @@ const CommunityShell: SlotComponent<CommunityShellProps> = ({
           >
             {t("shell.restore")}
           </button>
-        </header>
-        <div
+        </div>
+      </header>
+      {bannerNode}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "180px minmax(0, 1fr)",
+          minHeight: "calc(100svh - 62px)",
+        }}
+      >
+        <nav
           style={{
-            display: "grid",
-            gridTemplateColumns: "180px minmax(0, 1fr)",
-            minHeight: "calc(100svh - 62px)",
+            display: "flex",
+            flexDirection: "column",
+            padding: 16,
+            borderRight: "1px solid #303038",
           }}
         >
-          <nav style={{ padding: 16, borderRight: "1px solid #303038" }}>
+          <div style={{ flex: 1 }}>
             {navigation.map((item) => (
               <button
                 key={`${item.pluginId}:${item.id}`}
@@ -114,25 +150,39 @@ const CommunityShell: SlotComponent<CommunityShellProps> = ({
                 {item.title ?? item.titleKey ?? item.id}
               </button>
             ))}
-          </nav>
-          <section style={{ minWidth: 0, padding: 20 }}>
-            {children ?? <p>{t("shell.empty")}</p>}
-          </section>
-        </div>
-      </main>
+          </div>
+          {sidebarFooterNode}
+        </nav>
+        <section style={sectionStyle}>
+          {children ?? <p>{t("shell.empty")}</p>}
+        </section>
+      </div>
+    </main>
+  )
+
+  return (
+    <BackLayerProvider registerBackHandler={registerBackHandler}>
+      {renderSlotChain("shell.gate", shellBody)}
+      {overlayNode}
+      <Toaster theme="dark" />
     </BackLayerProvider>
   )
 }
 
 export default definePlugin({
   manifest: validatePluginManifest(manifest),
-  inject: ["ui", "router"] as const,
+  inject: ["ui", "slots", "router"] as const,
   apply(ctx) {
+    for (const [name, spec] of Object.entries(shellChildren)) {
+      ctx.slots.declare({ name: name as SlotName, kind: spec.kind })
+    }
     ctx.ui.registerShell(
       {
         id: "community",
         name: "Community Shell",
         dictionary: communityDictionary,
+        children: shellChildren,
+        declareChildren: false,
         inject: (): CommunityShellInject => ({
           hooks: { ui: ctx.ui.state },
           openPage: (pluginId: string, pageId: string) => ctx.router.push({ pluginId, pageId }),

@@ -291,14 +291,9 @@ export function CourseActivityModal({
 
   return (
     <ResponsiveModal open={open} onOpenChange={onOpenChange}>
-      <ResponsiveModalContent className="sm:max-w-md">
+      <ResponsiveModalContent className="sm:max-w-md" aria-describedby={undefined}>
         <ResponsiveModalHeader>
           <ResponsiveModalTitle>{course?.name || t("activity.title")}</ResponsiveModalTitle>
-          <ResponsiveModalDescription>
-            {course
-              ? [course.teacher, course.classroom, course.weeks || null].filter(Boolean).join(" · ")
-              : ""}
-          </ResponsiveModalDescription>
           {course && (
             <div className="flex flex-wrap items-center justify-center gap-1 pt-1">
               {course.courseType && (

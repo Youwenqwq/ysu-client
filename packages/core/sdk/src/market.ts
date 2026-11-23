@@ -192,6 +192,9 @@ export function validateMarketplaceIndex(input: unknown): MarketplaceIndex {
         (rawRelease.inject !== undefined && !isNonEmptyStringArray(rawRelease.inject)) ||
         (rawRelease.provides !== undefined && !isNonEmptyStringArray(rawRelease.provides)) ||
         (rawRelease.requires !== undefined && !isSemverRangeRecord(rawRelease.requires)) ||
+        (rawRelease.minAppVersion !== undefined &&
+          (typeof rawRelease.minAppVersion !== "string" ||
+            !semver.valid(rawRelease.minAppVersion))) ||
         typeof rawRelease.zipUrl !== "string" ||
         typeof rawRelease.sha256 !== "string" ||
         !/^[a-f0-9]{64}$/.test(rawRelease.sha256) ||

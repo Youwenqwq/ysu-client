@@ -8,7 +8,6 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react"
-import { LayoutGrid } from "lucide-react"
 import { toast } from "sonner"
 import type { Translator } from "@orahako/sdk"
 import { cn, useIsMobile } from "@orahako/ui-primitives"
@@ -90,17 +89,23 @@ interface BubbleLayout {
   readonly placement: "top" | "bottom"
 }
 
-export function WidgetAssistantAvatar({ className }: { readonly className?: string }): ReactNode {
+export function WidgetAssistantAvatar({
+  src,
+  className,
+}: {
+  readonly src: string
+  readonly className?: string
+}): ReactNode {
   return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "inline-flex items-center justify-center rounded-full bg-gradient-to-br from-primary/20 via-primary/10 to-accent text-primary shadow-md ring-1 ring-primary/25",
-        className
-      )}
-    >
-      <LayoutGrid className="size-1/2" />
-    </span>
+    // Package assets may be Blob URLs and packages must not import next/image.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      draggable={false}
+      data-widget-assistant-avatar=""
+      className={cn("pointer-events-none object-contain", className)}
+    />
   )
 }
 
@@ -109,6 +114,7 @@ export interface WidgetDiscoveryProps {
   readonly hidden: boolean
   readonly position: WidgetAssistantPosition | null
   readonly suspended?: boolean
+  readonly assistantSrc: string
   readonly widgetsSettingsHref: string
   readonly t: Translator<ScheduleDictionary>
   readonly onSetHidden: (hidden: boolean) => void
@@ -122,6 +128,7 @@ export function WidgetDiscovery({
   hidden,
   position,
   suspended = false,
+  assistantSrc,
   widgetsSettingsHref,
   t,
   onSetHidden,
@@ -511,7 +518,7 @@ export function WidgetDiscovery({
           departing && "translate-x-12 translate-y-6 scale-0 opacity-0 duration-700"
         )}
       >
-        <WidgetAssistantAvatar className="pointer-events-none size-full" />
+        <WidgetAssistantAvatar src={assistantSrc} className="size-full drop-shadow-md" />
       </button>
     </div>
   )
