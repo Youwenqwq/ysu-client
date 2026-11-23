@@ -2,15 +2,15 @@
 
 面向大学通用线上服务的第三方客户端，构建于 **Cordis** 插件架构之上。内核只负责组合、ZIP/Cordis 生命周期、恢复和通用 Native bridge；通用应用服务、可选教务运行时、燕大 Provider 与官方界面都由可替换插件提供。
 
-文档：[插件组合架构](PLUGIN_ARCHITECTURE.md) · [API v3 SDK](packages/core/sdk/README.md)
+文档：[插件组合架构](PLUGIN_ARCHITECTURE.md) · [API v1 SDK](packages/core/sdk/README.md)
 
 ## 开发者预览
 
-本项目处于 0.x 开发阶段。API v3、清单格式、Slot、Provider 与运行时行为可能发生不兼容变更；插件作者应约束 `apiVersion` 与 `minAppVersion`。本项目与燕山大学官方无任何关联。
+本项目处于 0.x 开发阶段。API v1、清单格式、Slot、Provider 与运行时行为可能发生不兼容变更；插件作者应约束 `apiVersion` 与 `minAppVersion`。本项目与燕山大学官方无任何关联。
 
 ## 架构速览
 
-API v3 将通用契约与内核、运行时服务、教务能力、客户端 UI、业务插件和应用组合分别放在 `packages/{core,runtime,edu,client,plugins,bundle}`。`app/layout.tsx`、`app/page.tsx` 与 `app/manifest.ts` 提供静态根入口；运行时页面由 `ctx.router` 通过根路径查询参数定位，例如 `/?route=schedule`。
+API v1 将通用契约与内核、运行时服务、教务能力、客户端 UI、业务插件和应用组合分别放在 `packages/{core,runtime,edu,client,plugins,bundle}`。`app/layout.tsx`、`app/page.tsx` 与 `app/manifest.ts` 提供静态根入口；运行时页面由 `ctx.router` 通过根路径查询参数定位，例如 `/?route=schedule`。
 
 默认应用按 `platform → academic → ysu` 叠加三个 Bundle。非教务应用只需平台 Bundle，不依赖 Provider、会话或教务查询；燕大组合在教务 Bundle 之上加入燕大 Provider 与应用配置。
 
@@ -20,7 +20,7 @@ API v3 将通用契约与内核、运行时服务、教务能力、客户端 UI�
 
 从 [GitHub Releases](https://github.com/Youwenqwq/ysu-client/releases) 下载最新 APK。Web 端是同一代码库的静态导出 PWA；原生端通过 Capacitor 打包，支持 OTA 热更新与外壳版本检测。应用内插件管理器可以安装市场包或可信来源的本地 ZIP。插件与应用同权，可访问凭据、会话、网络与 Native 能力，请只安装可信来源。
 
-API v3 不兼容旧市场 ZIP。API v2 插件须迁移源码、重新打包并发布，不能直接加载。
+API v1 不兼容旧市场 ZIP。其他 API 版本的插件须迁移源码、重新打包并发布，不能直接加载。官方市场索引与 ZIP 由 [`Youwenqwq/orahako-plugin-registry`](https://github.com/Youwenqwq/orahako-plugin-registry) 通过 GitHub Raw 分发，不再依赖 EdgeOne 插件接口。
 
 ### 数据与兼容性
 
@@ -41,7 +41,7 @@ pnpm run build
 pnpm plugin pack <plugin-directory> [output.zip]
 ```
 
-外部包的 API v3 清单、共享模块 `PLATFORM_MODULES`、打包与发布流程见 [SDK 指南](packages/core/sdk/README.md)。
+外部包的 API v1 清单、共享模块 `PLATFORM_MODULES`、打包与发布流程见 [SDK 指南](packages/core/sdk/README.md)。
 
 Android 组合验证：
 

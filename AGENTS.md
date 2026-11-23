@@ -1,6 +1,6 @@
 # AGENTS.md
 
-本文件面向在本仓库工作的 AI agent。产品说明见 [README.md](README.md)，插件边界见 [PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md)，清单、SDK 示例和包格式见 [API v3 SDK](packages/core/sdk/README.md)。
+本文件面向在本仓库工作的 AI agent。产品说明见 [README.md](README.md)，插件边界见 [PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md)，清单、SDK 示例和包格式见 [API v1 SDK](packages/core/sdk/README.md)。
 
 当前项目处于开发阶段，请以项目代码，架构实现之 “干净，优雅” 为首要目标，而不是尝试兜底与向前兼容。为了达到这个首要目标，你有足够高的自由度，可将其作为自己的项目看待。
 
@@ -11,7 +11,7 @@
 - **状态**：0.x 开发阶段。插件 API、清单、Slot / Provider 契约和共享模块导出均为 pre-stable；修改公共接口时必须同步所有消费者。
 - **技术栈**：Next.js 16、React 19、Tailwind CSS v4、shadcn/ui、Zustand、Cordis 3。
 - **Next.js 配置**：`output: "export"`、`distDir: "dist"`、`trailingSlash: true`、图片不优化；`basePath` 由 `APP_BASE_PATH` 控制（Web 部署为 `/app`，Capacitor 为空）。
-- **包管理**：pnpm workspace，API v3 包位于 `packages/<group>/<pkg>`，各自声明封闭 `exports` 和 `tsconfig.json`。
+- **包管理**：pnpm workspace，API v1 包位于 `packages/<group>/<pkg>`，各自声明封闭 `exports` 和 `tsconfig.json`。
 - **格式**：Prettier 无分号、双引号、100 列、Tailwind 类排序；格式化改动与功能改动分开提交。
 
 ## 命令
@@ -26,7 +26,7 @@ pnpm run test             # Vitest
 pnpm run verify-architecture
 pnpm run format
 
-pnpm plugin pack <plugin-directory> [output.zip]   # API v3 esbuild + Tailwind CSS + ZIP，输出 SHA-256
+pnpm plugin pack <plugin-directory> [output.zip]   # API v1 esbuild + Tailwind CSS + ZIP，输出 SHA-256
 npx cap sync              # 构建后同步 dist/ 到 android/
 npx cap open android
 cd android && ./gradlew verifyNativeComposition testDebugUnitTest   # provider/widget 选择与占位符检查
@@ -67,9 +67,9 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 
 ### ZIP、市场与构建产物
 
-- 外部 ZIP 清单必须是 API v3，包内 ESM 只能引用包内相对路径与 SDK `PLATFORM_MODULES` 列出的裸说明符。打包器处理其他依赖与插件 Tailwind utilities；不让宿主扫描外部插件源码。外部 ZIP 与宿主同权，API 版本和模块约束不是安全沙箱。
-- API v2 市场 ZIP 不兼容，必须迁移源码、重新打包并发布。`website/edge-functions/updates/plugins.json.js` 是生成的公开索引，不要手工编辑；公开地址为 `https://ysu.welain.com/updates/plugins.json`。索引版本、平台、能力、最低应用版本（如声明）、`sha256` 和 `size` 应与实际发布资产一致。
-- Web 代理位于 `website/edge-functions/api/proxy.js`，新增学校域名需同步部署端白名单。`scripts/deploy-website.sh` 以 `APP_BASE_PATH=/app` 构建静态应用并部署；不要提交 `dist/`、插件打包中间产物或 `website/public/app/`，市场 ZIP 是单独管理的发布资产。
+- 外部 ZIP 清单必须是 API v1，包内 ESM 只能引用包内相对路径与 SDK `PLATFORM_MODULES` 列出的裸说明符。打包器处理其他依赖与插件 Tailwind utilities；不让宿主扫描外部插件源码。外部 ZIP 与宿主同权，API 版本和模块约束不是安全沙箱。
+- 非 API v1 市场 ZIP 不兼容，必须迁移源码、重新打包并发布。公开索引为 `https://raw.githubusercontent.com/Youwenqwq/orahako-plugin-registry/main/dist/plugins.json`，ZIP 也保存在该仓库 `dist/plugins/<id>/<version>.zip`；索引版本、平台、能力、最低应用版本（如声明）、`sha256` 和 `size` 必须与资产一致。不要在主仓库恢复市场边缘函数或 ZIP 副本。
+- Web 代理位于 `website/edge-functions/api/proxy.js`，新增学校域名需同步部署端白名单。`scripts/deploy-website.sh` 以 `APP_BASE_PATH=/app` 构建静态应用并部署；不要提交 `dist/`、插件打包中间产物或 `website/public/app/`。
 
 ### Android 与验证
 

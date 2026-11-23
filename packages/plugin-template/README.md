@@ -1,6 +1,6 @@
 # 插件模板
 
-复制本目录，修改 `manifest.json` 的 ID、名称和版本，再实现 `src/index.tsx` 与页面。模板使用 API v3 的 `definePlugin` 注册派生 Props 页面，并通过 `slots.inject` 等待默认 Shell 的 `shell.header.actions` Slot。
+复制本目录，修改 `manifest.json` 的 ID、名称和版本，再实现 `src/index.tsx` 与页面。模板使用 API v1 的 `definePlugin` 注册派生 Props 页面，并通过 `slots.inject` 等待默认 Shell 的 `shell.header.actions` Slot。
 
 ```bash
 pnpm install

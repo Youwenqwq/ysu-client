@@ -15,7 +15,11 @@ describe("official composition", () => {
     expect(ids[0]).toBe("orahako.runtime.slots")
     expect(ids.indexOf("orahako.meter")).toBeLessThan(ids.indexOf("orahako.runtime.provider-registry"))
     expect(ids.at(-1)).toBe("ysu.provider")
+    expect(PLUGIN_API_VERSION).toBe(1)
     expect(plugins.every(({ manifest }) => manifest.apiVersion === PLUGIN_API_VERSION)).toBe(true)
+    expect(composition.market?.indexUrl).toBe(
+      "https://raw.githubusercontent.com/Youwenqwq/orahako-plugin-registry/main/dist/plugins.json"
+    )
     expect(Object.keys(platformModules).sort()).toEqual([...PLATFORM_MODULES].sort())
     expect(composition.identity).toBe(appIdentity)
     expect(composition.defaults).toEqual({

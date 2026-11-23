@@ -99,7 +99,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
     host.dispose()
   })
 
-  it("preflights and installs API v3 marketplace bundles in dependency order", async () => {
+  it("preflights and installs API v1 marketplace bundles in dependency order", async () => {
     const store = new PluginPackageStore({ backend: createMemoryPackageBackend() })
     const host = new PluginHost(
       {
@@ -132,7 +132,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
         versions: [
           {
             version: "9.0.0",
-            apiVersion: 2, // Historical v2 release ignored by v3 selector!
+            apiVersion: 2, // Unsupported release ignored by the v1 selector.
             platforms: ["web", "android"],
             zipUrl: `/v2/${id}.zip`,
             sha256: "f".repeat(64),
@@ -141,9 +141,9 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
           },
           {
             version: "1.0.0",
-            apiVersion: 3,
+            apiVersion: 1,
             platforms: ["web", "android"],
-            zipUrl: `/v3/${id}.zip`,
+            zipUrl: `/v1/${id}.zip`,
             sha256: "a".repeat(64),
             size: 100,
             publishedAt: "2026-11-18T00:00:00Z",
@@ -157,7 +157,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
 
     const installedOrder: string[] = []
     vi.spyOn(host, "installFromUrl").mockImplementation(async (url, _sha, expected) => {
-      expect(url).toContain("/v3/")
+      expect(url).toContain("/v1/")
       installedOrder.push(expected.id)
       const manifest = makeManifest(expected.id, {
         version: expected.version,
@@ -192,7 +192,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
           id: "ext.demo",
           name: "Demo",
           version: "1.0.0",
-          apiVersion: 3,
+          apiVersion: 1,
           kind: "feature",
           entry: "index.js",
         })
@@ -274,7 +274,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
           id: "ext.styled",
           name: "Styled",
           version: "1.0.0",
-          apiVersion: 3,
+          apiVersion: 1,
           kind: "theme",
           entry: "index.js",
           styles: ["theme.css"],
@@ -321,7 +321,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
           id: "ext.styled",
           name: "Styled",
           version: "2.0.0",
-          apiVersion: 3,
+          apiVersion: 1,
           kind: "theme",
           entry: "index.js",
           styles: ["theme.css"],
@@ -354,7 +354,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
           id: "ext.sideloaded",
           name: "Sideloaded",
           version: "1.2.3",
-          apiVersion: 3,
+          apiVersion: 1,
           kind: "feature",
           entry: "index.js",
         })
@@ -418,7 +418,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
           id: "ext.broken",
           name: "Broken",
           version: "1.0.0",
-          apiVersion: 3,
+          apiVersion: 1,
           kind: "feature",
           entry: "index.js",
         })
@@ -455,7 +455,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
           id: "ext.shadow",
           name: "Shadow",
           version: "1.0.0",
-          apiVersion: 3,
+          apiVersion: 1,
           kind: "feature",
           entry: "index.js",
         })
@@ -494,7 +494,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
           id: "ext.future",
           name: "Future",
           version: "1.0.0",
-          apiVersion: 3,
+          apiVersion: 1,
           kind: "feature",
           entry: "index.js",
           minAppVersion: "9.0.0",
@@ -525,7 +525,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
           id: "ext.valid",
           name: "ext.valid",
           version: "1.0.0",
-          apiVersion: 3,
+          apiVersion: 1,
           kind: "feature",
           entry: "index.js",
         })
@@ -560,7 +560,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
     )
 
     await host.bootstrap()
-    expect(host.loadErrors.get("ext.stale")).toContain("apiVersion must be 3")
+    expect(host.loadErrors.get("ext.stale")).toContain("apiVersion must be 1")
     expect(host.loadErrors.get("ext.newer")).toContain("requires app 9.0.0")
     expect(host.loadErrors.get("ext.valid")).toBeUndefined()
     expect(host.runtime.get("ext.valid")?.status).toBe("active")

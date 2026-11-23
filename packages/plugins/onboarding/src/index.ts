@@ -18,7 +18,8 @@ import {
 import { OnboardingWizard, type OnboardingSchoolChoice } from "./wizard"
 
 export const ONBOARDING_PLUGIN_ID = "orahako.onboarding"
-const DEFAULT_MARKET_URL = "https://ysu.welain.com/updates/plugins.json"
+const DEFAULT_MARKET_URL =
+  "https://raw.githubusercontent.com/Youwenqwq/orahako-plugin-registry/main/dist/plugins.json"
 const PROVIDER_CATEGORY = "provider"
 const PROVIDER_PLUGIN_SUFFIX = ".provider"
 

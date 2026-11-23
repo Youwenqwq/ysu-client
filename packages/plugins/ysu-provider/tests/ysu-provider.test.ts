@@ -80,7 +80,7 @@ function jsonResponse(url: string, payload: unknown, status = 200) {
   })
 }
 
-describe("YSU SchoolProvider API v3 contract & grade scale", () => {
+describe("YSU SchoolProvider API v1 contract & grade scale", () => {
   it("constructs a plain SchoolProvider with zero BaseProvider inheritance and all 15 built-in slices", () => {
     const { ctx } = createTestContext()
     const provider = createYsuSchoolProvider({

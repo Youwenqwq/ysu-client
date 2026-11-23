@@ -1,12 +1,12 @@
-# Orahako API v3 插件组合架构
+# Orahako API v1 插件组合架构
 
 Orahako 是由 Cordis 插件组合成的应用，而不是由固定 Next.js 页面控制的功能集合。内核负责 composition、插件生命周期、外部 ZIP、恢复和通用 Native bridge；服务、界面、Provider 与业务功能都由可替换包提供。插件与应用同权，不构成安全沙箱。
 
-本文描述 API v3 当前契约。API v2 市场 ZIP 不兼容且会被拒绝，必须重新发布；没有迁移、降级或兼容加载路径。
+本文描述 API v1 当前契约。API v2 市场 ZIP 不兼容且会被拒绝，必须重新发布；没有迁移、降级或兼容加载路径。
 
 ## 包拓扑与依赖边界
 
-API v3 Workspace 包位于 `packages/<group>/<package>`，各自拥有 `tsconfig.json` 和封闭的 `exports`。插件包之间不导入运行时值，可以用 `import type` 共享类型。包内不使用 `@/` 宿主别名、跨包私有路径或 `next/*`。
+API v1 Workspace 包位于 `packages/<group>/<package>`，各自拥有 `tsconfig.json` 和封闭的 `exports`。插件包之间不导入运行时值，可以用 `import type` 共享类型。包内不使用 `@/` 宿主别名、跨包私有路径或 `next/*`。
 
 ```text
 app/                              静态根入口：layout.tsx、page.tsx、manifest.ts
@@ -91,9 +91,9 @@ packages/bundle/{platform,academic,ysu}
 
 ZIP 不能新增原生模块或权限。新增能力需同步 Kotlin 工厂、模块 manifest、`android/app/src/main/assets/native-companion.json`、应用 composition 与插件清单。通用模块通过 `${applicationId}.MainActivity` 和 deep-link 占位符引用宿主身份；允许列表不等于设备支持该能力或用户已授权。
 
-## 外部 ZIP 与 API v3 市场
+## 外部 ZIP 与 API v1 市场
 
-外部 ZIP 使用 API v3 清单，仅能导入包内相对模块与 [`PLATFORM_MODULES`](packages/core/sdk/src/manifest.ts) 共享的模块实例。包格式、SDK 示例、`pnpm plugin pack <plugin-directory> [output.zip]` 及发布字段见 [SDK 指南](packages/core/sdk/README.md)。旧 API v2 ZIP 必须重新发布，生成的市场索引不手工修改。
+外部 ZIP 使用 API v1 清单，仅能导入包内相对模块与 [`PLATFORM_MODULES`](packages/core/sdk/src/manifest.ts) 共享的模块实例。包格式、SDK 示例、`pnpm plugin pack <plugin-directory> [output.zip]` 及发布字段见 [SDK 指南](packages/core/sdk/README.md)。其他 API 版本的 ZIP 必须重新发布。市场索引和 ZIP 均由 `Youwenqwq/orahako-plugin-registry` 的 `main` 分支通过 `raw.githubusercontent.com` 分发，主仓库和 EdgeOne 不保存市场副本。
 
 ## 安装、恢复与信任
 

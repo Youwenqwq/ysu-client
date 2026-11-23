@@ -259,7 +259,7 @@ function DummyIcon() {
 }
 
 describe("@orahako/ui-profile", () => {
-  it("validates API v3 manifest, avatar media controller, and profile store", async () => {
+  it("validates API v1 manifest, avatar media controller, and profile store", async () => {
     const validated = validatePluginManifest(manifest)
     expect(validated.id).toBe(PROFILE_PLUGIN_ID)
     expect(validated.kind).toBe("feature")
