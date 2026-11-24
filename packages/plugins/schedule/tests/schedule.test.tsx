@@ -1464,6 +1464,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       node.hasAttribute("data-widget-discovery-trigger")
     )[0]
     expect(triggerBtn).toBeDefined()
+    expect(triggerBtn!.parentNode?.parentNode).toBe(dom.body)
 
     const assistantAvatar = dom.body.findAll((node) =>
       node.hasAttribute("data-widget-assistant-avatar")

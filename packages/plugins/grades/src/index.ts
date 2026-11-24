@@ -15,7 +15,12 @@ import {
   type GradesHeaderActionsInject,
   type GradesHeaderActionsProps,
 } from "./header-actions"
-import { RecentGradesWidget, type RecentGradesWidgetInject } from "./overview-widget"
+import {
+  GpaSummaryWidget,
+  RecentGradesWidget,
+  type GpaSummaryWidgetInject,
+  type RecentGradesWidgetInject,
+} from "./overview-widget"
 import {
   GradesPage,
   type GradeAnalyticsResult,
@@ -46,6 +51,7 @@ export type {
   GradeGachaState,
   GradeGachaStoreInstance,
   GradeLetterCandidate,
+  GpaSummaryWidgetInject,
   GradesDictionary,
   GradesHeaderActionsInject,
   GradesHeaderActionsProps,
@@ -221,6 +227,27 @@ export const gradesPlugin = definePlugin({
 
     overview.registerWidget(
       {
+        id: "gpa-summary",
+        title: "初始绩点",
+        titleKey: "grades.gpaInitial",
+        description: "查看初始绩点、加权平均与算术平均。",
+        descriptionKey: "widgets.gpaSummary.description",
+        icon: GraduationCap,
+        region: "summary",
+        defaultVisible: false,
+        order: 20,
+        slice: "grades",
+        dictionary: gradesDictionary,
+        store: settingsStore,
+        inject: (): GpaSummaryWidgetInject => ({
+          hooks: { gpa: gpaSource },
+        }),
+      },
+      GpaSummaryWidget
+    )
+
+    overview.registerWidget(
+      {
         id: "recent-grades",
         title: "近期成绩",
         titleKey: "widgets.recentGrades.title",
@@ -228,7 +255,7 @@ export const gradesPlugin = definePlugin({
         descriptionKey: "widgets.recentGrades.description",
         icon: GraduationCap,
         region: "content",
-        defaultVisible: true,
+        defaultVisible: false,
         order: 70,
         slice: "grades",
         dictionary: gradesDictionary,

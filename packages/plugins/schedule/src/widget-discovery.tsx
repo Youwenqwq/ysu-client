@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react"
+import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import type { Translator } from "@orahako/sdk"
 import { cn, useIsMobile } from "@orahako/ui-primitives"
@@ -432,7 +433,7 @@ export function WidgetDiscovery({
 
   const placement = bubbleLayout?.placement ?? "top"
 
-  return (
+  const assistant = (
     <div
       ref={rootRef}
       data-widget-discovery=""
@@ -522,4 +523,6 @@ export function WidgetDiscovery({
       </button>
     </div>
   )
+
+  return typeof document === "undefined" ? null : createPortal(assistant, document.body)
 }

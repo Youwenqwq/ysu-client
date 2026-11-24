@@ -793,6 +793,15 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       slice: "grades",
       order: 70,
       region: "content",
+      defaultVisible: false,
+    })
+    const gpaSummaryWidget = overview
+      .getSnapshot()
+      .find((widget) => widget.pluginId === GRADES_PLUGIN_ID && widget.id === "gpa-summary")
+    expect(gpaSummaryWidget).toMatchObject({
+      slice: "grades",
+      region: "summary",
+      defaultVisible: false,
     })
 
     const gradesCategory = settings.getSnapshot().find((c) => c.id === "grades")!
@@ -1004,6 +1013,15 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       if (typeof onClick === "function") onClick({ preventDefault() {} })
     })
     expect(router.current.getSnapshot().route).toBe("grades")
+
+    const gpaSlotEntry = slots.select("overview.widget", `${GRADES_PLUGIN_ID}:gpa-summary`)[0]!
+    await dom.render(<ContributionOutlet entry={gpaSlotEntry} slots={slots} i18n={i18n} />)
+    await vi.waitFor(() => {
+      expect(dom.container.textContent).toContain("初始绩点")
+      expect(dom.container.textContent).toContain("4.60")
+      expect(dom.container.textContent).toContain("93.2")
+      expect(dom.container.textContent).toContain("92.0")
+    })
 
     // Stopping plugin removes all registrations cleanly
     await act(async () => {

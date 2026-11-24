@@ -124,7 +124,17 @@ class MiniDomNode {
   }
 }
 
-function mountMiniDom() {
+function findAllNodes(
+  node: MiniDomNode,
+  predicate: (candidate: MiniDomNode) => boolean
+): MiniDomNode[] {
+  return [
+    ...(predicate(node) ? [node] : []),
+    ...node.childNodes.flatMap((child) => findAllNodes(child, predicate)),
+  ]
+}
+
+function mountMiniDom(mobile = false) {
   const prevWindow = globalThis.window
   const prevDocument = globalThis.document
   const prevAct = (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT
@@ -134,7 +144,7 @@ function mountMiniDom() {
     HTMLIFrameElement: class {},
     location: { pathname: "/", search: "", reload: vi.fn() },
     matchMedia: () => ({
-      matches: false,
+      matches: mobile,
       addEventListener: () => {},
       removeEventListener: () => {},
     }),
@@ -213,7 +223,7 @@ function createMemoryStorage(): PluginKeyValueStorage {
 
 describe("@orahako/plugin-overview ownership, single store instantiation & keyed slot rendering", () => {
   it("delegates registered widgets into overview.widget keyed slot, instantiates StoreDefinition once, filters by slice & supportedPlugins, and removes widgets on plugin stop", async () => {
-    const dom = mountMiniDom()
+    const dom = mountMiniDom(true)
     activeUnmount = dom.unmount
 
     const localBackend = createMemoryStorage()
@@ -468,6 +478,17 @@ describe("@orahako/plugin-overview ownership, single store instantiation & keyed
       expect(dom.container.textContent).toContain("第 6 周")
       expect(dom.container.textContent).toContain("校园卡余额:¥88.50")
     })
+    const profileCard = findAllNodes(dom.container, (node) =>
+      node.attributes.has("data-overview-profile-card")
+    )[0]
+    const inlineSummary = findAllNodes(dom.container, (node) =>
+      node.attributes.has("data-overview-inline")
+    )[0]
+    let inlineParent = inlineSummary?.parentNode
+    while (inlineParent && inlineParent !== profileCard) inlineParent = inlineParent.parentNode
+    expect(inlineParent).toBe(profileCard)
+    expect(dom.container.textContent).toContain("周次")
+    expect(dom.container.textContent).not.toContain("学期信息")
     // Widget requiring missing "epay" slice is NOT rendered
     expect(dom.container.textContent).not.toContain("ShouldBeFilteredBySlice")
 

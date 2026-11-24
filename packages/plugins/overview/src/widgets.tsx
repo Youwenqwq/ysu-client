@@ -173,7 +173,7 @@ export interface ProfileSummaryWidgetInject {
 }
 
 export type ProfileSummaryWidgetProps = DerivedComponentProps<
-  Record<string, never>,
+  { readonly children?: ReactNode },
   OverviewDictionary,
   undefined,
   undefined,
@@ -213,6 +213,7 @@ export const ProfileSummaryWidget: SlotComponent<ProfileSummaryWidgetProps> = (p
           </OverviewQueryState>
         </CardContent>
       )}
+      {props.children}
     </Card>
   )
 }

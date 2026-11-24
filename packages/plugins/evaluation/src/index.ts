@@ -27,8 +27,11 @@ import {
   type EvaluationViewStoreInstance,
 } from "./view-store"
 import {
+  EVALUATION_SUMMARY_WIDGET_ID,
+  EvaluationSummaryWidget,
   PENDING_EVALUATIONS_WIDGET_ID,
   PendingEvaluationsWidget,
+  type EvaluationSummaryWidgetProps,
   type PendingEvaluationsWidgetInject,
   type PendingEvaluationsWidgetProps,
 } from "./widgets"
@@ -43,6 +46,7 @@ export type {
   EvaluationPageInject,
   EvaluationPageProps,
   EvaluationSources,
+  EvaluationSummaryWidgetProps,
   EvaluationViewState,
   EvaluationViewStoreInstance,
   PendingEvaluationsWidgetInject,
@@ -104,6 +108,30 @@ export const evaluationPlugin = definePlugin({
       query.invalidate({ feature: "pending-evaluations" })
       query.invalidate({ feature: "evaluation-tasks" })
     }
+
+    overview.registerWidget(
+      {
+        id: EVALUATION_SUMMARY_WIDGET_ID,
+        title: "评教数量",
+        titleKey: "widget.summaryTitle",
+        description: "查看当前待评教任务数量。",
+        descriptionKey: "widget.summaryDescription",
+        icon: ClipboardCheck,
+        region: "summary",
+        defaultVisible: false,
+        order: 30,
+        slice: "evaluation",
+        dictionary: evaluationDictionary,
+        inject: (): PendingEvaluationsWidgetInject => ({
+          hooks: { tasks: sources.allTasksSource },
+          evaluationHref: router.href({ route: "evaluation" }),
+          openEvaluation: () => {
+            router.push({ route: "evaluation" })
+          },
+        }),
+      },
+      EvaluationSummaryWidget
+    )
 
     overview.registerWidget(
       {

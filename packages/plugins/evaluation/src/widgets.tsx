@@ -21,11 +21,13 @@ import {
   CardHeader,
   CardTitle,
   Skeleton,
+  useIsMobile,
 } from "@orahako/ui-primitives"
 import type { EvaluationDictionary } from "./dictionary"
 import { isEvaluationTaskActive } from "./helpers"
 
 export const PENDING_EVALUATIONS_WIDGET_ID = "pending-evaluations"
+export const EVALUATION_SUMMARY_WIDGET_ID = "evaluation-summary"
 
 function hasErrorCode(error: Error | null, code: ProviderErrorCode): boolean {
   if (!error) return false
@@ -159,6 +161,63 @@ export const PendingEvaluationsWidget: SlotComponent<PendingEvaluationsWidgetPro
               {t("widget.pendingEvaluation", { count: activeTasks.length })}
             </span>
             <ChevronRight className="size-4 shrink-0" />
+          </a>
+        </WidgetQueryState>
+      </CardContent>
+    </Card>
+  )
+}
+
+export type EvaluationSummaryWidgetProps = PendingEvaluationsWidgetProps
+
+export const EvaluationSummaryWidget: SlotComponent<EvaluationSummaryWidgetProps> = (props) => {
+  const { t, evaluationHref, openEvaluation } = props
+  const query = props.useTasks()
+  const compact = useIsMobile()
+  const count = (query.data ?? []).filter((task) => isEvaluationTaskActive(task)).length
+
+  if (compact) {
+    return (
+      <a
+        href={evaluationHref}
+        data-overview-evaluation-summary="compact"
+        onClick={(event) => handleSpaClick(event, openEvaluation)}
+        className="flex min-w-0 flex-col gap-1 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <ClipboardCheck className="size-3.5 shrink-0" />
+          <span className="truncate">{t("widget.summaryTitle")}</span>
+        </span>
+        {query.data === undefined && query.isLoading ? (
+          <Skeleton className="h-6 w-14" aria-label={t("widget.loading")} />
+        ) : query.data === undefined ? (
+          <span className="text-sm text-muted-foreground">{t("widget.unavailableShort")}</span>
+        ) : (
+          <span className="text-base font-semibold tabular-nums">{count}</span>
+        )}
+      </a>
+    )
+  }
+
+  return (
+    <Card data-overview-evaluation-summary="card" size="sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ClipboardCheck className="size-4 shrink-0 text-primary" />
+          {t("widget.summaryTitle")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <WidgetQueryState query={query} t={t}>
+          <a
+            href={evaluationHref}
+            onClick={(event) => handleSpaClick(event, openEvaluation)}
+            className="flex flex-col gap-1 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span className="text-2xl font-semibold tabular-nums">{count}</span>
+            <span className="text-xs text-muted-foreground">
+              {t(count > 0 ? "evaluation.pendingTasks" : "evaluation.noTasks")}
+            </span>
           </a>
         </WidgetQueryState>
       </CardContent>

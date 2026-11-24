@@ -294,7 +294,7 @@ export const overviewPlugin = definePlugin({
     ownOverview.registerWidget(
       {
         id: OVERVIEW_WEEK_SUMMARY_WIDGET_ID,
-        title: "学期信息",
+        title: "周次",
         titleKey: "widgets.weekSummary.title",
         description: "查看当前教学周、星期与学期。",
         descriptionKey: "widgets.weekSummary.description",

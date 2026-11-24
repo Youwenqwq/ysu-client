@@ -53,9 +53,9 @@ export const overviewDictionary = defineDictionary({
         fallbackName: "学生信息",
       },
       weekSummary: {
-        title: "学期信息",
+        title: "周次",
         description: "查看当前教学周、星期与学期。",
-        termLabel: "学期信息",
+        termLabel: "周次",
         currentWeek: "第 {week} 周",
         weekday1: "星期一",
         weekday2: "星期二",
@@ -126,9 +126,9 @@ export const overviewDictionary = defineDictionary({
         fallbackName: "Student Info",
       },
       weekSummary: {
-        title: "Current term",
+        title: "Week",
         description: "See the teaching week, weekday and term.",
-        termLabel: "Current term",
+        termLabel: "Week",
         currentWeek: "Week {week}",
         weekday1: "Monday",
         weekday2: "Tuesday",

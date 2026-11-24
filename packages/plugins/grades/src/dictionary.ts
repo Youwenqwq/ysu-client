@@ -14,6 +14,10 @@ export const gradesDictionary = defineDictionary({
       gpaVisibleDesc: "关闭后在成绩页与总览中默认隐藏绩点",
     },
     widgets: {
+      gpaSummary: {
+        description: "查看初始绩点、加权平均与算术平均。",
+        unavailable: "暂不可用",
+      },
       recentGrades: {
         title: "近期成绩",
         description: "查看最近发布的课程成绩与绩点概览。",
@@ -139,6 +143,10 @@ export const gradesDictionary = defineDictionary({
       gpaVisibleDesc: "Mask GPA values by default on Grades and Overview when disabled",
     },
     widgets: {
+      gpaSummary: {
+        description: "View initial GPA, weighted average, and arithmetic average.",
+        unavailable: "Unavailable",
+      },
       recentGrades: {
         title: "Recent Grades",
         description: "View newly published course grades and GPA summary.",

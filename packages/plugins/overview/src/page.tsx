@@ -119,7 +119,7 @@ export const OverviewPage: SlotComponent<OverviewPageProps> = (props) => {
   const effective = normalizeOverviewLayout(storedLayout, dynamicWidgets)
   const profileLayoutId = pluginOverviewWidgetId(props.pluginId, OVERVIEW_PROFILE_WIDGET_ID)
 
-  let profileNode: { readonly id: OverviewWidgetId; readonly node: ReactNode } | null = null
+  let profileId: OverviewWidgetId | null = null
   const summary: Array<{ readonly id: OverviewWidgetId; readonly node: ReactNode }> = []
   const content: Array<{
     readonly id: OverviewWidgetId
@@ -136,11 +136,13 @@ export const OverviewPage: SlotComponent<OverviewPageProps> = (props) => {
     }
 
     const slotKey = overviewWidgetSlotKey(contribution.pluginId, contribution.id)
-    const rendered = renderSlot("overview.widget", {}, { key: slotKey })
-
     if (item.id === profileLayoutId) {
-      profileNode = { id: item.id, node: rendered }
-    } else if (contribution.region === "summary") {
+      profileId = item.id
+      continue
+    }
+
+    const rendered = renderSlot("overview.widget", {}, { key: slotKey })
+    if (contribution.region === "summary") {
       summary.push({ id: item.id, node: rendered })
     } else {
       content.push({
@@ -151,13 +153,13 @@ export const OverviewPage: SlotComponent<OverviewPageProps> = (props) => {
     }
   }
 
-  const showFallback = !profileNode && summary.length === 0 && content.length === 0
+  const showFallback = profileId === null && summary.length === 0 && content.length === 0
 
   const inlineSummaries =
     summary.length > 0 ? (
       <CardContent
         data-overview-inline=""
-        className={cn("grid gap-x-3 gap-y-4", Boolean(profileNode) && "pt-3")}
+        className={cn("grid gap-x-3 gap-y-4", profileId !== null && "border-t pt-3")}
         style={{ gridTemplateColumns: `repeat(${Math.min(3, summary.length)}, minmax(0, 1fr))` }}
       >
         {summary.map(({ id, node }) => (
@@ -167,6 +169,17 @@ export const OverviewPage: SlotComponent<OverviewPageProps> = (props) => {
         ))}
       </CardContent>
     ) : null
+
+  const profileNode = profileId
+    ? {
+        id: profileId,
+        node: renderSlot(
+          "overview.widget",
+          { children: compact ? inlineSummaries : undefined },
+          { key: overviewWidgetSlotKey(props.pluginId, OVERVIEW_PROFILE_WIDGET_ID) }
+        ),
+      }
+    : null
 
   const summaryGridStyle: CSSCustomProperties = {
     "--summary-columns": summary.length === 4 ? 2 : summary.length,
@@ -181,7 +194,7 @@ export const OverviewPage: SlotComponent<OverviewPageProps> = (props) => {
               {profileNode.node}
             </div>
           )}
-          {inlineSummaries && <Card>{inlineSummaries}</Card>}
+          {!profileNode && inlineSummaries && <Card>{inlineSummaries}</Card>}
         </>
       ) : (
         (profileNode !== null || summary.length > 0) && (

@@ -1,4 +1,4 @@
-import { ChevronRight, Eye, EyeOff, GraduationCap } from "lucide-react"
+import { BarChart3, ChevronRight, Eye, EyeOff, GraduationCap } from "lucide-react"
 import {
   isProviderError,
   ProviderErrorCode,
@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
   Skeleton,
+  useIsMobile,
 } from "@orahako/ui-primitives"
 import type { GradesDictionary } from "./dictionary"
 import {
@@ -32,6 +33,102 @@ function hasErrorCode(error: Error | null, code: ProviderErrorCode): boolean {
   if (!error) return false
   if (isProviderError(error)) return error.code === code
   return "code" in error && error.code === code
+}
+
+export interface GpaSummaryWidgetInject {
+  readonly hooks: {
+    readonly gpa: ObservableSource<QuerySnapshot<GPAStats>>
+  }
+}
+
+export type GpaSummaryWidgetProps = DerivedComponentProps<
+  Record<string, never>,
+  GradesDictionary,
+  undefined,
+  GradesSettingsStoreInstance,
+  GpaSummaryWidgetInject
+>
+
+export const GpaSummaryWidget: SlotComponent<GpaSummaryWidgetProps> = (props) => {
+  const { t, useStore, actions } = props
+  const query = props.useGpa()
+  const compact = useIsMobile()
+  const visible = useStore((state) => state.gpaVisible)
+  const data = query.data
+  const gpa = data?.gpaInitial ?? data?.numericGpaInitial ?? "-"
+  const weightedAvg = data?.weightedAvg ?? data?.numericWeightedAvg ?? "-"
+  const arithmeticAvg = data?.arithmeticAvg ?? data?.numericArithmeticAvg ?? "-"
+
+  const value = (
+    <span className="text-base font-semibold tabular-nums">{visible ? gpa : "***"}</span>
+  )
+  if (compact) {
+    return (
+      <button
+        type="button"
+        data-overview-gpa-summary="compact"
+        onClick={actions.toggleGpaVisible}
+        aria-label={t("gpa.toggleVisibility")}
+        aria-pressed={visible}
+        className="flex w-full min-w-0 flex-col gap-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
+      >
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <span className="truncate">{t("grades.gpaInitial")}</span>
+          {visible ? <EyeOff className="size-3 shrink-0" /> : <Eye className="size-3 shrink-0" />}
+        </span>
+        {data === undefined && query.isLoading ? (
+          <Skeleton className="h-6 w-14" aria-label={t("widgets.recentGrades.loading")} />
+        ) : data === undefined ? (
+          <span className="text-sm text-muted-foreground">
+            {t("widgets.gpaSummary.unavailable")}
+          </span>
+        ) : (
+          value
+        )}
+      </button>
+    )
+  }
+
+  return (
+    <Card data-overview-gpa-summary="card" size="sm">
+      <CardHeader className="flex flex-row items-center justify-between gap-1">
+        <CardTitle className="flex items-center gap-2">
+          <BarChart3 className="size-4 shrink-0 text-primary" />
+          {t("grades.gpaInitial")}
+        </CardTitle>
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          aria-label={t("gpa.toggleVisibility")}
+          aria-pressed={visible}
+          onClick={actions.toggleGpaVisible}
+        >
+          {visible ? <EyeOff /> : <Eye />}
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {data === undefined && query.isLoading ? (
+          <div className="flex flex-col gap-2" aria-label={t("widgets.recentGrades.loading")}>
+            <Skeleton className="h-6 w-2/3" />
+            <Skeleton className="h-4 w-full" />
+          </div>
+        ) : data === undefined ? (
+          <p className="text-sm text-muted-foreground">{t("widgets.gpaSummary.unavailable")}</p>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <p className="text-2xl font-semibold tabular-nums">{visible ? gpa : "***"}</p>
+            <p className="text-xs text-muted-foreground">
+              {t("grades.weightedAvg")} {visible ? weightedAvg : "***"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {t("grades.arithmeticAvg")} {visible ? arithmeticAvg : "***"}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
 }
 
 export interface RecentGradesWidgetInject {

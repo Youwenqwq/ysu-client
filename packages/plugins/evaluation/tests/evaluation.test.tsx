@@ -1,5 +1,6 @@
 import { act, type ReactNode } from "react"
 import { createRoot } from "react-dom/client"
+import { renderToStaticMarkup } from "react-dom/server"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   providerRegistryRuntimePlugin,
@@ -49,7 +50,7 @@ import {
   resolvePreviewKeyLabel,
   validateAnswers,
 } from "../src/helpers"
-import { PENDING_EVALUATIONS_WIDGET_ID } from "../src/widgets"
+import { EVALUATION_SUMMARY_WIDGET_ID, PENDING_EVALUATIONS_WIDGET_ID } from "../src/widgets"
 
 vi.mock("@orahako/ui-primitives", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
@@ -655,6 +656,16 @@ describe("@orahako/plugin-evaluation", () => {
     expect(widgetContribution).toBeDefined()
     expect(widgetContribution?.region).toBe("content")
     expect(widgetContribution?.slice).toBe("evaluation")
+    const summaryContribution = overview
+      .getSnapshot()
+      .find(
+        (item) => item.pluginId === EVALUATION_PLUGIN_ID && item.id === EVALUATION_SUMMARY_WIDGET_ID
+      )
+    expect(summaryContribution).toMatchObject({
+      region: "summary",
+      slice: "evaluation",
+      defaultVisible: false,
+    })
 
     await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
     session.setCredential({
@@ -698,6 +709,16 @@ describe("@orahako/plugin-evaluation", () => {
     expect(findNode(main, isTypeMenu)).toBeNull()
     expect(findNode(main, isBatchButton)).toBeNull()
     expect(pendingCalls).toContain("01")
+
+    const summarySlot = slots.select(
+      "overview.widget",
+      `${EVALUATION_PLUGIN_ID}:${EVALUATION_SUMMARY_WIDGET_ID}`
+    )[0]!
+    const summaryHtml = renderToStaticMarkup(
+      <ContributionOutlet entry={summarySlot} slots={slots} i18n={i18n} />
+    )
+    expect(summaryHtml).toContain("评教数量")
+    expect(summaryHtml).toContain(">2</span>")
 
     // Click widget link to navigate to evaluation route
     const widgetLink = findNode(dom.container, (node) =>
