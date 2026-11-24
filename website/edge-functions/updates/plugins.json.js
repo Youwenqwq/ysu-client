@@ -180,10 +180,18 @@ const DEFAULT_INDEX = {
       "pluginIds": [
         "orahako.overview",
         "orahako.schedule",
+        "orahako.school-schedule",
         "orahako.grades",
         "orahako.exams",
+        "orahako.makeup-exams",
         "orahako.student-info",
-        "orahako.skbird"
+        "orahako.training-plan",
+        "orahako.evaluation",
+        "orahako.ecard",
+        "orahako.epay",
+        "orahako.labor",
+        "orahako.credits",
+        "orahako.comprehensive"
       ]
     },
     {

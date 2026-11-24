@@ -37,7 +37,7 @@ import {
   Spinner,
   Switch,
 } from "@orahako/ui-primitives"
-import { groupByPluginCategory, type PluginCategory } from "./categories"
+import { groupByPluginCategory, pluginCategory, type PluginCategory } from "./categories"
 import type { PluginsDictionary } from "./dictionary"
 import type { PluginManagerPreferencesStore } from "./store"
 
@@ -127,6 +127,7 @@ interface InstalledRow {
   readonly version: string
   readonly kind: PluginKind
   readonly categories?: readonly string[]
+  readonly required?: boolean
   readonly source: "builtin" | "external"
   readonly protected: boolean
   readonly supported: boolean
@@ -167,12 +168,16 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
   const providerInfo = useProvider()
   const autoCheckUpdates = useStore((s) => s.autoCheckUpdates)
   const lastUpdateCheck = useStore((s) => s.lastUpdateCheck)
+  const showSystemPlugins = useStore((s) => s.showSystemPlugins)
+  const marketEnabled = useStore((s) => s.marketEnabled)
+  const customMarketUrl = useStore((s) => s.customMarketUrl)
+  const [defaultMarketUrl] = useState(() => getMarketUrl())
+  const marketUrl = marketEnabled ? customMarketUrl.trim() || defaultMarketUrl : undefined
 
   const [packages, setPackages] = useState<readonly InstalledPluginSummary[]>([])
-  const [market, setMarket] = useState<PluginMarketResult | undefined>(() => {
-    const url = getMarketUrl()
-    return url ? loadCachedPluginMarket(url) : undefined
-  })
+  const [market, setMarket] = useState<PluginMarketResult | undefined>(() =>
+    marketUrl ? loadCachedPluginMarket(marketUrl) : undefined
+  )
   const [marketError, setMarketError] = useState<string | undefined>()
   const [busy, setBusy] = useState<string | undefined>()
   const [checking, setChecking] = useState(false)
@@ -182,7 +187,6 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
   const platform = getPlatform()
   const appVersion = getAppVersion()
   const nativeCapabilities = getNativeCapabilities()
-  const marketUrl = getMarketUrl()
   const loadErrors = getLoadErrors()
   const safeMode = isSafeMode()
 
@@ -196,11 +200,10 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
     setChecking(true)
     setMarketError(undefined)
     try {
-      const currentMarketUrl = getMarketUrl()
-      if (!currentMarketUrl) {
+      if (!marketUrl) {
         throw new Error("The active composition does not provide a plugin market")
       }
-      setMarket(await loadPluginMarket(currentMarketUrl))
+      setMarket(await loadPluginMarket(marketUrl))
     } catch (error) {
       setMarketError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -208,7 +211,12 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
       checkingRef.current = false
       setChecking(false)
     }
-  }, [actions, getMarketUrl])
+  }, [actions, marketUrl])
+
+  useEffect(() => {
+    setMarket(marketUrl ? loadCachedPluginMarket(marketUrl) : undefined)
+    setMarketError(undefined)
+  }, [marketUrl])
 
   useEffect(() => {
     void refreshPackages().catch((error) => {
@@ -289,6 +297,7 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
         version: state.manifest.version,
         kind: state.manifest.kind,
         ...(categories !== undefined ? { categories } : {}),
+        ...(state.manifest.required !== undefined ? { required: state.manifest.required } : {}),
         source,
         protected: isProtected(state.manifest.id),
         supported: isSupportedFeature(providerInfo.supportedPlugins, state.manifest),
@@ -307,6 +316,7 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
         version: pkg.manifest.version,
         kind: pkg.manifest.kind,
         ...(categories !== undefined ? { categories } : {}),
+        ...(pkg.manifest.required !== undefined ? { required: pkg.manifest.required } : {}),
         source: "external",
         protected: isProtected(pkg.manifest.id),
         supported: isSupportedFeature(providerInfo.supportedPlugins, pkg.manifest),
@@ -326,7 +336,9 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
       )
     : []
 
-  const installedGroups = groupByPluginCategory(rows)
+  const installedGroups = groupByPluginCategory(
+    showSystemPlugins ? rows : rows.filter((row) => pluginCategory(row) !== "system")
+  )
   const compatibleMarketPlugins =
     market?.index.plugins.filter((plugin) =>
       Boolean(selectCompatibleRelease(plugin, appVersion, platform, nativeCapabilities))
@@ -494,7 +506,7 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
           </label>
         </div>
         <p className="text-xs leading-relaxed text-muted-foreground">{t("trustWarning")}</p>
-        {rows.length === 0 ? (
+        {installedGroups.length === 0 ? (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">

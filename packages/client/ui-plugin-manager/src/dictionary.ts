@@ -3,6 +3,18 @@ import { defineDictionary } from "@orahako/sdk"
 export const pluginsDictionary = defineDictionary({
   zh: {
     title: "插件",
+    settings: {
+      title: "插件设置",
+      description: "管理插件列表与插件市场。",
+      showSystem: "显示系统插件",
+      showSystemDesc: "显示应用运行所需的内置插件。",
+      enableMarket: "启用插件市场",
+      enableMarketDesc: "浏览推荐组合包、安装插件并检查更新。",
+      customMarketUrl: "自定义插件市场 URL",
+      customMarketUrlDesc: "留空时使用应用默认市场。",
+      invalidMarketUrl: "请输入有效的 HTTP 或 HTTPS URL。",
+      save: "保存",
+    },
     installed: "已安装插件",
     market: "插件市场",
     refresh: "刷新市场",
@@ -57,6 +69,18 @@ export const pluginsDictionary = defineDictionary({
   },
   en: {
     title: "Plugins",
+    settings: {
+      title: "Plugin settings",
+      description: "Manage the plugin list and plugin market.",
+      showSystem: "Show system plugins",
+      showSystemDesc: "Show built-in plugins required by the application.",
+      enableMarket: "Enable plugin market",
+      enableMarketDesc: "Browse recommended bundles, install plugins, and check for updates.",
+      customMarketUrl: "Custom plugin market URL",
+      customMarketUrlDesc: "Leave blank to use the app's default market.",
+      invalidMarketUrl: "Enter a valid HTTP or HTTPS URL.",
+      save: "Save",
+    },
     installed: "Installed plugins",
     market: "Plugin market",
     refresh: "Refresh market",

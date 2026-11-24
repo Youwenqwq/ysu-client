@@ -23,4 +23,25 @@ describe("published plugin market artifacts", () => {
       }
     }
   })
+
+  it("offers every built-in academic feature in the YSU bundle without Skbird", async () => {
+    const index = validateMarketplaceIndex(await onRequestGet().json())
+    const bundle = index.bundles?.find((entry) => entry.id === "ysu.essentials")
+    expect(bundle?.pluginIds).toEqual([
+      "orahako.overview",
+      "orahako.schedule",
+      "orahako.school-schedule",
+      "orahako.grades",
+      "orahako.exams",
+      "orahako.makeup-exams",
+      "orahako.student-info",
+      "orahako.training-plan",
+      "orahako.evaluation",
+      "orahako.ecard",
+      "orahako.epay",
+      "orahako.labor",
+      "orahako.credits",
+      "orahako.comprehensive",
+    ])
+  })
 })

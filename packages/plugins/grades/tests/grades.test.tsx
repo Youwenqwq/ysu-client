@@ -915,16 +915,20 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       expect(dom.bodyEl.textContent).toContain("2 / 45")
     })
 
-    // Course detail renders a single hierarchy: hero score, key metrics, meta rows.
+    // Course detail keeps type/credit badges under the title and grade point beside the score.
     const detailHero = dom.bodyEl.findAll((n) => n.hasAttribute("data-grade-detail"))[0]
     expect(detailHero).toBeDefined()
     const detailScore = dom.bodyEl.findAll((n) => n.hasAttribute("data-grade-detail-score"))[0]
     expect(detailScore?.textContent).toBe("96")
-    const detailMetrics = dom.bodyEl.findAll((n) => n.hasAttribute("data-grade-detail-metrics"))[0]
-    expect(detailMetrics?.textContent).toContain("4.8")
-    const detailMeta = dom.bodyEl.findAll((n) => n.hasAttribute("data-grade-detail-meta"))[0]
-    expect(detailMeta?.textContent).toContain("MATH301")
-    expect(detailMeta?.textContent).toContain("专业必修")
+    const detailBadges = dom.bodyEl.findAll((n) => n.hasAttribute("data-grade-detail-badges"))[0]
+    expect(detailBadges?.textContent).toContain("专业必修")
+    expect(detailBadges?.textContent).toContain("学分 4")
+    const detailGradePoint = dom.bodyEl.findAll((n) =>
+      n.hasAttribute("data-grade-detail-grade-point")
+    )[0]
+    expect(detailGradePoint?.textContent).toBe("绩点4.8")
+    expect(detailHero?.textContent).not.toContain("MATH301")
+    expect(detailHero?.textContent).not.toContain("开课学院")
 
     // Publish a second grade -> triggers gacha modal & hides unrevealed grade from list until collected
     liveGrades = [...SAMPLE_GRADES]

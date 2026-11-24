@@ -16,7 +16,12 @@ import { routerRuntimePlugin } from "@orahako/runtime-router"
 import { ContributionOutlet, slotRegistryPlugin } from "@orahako/runtime-slots"
 import { storageRuntimePlugin } from "@orahako/runtime-storage"
 import { uiRegistryPlugin } from "@orahako/runtime-ui"
-import { groupByPluginCategory, pluginCategory, pluginManagerPlugin } from "../src/index"
+import {
+  groupByPluginCategory,
+  pluginCategory,
+  pluginManagerPlugin,
+  type PluginManagerPreferencesStoreInstance,
+} from "../src/index"
 
 class MiniDomNode {
   readonly nodeType: number
@@ -401,15 +406,26 @@ describe("@orahako/ui-plugin-manager", () => {
         group: "account",
       })
 
-      // Static SSR check
-      const staticHtml = renderToStaticMarkup(
+      // Static SSR check: system plugins and the market stay out of the default page.
+      const preferences = pageEntry!.store as PluginManagerPreferencesStoreInstance
+      let staticHtml = renderToStaticMarkup(
         <ContributionOutlet entry={pageEntry!} slots={host.slots} i18n={host.i18n} />
       )
       expect(staticHtml).toContain("已安装插件")
       expect(staticHtml).toContain("酸橙盒默认")
       expect(staticHtml).toContain("紧凑界面")
+      expect(staticHtml).not.toContain("必需插件")
+      expect(staticHtml).not.toContain("插件更新检查")
+
+      preferences.actions.setShowSystemPlugins(true)
+      preferences.actions.setCustomMarketUrl("https://market.example.com/custom.json")
+      preferences.actions.setMarketEnabled(true)
+      staticHtml = renderToStaticMarkup(
+        <ContributionOutlet entry={pageEntry!} slots={host.slots} i18n={host.i18n} />
+      )
       // `required` in a manifest does not self-grant protection; only composition policy does.
       expect(staticHtml).toContain('aria-label="启用或停用 必需插件"')
+      expect(staticHtml).toContain("插件更新检查")
 
       // Interactive mount loads installed packages, market v3 releases, update badge, and school bundle
       const dom = mountDom()
@@ -428,6 +444,9 @@ describe("@orahako/ui-plugin-manager", () => {
       expect(text).not.toContain("v9.0.0") // v2 release filtered out!
       expect(text).toContain("更新全部（1）")
       expect(text).toContain("Mint Theme")
+      expect(fetch).toHaveBeenCalledWith("https://market.example.com/custom.json", {
+        cache: "no-store",
+      })
 
       await dom.unmount()
     } finally {

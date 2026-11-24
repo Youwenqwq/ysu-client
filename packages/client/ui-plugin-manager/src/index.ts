@@ -16,6 +16,11 @@ import {
 } from "./categories"
 import { pluginsDictionary, type PluginsDictionary } from "./dictionary"
 import {
+  PluginsHeaderActions,
+  type PluginsHeaderActionsInject,
+  type PluginsHeaderActionsProps,
+} from "./header-actions"
+import {
   PluginsPage,
   type OptionalProviderSnapshot,
   type PluginsPageInject,
@@ -25,6 +30,7 @@ import {
   pluginManagerPreferencesStore,
   type PluginManagerPreferencesState,
   type PluginManagerPreferencesStore,
+  type PluginManagerPreferencesStoreInstance,
 } from "./store"
 
 export {
@@ -32,13 +38,17 @@ export {
   pluginCategory,
   pluginManagerPreferencesStore,
   pluginsDictionary,
+  PluginsHeaderActions,
   PluginsPage,
   type OptionalProviderSnapshot,
   type PluginCategory,
   type PluginCategoryInput,
   type PluginManagerPreferencesState,
   type PluginManagerPreferencesStore,
+  type PluginManagerPreferencesStoreInstance,
   type PluginsDictionary,
+  type PluginsHeaderActionsInject,
+  type PluginsHeaderActionsProps,
   type PluginsPageInject,
   type PluginsPageProps,
 }
@@ -115,15 +125,35 @@ export const pluginManagerPlugin = definePlugin({
     providerIndependent: true,
     required: true,
     entry: "index.js",
-    inject: ["ui", "slots", "router", "i18n", "pluginManager", "packageRuntime"],
+    inject: ["ui", "slots", "router", "i18n", "storage", "pluginManager", "packageRuntime"],
     description: "管理已安装插件、外部 ZIP 侧载、应用 Shell 选择与插件市场",
   },
-  inject: ["ui", "slots", "router", "i18n", "pluginManager", "packageRuntime"] as const,
+  inject: ["ui", "slots", "router", "i18n", "storage", "pluginManager", "packageRuntime"] as const,
   apply(ctx) {
+    const preferencesStore = pluginManagerPreferencesStore.create(ctx.storage)
+    ctx.effect(() => () => preferencesStore.dispose())
+
     ctx.i18n.register({
       zh: { ...pluginsDictionary.zh, plugins: pluginsDictionary.zh },
       en: { ...pluginsDictionary.en, plugins: pluginsDictionary.en },
     })
+
+    ctx.slots.inject("shell.header.actions", () =>
+      ctx.slots.register(
+        {
+          id: "plugins-header-actions",
+          slot: "shell.header.actions",
+          dictionary: pluginsDictionary,
+          store: preferencesStore,
+          inject: (): PluginsHeaderActionsInject => ({
+            hooks: { location: ctx.router.current },
+            pluginId: pluginManagerPlugin.manifest.id,
+            defaultMarketUrl: ctx.packageRuntime.marketUrl?.(),
+          }),
+        },
+        PluginsHeaderActions
+      )
+    )
 
     ctx.ui.registerPage(
       {
@@ -134,7 +164,7 @@ export const pluginManagerPlugin = definePlugin({
         requiresProvider: false,
         parent: "me",
         dictionary: pluginsDictionary,
-        store: pluginManagerPreferencesStore,
+        store: preferencesStore,
         inject: (registrantCtx: Context): PluginsPageInject => {
           const providerSource = projectProviderSource(registrantCtx)
           return {

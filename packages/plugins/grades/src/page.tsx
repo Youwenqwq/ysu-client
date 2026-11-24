@@ -555,6 +555,23 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
             <ResponsiveModalTitle>
               {selectedGrade?.courseName || t("grades.stats.title")}
             </ResponsiveModalTitle>
+            {selectedGrade && (selectedGrade.courseType || selectedGrade.credit) && (
+              <div
+                data-grade-detail-badges=""
+                className="flex flex-wrap items-center justify-center gap-1 pt-1"
+              >
+                {selectedGrade.courseType && (
+                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                    {selectedGrade.courseType}
+                  </Badge>
+                )}
+                {selectedGrade.credit && (
+                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                    {t("grades.table.credit")} {selectedGrade.credit}
+                  </Badge>
+                )}
+              </div>
+            )}
             <ResponsiveModalDescription className="sr-only">
               {t("grades.stats.description")}
             </ResponsiveModalDescription>
@@ -564,9 +581,7 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
               <section data-grade-detail="" className="flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 flex-col gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      {t("grades.table.score")}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{t("grades.table.score")}</span>
                     <div className="flex items-baseline gap-2">
                       <span
                         data-grade-detail-score=""
@@ -592,79 +607,35 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
                       </div>
                     )}
                   </div>
-                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                    {selectedGrade.isDegreeCourse && (
-                      <Badge variant="outline" className="text-[10px]">
-                        {t("grades.degreeCourse")}
-                      </Badge>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    {selectedGrade.gradePoint && (
+                      <div data-grade-detail-grade-point="" className="flex items-baseline gap-1.5">
+                        <span className="text-xs text-muted-foreground">
+                          {t("grades.table.gradePoint")}
+                        </span>
+                        <span className="text-lg leading-none font-semibold tabular-nums">
+                          {selectedGrade.gradePoint}
+                        </span>
+                      </div>
                     )}
-                    {selectedGrade.isPass ? (
-                      <Badge variant="default" className="text-[10px]">
-                        {t("grades.table.pass")}
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive" className="text-[10px]">
-                        {t("grades.table.fail")}
-                      </Badge>
-                    )}
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {selectedGrade.isDegreeCourse && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {t("grades.degreeCourse")}
+                        </Badge>
+                      )}
+                      {selectedGrade.isPass ? (
+                        <Badge variant="default" className="text-[10px]">
+                          {t("grades.table.pass")}
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-[10px]">
+                          {t("grades.table.fail")}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                {(selectedGrade.credit || selectedGrade.gradePoint) && (
-                  <dl data-grade-detail-metrics="" className="grid grid-cols-2 gap-4 border-y py-3">
-                    {selectedGrade.credit && (
-                      <div className="flex flex-col gap-0.5">
-                        <dt className="text-xs text-muted-foreground">
-                          {t("grades.table.credit")}
-                        </dt>
-                        <dd className="text-lg leading-none font-semibold tabular-nums">
-                          {selectedGrade.credit}
-                        </dd>
-                      </div>
-                    )}
-                    {selectedGrade.gradePoint && (
-                      <div className="flex flex-col gap-0.5">
-                        <dt className="text-xs text-muted-foreground">
-                          {t("grades.table.gradePoint")}
-                        </dt>
-                        <dd className="text-lg leading-none font-semibold tabular-nums">
-                          {selectedGrade.gradePoint}
-                        </dd>
-                      </div>
-                    )}
-                  </dl>
-                )}
-
-                <dl data-grade-detail-meta="" className="grid grid-cols-1 gap-1.5 text-xs">
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-muted-foreground">{t("grades.table.term")}</dt>
-                    <dd className="font-medium">{selectedGrade.semester || "-"}</dd>
-                  </div>
-                  {selectedGrade.courseCode && (
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">{t("grades.table.courseCode")}</dt>
-                      <dd className="font-mono font-medium">{selectedGrade.courseCode}</dd>
-                    </div>
-                  )}
-                  {selectedGrade.courseType && (
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">{t("grades.table.type")}</dt>
-                      <dd className="font-medium">{selectedGrade.courseType}</dd>
-                    </div>
-                  )}
-                  {selectedGrade.department && (
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">{t("grades.table.department")}</dt>
-                      <dd className="truncate font-medium">{selectedGrade.department}</dd>
-                    </div>
-                  )}
-                  {selectedGrade.examType && (
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">{t("grades.table.examType")}</dt>
-                      <dd className="font-medium">{selectedGrade.examType}</dd>
-                    </div>
-                  )}
-                </dl>
               </section>
             )}
 
@@ -712,28 +683,28 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
                         {t("grades.stats.sectionStatistics")}
                       </h3>
                       {statsResult ? (
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex flex-col gap-1">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="flex flex-col gap-1 rounded-md border p-2.5">
                             <span className="text-[10px] text-muted-foreground">
                               {t("grades.stats.highest")}
                             </span>
-                            <span className="text-lg leading-none font-semibold tabular-nums">
+                            <span className="text-base font-semibold tabular-nums">
                               {statsResult.highestScore?.toFixed(1) ?? "-"}
                             </span>
                           </div>
-                          <div className="flex flex-col gap-1">
+                          <div className="flex flex-col gap-1 rounded-md border p-2.5">
                             <span className="text-[10px] text-muted-foreground">
                               {t("grades.stats.lowest")}
                             </span>
-                            <span className="text-lg leading-none font-semibold tabular-nums">
+                            <span className="text-base font-semibold tabular-nums">
                               {statsResult.lowestScore?.toFixed(1) ?? "-"}
                             </span>
                           </div>
-                          <div className="flex flex-col gap-1 text-right">
+                          <div className="flex flex-col gap-1 rounded-md border p-2.5">
                             <span className="text-[10px] text-muted-foreground">
                               {t("grades.stats.average")}
                             </span>
-                            <span className="text-lg leading-none font-semibold tabular-nums">
+                            <span className="text-base font-semibold tabular-nums">
                               {statsResult.averageScore?.toFixed(1) ?? "-"}
                             </span>
                           </div>
@@ -789,20 +760,20 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
                     <section className="flex flex-col gap-2">
                       <h3 className="text-sm font-semibold">{t("grades.stats.sectionRanking")}</h3>
                       {rankingResult ? (
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex flex-col gap-1">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex flex-col gap-1 rounded-md border p-2.5">
                             <span className="text-[10px] text-muted-foreground">
                               {t("grades.stats.myScore")}
                             </span>
-                            <span className="text-lg leading-none font-semibold tabular-nums">
+                            <span className="text-base font-semibold tabular-nums">
                               {rankingResult.score?.toFixed(1) ?? "-"}
                             </span>
                           </div>
-                          <div className="flex flex-col gap-1 text-right">
+                          <div className="flex flex-col gap-1 rounded-md border p-2.5">
                             <span className="text-[10px] text-muted-foreground">
                               {t("grades.stats.rank")}
                             </span>
-                            <span className="text-lg leading-none font-semibold tabular-nums">
+                            <span className="text-base font-semibold tabular-nums">
                               {t("grades.stats.rankFormat", {
                                 rank: rankingResult.rank,
                                 total: rankingResult.total,
