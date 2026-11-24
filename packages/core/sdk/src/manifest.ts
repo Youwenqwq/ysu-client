@@ -1,6 +1,6 @@
 import semver from "semver"
 
-export const PLUGIN_API_VERSION = 3
+export const PLUGIN_API_VERSION = 1
 
 export const PLATFORM_MODULES = [
   "react",

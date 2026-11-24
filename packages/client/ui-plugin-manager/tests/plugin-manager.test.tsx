@@ -219,7 +219,7 @@ describe("@orahako/ui-plugin-manager", () => {
           id: "community.toy",
           name: "Community Toy",
           version: "1.0.0",
-          apiVersion: 3,
+          apiVersion: 1,
           kind: "feature",
           categories: ["toybox"],
           entry: "index.js",
@@ -250,9 +250,9 @@ describe("@orahako/ui-plugin-manager", () => {
             },
             {
               version: "1.5.0",
-              apiVersion: 3,
+              apiVersion: 1,
               platforms: ["web", "android"],
-              zipUrl: "/v3/toy-1.5.0.zip",
+              zipUrl: "/v1/toy-1.5.0.zip",
               sha256: "b".repeat(64),
               size: 200,
               publishedAt: "2026-11-18T00:00:00Z",
@@ -268,9 +268,9 @@ describe("@orahako/ui-plugin-manager", () => {
           versions: [
             {
               version: "1.0.0",
-              apiVersion: 3,
+              apiVersion: 1,
               platforms: ["web", "android"],
-              zipUrl: "/v3/mint-1.0.0.zip",
+              zipUrl: "/v1/mint-1.0.0.zip",
               sha256: "c".repeat(64),
               size: 150,
               publishedAt: "2026-11-18T00:00:00Z",

@@ -126,7 +126,7 @@ describe("@orahako/runtime-packages", () => {
     }
   })
 
-  it("installs API v3 compatible market releases and skips legacy v2 or incompatible entries", async () => {
+  it("installs API v1 compatible market releases and skips incompatible entries", async () => {
     const marketPayload: MarketplaceIndex = {
       schemaVersion: 1,
       updatedAt: "2026-11-18T00:00:00Z",
@@ -139,7 +139,7 @@ describe("@orahako/runtime-packages", () => {
           categories: ["toybox"],
           versions: [
             {
-              // Historical API v2 release — valid in index, ignored by v3 selector
+              // Unsupported API v2 release — valid in index, ignored by the v1 selector
               version: "9.9.9",
               apiVersion: 2,
               platforms: ["web", "android"],

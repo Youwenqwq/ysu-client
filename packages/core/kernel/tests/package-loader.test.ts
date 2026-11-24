@@ -45,7 +45,7 @@ describe("package-path & parsePluginPackage", () => {
     expect(resolveRelativePackagePath("dist/index.js", "../../escape.js")).toBeUndefined()
   })
 
-  it("parses valid API v3 ZIP archives and rejects API v2 archives or missing assets", () => {
+  it("parses valid API v1 ZIP archives and rejects incompatible archives or missing assets", () => {
     const validBytes = encodeZip({
       "manifest.json": JSON.stringify(validManifest({ styles: ["dist/style.css"] })),
       "dist/index.js": "export default () => {}\n",
@@ -53,7 +53,7 @@ describe("package-path & parsePluginPackage", () => {
     })
     const parsed = parsePluginPackage(validBytes)
     expect(parsed.manifest.id).toBe("community.hello")
-    expect(parsed.manifest.apiVersion).toBe(3)
+    expect(parsed.manifest.apiVersion).toBe(1)
     expect(parsed.files.map((f) => f.path)).toEqual([
       "dist/index.js",
       "dist/style.css",
@@ -124,7 +124,7 @@ describe("external-loader", () => {
     const { api, blobs, revoked } = createFakeBlobUrls()
     const hostRegistry = createHostModuleRegistry(
       {
-        "@orahako/sdk": { PLUGIN_API_VERSION: 3 },
+        "@orahako/sdk": { PLUGIN_API_VERSION: 1 },
       },
       api
     )
@@ -137,7 +137,7 @@ describe("external-loader", () => {
             icon: "assets/logo.svg",
           })
         ),
-        "dist/helper.js": `export const label = "v3-helper"\n`,
+        "dist/helper.js": `export const label = "v1-helper"\n`,
         "dist/index.js": `import { PLUGIN_API_VERSION } from "@orahako/sdk"\nimport { label } from "./helper"\nexport default { apply() { return label + PLUGIN_API_VERSION } }\n`,
         "dist/tailwind.css": ".btn { padding: 4px; }",
         "assets/logo.svg": "<svg></svg>",

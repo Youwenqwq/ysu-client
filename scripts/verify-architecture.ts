@@ -433,6 +433,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error(`Architecture verification failed with ${diagnostics.length} violation(s).`)
     process.exitCode = 1
   } else {
-    console.log(`Architecture verification passed (${packageCount} API v3 packages scanned).`)
+    console.log(`Architecture verification passed (${packageCount} API v1 packages scanned).`)
   }
 }

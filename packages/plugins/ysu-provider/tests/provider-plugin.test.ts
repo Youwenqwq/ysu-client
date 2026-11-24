@@ -281,7 +281,7 @@ async function startAllBuiltins(kernel: PluginRuntime): Promise<void> {
 }
 
 describe("ysu.provider manifest & plugin lifecycle", () => {
-  it("exports API v3 manifest and registers/cleans up provider, i18n, and activity hooks without a settings category", async () => {
+  it("exports API v1 manifest and registers/cleans up provider, i18n, and activity hooks without a settings category", async () => {
     expect(definition).toBe(ysuProviderPlugin)
     expect(manifest).toEqual({
       id: "ysu.provider",
@@ -294,7 +294,7 @@ describe("ysu.provider manifest & plugin lifecycle", () => {
       description: "燕山大学 CAS / 教务 / 移动端 / 缴费平台 Provider",
       inject: ["i18n", "storage", "providers", "http", "session", "query", "native", "mfa"],
     })
-    expect(manifest.apiVersion).toBe(3)
+    expect(manifest.apiVersion).toBe(1)
 
     const env = createTestRuntimeEnvironment()
     await startAllBuiltins(env.kernel)

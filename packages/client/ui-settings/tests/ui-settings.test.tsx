@@ -31,7 +31,7 @@ function DummyIcon() {
 }
 
 describe("@orahako/ui-settings", () => {
-  it("validates API v3 manifest and normalizes & applies Custom User-Agent headers", () => {
+  it("validates API v1 manifest and normalizes & applies Custom User-Agent headers", () => {
     const validated = validatePluginManifest(manifest)
     expect(validated.id).toBe(SETTINGS_PLUGIN_ID)
     expect(validated.kind).toBe("feature")

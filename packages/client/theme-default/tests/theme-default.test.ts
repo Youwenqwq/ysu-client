@@ -5,7 +5,7 @@ import { uiRegistryPlugin } from "@orahako/runtime-ui"
 import { manifest, THEME_DEFAULT_PLUGIN_ID, themeDefaultPlugin } from "../src"
 
 describe("@orahako/theme-default", () => {
-  it("validates API v3 manifest and registers & cleans up the default theme", () => {
+  it("validates API v1 manifest and registers & cleans up the default theme", () => {
     const validated = validatePluginManifest(manifest)
     expect(validated.id).toBe(THEME_DEFAULT_PLUGIN_ID)
     expect(validated.apiVersion).toBe(PLUGIN_API_VERSION)

@@ -23,7 +23,7 @@ async function packFixture(manifest: Partial<PluginManifest>, sources: Record<st
     id: "test.sample",
     name: "Sample",
     version: "1.0.0",
-    apiVersion: 3,
+    apiVersion: 1,
     minAppVersion: "0.16.0",
     kind: "feature",
     entry: "dist/index.js",
@@ -57,7 +57,7 @@ describe("plugin packaging styles", () => {
     expect(read("dist/index.js")).toContain("data:image/png")
   })
 
-  it("keeps API v3 platform modules external in the packed entry", async () => {
+  it("keeps API v1 platform modules external in the packed entry", async () => {
     const { manifest, read } = await packFixture(
       {},
       {
@@ -71,17 +71,17 @@ describe("plugin packaging styles", () => {
       }
     )
 
-    expect(manifest).toMatchObject({ apiVersion: 3, kind: "feature", entry: "dist/index.js" })
+    expect(manifest).toMatchObject({ apiVersion: 1, kind: "feature", entry: "dist/index.js" })
     const entry = read("dist/index.js")
     expect(entry).toMatch(/from\s*["']@orahako\/sdk["']/)
     expect(entry).toMatch(/from\s*["']@orahako\/ui-primitives["']/)
     expect(entry).toMatch(/from\s*["']react\/jsx-runtime["']/)
   })
 
-  it("rejects API versions older than v3", async () => {
+  it("rejects API versions other than v1", async () => {
     await expect(
       packFixture({ apiVersion: 2 }, { "src/index.ts": "export default null" })
-    ).rejects.toThrow("apiVersion must be 3")
+    ).rejects.toThrow("apiVersion must be 1")
   })
 
   it("does not externalize unexported platform package subpaths", async () => {

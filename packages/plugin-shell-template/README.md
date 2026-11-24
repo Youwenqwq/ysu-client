@@ -1,6 +1,6 @@
 # 社区 Shell 模板
 
-这是一个不导入宿主私有模块的 API v3 Shell 示例。它通过派生 Props 读取 UI 快照、组合插件页面和导航，并提供恢复默认 Shell 的入口。
+这是一个不导入宿主私有模块的 API v1 Shell 示例。它通过派生 Props 读取 UI 快照、组合插件页面和导航，并提供恢复默认 Shell 的入口。
 
 ```bash
 pnpm plugin pack packages/plugin-shell-template
