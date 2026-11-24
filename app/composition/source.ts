@@ -3,7 +3,7 @@ import { platformBundle } from "@orahako/bundle-platform"
 import { ysuBundle } from "@orahako/bundle-ysu"
 import { composeBundles, type CompositionLayer, type CompositionSource } from "@orahako/sdk"
 import { appIdentity } from "./identity"
-import { officialPlugins } from "./plugins"
+import { createOfficialPlugins } from "./plugins"
 
 const appVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"
 const appBuild = process.env.NEXT_PUBLIC_APP_BUILD ?? "dev"
@@ -13,13 +13,27 @@ const { name: appName, nameEn: appNameEn, deepLinkScheme } = appIdentity
 const repoUrl = "https://github.com/Youwenqwq/orahako"
 const schools = [{ id: "ysu", name: "燕山大学", nameEn: "Yanshan University" }] as const
 
+export type DeploymentTarget = "native" | "edgeone-pwa"
+
+export const EDGEONE_PWA_DEPLOYMENT = "edgeone-pwa"
+
+/** Only the EdgeOne deployment script sets this build-time marker. */
+export function resolveDeploymentTarget(
+  configured: string | undefined = process.env.NEXT_PUBLIC_APP_DEPLOYMENT
+): DeploymentTarget {
+  return configured === EDGEONE_PWA_DEPLOYMENT ? EDGEONE_PWA_DEPLOYMENT : "native"
+}
+
+export interface OfficialCompositionOptions {
+  readonly deployment?: DeploymentTarget
+}
+
 const deployment: CompositionLayer = {
   id: "orahako.official.deployment",
   plugins: [
     { id: "orahako.runtime.installer", config: { marketUrl, appVersion } },
     { id: "orahako.runtime.router", config: { basePath } },
     { id: "orahako.runtime.navigation", config: { fallbackHref: "/" } },
-    { id: "orahako.activation", config: { required: process.env.NODE_ENV === "production" } },
     {
       id: "orahako.analytics",
       config: { endpoint: "https://ysu.welain.com/api/stats", appVersion },
@@ -72,11 +86,30 @@ const deployment: CompositionLayer = {
   ],
 }
 
-export const officialCompositionSource: CompositionSource = {
-  appVersion,
-  appBuild,
-  composition: composeBundles("orahako.official", [platformBundle, academicBundle, ysuBundle], [
-    deployment,
-  ]),
-  plugins: officialPlugins,
+const edgeonePwaLayer: CompositionLayer = {
+  id: "orahako.official.edgeone-pwa",
+  plugins: [
+    {
+      insert: [{ id: "orahako.activation", config: { required: true } }],
+    },
+  ],
 }
+
+export function createOfficialCompositionSource(
+  options: OfficialCompositionOptions = {}
+): CompositionSource {
+  const deploymentTarget = options.deployment ?? resolveDeploymentTarget()
+  const pwa = deploymentTarget === EDGEONE_PWA_DEPLOYMENT
+  return {
+    appVersion,
+    appBuild,
+    composition: composeBundles(
+      "orahako.official",
+      [platformBundle, academicBundle, ysuBundle],
+      pwa ? [deployment, edgeonePwaLayer] : [deployment]
+    ),
+    plugins: createOfficialPlugins({ activation: pwa }),
+  }
+}
+
+export const officialCompositionSource = createOfficialCompositionSource()

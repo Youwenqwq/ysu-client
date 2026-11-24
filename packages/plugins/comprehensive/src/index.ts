@@ -17,6 +17,9 @@ import { comprehensiveViewStore } from "./view-store"
 
 export const COMPREHENSIVE_PLUGIN_ID = "orahako.comprehensive"
 
+const SIX_HOUR_TTL_MS = 1000 * 60 * 60 * 6
+const DEFAULT_TTL_MS = 1000 * 60 * 60 * 24
+
 export type {
   ComprehensiveDictionary,
   ComprehensivePageInject,
@@ -42,6 +45,14 @@ export const comprehensivePlugin = definePlugin({
   apply(ctx) {
     const { ui, slots, router, i18n, provider, session, query } = ctx
     i18n.register(comprehensiveDictionary)
+
+    query.registerPolicy("comprehensive-terms", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("comprehensive-result", { ttl: SIX_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("comprehensive-indicators", { ttl: SIX_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("comprehensive-radar", { ttl: SIX_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("comprehensive-year-scores", { ttl: SIX_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("comprehensive-report-years", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("comprehensive-report", { ttl: SIX_HOUR_TTL_MS, persist: true })
 
     const sources = createComprehensiveSources({ query, provider, session })
     const viewStore = comprehensiveViewStore.create()

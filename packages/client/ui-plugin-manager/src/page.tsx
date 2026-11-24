@@ -62,7 +62,8 @@ export interface PluginsPageInject {
   ) => Promise<PluginManifest>
   readonly applyPluginBundle: (
     pluginIds: readonly string[],
-    index: MarketplaceIndex
+    index: MarketplaceIndex,
+    marketBaseUrl: string
   ) => Promise<PluginManifest>
   readonly getMarketUrl: () => string | undefined
   readonly getAppVersion: () => string
@@ -70,6 +71,7 @@ export interface PluginsPageInject {
   readonly getLoadErrors: () => ReadonlyMap<string, string>
   readonly getActiveShell: () => string | undefined
   readonly setActiveShell: (shellId: string | undefined) => void
+  readonly getDefaultShell?: () => string | undefined
   readonly isSafeMode: () => boolean
   readonly getPlatform: () => PluginPlatform
   readonly confirmUninstall?: (message: string) => boolean
@@ -155,6 +157,7 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
     getLoadErrors,
     getActiveShell,
     setActiveShell,
+    getDefaultShell,
     isSafeMode,
     getPlatform,
     confirmUninstall,
@@ -203,11 +206,12 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
       if (!marketUrl) {
         throw new Error("The active composition does not provide a plugin market")
       }
-      setMarket(await loadPluginMarket(marketUrl))
+      const resolved = await loadPluginMarket(marketUrl)
+      setMarket(resolved)
+      if (!resolved.stale) actions.setLastUpdateCheck(Date.now())
     } catch (error) {
       setMarketError(error instanceof Error ? error.message : String(error))
     } finally {
-      actions.setLastUpdateCheck(Date.now())
       checkingRef.current = false
       setChecking(false)
     }
@@ -273,7 +277,7 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
       if (!marketUrl) throw new Error("The active composition does not provide a plugin market")
       const resolved = market ?? (await loadPluginMarket(marketUrl))
       setMarket(resolved)
-      await applyPluginBundle(bundle.pluginIds, resolved.index)
+      await applyPluginBundle(bundle.pluginIds, resolved.index, marketUrl)
       toast.success(t("bundleEnabled", { name: bundle.name }))
     })
   }
@@ -363,8 +367,9 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
       : undefined
 
   const shells = uiSnapshot.shells
+  const activeShellId = selectedShell ?? getDefaultShell?.()
 
-  const handleSelectShell = (shellId: string | undefined): void => {
+  const handleSelectShell = (shellId: string): void => {
     setActiveShell(shellId)
     setSelectedShell(shellId)
   }
@@ -596,15 +601,16 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold">{t("shell")}</h2>
           <div className="grid grid-cols-2 gap-2">
-            {shells.map((shell, idx) => {
+            {shells.map((shell) => {
               const id = `${shell.pluginId}:${shell.id}`
-              const isDefaultShell = id === "orahako.shell:default" || idx === 0
-              const selected = selectedShell ? selectedShell === id : isDefaultShell
+              const selected =
+                activeShellId !== undefined &&
+                (activeShellId === id || activeShellId === shell.id)
               return (
                 <Button
                   key={id}
                   variant={selected ? "default" : "outline"}
-                  onClick={() => handleSelectShell(isDefaultShell ? undefined : id)}
+                  onClick={() => handleSelectShell(id)}
                 >
                   {shell.name}
                 </Button>

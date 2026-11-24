@@ -26,12 +26,20 @@ import {
   createObservableSource,
   type HttpRequest,
   type HttpResponse,
+  type MutableObservableSource,
+  type ObservableSource,
   type PluginHttpService,
   type PluginI18nRegistryService,
   type PluginKeyValueStorage,
 } from "@orahako/sdk"
+import type { SessionService, SessionSnapshot } from "@orahako/academic-sdk"
 import * as meterEntry from "../src"
-import { METER_PLUGIN_ID, meterPlugin } from "../src"
+import {
+  METER_PLUGIN_ID,
+  meterPlugin,
+  type MeterPageInject,
+  type SessionAccountSnapshot,
+} from "../src"
 import { meterRoomStore } from "../src/store"
 
 class MiniDomNode {
@@ -350,6 +358,7 @@ describe("@orahako/plugin-meter", () => {
       "storage",
       "http",
     ])
+    expect(meterPlugin.optionalInject).toEqual(["session"])
   })
 
   it("manages room history in meterRoomStore cleanly", () => {
@@ -375,6 +384,109 @@ describe("@orahako/plugin-meter", () => {
     expect(store.source.getSnapshot().selectedAccount).toBe("2024001")
     expect(store.source.getSnapshot().history.map((h) => h.account)).toEqual(["2024001"])
     store.dispose()
+  })
+
+  it("rebinds the optional session source on appearance, replacement, and removal", async () => {
+    const localMem = createMemoryStorage()
+    const secureMem = createMemoryStorage()
+    const runtime = new PluginRuntime()
+
+    runtime.context.set(
+      "storage",
+      new NamespacedStorageService({
+        local: localMem.backend,
+        secure: secureMem.backend,
+      })
+    )
+    runtime.context.set(
+      "http",
+      makeEncryptedHttp({
+        "202411040369": { roomName: "西校区_四组团B座_526房间", remaining: 68.5 },
+      })
+    )
+
+    for (const plugin of [
+      slotRegistryPlugin,
+      uiRegistryPlugin,
+      i18nRegistryPlugin,
+      routerRuntimePlugin,
+      meterPlugin,
+    ]) {
+      runtime.register(plugin, "builtin")
+      runtime.start(plugin.manifest.id)
+    }
+
+    const ui = runtime.context.get("ui")!
+    const readSession = (): ObservableSource<SessionAccountSnapshot> => {
+      const page = ui
+        .getSnapshot()
+        .pages.find((item) => item.pluginId === METER_PLUGIN_ID && item.id === "index")
+      expect(page).toBeDefined()
+      return (page!.inject!(runtime.context) as MeterPageInject).hooks.session
+    }
+
+    const makeSessionService = (
+      state: MutableObservableSource<SessionSnapshot>
+    ): SessionService => ({
+      state,
+      getSnapshot: state.getSnapshot,
+      subscribe: state.subscribe,
+      setCredential: () => {},
+      activateSchool: () => {},
+      clearCredential: () => {},
+      setSessionExpired: () => {},
+      setArtifact: () => {},
+      getArtifact: () => null,
+      createCookieJar: () => {
+        throw new Error("not used")
+      },
+      fetchWithJar: async () => {
+        throw new Error("not used")
+      },
+    })
+
+    try {
+      expect(readSession().getSnapshot()).toEqual({ hasHydrated: true, username: null })
+
+      const sessionAState = createObservableSource<SessionSnapshot>({
+        activeSchoolId: "ysu",
+        credential: null,
+        username: "2024001",
+        isAuthenticated: true,
+        sessionExpired: false,
+        hasHydrated: true,
+        artifacts: {},
+      })
+      const releaseSessionA = runtime.context.set("session", makeSessionService(sessionAState))
+      await vi.waitFor(() => {
+        expect(readSession().getSnapshot().username).toBe("2024001")
+      })
+
+      const firstSource = readSession()
+      const sessionBState = createObservableSource<SessionSnapshot>({
+        activeSchoolId: "ysu",
+        credential: null,
+        username: "2024002",
+        isAuthenticated: true,
+        sessionExpired: false,
+        hasHydrated: true,
+        artifacts: {},
+      })
+      releaseSessionA()
+      const releaseSessionB = runtime.context.set("session", makeSessionService(sessionBState))
+      await vi.waitFor(() => {
+        const nextSource = readSession()
+        expect(nextSource).not.toBe(firstSource)
+        expect(nextSource.getSnapshot().username).toBe("2024002")
+      })
+
+      releaseSessionB()
+      await vi.waitFor(() => {
+        expect(readSession().getSnapshot()).toEqual({ hasHydrated: true, username: null })
+      })
+    } finally {
+      runtime.dispose()
+    }
   })
 
   it("renders a route-scoped mobile refresh and persists room history in a non-academic runtime", async () => {

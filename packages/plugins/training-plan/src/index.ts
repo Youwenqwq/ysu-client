@@ -17,6 +17,8 @@ import {
 
 export const TRAINING_PLAN_PLUGIN_ID = "orahako.training-plan"
 
+const DEFAULT_TTL_MS = 1000 * 60 * 60 * 24
+
 export type {
   TrainingPlanDictionary,
   TrainingPlanFilterInput,
@@ -42,6 +44,10 @@ export const trainingPlanPlugin = definePlugin({
     const { ui, i18n, provider, session, query } = ctx
     i18n.register(trainingPlanDictionary)
     let disposed = false
+
+    query.registerPolicy("training-plan", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("academic-completion", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("academic-warnings", { ttl: DEFAULT_TTL_MS, persist: true })
 
     const plansSource = query.source<TrainingPlan[], "trainingPlan">({
       feature: "training-plan",

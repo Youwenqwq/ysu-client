@@ -26,7 +26,8 @@ export interface MarketPluginInstallerOptions {
   readonly nativeCapabilities?: readonly string[] | (() => readonly string[])
   readonly applyBundle: (
     pluginIds: readonly string[],
-    index: MarketplaceIndex
+    index: MarketplaceIndex,
+    marketBaseUrl: string
   ) => Promise<PluginManifest>
   readonly loadMarket?: () => Promise<{ readonly index: MarketplaceIndex }>
   readonly platform?: () => PluginPlatform
@@ -61,7 +62,7 @@ export function createMarketPluginInstaller({
           `No compatible release for plugin ${pluginId} (app ${appVersion}, platform ${currentPlatform})`
         )
       }
-      return applyBundle([pluginId], index)
+      return applyBundle([pluginId], index, marketUrl)
     },
   }
 }
@@ -125,7 +126,8 @@ export const installerRuntimePlugin = definePlugin<
         marketUrl: config.marketUrl,
         appVersion: config.appVersion,
         nativeCapabilities: () => packages.nativeCapabilities(),
-        applyBundle: (pluginIds, index) => packages.applyPluginBundle(pluginIds, index),
+        applyBundle: (pluginIds, index, marketBaseUrl) =>
+          packages.applyPluginBundle(pluginIds, index, marketBaseUrl),
       })
     )
   },

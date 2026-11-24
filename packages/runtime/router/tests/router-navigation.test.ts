@@ -178,6 +178,108 @@ describe("PluginRouter & routerRuntimePlugin", () => {
     expect(browser.listenerCount()).toBe(0)
   })
 
+  it("resumes a persisted history stack after refresh when the index matches the href", () => {
+    const browser = createFakeBrowserWindow("/?route=home")
+    const first = new PluginRouter({ window: browser.window })
+    first.push("detail")
+    first.dispose()
+
+    const refreshed = new PluginRouter({ window: browser.window })
+    expect(browser.window.history.state).toMatchObject({
+      orahakoIndex: 1,
+      orahakoEntries: ["/?route=home", "/?route=detail"],
+    })
+    expect(refreshed.current.getSnapshot().route).toBe("detail")
+
+    refreshed.push("editor")
+    refreshed.back()
+    expect(refreshed.current.getSnapshot().route).toBe("detail")
+    refreshed.back()
+    expect(refreshed.current.getSnapshot().route).toBe("home")
+    refreshed.dispose()
+  })
+
+  it("rebuilds a safe stack when a refreshed orahakoIndex no longer matches its href", () => {
+    const browser = createFakeBrowserWindow("/?route=home")
+    browser.window.history.replaceState(
+      {
+        orahakoIndex: 2,
+        orahakoEntries: ["/?route=home", "/?route=detail", "/?route=editor"],
+      },
+      "",
+      "/?route=home"
+    )
+
+    const router = new PluginRouter({ window: browser.window })
+    expect(browser.window.history.state).toMatchObject({
+      orahakoIndex: 0,
+      orahakoEntries: ["/?route=home"],
+    })
+    expect(router.current.getSnapshot().route).toBe("home")
+
+    router.push("detail")
+    router.back()
+    expect(router.current.getSnapshot().route).toBe("home")
+    router.dispose()
+  })
+
+  it("matches a popstate href instead of trusting a stale index in event state", () => {
+    const browser = createFakeBrowserWindow("/?route=home")
+    const router = new PluginRouter({ window: browser.window })
+    router.push("detail")
+    router.push("editor")
+
+    browser.triggerPopState("/?route=detail", { orahakoIndex: 2 })
+    expect(router.current.getSnapshot().route).toBe("detail")
+    expect(browser.window.history.state).toMatchObject({
+      orahakoIndex: 1,
+      orahakoEntries: ["/?route=home", "/?route=detail", "/?route=editor"],
+    })
+    router.dispose()
+  })
+
+  it("coalesces repeated back requests while an async guard is in flight", async () => {
+    const browser = createFakeBrowserWindow("/?route=home")
+    const router = new PluginRouter({ window: browser.window })
+    router.push("detail")
+
+    const guardDeferred = Promise.withResolvers<boolean>()
+    const guard = vi.fn(() => guardDeferred.promise)
+    router.registerBackGuard(guard)
+
+    router.back()
+    router.back()
+    router.back()
+    expect(guard).toHaveBeenCalledTimes(1)
+
+    guardDeferred.resolve(true)
+    await vi.waitFor(() => expect(router.current.getSnapshot().route).toBe("home"))
+    expect(guard).toHaveBeenCalledTimes(1)
+    router.dispose()
+  })
+
+  it("treats rejected async back guards as vetoes and releases the in-flight lock", async () => {
+    const router = new PluginRouter({ window: null, initialHref: "/?route=home" })
+    router.push("detail")
+
+    const guard = vi.fn(async () => {
+      await Promise.resolve()
+      throw new Error("guard denied")
+    })
+    router.registerBackGuard(guard)
+
+    await expect(router.dispatchHardwareBack()).resolves.toBe(true)
+    expect(guard).toHaveBeenCalledTimes(1)
+    expect(router.current.getSnapshot().route).toBe("detail")
+
+    const hardwareGuard = vi.fn(() => Promise.reject(new Error("still denied")))
+    router.registerBackGuard(hardwareGuard)
+    await expect(router.dispatchHardwareBack()).resolves.toBe(true)
+    expect(hardwareGuard).toHaveBeenCalledTimes(1)
+    expect(router.current.getSnapshot().route).toBe("detail")
+    router.dispose()
+  })
+
   it("evaluates LIFO back guards (sync & async) and revokes guards on plugin scope stop", async () => {
     const runtime = new PluginRuntime()
     runtime.register(routerRuntimePlugin, "builtin", { initialHref: "/?route=home" })
@@ -231,13 +333,13 @@ describe("PluginRouter & routerRuntimePlugin", () => {
       return allowAsync
     })
 
-    router.back()
-    await vi.waitFor(() => expect(order).toEqual(["inner", "async"]))
+    await expect(router.dispatchHardwareBack()).resolves.toBe(true)
+    expect(order).toEqual(["inner", "async"])
     expect(router.current.getSnapshot().route).toBe("detail")
 
     allowAsync = true
-    router.back()
-    await vi.waitFor(() => expect(router.current.getSnapshot().route).toBe("home"))
+    await expect(router.dispatchHardwareBack()).resolves.toBe(true)
+    expect(router.current.getSnapshot().route).toBe("home")
     expect(order).toEqual(["inner", "async", "async", "outer"])
 
     disposeAsync()

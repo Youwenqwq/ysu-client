@@ -118,12 +118,14 @@ export interface SchedulePageInject {
     readonly termCalendar: ObservableSource<QuerySnapshot<TermCalendar>>
     readonly periods: ObservableSource<QuerySnapshot<ClassPeriod[]>>
     readonly exams: ObservableSource<QuerySnapshot<Exam[]>>
+    readonly navigation: ObservableSource<number>
   }
   readonly patchMutators: SchedulePatchMutators
   readonly mobileBridge: MobileLessonBridge
   readonly pluginId: string
   readonly isNative: () => boolean
   readonly assistantSrc: string
+  readonly canOpenSchoolSchedule: () => boolean
   readonly setCompactMode: (compact: boolean) => void
   readonly setWidgetAssistantHidden: (hidden: boolean) => void
   readonly setWidgetAssistantPosition: (position: WidgetAssistantPosition | null) => void
@@ -168,7 +170,7 @@ function isUnsupportedError(error: Error | null): boolean {
 }
 
 export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
-  const { t, useStore, actions } = props
+  const { t, useStore, actions, canOpenSchoolSchedule: canOpenSchoolScheduleRoute } = props
   const isMobile = useIsMobile()
   const clockTick = props.useClockTick()
   const settings = props.useSettings()
@@ -181,6 +183,8 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   const termCalendarQuery = props.useTermCalendar()
   const periodsQuery = props.usePeriods()
   const examsQuery = props.useExams()
+  props.useNavigation()
+  const canOpenSchoolSchedule = canOpenSchoolScheduleRoute()
 
   const weekOverride = useStore((s) => s.weekOverride)
   const termInput = useStore((s) => s.termInput)
@@ -584,14 +588,18 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {editing && editorActions}
-            <Button type="button" variant="outline" onClick={handleOpenFreeRooms}>
-              <CalendarSearch data-icon="inline-start" />
-              {t("freeRoomEntry")}
-            </Button>
-            <Button type="button" variant="outline" onClick={props.openSchoolSchedule}>
-              <CalendarDays data-icon="inline-start" />
-              {t("schoolScheduleEntry")}
-            </Button>
+            {canOpenSchoolSchedule && (
+              <>
+                <Button type="button" variant="outline" onClick={handleOpenFreeRooms}>
+                  <CalendarSearch data-icon="inline-start" />
+                  {t("freeRoomEntry")}
+                </Button>
+                <Button type="button" variant="outline" onClick={props.openSchoolSchedule}>
+                  <CalendarDays data-icon="inline-start" />
+                  {t("schoolScheduleEntry")}
+                </Button>
+              </>
+            )}
           </div>
         </CardHeader>
         {!editing && <CardContent>{renderFilterControls("schedule-desktop")}</CardContent>}
@@ -813,9 +821,11 @@ export interface ScheduleHeaderActionsInject {
     readonly currentWeek: ObservableSource<QuerySnapshot<CurrentWeek>>
     readonly termCalendar: ObservableSource<QuerySnapshot<TermCalendar>>
     readonly periods: ObservableSource<QuerySnapshot<ClassPeriod[]>>
+    readonly navigation: ObservableSource<number>
   }
   readonly pluginId: string
   readonly setCompactMode: (compact: boolean) => void
+  readonly canOpenSchoolSchedule: () => boolean
   readonly openSchoolSchedule: () => void
   readonly openFreeRooms: (params: FreeRoomTargetParams) => void
 }
@@ -829,7 +839,7 @@ export type ScheduleHeaderActionsProps = DerivedComponentProps<
 >
 
 export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = (props) => {
-  const { t, useStore, actions } = props
+  const { t, useStore, actions, canOpenSchoolSchedule: canOpenSchoolScheduleRoute } = props
   const location = props.useLocation()
   const clockTick = props.useClockTick()
   const settings = props.useSettings()
@@ -841,6 +851,8 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
   const currentWeekQuery = props.useCurrentWeek()
   const termCalendarQuery = props.useTermCalendar()
   const periodsQuery = props.usePeriods()
+  props.useNavigation()
+  const canOpenSchoolSchedule = canOpenSchoolScheduleRoute()
 
   const weekOverride = useStore((s) => s.weekOverride)
   const queriedTerm = useStore((s) => s.queriedTerm)
@@ -938,35 +950,37 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
         </div>
       ) : (
         <>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="h-8 w-8"
-                aria-label={t("schoolScheduleEntry")}
-              >
-                <CalendarDays className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={props.openSchoolSchedule}>
-                {t("schoolScheduleEntry")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() =>
-                  props.openFreeRooms({
-                    week: selectedWeek || currentWeek?.week || 1,
-                    day: clock.weekday >= 1 ? clock.weekday : undefined,
-                    section: currentSection ?? undefined,
-                  })
-                }
-              >
-                {t("freeRoomEntry")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {canOpenSchoolSchedule && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="h-8 w-8"
+                  aria-label={t("schoolScheduleEntry")}
+                >
+                  <CalendarDays className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={props.openSchoolSchedule}>
+                  {t("schoolScheduleEntry")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    props.openFreeRooms({
+                      week: selectedWeek || currentWeek?.week || 1,
+                      day: clock.weekday >= 1 ? clock.weekday : undefined,
+                      section: currentSection ?? undefined,
+                    })
+                  }
+                >
+                  {t("freeRoomEntry")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Button
             type="button"
             variant="ghost"

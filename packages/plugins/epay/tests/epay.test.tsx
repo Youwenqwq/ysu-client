@@ -492,6 +492,28 @@ describe("@orahako/plugin-epay", () => {
     await act(async () => router.push({ route: "meter" }))
     expect(header.findAll(isRefresh)).toEqual([])
 
+    // The provider is already ready, so a later sign-in must trigger the auto-check by itself.
+    await act(async () => {
+      session.setCredential({
+        schoolId: "epay-school",
+        credential: "ticket-epay-b",
+        username: "20260202",
+      })
+    })
+    await vi.waitFor(() => {
+      expect(toastMocks.warning).toHaveBeenCalledTimes(2)
+    })
+
+    // Re-notifying the same account (fresh credential) must stay inside the 3-hour cooldown.
+    await act(async () => {
+      session.setCredential({
+        schoolId: "epay-school",
+        credential: "ticket-epay-b-relogin",
+        username: "20260202",
+      })
+    })
+    expect(toastMocks.warning).toHaveBeenCalledTimes(2)
+
     // Render reminder settings contribution for epay-school (visible) then plain-school (hidden)
     await dom.render(
       <ContributionOutlet entry={reminderContributions[0]!} slots={slots} i18n={i18n} />

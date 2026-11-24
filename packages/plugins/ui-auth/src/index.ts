@@ -39,6 +39,8 @@ import {
   RATE_LIMIT_MAX_ATTEMPTS,
   RATE_LIMIT_WINDOW_MS,
   rememberedCredentialsStore,
+  REMEMBERED_PASSWORD_ARTIFACT,
+  REMEMBERED_USERNAME_ARTIFACT,
   type LoginRateLimitState,
   type RateLimitResult,
   type RememberedCredentialEntry,
@@ -47,6 +49,8 @@ import {
 } from "./stores"
 
 export const AUTH_UI_PLUGIN_ID = "orahako.auth-ui"
+
+const LONG_TTL_MS = 1000 * 60 * 60 * 24 * 7
 const DEFAULT_CAPACITOR_RETRY_DELAY_MS = 800
 
 export interface AuthUiPluginConfig extends PluginConfig {
@@ -70,6 +74,8 @@ export {
   RATE_LIMIT_WINDOW_MS,
   RefreshIndicator,
   rememberedCredentialsStore,
+  REMEMBERED_PASSWORD_ARTIFACT,
+  REMEMBERED_USERNAME_ARTIFACT,
   SessionExpiredBanner,
   StaleIndicator,
   StudentProfileHeader,
@@ -173,10 +179,27 @@ export const authUiPlugin = definePlugin({
       ctx
     i18n.register(authUiDictionary)
     const t = i18n.translator(authUiDictionary)
+    query.registerPolicy("student-info", { ttl: LONG_TTL_MS, persist: true })
     const rateLimiter = createLoginRateLimiter(storage)
     const rememberStore = rememberedCredentialsStore.create(storage)
     const providersRevision = createObservableSource(0)
     const retryDelayMs = config.capacitorRetryDelayMs ?? DEFAULT_CAPACITOR_RETRY_DELAY_MS
+
+    const applyRememberedCredential = (
+      schoolId: string,
+      entry: RememberedCredentialEntry | null
+    ): void => {
+      if (!schoolId) return
+      if (entry) {
+        session.setArtifact(REMEMBERED_USERNAME_ARTIFACT, entry.username, schoolId)
+        session.setArtifact(REMEMBERED_PASSWORD_ARTIFACT, entry.password, schoolId)
+        rememberStore.actions.save(schoolId, entry)
+        return
+      }
+      session.setArtifact(REMEMBERED_USERNAME_ARTIFACT, null, schoolId)
+      session.setArtifact(REMEMBERED_PASSWORD_ARTIFACT, null, schoolId)
+      rememberStore.actions.remove(schoolId)
+    }
 
     let disposed = false
     let checkedReadyGeneration = -1
@@ -344,7 +367,12 @@ export const authUiPlugin = definePlugin({
     }
 
     const performLogout = async (): Promise<void> => {
-      await provider.logout()
+      const schoolId = provider.getSnapshot().schoolId ?? session.getSnapshot().activeSchoolId
+      try {
+        await provider.logout()
+      } finally {
+        if (schoolId) applyRememberedCredential(schoolId, null)
+      }
       toast.success(t("session.logoutSuccess"))
       router.replace({ route: "login" })
     }
@@ -425,11 +453,13 @@ export const authUiPlugin = definePlugin({
           canRemember: config.canRemember ?? isCapacitor(),
           listSchools,
           selectSchool: selectSchoolSafe,
-          setCredential: (input) => {
+          setCredential: (input, remembered) => {
             checkedReadyGeneration = -1
             session.setCredential(input)
+            applyRememberedCredential(input.schoolId, remembered)
             ensureProviderInitialized()
           },
+          rememberCredential: applyRememberedCredential,
           redirectAfterLogin: () => {
             const targetHref = navigation.landing(config.defaultLanding ?? "overview")
             router.replace(targetHref)

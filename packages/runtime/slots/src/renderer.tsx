@@ -755,6 +755,7 @@ export interface OrahakoHostPreferencesLike {
   setActiveShell(shellId: string | undefined): void
   getActiveTheme?(): string | undefined
   setActiveTheme?(themeId: string | undefined): void
+  getStartupPage?(): string | undefined
 }
 
 export interface OrahakoHostLike {
@@ -849,7 +850,12 @@ export function OrahakoApp({
         ? preferenceSnapshot.activeShell
         : (preferences?.getActiveShell() ?? memoryShell)
 
-  const defaultLanding = host.composition.defaults.landing ?? ""
+  const defaultLanding =
+    (preferenceState
+      ? preferenceSnapshot.startupPage
+      : preferences?.getStartupPage?.()) ??
+    host.composition.defaults.landing ??
+    ""
 
   const activePage = useMemo<PluginPageContribution | undefined>(() => {
     if (children !== undefined) return undefined

@@ -32,6 +32,8 @@ packages/bundle/{platform,academic,ysu}
 
 非教务应用只需选择 `platform`（可选配自己的 Shell 和功能插件），不应叠加 `academic` 或依赖它的 `ysu`。通用插件必须能在没有 `provider`、`session`、`query` 的情况下启动。层可插入条目、替换整份插件配置或停用条目，不会删除条目；重复条目和未知 patch ID 会报错。
 
+Activation 只由 `scripts/deploy-website.sh` 的 `APP_DEPLOYMENT=edgeone-pwa` 构建插入，用于 EdgeOne 同源代理鉴权；Android 和普通 platform 组合不安装该插件，Native 直连也不会发送 `x-activation`。YSU 专属的 Meter 位于 `ysu` 层，不属于通用平台层。
+
 ## 静态入口与根查询路由
 
 `app/layout.tsx` 与 `app/manifest.ts` 提供静态外壳和 PWA 元数据，`app/page.tsx` 挂载客户端 composition，由 `OrahakoApp` 渲染。插件不新增 Next.js 文件路由；所有页面都以应用根路径的查询参数定位：
@@ -45,9 +47,9 @@ packages/bundle/{platform,academic,ysu}
 
 ## PluginContext、生命周期与服务
 
-`definePlugin` 的泛型根据 `inject` 静态裁剪 `ctx`。`inject` 是必须存在的 Cordis 根服务；`provides` 要求 `apply` 完成后已通过 `ctx.set` 注册服务；`requires` 是插件 ID 到 SemVer 范围的依赖，不能用 `inject` 替代。服务实例归属提供方 Cordis 作用域，停用、更新或卸载会释放实例与注册项；消费者因服务替换停止后可在新服务就绪时重启。
+`definePlugin` 的泛型根据 `inject` 和 `optionalInject` 静态裁剪 `ctx`。`inject` 是必须存在的 Cordis 根服务；`optionalInject` 允许服务缺失，并在服务出现、替换或撤销时重挂消费者，不通过完整 `Context.get` 绕过契约。`provides` 要求 `apply` 完成后已通过 `ctx.set` 注册服务；`requires` 是插件 ID 到 SemVer 范围的依赖，不能用 `inject` 替代。服务实例归属提供方 Cordis 作用域，停用、更新或卸载会释放实例与注册项；消费者因服务替换停止后可在新服务就绪时重启。
 
-注册必须在 `apply` 中完成，并通过 disposer/`ctx.effect` 绑定作用域。不要依赖模块级单例、手搓 `while (pending)` 启动轮询或 `as unknown as` 逃避契约。Cordis 的 `effect`、`on`、`once`、`serial`、`parallel`、`waterfall` 构成生命周期与事件边界。启动对异步 `apply` 使用有界等待；超时或停用后，迟到的 continuation 不得重新发布服务或贡献。
+注册必须在 `apply` 中完成，并通过 disposer/`ctx.effect` 绑定作用域。不要依赖模块级单例、手搓 `while (pending)` 启动轮询或 `as unknown as` 逃避契约。Cordis 的 `effect`、`on`、`once`、`serial`、`parallel` 构成生命周期与事件边界。启动对异步 `apply` 使用有界等待；超时或停用后，迟到的 continuation 不得重新发布服务或贡献。内核记录异步 disposer，并在同一插件的下一次启动前等待旧清理完成，避免原生新旧实例交错。
 
 通用服务属于 composition 中的普通运行时插件：
 
@@ -60,13 +62,13 @@ packages/bundle/{platform,academic,ysu}
 | `native` | `runtime/native` | 版本化宿主能力 |
 | `assets` / `plugins` | `runtime/packages` | 包内资源和市场安装 |
 
-教务运行时是可选服务：Provider 通过 `ctx.providers.registerProvider(schoolId, factory)` 注册；`SchoolProvider` 以正交 `AcademicSliceMap` 组合认证和业务切片，不恢复单体 Provider。Provider 的能力声明与 `supportedPlugins` 同时决定查询、页面、导航和功能插件是否可用。官方组合只内置 YSU 学校元数据；初始化向导会从当前市场的 `provider` 类别发现其他学校，约定插件 ID 为 `<schoolId>.provider`，选择时安装该插件并验证对应 Provider 已注册，不在部署配置中枚举社区学校。
+教务运行时是可选服务：Provider 通过 `ctx.providers.registerProvider(schoolId, factory)` 注册；`SchoolProvider` 以正交 `AcademicSliceMap` 组合认证和业务切片，不恢复单体 Provider。Provider 的能力声明与 `supportedPlugins` 同时决定查询、页面、导航和功能插件是否可用。查询数据 record 可按身份共享，但每个插件的 descriptor、enabled 和订阅生命周期相互隔离；TTL/persist 策略由功能插件通过 `query.registerPolicy` 在自己的作用域注册，不在运行时枚举业务功能。官方组合只内置 YSU 学校元数据；初始化向导会从当前市场的 `provider` 类别发现其他学校，约定插件 ID 为 `<schoolId>.provider`，选择时安装该插件并验证对应 Provider 已注册，不在部署配置中枚举社区学校。
 
 ## Slot、UI 与四份派生 Props
 
 `root`（`single`）是唯一预置 Slot。其他 Slot 由插件扩展 `SlotMap` 并在运行时声明；`children` 只授权当前组件渲染所声明的子 Slot。用 `slots.inject` 等待可选 Slot，并在声明撤销时清理贡献。`single` 与 `keyed` 选最低优先级，同一目标同优先级会报错；`list` 与 `chain` 按 `order` 排列。普通贡献仍遵守单声明者原则；替代 Shell 可对已预声明的公共 `shell.*` Slot 使用 `declareChildren: false`，取得渲染授权而不重复声明。
 
-宿主偏好中的 Shell 与主题选择是同一份 Observable 状态，插件管理器和 `OrahakoApp` 通过它同步切换。主题 CSS 只由宿主按 `activeTheme` 注入；空值表示默认主题，Shell 不再维护第二份主题状态或自行注入另一份全局 CSS。
+宿主偏好中的 Shell、主题与启动页选择共享同一份 Observable 状态，插件管理器、设置页和 `OrahakoApp` 通过它同步切换。主题 CSS 只由宿主按 `activeTheme` 注入；空值表示默认主题。启动页只保存宿主的 `startupPage`，未设置时回退 `composition.defaults.landing`；Shell 和设置 Store 不再维护第二份状态。
 
 页面、Shell、设置和 Slot 组件都用注册点声明 `children`、`store`、`inject`，不得读取 `ctx`、业务 React Context、`useSyncExternalStore` 或直接 `useSWR`。唯一 `ui-renderer` 自动派生：
 
@@ -83,9 +85,9 @@ packages/bundle/{platform,academic,ysu}
 
 每个插件通过 `defineDictionary({ zh, en })` 持有自己的类型化词典，点路径 Key 在中英文形状间静态检查。词典随插件作用域注册和释放；不要恢复集中式巨型 `dict.ts`。
 
-## HTTP waterfall 与 Native 边界
+## HTTP 管道与 Native 边界
 
-`ctx.http.send` 通过 Capacitor 或同源 Web 代理传输，`ctx.http.activity` 提供粗粒度活动快照。插件在 `apply` 中用 `ctx.on("http/request", handler)` 和 `ctx.on("http/response", handler)` 注册中间件。HTTP 运行时在传输前后执行 Cordis waterfall；处理器返回替换值，或返回 `undefined` 保留当前值。响应处理器还收到实际发送的请求。会话使用教务运行时的 JS CookieJar，不使用 WebView CookieManager 作为会话来源。
+`ctx.http.send` 通过 Capacitor 或同源 Web 代理传输，`ctx.http.activity` 提供粗粒度活动快照。插件在 `apply` 中用 `ctx.on("http/request", handler)` 和 `ctx.on("http/response", handler)` 注册中间件。HTTP 运行时在传输前后通过 `runHttpRequestPipeline` / `runHttpResponsePipeline` 执行局部值转换链，不修改 Cordis 原型；处理器返回替换值，或返回 `undefined` 保留当前值。响应处理器还收到实际发送的请求。会话使用教务运行时的 JS CookieJar，不使用 WebView CookieManager 作为会话来源。
 
 `ctx.native.capabilities` 提供 `list`、`has`、`acquire`、`invoke`，其中 `acquire` 返回释放函数；Capacitor bridge 只处理 `describe`、`acquire`、`release` 和 `invoke`。`android/nativeComposition.gradle` 选择 provider、companion 与 deep-link 配置：app 只依赖 `:native-core` 和所选 provider，通用 `:native-widgets` 可独立于 schedule/exam companion 构建。
 
@@ -93,7 +95,7 @@ ZIP 不能新增原生模块或权限。新增能力需同步 Kotlin 工厂、�
 
 ## 外部 ZIP 与 API v1 市场
 
-外部 ZIP 使用 API v1 清单，仅能导入包内相对模块与 [`PLATFORM_MODULES`](packages/core/sdk/src/manifest.ts) 共享的模块实例。包格式、SDK 示例、`pnpm plugin pack <plugin-directory> [output.zip]` 及发布字段见 [SDK 指南](packages/core/sdk/README.md)。其他 API 版本的 ZIP 必须重新发布。市场索引和 ZIP 均由 `Youwenqwq/orahako-plugin-registry` 的 `main` 分支通过 `raw.githubusercontent.com` 分发，主仓库和 EdgeOne 不保存市场副本。
+外部 ZIP 使用 API v1 清单，仅能导入包内相对模块与 [`PLATFORM_MODULES`](packages/core/sdk/src/manifest.ts) 共享的模块实例。动态导入也必须是静态字符串或无插值模板字符串；计算表达式和 glob 会被拒绝。包格式、SDK 示例、`pnpm plugin pack <plugin-directory> [output.zip]` 及发布字段见 [SDK 指南](packages/core/sdk/README.md)。其他 API 版本的 ZIP 必须重新发布。市场索引和 ZIP 均由 `Youwenqwq/orahako-plugin-registry` 的 `main` 分支通过 `raw.githubusercontent.com` 分发，主仓库和 EdgeOne 不保存市场副本。
 
 ## 安装、恢复与信任
 

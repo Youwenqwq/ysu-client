@@ -11,9 +11,3 @@ declare module "@orahako/sdk" {
     "settings.appearance": { kind: "list"; owner: Record<string, never> }
   }
 }
-
-declare module "@cordisjs/core" {
-  interface Events {
-    "shell/landing-preference"(route: string): void
-  }
-}

@@ -27,12 +27,10 @@ export const platformBundle = defineBundle({
     { id: "orahako.settings", protected: true },
     { id: "orahako.profile", protected: true },
     { id: "orahako.plugin-manager", protected: true },
-    { id: "orahako.activation" },
     { id: "orahako.mfa", protected: true },
     { id: "orahako.updater", protected: true },
     { id: "orahako.announcement", protected: true },
     { id: "orahako.analytics", protected: true },
     { id: "orahako.network-activity" },
-    { id: "orahako.meter" },
   ],
 })

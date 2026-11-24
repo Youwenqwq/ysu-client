@@ -3,10 +3,13 @@ import { createRoot } from "react-dom/client"
 import { renderToStaticMarkup } from "react-dom/server"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  DEFAULT_TTL_MS,
+  LONG_TTL_MS,
   providerRegistryRuntimePlugin,
   providerRuntimePlugin,
   queryRuntimePlugin,
   sessionRuntimePlugin,
+  SHORT_TTL_MS,
 } from "@orahako/academic-runtime"
 import { defineSchoolProvider, type SchoolProvider } from "@orahako/academic-sdk"
 import { PluginRuntime } from "@orahako/kernel"
@@ -416,7 +419,9 @@ describe("@orahako/plugin-overview ownership, single store instantiation & keyed
       featureCardPlugin,
       unsupportedSlicePlugin,
     ]) {
-      if (
+      if (p.manifest.id === queryRuntimePlugin.manifest.id) {
+        runtime.register(p, "builtin", { policies: {} })
+      } else if (
         p.manifest.id === sessionRuntimePlugin.manifest.id ||
         p.manifest.id === providerRuntimePlugin.manifest.id
       ) {
@@ -426,6 +431,11 @@ describe("@orahako/plugin-overview ownership, single store instantiation & keyed
       }
       runtime.start(p.manifest.id)
     }
+
+    const rootQuery = runtime.context.get("query")!
+    expect(rootQuery.policy("student-info")).toEqual({ ttl: LONG_TTL_MS, persist: true })
+    expect(rootQuery.policy("current-week")).toEqual({ ttl: SHORT_TTL_MS, persist: true })
+    expect(rootQuery.policy("term-calendar")).toEqual({ ttl: LONG_TTL_MS, persist: true })
 
     const overviewService = runtime.context.get("overview")!
     const slots = runtime.context.get("slots") as PluginSlotRegistry
@@ -532,6 +542,10 @@ describe("@orahako/plugin-overview ownership, single store instantiation & keyed
 
     activeUnmount = undefined
     await dom.unmount()
+    runtime.stop(OVERVIEW_PLUGIN_ID)
+    expect(rootQuery.policy("student-info")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
+    expect(rootQuery.policy("current-week")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
+    expect(rootQuery.policy("term-calendar")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
     runtime.dispose()
   })
 })

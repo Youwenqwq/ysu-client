@@ -15,6 +15,7 @@ import {
   type QueryStatus,
   type SchoolProvider,
   type SessionService,
+  type SessionSnapshot,
 } from "@orahako/academic-sdk"
 import {
   createObservableSource,
@@ -31,47 +32,13 @@ import {
 } from "@orahako/sdk"
 
 const PERSISTENT_CACHE_STORAGE_KEY = "persistent-cache-v1"
+const HOST_CONSUMER_ID = "orahako.runtime.query"
 
 export const DEFAULT_TTL_MS = 1000 * 60 * 60 * 24
 export const LONG_TTL_MS = 1000 * 60 * 60 * 24 * 7
 export const SHORT_TTL_MS = 1000 * 60 * 60 * 12
 export const SIX_HOUR_TTL_MS = 1000 * 60 * 60 * 6
 export const ONE_HOUR_TTL_MS = 1000 * 60 * 60
-
-export const defaultAcademicQueryPolicies: Readonly<Record<string, ProviderQueryPolicy>> = {
-  "student-info": { ttl: LONG_TTL_MS, persist: true },
-  studentInfo: { ttl: LONG_TTL_MS, persist: true },
-  schedule: { ttl: LONG_TTL_MS, persist: true },
-  "class-periods": { ttl: LONG_TTL_MS, persist: true },
-  "term-calendar": { ttl: LONG_TTL_MS, persist: true },
-  "training-plan": { ttl: LONG_TTL_MS, persist: true },
-  "current-week": { ttl: SHORT_TTL_MS, persist: true },
-  grades: { ttl: DEFAULT_TTL_MS, persist: true },
-  "gpa-stats": { ttl: DEFAULT_TTL_MS, persist: true },
-  "grade-statistics": { ttl: DEFAULT_TTL_MS, persist: true },
-  "grade-distribution": { ttl: DEFAULT_TTL_MS, persist: true },
-  "grade-ranking": { ttl: DEFAULT_TTL_MS, persist: true },
-  exams: { ttl: DEFAULT_TTL_MS, persist: true },
-  "academic-completion": { ttl: DEFAULT_TTL_MS, persist: true },
-  "academic-warnings": { ttl: DEFAULT_TTL_MS, persist: true },
-  "labor-records": { ttl: SIX_HOUR_TTL_MS, persist: true },
-  "labor-summary": { ttl: SIX_HOUR_TTL_MS, persist: true },
-  "labor-activities": { ttl: ONE_HOUR_TTL_MS, persist: true },
-  "credit-batches": { ttl: DEFAULT_TTL_MS, persist: true },
-  "credit-declarations": { ttl: ONE_HOUR_TTL_MS, persist: true },
-  "credit-records": { ttl: SIX_HOUR_TTL_MS, persist: true },
-  "credit-summary": { ttl: SIX_HOUR_TTL_MS, persist: true },
-  "credit-competitions": { ttl: DEFAULT_TTL_MS, persist: true },
-  "credit-library-activities": { ttl: DEFAULT_TTL_MS, persist: true },
-  "comprehensive-terms": { ttl: DEFAULT_TTL_MS, persist: true },
-  "comprehensive-result": { ttl: SIX_HOUR_TTL_MS, persist: true },
-  "comprehensive-indicators": { ttl: SIX_HOUR_TTL_MS, persist: true },
-  "comprehensive-radar": { ttl: SIX_HOUR_TTL_MS, persist: true },
-  "comprehensive-year-scores": { ttl: SIX_HOUR_TTL_MS, persist: true },
-  "comprehensive-report-years": { ttl: DEFAULT_TTL_MS, persist: true },
-  "comprehensive-report": { ttl: SIX_HOUR_TTL_MS, persist: true },
-  ecard: { ttl: ONE_HOUR_TTL_MS, persist: false },
-}
 
 const DEFAULT_QUERY_POLICY: ProviderQueryPolicy = {
   ttl: DEFAULT_TTL_MS,
@@ -225,6 +192,8 @@ class QueryIdentityRecord {
   inFlight: Promise<unknown> | null = null
   hasMemoryValue = false
   failedFetch = false
+  failedSessionExpired = false
+  failedCredential: string | null = null
   needsRevalidation = false
 
   fields: RecordFields = {
@@ -463,6 +432,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
   private unsubscribeProvider: (() => void) | null = null
   private unsubscribeSession: (() => void) | null = null
   private unsubscribeInvalidate: (() => void) | null = null
+  private lastSessionSnapshot: SessionSnapshot | null = null
 
   private readonly activitySource = createObservableSource<QueryActivitySnapshot>(
     { refreshingCount: 0, staleCount: 0 },
@@ -476,7 +446,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     provider,
     session,
     storage,
-    policies = defaultAcademicQueryPolicies,
+    policies = {},
   }: QueryRuntimeServiceOptions) {
     this.ctx = ctx
     this.provider = provider
@@ -600,6 +570,13 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
   source = <T, K extends AcademicSliceKey = AcademicSliceKey>(
     descriptor: QueryDescriptor<T, K>
   ): ObservableSource<QuerySnapshot<T>> => {
+    return this.sourceForConsumer(HOST_CONSUMER_ID, descriptor)
+  };
+
+  private sourceForConsumer<T, K extends AcademicSliceKey = AcademicSliceKey>(
+    consumerId: string,
+    descriptor: QueryDescriptor<T, K>
+  ): ObservableSource<QuerySnapshot<T>> {
     const anyDesc: AnyDescriptor = {
       feature: descriptor.feature,
       slice: descriptor.slice,
@@ -609,7 +586,8 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
       fetcher: (provider) => descriptor.fetcher(provider),
     }
     const resolved = this.resolveIdentity(anyDesc)
-    const existing = this.handles.get(resolved.recordKey)
+    const handleKey = `${consumerId}|${resolved.recordKey}`
+    const existing = this.handles.get(handleKey)
     if (existing) {
       existing.updateDescriptor(anyDesc)
       return existing.source as ObservableSource<QuerySnapshot<T>>
@@ -617,12 +595,12 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     const record = anyDesc.releaseOnInactive
       ? new QueryIdentityRecord(resolved, anyDesc.feature, anyDesc.slice)
       : this.getOrCreateRecord(resolved, anyDesc)
-    const handle = new QuerySourceHandle(this, resolved.recordKey, anyDesc, record)
-    if (!anyDesc.releaseOnInactive) this.handles.set(resolved.recordKey, handle)
+    const handle = new QuerySourceHandle(this, handleKey, anyDesc, record)
+    if (!anyDesc.releaseOnInactive) this.handles.set(handleKey, handle)
     return handle.source as ObservableSource<QuerySnapshot<T>>
-  };
+  }
 
-  [PLUGIN_SERVICE_SCOPE](consumerCtx: Context, _manifest: PluginManifest): QueryService {
+  [PLUGIN_SERVICE_SCOPE](consumerCtx: Context, manifest: PluginManifest): QueryService {
     const scopedSources = new WeakMap<
       ObservableSource<QuerySnapshot<unknown>>,
       ObservableSource<QuerySnapshot<unknown>>
@@ -655,7 +633,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     }
 
     return {
-      source: (descriptor) => wrapScopedSource(this.source(descriptor)),
+      source: (descriptor) => wrapScopedSource(this.sourceForConsumer(manifest.id, descriptor)),
       activity: this.activity,
       policy: this.policy,
       registerPolicy: (feature, policy) =>
@@ -712,7 +690,39 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     record.fetchEpoch += 1
     record.inFlight = null
   }
-  reconcileHandle(handle: QuerySourceHandle): void {
+
+  private hasEnabledActiveHandle(record: QueryIdentityRecord): boolean {
+    for (const handle of this.activeHandles) {
+      if (handle.currentRecord === record && evaluateEnabled(handle.descriptor.enabled)) {
+        return true
+      }
+    }
+    return false
+  }
+
+  private deactivateRecord(record: QueryIdentityRecord): void {
+    if (this.hasEnabledActiveHandle(record)) return
+    record.fetchEpoch += 1
+    record.inFlight = null
+    record.failedFetch = false
+    record.failedSessionExpired = false
+    record.failedCredential = null
+    const changed = record.setFields({
+      status: "idle",
+      data: undefined,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isStale: false,
+      updatedAt: null,
+    })
+    if (changed) {
+      this.recomputeActivity()
+      record.notify()
+    }
+  }
+
+  reconcileHandle(handle: QuerySourceHandle, forceRefresh = false): void {
     if (this.disposed) return
     const previousRecord = handle.currentRecord
     const targetRecord = this.resolveRecordForDescriptor(handle.descriptor, previousRecord)
@@ -720,7 +730,13 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
       handle.rebindRecord(targetRecord)
       if (handle.descriptor.releaseOnInactive) this.releaseRecord(previousRecord)
     }
-    this.reconcileRecord(targetRecord, handle.descriptor)
+    if (!evaluateEnabled(handle.descriptor.enabled)) {
+      this.deactivateRecord(targetRecord)
+      handle.syncAndNotify()
+      this.recomputeActivity()
+      return
+    }
+    this.reconcileRecord(targetRecord, handle.descriptor, forceRefresh)
     handle.syncAndNotify()
     this.recomputeActivity()
   }
@@ -728,7 +744,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
   async refreshHandle(handle: QuerySourceHandle): Promise<unknown> {
     if (this.disposed) return undefined
     if (!evaluateEnabled(handle.descriptor.enabled)) {
-      this.reconcileRecord(handle.currentRecord, handle.descriptor)
+      this.deactivateRecord(handle.currentRecord)
       handle.syncAndNotify()
       return undefined
     }
@@ -798,7 +814,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
 
   syncPassiveRecord(record: QueryIdentityRecord, descriptor: AnyDescriptor): void {
     if (!evaluateEnabled(descriptor.enabled)) {
-      if (record.inFlight === null) {
+      if (record.inFlight === null && !this.hasEnabledActiveHandle(record)) {
         record.setFields({
           status: "idle",
           data: undefined,
@@ -856,27 +872,11 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     })
   }
 
-  private reconcileRecord(record: QueryIdentityRecord, descriptor: AnyDescriptor): void {
-    if (!evaluateEnabled(descriptor.enabled)) {
-      record.fetchEpoch += 1
-      record.inFlight = null
-      record.failedFetch = false
-      const changed = record.setFields({
-        status: "idle",
-        data: undefined,
-        error: null,
-        isLoading: false,
-        isRefreshing: false,
-        isStale: false,
-        updatedAt: null,
-      })
-      if (changed) {
-        this.recomputeActivity()
-        record.notify()
-      }
-      return
-    }
-
+  private reconcileRecord(
+    record: QueryIdentityRecord,
+    descriptor: AnyDescriptor,
+    forceRefresh = false
+  ): void {
     const providerSnap = this.provider.getSnapshot()
     const activeProvider = providerSnap.provider
 
@@ -926,6 +926,11 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
       return
     }
 
+    if (this.hasFailureRecovered(record)) {
+      this.clearFailureMarkers(record)
+      forceRefresh = true
+    }
+
     const policy = this.policy(descriptor.feature)
     const isExpired =
       record.fields.updatedAt !== null && Date.now() - record.fields.updatedAt > policy.ttl
@@ -938,6 +943,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     }
 
     const shouldFetch =
+      forceRefresh ||
       (!record.hasMemoryValue && !record.failedFetch) ||
       record.needsRevalidation ||
       (record.hasMemoryValue && isExpired)
@@ -1007,6 +1013,8 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
         record.inFlight = null
         record.hasMemoryValue = true
         record.failedFetch = false
+        record.failedSessionExpired = false
+        record.failedCredential = null
         const changed = record.setFields({
           status: "success",
           data: result,
@@ -1026,13 +1034,18 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
           return record.fields.data
         }
         record.inFlight = null
+        const failureSession = this.session.getSnapshot()
+        record.failedSessionExpired = failureSession.sessionExpired
+        record.failedCredential = failureSession.credential
 
         if (
           isProviderError(err) &&
           err.code === ProviderErrorCode.AUTH_SESSION_EXPIRED &&
           this.isRecordMatchingCurrentEnv(record) &&
-          this.session.getSnapshot().isAuthenticated
+          failureSession.isAuthenticated
         ) {
+          record.failedSessionExpired = true
+          record.failedFetch = true
           this.session.setSessionExpired(true)
         }
 
@@ -1042,6 +1055,8 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
           if (fallback !== null) {
             record.hasMemoryValue = true
             record.failedFetch = false
+            record.failedSessionExpired = false
+            record.failedCredential = null
             const changed = record.setFields({
               status: "success",
               data: fallback.data,
@@ -1098,10 +1113,57 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
 
   private handleExternalChange = (): void => {
     if (this.disposed) return
+    this.reconcileHandles(false)
+  }
+
+  private handleSessionChange = (): void => {
+    if (this.disposed) return
+    const previous = this.lastSessionSnapshot
+    const snapshot = this.session.getSnapshot()
+    this.lastSessionSnapshot = snapshot
+    const recovered = previous !== null && this.hasSessionRecovered(previous, snapshot)
+    if (recovered) this.recoverCurrentIdentityRecords()
+    this.reconcileHandles(recovered)
+  }
+
+  private reconcileHandles(forceRefresh: boolean): void {
     for (const handle of Array.from(this.activeHandles)) {
-      this.reconcileHandle(handle)
+      this.reconcileHandle(handle, forceRefresh)
     }
     this.recomputeActivity()
+  }
+
+  private hasSessionRecovered(previous: SessionSnapshot, next: SessionSnapshot): boolean {
+    if (next.sessionExpired || !next.isAuthenticated || next.credential === null) return false
+    if (previous.sessionExpired) return true
+    return previous.credential === null || !previous.isAuthenticated
+  }
+
+  private recoverCurrentIdentityRecords(): void {
+    for (const record of this.records.values()) {
+      if (!this.isRecordMatchingCurrentEnv(record)) continue
+      this.clearFailureMarkers(record)
+    }
+    for (const handle of this.activeHandles) {
+      if (!this.isRecordMatchingCurrentEnv(handle.currentRecord)) continue
+      this.clearFailureMarkers(handle.currentRecord)
+    }
+  }
+
+  private clearFailureMarkers(record: QueryIdentityRecord): void {
+    record.failedFetch = false
+    record.failedSessionExpired = false
+    record.failedCredential = null
+    record.needsRevalidation = false
+  }
+
+  private hasFailureRecovered(record: QueryIdentityRecord): boolean {
+    if (!record.failedFetch) return false
+    const sessionSnap = this.session.getSnapshot()
+    if (sessionSnap.sessionExpired || !sessionSnap.isAuthenticated) return false
+    if (sessionSnap.credential === null) return false
+    if (record.failedSessionExpired) return true
+    return sessionSnap.credential !== record.failedCredential
   }
 
   private syncUpstreamSubscriptions(): void {
@@ -1113,7 +1175,8 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
         this.unsubscribeProvider = this.provider.state.subscribe(this.handleExternalChange)
       }
       if (!this.unsubscribeSession) {
-        this.unsubscribeSession = this.session.state.subscribe(this.handleExternalChange)
+        this.lastSessionSnapshot = this.session.getSnapshot()
+        this.unsubscribeSession = this.session.state.subscribe(this.handleSessionChange)
       }
       if (!this.unsubscribeInvalidate) {
         this.unsubscribeInvalidate = this.ctx.on("query/invalidate", (identity) => {
@@ -1130,6 +1193,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     this.unsubscribeProvider = null
     this.unsubscribeSession?.()
     this.unsubscribeSession = null
+    this.lastSessionSnapshot = null
     this.unsubscribeInvalidate?.()
     this.unsubscribeInvalidate = null
   }
@@ -1139,9 +1203,12 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     let refreshingCount = 0
     let staleCount = 0
 
-    for (const record of this.records.values()) {
+    const observedRecords = new Set<QueryIdentityRecord>(this.records.values())
+    for (const handle of this.activeHandles) observedRecords.add(handle.currentRecord)
+
+    for (const record of observedRecords) {
       if (!this.isRecordMatchingCurrentEnv(record)) continue
-      const isObserved = record.holderCount > 0
+      const isObserved = this.hasEnabledActiveHandle(record)
       const isActivelyRefreshing = isObserved || record.manualRefreshCount > 0
       if (isActivelyRefreshing && record.fields.isRefreshing) {
         refreshingCount += 1
@@ -1311,7 +1378,7 @@ export const queryRuntimePlugin = definePlugin({
       provider: ctx.provider,
       session: ctx.session,
       storage: ctx.storage,
-      policies: config.policies ?? defaultAcademicQueryPolicies,
+      policies: config.policies,
     })
     ctx.set("query", service)
     ctx.effect(() => () => service.dispose())

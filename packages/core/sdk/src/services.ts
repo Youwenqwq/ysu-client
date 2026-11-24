@@ -1,4 +1,3 @@
-import type { GetEvents, Parameters as CordisParameters, ThisType } from "@cordisjs/core"
 import type { HttpRequest, HttpResponse, PluginHttpService } from "./http"
 import type { PluginI18nService } from "./i18n"
 import type { PluginManifest } from "./manifest"
@@ -31,6 +30,7 @@ export interface PluginAssetService {
 export interface PluginHostPreferenceSnapshot {
   readonly activeShell?: string
   readonly activeTheme?: string
+  readonly startupPage?: string
 }
 
 /** Host-owned, persisted preference facade exposed to the app runtime. */
@@ -42,6 +42,8 @@ export interface PluginHostPreferences {
   setActiveShell(shellId: string | undefined): void
   getActiveTheme(): string | undefined
   setActiveTheme(themeId: string | undefined): void
+  getStartupPage(): string | undefined
+  setStartupPage(route: string | undefined): void
 }
 
 export interface InstalledPluginSummary {
@@ -81,7 +83,11 @@ export interface PluginPackageRuntime {
     sha256: string,
     expected: { id: string; version: string }
   ): Promise<PluginManifest>
-  applyPluginBundle(pluginIds: readonly string[], index: MarketplaceIndex): Promise<PluginManifest>
+  applyPluginBundle(
+    pluginIds: readonly string[],
+    index: MarketplaceIndex,
+    marketBaseUrl: string
+  ): Promise<PluginManifest>
   assetUrl(pluginId: string, path: string): string | undefined
   nativeCapabilities(): readonly string[]
   /** Optional on minimal test/embedded runtimes; always provided by PluginHost. */
@@ -97,6 +103,10 @@ export interface PluginPackageRuntime {
   preferenceState?: ObservableSource<PluginHostPreferenceSnapshot>
   getActiveTheme?(): string | undefined
   setActiveTheme?(themeId: string | undefined): void
+  getStartupPage?(): string | undefined
+  setStartupPage?(route: string | undefined): void
+  defaultLanding?(): string | undefined
+  defaultShell?(): string | undefined
   safeMode?(): boolean
 }
 
@@ -209,25 +219,8 @@ export interface OrahakoServiceMap {
   updater: PluginUpdateService
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type WaterfallValue<F> = F extends (value: infer V, ...rest: any[]) => any ? V : never
-
 declare module "@cordisjs/core" {
-  interface Context extends OrahakoServiceMap {
-    waterfall<K extends keyof GetEvents<this>>(
-      name: K,
-      ...args: CordisParameters<GetEvents<this>[K]>
-    ): Promise<WaterfallValue<GetEvents<this>[K]>>
-    waterfall<K extends keyof GetEvents<this>>(
-      thisArg: ThisType<GetEvents<this>[K]>,
-      name: K,
-      ...args: CordisParameters<GetEvents<this>[K]>
-    ): Promise<WaterfallValue<GetEvents<this>[K]>>
-  }
-
-  interface Lifecycle {
-    waterfall(...args: unknown[]): Promise<unknown>
-  }
+  interface Context extends OrahakoServiceMap {}
 
   interface Events {
     "http/request"(

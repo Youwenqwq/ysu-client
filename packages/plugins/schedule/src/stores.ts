@@ -142,6 +142,65 @@ export const BLOCKING_SCHEDULE_ISSUES: Readonly<Partial<Record<ScheduleIssue["re
   patchConflict: true,
 }
 
+const SCHEDULE_PATCHES_VERSION = 2
+
+function normalizePatchScopeKey(scopeKey: string): string | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(scopeKey)
+  } catch {
+    return null
+  }
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every((part) => typeof part === "string" && part.length > 0)
+  ) {
+    return null
+  }
+  if (parsed.length === 3) return scopeKey
+  if (parsed.length !== 4) return null
+  return JSON.stringify([parsed[0], parsed[2], parsed[3]])
+}
+
+function mergePatchLists(
+  left: readonly SchedulePatch[],
+  right: readonly SchedulePatch[]
+): readonly SchedulePatch[] {
+  const byId = new Map<string, SchedulePatch>()
+  for (const patch of left) {
+    byId.set(patch.id, patch)
+  }
+  for (const patch of right) {
+    const existing = byId.get(patch.id)
+    if (
+      existing === undefined ||
+      Date.parse(patch.createdAt) >= Date.parse(existing.createdAt)
+    ) {
+      byId.set(patch.id, patch)
+    }
+  }
+  return Array.from(byId.values())
+}
+
+function migrateSchedulePatchesState(persisted: unknown): SchedulePatchesState {
+  if (typeof persisted !== "object" || persisted === null || !("byScope" in persisted)) {
+    return { byScope: {} }
+  }
+  const rawByScope = persisted.byScope
+  if (typeof rawByScope !== "object" || rawByScope === null || Array.isArray(rawByScope)) {
+    return { byScope: {} }
+  }
+  const byScope: Record<string, readonly SchedulePatch[]> = {}
+  for (const [scopeKey, patches] of Object.entries(rawByScope)) {
+    if (!Array.isArray(patches)) continue
+    const scope = normalizePatchScopeKey(scopeKey)
+    if (!scope) continue
+    const retained = patches as readonly SchedulePatch[]
+    byScope[scope] = mergePatchLists(byScope[scope] ?? [], retained)
+  }
+  return { byScope }
+}
+
 export const schedulePatchesStore = defineStore({
   init: (): SchedulePatchesState => ({
     byScope: {},
@@ -149,7 +208,8 @@ export const schedulePatchesStore = defineStore({
   persist: {
     key: "schedule-patches",
     mode: "secure",
-    version: 1,
+    version: SCHEDULE_PATCHES_VERSION,
+    migrate: migrateSchedulePatchesState,
   },
   actions: {
     add(ctx, scope: string, patch: SchedulePatch) {
@@ -221,10 +281,6 @@ export const schedulePatchesStore = defineStore({
 
 export type SchedulePatchesStoreInstance = ReturnType<typeof schedulePatchesStore.create>
 
-export function formatProviderScope(providerSnap: ProviderRuntimeSnapshot): string {
-  return `${providerSnap.schoolId ?? "none"}:${providerSnap.generation}`
-}
-
 export function computeSchedulePatchScope(options: {
   readonly providerSnapshot: ProviderRuntimeSnapshot
   readonly sessionSnapshot: SessionSnapshot
@@ -243,7 +299,6 @@ export function computeSchedulePatchScope(options: {
   }
   return JSON.stringify([
     providerSnapshot.provider.id,
-    formatProviderScope(providerSnapshot),
     sessionSnapshot.username,
     semester,
   ])
@@ -430,9 +485,11 @@ export function createSchedulePatchMutators(deps: {
     const parsed: unknown = JSON.parse(mutationCtx.expectedScope)
     if (
       !Array.isArray(parsed) ||
+      parsed.length !== 3 ||
       parsed[0] !== providerSnap.provider.id ||
-      parsed[1] !== formatProviderScope(providerSnap) ||
-      parsed[2] !== sessionSnap.username
+      parsed[1] !== sessionSnap.username ||
+      typeof parsed[2] !== "string" ||
+      parsed[2].length === 0
     ) {
       throw new Error("scheduleEditor.notReady")
     }

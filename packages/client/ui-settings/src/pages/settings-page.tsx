@@ -23,6 +23,7 @@ import {
 import type {
   DerivedComponentProps,
   ObservableSource,
+  PluginHostPreferenceSnapshot,
   PluginLocale,
   PluginSettingsCategory,
   SlotComponent,
@@ -46,6 +47,7 @@ export const settingsPageChildren = {
 export interface SettingsPageInject {
   readonly hooks: {
     readonly categories: ObservableSource<readonly PluginSettingsCategory[]>
+    readonly preference: ObservableSource<PluginHostPreferenceSnapshot>
   }
   readonly setLocale: (locale: PluginLocale) => void
   readonly categoryHref: (categoryId: string) => string
@@ -57,7 +59,8 @@ export interface SettingsPageInject {
     category: PluginSettingsCategory,
     locale: PluginLocale
   ) => string
-  readonly onSelectStartupPage: (route: string) => void
+  readonly getStartupPage: () => string | undefined
+  readonly setStartupPage: (route: string | undefined) => void
   readonly getDefaultUserAgent: () => string
 }
 
@@ -87,9 +90,10 @@ function handleSpaClick(event: MouseEvent<HTMLAnchorElement>, navigate: () => vo
 export const SettingsPage: SlotComponent<SettingsPageProps> = (props) => {
   const { t, locale, renderSlot, useStore, actions } = props
   const categories = props.useCategories()
+  const preference = props.usePreference()
   const customUserAgentEnabled = useStore((s) => s.customUserAgentEnabled)
   const customUserAgent = useStore((s) => s.customUserAgent)
-  const startupPage = useStore((s) => s.startupPage)
+  const startupPage = preference.startupPage ?? props.getStartupPage() ?? ""
 
   const [uaDraft, setUaDraft] = useState(customUserAgent)
   useEffect(() => {
@@ -134,8 +138,7 @@ export const SettingsPage: SlotComponent<SettingsPageProps> = (props) => {
                   value={startupPage}
                   onValueChange={(value) => {
                     if (!value) return
-                    actions.setStartupPage(value)
-                    props.onSelectStartupPage(value)
+                    props.setStartupPage(value)
                   }}
                   variant="outline"
                   size="sm"

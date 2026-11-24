@@ -47,6 +47,7 @@ interface StoredHostPreferences {
   disabledPluginIds: string[]
   activeShell?: string
   activeTheme?: string
+  startupPage?: string
 }
 
 export function createPluginHostPreferences(
@@ -55,6 +56,7 @@ export function createPluginHostPreferences(
   let memoryDisabled = new Set<string>()
   let memoryActiveShell: string | undefined
   let memoryActiveTheme: string | undefined
+  let memoryStartupPage: string | undefined
 
   const read = (): StoredHostPreferences => {
     try {
@@ -75,10 +77,15 @@ export function createPluginHostPreferences(
               "activeTheme" in parsed && typeof parsed.activeTheme === "string"
                 ? parsed.activeTheme
                 : undefined
+            const startupPage =
+              "startupPage" in parsed && typeof parsed.startupPage === "string"
+                ? parsed.startupPage
+                : undefined
             return {
               disabledPluginIds: disabled,
               ...(activeShell !== undefined ? { activeShell } : {}),
               ...(activeTheme !== undefined ? { activeTheme } : {}),
+              ...(startupPage !== undefined ? { startupPage } : {}),
             }
           }
         }
@@ -90,6 +97,7 @@ export function createPluginHostPreferences(
       disabledPluginIds: Array.from(memoryDisabled),
       ...(memoryActiveShell !== undefined ? { activeShell: memoryActiveShell } : {}),
       ...(memoryActiveTheme !== undefined ? { activeTheme: memoryActiveTheme } : {}),
+      ...(memoryStartupPage !== undefined ? { startupPage: memoryStartupPage } : {}),
     }
   }
 
@@ -97,6 +105,7 @@ export function createPluginHostPreferences(
     memoryDisabled = new Set(next.disabledPluginIds)
     memoryActiveShell = next.activeShell
     memoryActiveTheme = next.activeTheme
+    memoryStartupPage = next.startupPage
     try {
       if (typeof localStorage !== "undefined") {
         localStorage.setItem(storageKey, JSON.stringify(next))
@@ -109,6 +118,7 @@ export function createPluginHostPreferences(
   const snapshot = (preferences: StoredHostPreferences): PluginHostPreferenceSnapshot => ({
     ...(preferences.activeShell !== undefined ? { activeShell: preferences.activeShell } : {}),
     ...(preferences.activeTheme !== undefined ? { activeTheme: preferences.activeTheme } : {}),
+    ...(preferences.startupPage !== undefined ? { startupPage: preferences.startupPage } : {}),
   })
   const stateSource = createObservableSource<PluginHostPreferenceSnapshot>(snapshot(read()))
   const commit = (next: StoredHostPreferences, publish: boolean): void => {
@@ -142,6 +152,7 @@ export function createPluginHostPreferences(
           disabledPluginIds: current.disabledPluginIds,
           ...(shellId !== undefined ? { activeShell: shellId } : {}),
           ...(current.activeTheme !== undefined ? { activeTheme: current.activeTheme } : {}),
+          ...(current.startupPage !== undefined ? { startupPage: current.startupPage } : {}),
         },
         true
       )
@@ -156,6 +167,22 @@ export function createPluginHostPreferences(
           disabledPluginIds: current.disabledPluginIds,
           ...(current.activeShell !== undefined ? { activeShell: current.activeShell } : {}),
           ...(themeId !== undefined ? { activeTheme: themeId } : {}),
+          ...(current.startupPage !== undefined ? { startupPage: current.startupPage } : {}),
+        },
+        true
+      )
+    },
+    getStartupPage(): string | undefined {
+      return read().startupPage
+    },
+    setStartupPage(startupPage: string | undefined): void {
+      const current = read()
+      commit(
+        {
+          disabledPluginIds: current.disabledPluginIds,
+          ...(current.activeShell !== undefined ? { activeShell: current.activeShell } : {}),
+          ...(current.activeTheme !== undefined ? { activeTheme: current.activeTheme } : {}),
+          ...(startupPage !== undefined ? { startupPage } : {}),
         },
         true
       )
@@ -217,8 +244,11 @@ export class PluginHost {
     this.runtime.context.set("packageRuntime", {
       installFromUrl: (url: string, sha256: string, expected: { id: string; version: string }) =>
         this.installFromUrl(url, sha256, expected),
-      applyPluginBundle: (pluginIds: readonly string[], index: MarketplaceIndex) =>
-        this.applyPluginBundle(pluginIds, index),
+      applyPluginBundle: (
+        pluginIds: readonly string[],
+        index: MarketplaceIndex,
+        marketBaseUrl: string
+      ) => this.applyPluginBundle(pluginIds, index, marketBaseUrl),
       assetUrl: (pluginId: string, path: string) => this.external.get(pluginId)?.assets.get(path),
       nativeCapabilities: () => this.composition.nativeCapabilities ?? [],
       installPackage: (input: Uint8Array | ArrayBuffer | Blob) => this.install(input),
@@ -232,6 +262,10 @@ export class PluginHost {
       setActiveShell: (shellId: string | undefined) => this.preferences.setActiveShell(shellId),
       getActiveTheme: () => this.preferences.getActiveTheme(),
       setActiveTheme: (themeId: string | undefined) => this.preferences.setActiveTheme(themeId),
+      getStartupPage: () => this.preferences.getStartupPage(),
+      setStartupPage: (route: string | undefined) => this.preferences.setStartupPage(route),
+      defaultLanding: () => this.composition.defaults.landing,
+      defaultShell: () => this.composition.defaults.shell,
       safeMode: () => Boolean(this.recovery?.safeMode),
     })
 
@@ -340,7 +374,8 @@ export class PluginHost {
 
   async applyPluginBundle(
     pluginIds: readonly string[],
-    index: MarketplaceIndex
+    index: MarketplaceIndex,
+    marketBaseUrl: string
   ): Promise<PluginManifest> {
     if (pluginIds.length === 0) throw new Error("Plugin bundle must not be empty")
     const { releases, ordered } = await this.preflightPluginBundle(pluginIds, index)
@@ -357,7 +392,7 @@ export class PluginHost {
         continue
       }
       await this.installFromUrl(
-        new URL(release.zipUrl, this.requireMarketUrl()).toString(),
+        new URL(release.zipUrl, marketBaseUrl).toString(),
         release.sha256,
         { id, version: release.version }
       )
@@ -464,12 +499,6 @@ export class PluginHost {
     }
   }
 
-  private requireMarketUrl(): string {
-    const url = this.composition.market?.indexUrl
-    if (!url) throw new Error("The active composition does not provide a plugin market")
-    return url
-  }
-
   private async preflightPluginBundle(
     pluginIds: readonly string[],
     index: MarketplaceIndex
@@ -509,14 +538,16 @@ export class PluginHost {
       for (const [dependency, range] of Object.entries(
         manifest?.requires ?? release?.requires ?? {}
       )) {
-        const installedVersion =
-          this.runtime.get(dependency)?.manifest.version ?? installed.get(dependency)?.version
-        if (installedVersion && !semver.satisfies(installedVersion, range)) {
+        visit(dependency)
+        const dependencyVersion =
+          this.runtime.get(dependency)?.manifest.version ??
+          installed.get(dependency)?.version ??
+          releases.get(dependency)?.version
+        if (dependencyVersion && !semver.satisfies(dependencyVersion, range)) {
           throw new Error(
-            `Plugin dependency ${dependency}@${installedVersion} does not satisfy ${range}`
+            `Plugin dependency ${dependency}@${dependencyVersion} does not satisfy ${range}`
           )
         }
-        visit(dependency)
       }
       for (const service of manifest?.inject ?? release?.inject ?? []) {
         if (this.runtime.context.get(service) != null) continue

@@ -178,13 +178,12 @@ export const onboardingPlugin = definePlugin({
 
       if (!builtinReady) {
         const pluginId = school.bundleId ?? `${school.id}${PROVIDER_PLUGIN_SUFFIX}`
-        const { index } = await loadPluginMarket(
-          resolveRuntimeMarketUrl(packageRuntime, config.marketUrl)
-        )
+        const marketUrl = resolveRuntimeMarketUrl(packageRuntime, config.marketUrl)
+        const { index } = await loadPluginMarket(marketUrl)
         if (!index.plugins.some((plugin) => plugin.id === pluginId)) {
           throw new Error(`School provider plugin is unavailable: ${pluginId}`)
         }
-        await packageRuntime.applyPluginBundle([pluginId], index)
+        await packageRuntime.applyPluginBundle([pluginId], index, marketUrl)
       }
 
       if (!providers.hasProvider(school.id)) {

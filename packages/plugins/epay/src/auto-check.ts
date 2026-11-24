@@ -24,6 +24,31 @@ export interface EpaySessionLookup {
   }
 }
 
+/** Session fields whose readiness or change should schedule an automatic unpaid-fee check. */
+export interface EpaySessionTriggerState {
+  readonly hasHydrated: boolean
+  readonly isAuthenticated: boolean
+  readonly username: string | null
+  readonly credential: string | null
+}
+
+/**
+ * Returns true when a session notification changes hydration, authentication, username or
+ * credential. Unchanged notifications are ignored; the cooldown and in-flight guards inside
+ * `runEpayAutoCheck` remain the deduplication source for repeated requests.
+ */
+export function shouldTriggerEpayCheckOnSession(
+  previous: EpaySessionTriggerState,
+  current: EpaySessionTriggerState
+): boolean {
+  return (
+    previous.hasHydrated !== current.hasHydrated ||
+    previous.isAuthenticated !== current.isAuthenticated ||
+    previous.username !== current.username ||
+    previous.credential !== current.credential
+  )
+}
+
 export interface EpayAutoCheckOptions {
   readonly session: EpaySessionLookup
   readonly provider: EpayProviderLookup

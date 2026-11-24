@@ -9,7 +9,13 @@ import {
   type EpaySessionStatus,
 } from "@orahako/academic-sdk"
 import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/sdk"
-import { runEpayAutoCheck, type EpayAutoCheckOptions, type EpayCheckResult } from "./auto-check"
+import {
+  runEpayAutoCheck,
+  shouldTriggerEpayCheckOnSession,
+  type EpayAutoCheckOptions,
+  type EpayCheckResult,
+  type EpaySessionTriggerState,
+} from "./auto-check"
 import { epayDictionary, type EpayDictionary } from "./dictionary"
 import {
   EpayHeaderActions,
@@ -173,6 +179,27 @@ export const epayPlugin = definePlugin({
       )
     }
 
+    const readSessionTrigger = (): EpaySessionTriggerState => {
+      const current = session.getSnapshot()
+      return {
+        hasHydrated: current.hasHydrated,
+        isAuthenticated: current.isAuthenticated,
+        username: current.username,
+        credential: current.credential,
+      }
+    }
+
+    let previousSessionTrigger = readSessionTrigger()
+
+    const unsubSession = session.state.subscribe(() => {
+      if (disposed) return
+      const current = readSessionTrigger()
+      const shouldCheck = shouldTriggerEpayCheckOnSession(previousSessionTrigger, current)
+      previousSessionTrigger = current
+      if (!shouldCheck) return
+      void checkUnpaid()
+    })
+
     ctx.on("provider/ready", () => {
       void checkUnpaid()
     })
@@ -183,6 +210,7 @@ export const epayPlugin = definePlugin({
 
     ctx.effect(() => () => {
       disposed = true
+      unsubSession()
       inFlight.clear()
       settingsStore.dispose()
     })

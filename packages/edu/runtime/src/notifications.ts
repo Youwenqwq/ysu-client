@@ -31,7 +31,8 @@ function sameChannelEntry(
     left.pluginId === right.pluginId &&
     left.slice === right.slice &&
     left.toPollingFlag === right.toPollingFlag &&
-    left.onDisable === right.onDisable
+    left.onDisable === right.onDisable &&
+    left.onEnable === right.onEnable
   )
 }
 

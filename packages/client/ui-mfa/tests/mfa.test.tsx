@@ -30,7 +30,12 @@ vi.mock("sonner", () => ({
 import { PluginRuntime } from "@orahako/kernel"
 import { i18nRegistryPlugin, PluginI18nRegistry } from "@orahako/runtime-i18n"
 import { ContributionOutlet, PluginSlotRegistry } from "@orahako/runtime-slots"
-import { createObservableSource, PLUGIN_API_VERSION, validatePluginManifest } from "@orahako/sdk"
+import {
+  createObservableSource,
+  PLUGIN_API_VERSION,
+  validatePluginManifest,
+  type MutableObservableSource,
+} from "@orahako/sdk"
 import type {
   MfaService,
   ProviderRuntimeService,
@@ -48,6 +53,8 @@ import {
   MFAModal,
   mfaPlugin,
   STATIC_UNAVAILABLE_PROVIDER_SOURCE,
+  UNAVAILABLE_PROVIDER_SNAPSHOT,
+  type MfaModalInject,
 } from "../src/index"
 
 type EventListenerFn = (event: unknown) => void
@@ -462,6 +469,7 @@ describe("@orahako/ui-mfa", () => {
       providerIndependent: true,
       inject: ["slots", "i18n"],
     })
+    expect(mfaPlugin.optionalInject).toEqual(["provider", "session"])
     expect(STATIC_UNAVAILABLE_PROVIDER_SOURCE.getSnapshot().status).toBe("unavailable")
 
     const service = createMfaService()
@@ -479,6 +487,135 @@ describe("@orahako/ui-mfa", () => {
       reason: "disposed",
     })
     await expect(service.show({ username: "u3" })).rejects.toBeInstanceOf(MfaCancelledError)
+  })
+
+  it("applies without optional services and rebinds provider source", async () => {
+    const slots = new PluginSlotRegistry()
+    slots.declare({ name: "shell.overlay", kind: "list" })
+    const i18n = new PluginI18nRegistry()
+
+    const runtime = new PluginRuntime()
+    runtime.context.set("slots", slots)
+    runtime.context.set("i18n", i18n)
+    runtime.register(mfaPlugin, "builtin")
+    await runtime.startAndWait(mfaPlugin.manifest.id)
+
+    const readInject = (): MfaModalInject => {
+      const entry = slots.select("shell.overlay")[0]
+      expect(entry).toBeDefined()
+      return entry!.inject!(runtime.context) as MfaModalInject
+    }
+
+    const makeProviderService = (
+      state: MutableObservableSource<ProviderRuntimeSnapshot>
+    ): ProviderRuntimeService => ({
+      state,
+      getSnapshot: state.getSnapshot,
+      subscribe: state.subscribe,
+      getActive: () => {
+        throw new Error("not used")
+      },
+      selectSchool: () => {
+        throw new Error("not used")
+      },
+      initialize: async () => {
+        throw new Error("not used")
+      },
+      reset: async () => {},
+      logout: async () => {},
+      relogin: async () => false,
+    })
+
+    try {
+      expect(readInject().hooks.providerState).toBe(STATIC_UNAVAILABLE_PROVIDER_SOURCE)
+
+      const providerAState = createObservableSource<ProviderRuntimeSnapshot>({
+        status: "ready",
+        schoolId: "ysu",
+        provider: null,
+        error: null,
+        generation: 1,
+      })
+      const releaseProviderA = runtime.context.set(
+        "provider",
+        makeProviderService(providerAState)
+      )
+      await vi.waitFor(() => {
+        expect(readInject().hooks.providerState).toBe(providerAState)
+      })
+
+      const providerBState = createObservableSource<ProviderRuntimeSnapshot>({
+        status: "ready",
+        schoolId: "ysu",
+        provider: null,
+        error: null,
+        generation: 2,
+      })
+      releaseProviderA()
+      const releaseProviderB = runtime.context.set(
+        "provider",
+        makeProviderService(providerBState)
+      )
+      await vi.waitFor(() => {
+        expect(readInject().hooks.providerState).toBe(providerBState)
+      })
+
+      releaseProviderB()
+      await vi.waitFor(() => {
+        expect(readInject().hooks.providerState.getSnapshot()).toBe(
+          UNAVAILABLE_PROVIDER_SNAPSHOT
+        )
+      })
+    } finally {
+      runtime.dispose()
+    }
+  })
+
+  it("never selects an MFA method outside the available set", async () => {
+    const dom = mountInteractiveDom(390, 844)
+    activeUnmount = dom.unmount
+
+    const slots = new PluginSlotRegistry()
+    slots.declare({ name: "shell.overlay", kind: "list" })
+    const i18n = new PluginI18nRegistry()
+    const runtime = new PluginRuntime()
+    runtime.context.set("slots", slots)
+    runtime.context.set("i18n", i18n)
+    runtime.register(mfaPlugin, "builtin")
+    await runtime.startAndWait(mfaPlugin.manifest.id)
+
+    try {
+      const mfaService = runtime.context.get("mfa") as MfaService
+      const overlayEntry = slots.select("shell.overlay")[0]!
+      await dom.render(
+        <ContributionOutlet
+          entry={overlayEntry}
+          slots={slots}
+          i18n={i18n}
+          onError={(err) => {
+            throw err
+          }}
+        />
+      )
+
+      await act(async () => {
+        const pending = mfaService.show({
+          username: "20241234",
+          method: "cpdaily",
+          methods: ["sms"],
+        })
+        void pending.catch(() => {})
+      })
+
+      // The requested/challenge method is outside the offered set, so the
+      // modal must fall back to the first available method instead.
+      expect(dom.bodyEl.textContent).toContain("短信")
+      expect(dom.bodyEl.textContent).not.toContain("今日校园")
+    } finally {
+      activeUnmount = undefined
+      await dom.unmount()
+      runtime.dispose()
+    }
   })
 
   it("boots in non-academic composition without provider/session and supports pre-populated challenge + code submission via ContributionOutlet", async () => {

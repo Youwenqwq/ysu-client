@@ -264,6 +264,8 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
 
     const onDisableAlpha = vi.fn()
     const onDisableBeta = vi.fn()
+    const onEnableAlpha = vi.fn()
+    const onEnableBeta = vi.fn()
 
     const alphaPlugin = definePlugin({
       manifest: {
@@ -282,6 +284,7 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
           slice: "ecard",
           toPollingFlag: "watchAlpha",
           onDisable: onDisableAlpha,
+          onEnable: onEnableAlpha,
         })
         ctx.slots.inject("settings.notifications.content", () =>
           ctx.slots.register({ id: "alpha-opt", slot: "settings.notifications.content" }, () => (
@@ -308,6 +311,7 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
           slice: "epay",
           toPollingFlag: (enabled) => ({ watchBeta: enabled }),
           onDisable: onDisableBeta,
+          onEnable: onEnableBeta,
         })
       },
     })
@@ -334,6 +338,10 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
       username: "student-1",
     })
     await providerRuntime.initialize()
+    await vi.waitFor(() => {
+      expect(onEnableAlpha).toHaveBeenCalledTimes(1)
+      expect(onEnableBeta).toHaveBeenCalledTimes(1)
+    })
 
     const category = settings.getSnapshot().find((c) => c.id === "notifications")!
     expect(category).toBeDefined()
@@ -378,12 +386,25 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
     // Disabling feed-alpha triggers onDisableAlpha and clears widgets
     store.actions.setChannelEnabled("feed-alpha", false)
     expect(onDisableAlpha).toHaveBeenCalledTimes(1)
+    expect(onEnableAlpha).toHaveBeenCalledTimes(1)
     expect(harness.getWidgetClearCalls()).toBeGreaterThanOrEqual(1)
 
     await vi.waitFor(() => {
       expect(harness.getPollingConfig()).toMatchObject({
         payload: expect.objectContaining({
           watchAlpha: false,
+          watchBeta: true,
+        }),
+      })
+    })
+
+    // Re-enabling feed-alpha fires onEnableAlpha and restores the polling flag
+    store.actions.setChannelEnabled("feed-alpha", true)
+    expect(onEnableAlpha).toHaveBeenCalledTimes(2)
+    await vi.waitFor(() => {
+      expect(harness.getPollingConfig()).toMatchObject({
+        payload: expect.objectContaining({
+          watchAlpha: true,
           watchBeta: true,
         }),
       })
@@ -404,8 +425,7 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
       })
     })
 
-    // Switching provider triggers onDisable on previously active channel (feed-beta) and switches handlerId
-    store.actions.setChannelEnabled("feed-alpha", true)
+    // Switching provider triggers onDisable/onEnable on previously active channels and switches handlerId
     session.setCredential({
       schoolId: "campus-b",
       credential: "ticket-b",

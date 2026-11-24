@@ -155,6 +155,7 @@ export interface AcademicNotificationChannelSpec {
   readonly slice?: AcademicSliceKey
   readonly toPollingFlag?: PollingFlagMapping
   onDisable?(): void | Promise<void>
+  onEnable?(): void | Promise<void>
 }
 
 export interface AcademicNotificationChannel extends AcademicNotificationChannelSpec {

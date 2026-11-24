@@ -4,11 +4,14 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { expandScheduleCourses } from "@orahako/academic-kit"
 import {
+  DEFAULT_TTL_MS,
+  LONG_TTL_MS,
   notificationRegistryRuntimePlugin,
   providerRegistryRuntimePlugin,
   providerRuntimePlugin,
   queryRuntimePlugin,
   sessionRuntimePlugin,
+  SHORT_TTL_MS,
 } from "@orahako/academic-runtime"
 import {
   defineSchoolProvider,
@@ -66,6 +69,7 @@ import {
 import { WidgetDiscovery } from "../src/widget-discovery"
 import {
   computeEffectiveScheduleSnapshot,
+  computeSchedulePatchScope,
   createSchedulePatchMutators,
   createValidatedSchedulePatch,
   schedulePatchesStore,
@@ -557,6 +561,7 @@ describe("@orahako/plugin-schedule export discipline & manifest", () => {
       "slots",
       "settings",
       "router",
+      "navigation",
       "i18n",
       "storage",
       "provider",
@@ -643,7 +648,7 @@ describe("scheduleSettingsStore & schedulePatchesStore validation and persistenc
       nowMs: 1_700_000_000_000,
     })
 
-    const scope = JSON.stringify(["ysu", "ysu:1", "20240001", "2026-2027-1"])
+    const scope = JSON.stringify(["ysu", "20240001", "2026-2027-1"])
     patches.actions.add(scope, patch1)
     await vi.waitFor(() => expect(secure.map.has("schedule-patches")).toBe(true))
 
@@ -728,6 +733,31 @@ describe("scheduleSettingsStore & schedulePatchesStore validation and persistenc
     // Removing parent removes child transitively
     mutators.removePatch(mutationCtx, "patch-1")
     expect(patches.source.getSnapshot().byScope[scope]).toEqual([])
+
+    // Provider generation changes no longer move the patch scope
+    expect(
+      computeSchedulePatchScope({
+        providerSnapshot: { ...fakeProviderSnap, generation: 9 },
+        sessionSnapshot: fakeSessionSnap,
+        semester: "2026-2027-1",
+      })
+    ).toBe(afterPatch1.scope)
+
+    // Legacy generation-scoped patches migrate into the stable scope on hydration
+    const legacyScope = JSON.stringify(["ysu", "ysu:7", "20240001", "2026-2027-1"])
+    const legacyBackend = createMemoryStorage()
+    await legacyBackend.setItem(
+      "schedule-patches",
+      JSON.stringify({ version: 1, state: { byScope: { [legacyScope]: [patch1] } } })
+    )
+    const migratedPatches = schedulePatchesStore.create({
+      local: createMemoryStorage(),
+      secure: legacyBackend,
+    })
+    await vi.waitFor(() => expect(migratedPatches.hydrated.getSnapshot()).toBe(true))
+    expect(migratedPatches.source.getSnapshot().byScope[scope]).toEqual([patch1])
+    expect(migratedPatches.source.getSnapshot().byScope[legacyScope]).toBeUndefined()
+    migratedPatches.dispose()
 
     settings.dispose()
     patches.dispose()
@@ -1022,6 +1052,8 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     const providerRuntime = runtime.context.get("provider")!
     const notifications = runtime.context.get("notifications")!
     const overview = runtime.context.get("overview")!
+    const navigation = runtime.context.get("navigation")!
+    const query = runtime.context.get("query")!
 
     slots.declare({ name: "settings.startupOptions", kind: "list" })
     slots.declare({ name: "settings.widgets", kind: "list" })
@@ -1066,6 +1098,12 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       expect(widgetUpdates.has("tomorrow")).toBe(true)
     })
 
+    expect(query.policy("schedule")).toEqual({ ttl: LONG_TTL_MS, persist: true })
+    expect(query.policy("current-week")).toEqual({ ttl: SHORT_TTL_MS, persist: true })
+    expect(query.policy("class-periods")).toEqual({ ttl: LONG_TTL_MS, persist: true })
+    expect(query.policy("term-calendar")).toEqual({ ttl: LONG_TTL_MS, persist: true })
+    expect(query.policy("exams")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
+
     // Enable class reminders via plugin settings store -> schedules native alarms on reminders.classes@1
     const scheduleStore = widgetsCategory.store as ScheduleSettingsStoreInstance
     await vi.waitFor(() => expect(scheduleStore.hydrated.getSnapshot()).toBe(true))
@@ -1104,6 +1142,45 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       expect(dom.container.textContent).toContain("英语分级考")
       expect(dom.container.textContent).toContain("日程查询")
     })
+
+    // Without a registered school-schedule route, both entries stay hidden
+    await dom.render(<ContributionOutlet entry={schedulePage} slots={slots} i18n={i18n} />)
+    expect(dom.container.textContent).not.toContain("全校课表")
+    expect(dom.container.textContent).not.toContain("查空教室")
+
+    // Registering the route makes the entries visible, disposing hides them again
+    const stubRoutePlugin = definePlugin({
+      manifest: {
+        id: "test.school-schedule-route",
+        name: "School schedule route stub",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+        inject: ["ui"],
+      },
+      inject: ["ui"] as const,
+      apply(stubCtx) {
+        stubCtx.ui.registerPage(
+          {
+            id: "index",
+            route: "school-schedule",
+            title: "全校课表",
+          },
+          () => null
+        )
+      },
+    })
+    runtime.register(stubRoutePlugin, "builtin")
+    await runtime.startAndWait(stubRoutePlugin.manifest.id)
+    await vi.waitFor(() => expect(navigation.resolve("school-schedule")).toBeDefined())
+    await dom.render(<ContributionOutlet entry={schedulePage} slots={slots} i18n={i18n} />)
+    await vi.waitFor(() => {
+      expect(dom.container.textContent).toContain("全校课表")
+      expect(dom.container.textContent).toContain("查空教室")
+    })
+    runtime.stop(stubRoutePlugin.manifest.id)
+    await vi.waitFor(() => expect(navigation.resolve("school-schedule")).toBeUndefined())
 
     const viewStore = schedulePage.store as ScheduleViewStoreInstance
     await act(async () => {
@@ -1171,19 +1248,12 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     const headerActionEntry = slots
       .select("shell.header.actions")
       .find((s) => s.pluginId === SCHEDULE_PLUGIN_ID)!
-    expect(
-      renderToStaticMarkup(
-        <ContributionOutlet entry={headerActionEntry} slots={slots} i18n={i18n} />
-      )
-    ).toContain("第1周")
+    await dom.render(<ContributionOutlet entry={headerActionEntry} slots={slots} i18n={i18n} />)
+    expect(dom.container.textContent).toContain("第1周")
     await act(async () => {
       router.push({ route: "overview" })
     })
-    expect(
-      renderToStaticMarkup(
-        <ContributionOutlet entry={headerActionEntry} slots={slots} i18n={i18n} />
-      )
-    ).toBe("")
+    await vi.waitFor(() => expect(dom.container.textContent).not.toContain("第1周"))
 
     // Render OverviewPage with CourseProgressWidget ("下一节") and TodayCoursesWidget ("今日课程")
     const overviewPage = ui
@@ -1235,6 +1305,23 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     await vi.waitFor(() => {
       expect(scheduledAlarms).toEqual([])
       expect(widgetClears).toEqual(expect.arrayContaining(["schedule", "tomorrow"]))
+    })
+
+    // Unrelated reminder setting changes must not bypass the disabled channel
+    await act(async () => {
+      scheduleStore.actions.setClassReminderMinutes(5)
+    })
+    expect(scheduledAlarms).toEqual([])
+    expect(widgetUpdates.has("schedule")).toBe(false)
+
+    // Re-enabling the channel rebuilds alarms and widgets from current data
+    await act(async () => {
+      notifStore.actions.setChannelEnabled("schedule", true)
+    })
+    await vi.waitFor(() => {
+      expect(scheduledAlarms.length).toBeGreaterThanOrEqual(1)
+      expect(widgetUpdates.has("schedule")).toBe(true)
+      expect(widgetUpdates.has("tomorrow")).toBe(true)
     })
 
     // Standalone controller race test: permission prompt completing after logout returns false

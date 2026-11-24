@@ -30,11 +30,19 @@ class ScopedRootService {
 }
 
 class LabelledRootService {
-  constructor(readonly label: string) {}
+  constructor(readonly rawLabel: string) {}
 
   [PLUGIN_SERVICE_SCOPE](): { label: string } {
-    return { label: this.label }
+    return { label: this.rawLabel }
   }
+}
+
+function readFacadeLabel(value: unknown): string | undefined {
+  if (typeof value === "object" && value !== null && "label" in value) {
+    const label = value.label
+    if (typeof label === "string") return label
+  }
+  return undefined
 }
 
 describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
@@ -142,6 +150,44 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
     expect(uiRoot.facades[0]?.ctx).toBe(seenCtx)
     expect(uiRoot.facades[0]?.ctx.get("http")).toEqual({ label: "http-scoped" })
     expect(runtime.context.get("ui")).toBe(uiRoot)
+    runtime.dispose()
+  })
+
+  it("applies plugins with absent optional services and remounts on service changes", async () => {
+    const runtime = new PluginRuntime()
+    const observed: Array<string | undefined> = []
+    const optional = definePlugin({
+      manifest: makeManifest("example.optional", { kind: "feature" }),
+      optionalInject: ["ui"] as const,
+      apply(ctx) {
+        observed.push(readFacadeLabel(ctx.ui))
+      },
+    })
+
+    runtime.register(optional, "builtin")
+    await runtime.startAndWait(optional.manifest.id)
+    expect(observed).toEqual([undefined])
+    expect(runtime.get(optional.manifest.id)?.status).toBe("active")
+
+    const releaseFirst = runtime.context.set("ui", new LabelledRootService("first"))
+    await runtime.flush()
+    expect(observed).toEqual([undefined, "first"])
+    expect(runtime.get(optional.manifest.id)?.status).toBe("active")
+
+    // Revocation drops the old facade before the next generation applies.
+    releaseFirst()
+    await runtime.flush()
+    expect(observed).toEqual([undefined, "first", undefined])
+
+    const releaseSecond = runtime.context.set("ui", new LabelledRootService("second"))
+    await runtime.flush()
+    expect(observed).toEqual([undefined, "first", undefined, "second"])
+    expect(runtime.get(optional.manifest.id)?.status).toBe("active")
+
+    releaseSecond()
+    await runtime.flush()
+    expect(observed).toEqual([undefined, "first", undefined, "second", undefined])
+    expect(runtime.get(optional.manifest.id)?.status).toBe("active")
     runtime.dispose()
   })
 
@@ -279,6 +325,121 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
       runtime.stop(base.id)
     }
     expect(runtime.context.registry.size).toBe(baseline)
+    runtime.dispose()
+  })
+
+  it("revalidates requires on hot replacement without illegal active dependents", () => {
+    const runtime = new PluginRuntime()
+    const base = makeManifest("example.base", { version: "1.2.0" })
+    const dependent = makeManifest("example.dep", { requires: { "example.base": "^1.0.0" } })
+
+    runtime.register(base, () => {}, "builtin")
+    runtime.register(dependent, () => {}, "external")
+    runtime.start(base.id)
+    runtime.start(dependent.id)
+    expect(runtime.get(dependent.id)?.status).toBe("active")
+
+    runtime.register(makeManifest("example.base", { version: "2.0.0" }), () => {}, "builtin")
+    expect(runtime.get("example.base")?.status).toBe("active")
+    expect(runtime.get(dependent.id)?.status).toBe("disabled")
+
+    // Restoring a compatible dependency lets the dependent start again.
+    runtime.register(base, () => {}, "builtin")
+    runtime.start(base.id)
+    runtime.start(dependent.id)
+    expect(runtime.get(dependent.id)?.status).toBe("active")
+    runtime.dispose()
+  })
+
+  it("invalidates dependents when a hot-replaced dependency fails to start", () => {
+    const runtime = new PluginRuntime()
+    const base = makeManifest("example.base", { version: "2.0.0" })
+    const dependent = makeManifest("example.dep", { requires: { "example.base": "^2.0.0" } })
+
+    runtime.register(base, () => {}, "builtin")
+    runtime.register(dependent, () => {}, "external")
+    runtime.start(base.id)
+    runtime.start(dependent.id)
+    expect(runtime.get(dependent.id)?.status).toBe("active")
+
+    // The replacement satisfies the dependent's range, but cannot start on
+    // its own missing package dependency.
+    const failing = makeManifest("example.base", {
+      version: "2.1.0",
+      requires: { "example.missing": "^1.0.0" },
+    })
+    expect(() => runtime.register(failing, () => {}, "builtin")).toThrow(PluginDependencyError)
+    expect(runtime.get("example.base")?.status).toBe("registered")
+    expect(runtime.get(dependent.id)?.status).toBe("disabled")
+
+    // Rolling back to the previous compatible release restores both.
+    runtime.register(base, () => {}, "builtin")
+    runtime.start(base.id)
+    runtime.start(dependent.id)
+    expect(runtime.get(base.id)?.status).toBe("active")
+    expect(runtime.get(dependent.id)?.status).toBe("active")
+    runtime.dispose()
+  })
+
+  it("clears failed status when a service replacement revives the plugin", async () => {
+    const runtime = new PluginRuntime()
+    const consumer = makeManifest("example.revive", { kind: "runtime", inject: ["ui"] })
+    const releaseBad = runtime.context.set("ui", new LabelledRootService("bad"))
+
+    runtime.register(
+      consumer,
+      async (ctx) => {
+        await Promise.resolve()
+        if (readFacadeLabel(ctx.get("ui")) !== "good") throw new Error("bad ui")
+      },
+      "builtin"
+    )
+    await expect(runtime.startAndWait(consumer.id)).rejects.toThrow("bad ui")
+    expect(runtime.get(consumer.id)?.status).toBe("failed")
+
+    releaseBad()
+    runtime.context.set("ui", new LabelledRootService("good"))
+    await runtime.startAndWait(consumer.id)
+    expect(runtime.get(consumer.id)?.status).toBe("active")
+    expect(runtime.get(consumer.id)?.error).toBeUndefined()
+    runtime.dispose()
+  })
+
+  it("waits for async disposers before applying the next plugin generation", async () => {
+    const runtime = new PluginRuntime()
+    const releaseCleanup = Promise.withResolvers<void>()
+    const events: string[] = []
+    let generation = 0
+    const manifest = makeManifest("example.async-cleanup")
+
+    const executable = (ctx: Context) => {
+      generation += 1
+      const current = generation
+      events.push(`apply:${current}`)
+      ctx.effect(() => async () => {
+        events.push(`cleanup:start:${current}`)
+        if (current === 1) await releaseCleanup.promise
+        events.push(`cleanup:end:${current}`)
+      })
+    }
+
+    runtime.register(manifest, executable, "builtin")
+    await runtime.startAndWait(manifest.id)
+    expect(events).toEqual(["apply:1"])
+
+    runtime.stop(manifest.id)
+    runtime.start(manifest.id)
+    expect(runtime.get(manifest.id)?.status).toBe("starting")
+    expect(events).toEqual(["apply:1", "cleanup:start:1"])
+
+    const waiting = runtime.startAndWait(manifest.id)
+    await Promise.resolve()
+    expect(events).toEqual(["apply:1", "cleanup:start:1"])
+
+    releaseCleanup.resolve()
+    await waiting
+    expect(events).toEqual(["apply:1", "cleanup:start:1", "cleanup:end:1", "apply:2"])
+    expect(runtime.get(manifest.id)?.status).toBe("active")
     runtime.dispose()
   })
 })

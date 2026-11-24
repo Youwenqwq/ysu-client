@@ -10,6 +10,7 @@ import {
   type CompositionSource,
   type HttpRequest,
 } from "@orahako/sdk"
+import { ToggleGroupItem } from "@orahako/ui-primitives"
 import { StatelessHttpService } from "@orahako/runtime-http"
 import { i18nRegistryPlugin } from "@orahako/runtime-i18n"
 import { navigationRuntimePlugin, PluginRouter, routerRuntimePlugin } from "@orahako/runtime-router"
@@ -113,7 +114,6 @@ describe("@orahako/ui-settings", () => {
           state: {
             customUserAgentEnabled: true,
             customUserAgent: "CustomOrahakoUA/3.1",
-            startupPage: "",
           },
         })
       )
@@ -242,6 +242,13 @@ describe("@orahako/ui-settings", () => {
             <div>ACCOUNT_CONTRIB</div>
           ))
         )
+        ctx.slots.inject("settings.startupOptions", (sCtx) =>
+          sCtx.slots.register({ id: "startup-item", slot: "settings.startupOptions" }, () => (
+            <ToggleGroupItem value="schedule" className="text-xs">
+              STARTUP_SCHEDULE
+            </ToggleGroupItem>
+          ))
+        )
         ctx.settings.registerCategory(
           {
             id: "channels",
@@ -318,8 +325,24 @@ describe("@orahako/ui-settings", () => {
     await host.bootstrap()
     const router = host.runtime.context.get("router") as PluginRouter
 
+    // The settings page reads and writes the shared host startup preference.
+    const settingsPage = host.ui
+      ?.getSnapshot()
+      .pages.find((page) => page.pluginId === SETTINGS_PLUGIN_ID && page.id === "settings")
+    const startupControls = settingsPage?.inject?.(host.runtime.context) as
+      | {
+          getStartupPage: () => string | undefined
+          setStartupPage: (route: string | undefined) => void
+        }
+      | undefined
+    expect(startupControls?.getStartupPage()).toBeUndefined()
+    startupControls?.setStartupPage("schedule")
+    expect(host.preferences.state.getSnapshot()).toMatchObject({ startupPage: "schedule" })
+
     // Render Settings page
     const settingsHtml = renderToStaticMarkup(<OrahakoApp host={host} />)
+    expect(settingsHtml).toContain("STARTUP_SCHEDULE")
+    expect(settingsHtml).toMatch(/data-state="on"[^>]*>[^<]*STARTUP_SCHEDULE/)
     expect(settingsHtml).toContain("APPEARANCE_CONTRIB")
     expect(settingsHtml).toContain("GENERAL_CONTRIB")
     expect(settingsHtml).toContain("ACCOUNT_CONTRIB")
@@ -346,10 +369,9 @@ describe("@orahako/ui-settings", () => {
     const missingCatHtml = renderToStaticMarkup(<OrahakoApp host={host} />)
     expect(missingCatHtml).toContain("Settings category unavailable")
 
-    // Also verify settingsStore standalone actions
+    // Startup state lives in host preferences, not the settings store.
     const standaloneStore = settingsStore.create()
-    standaloneStore.actions.setStartupPage("schedule")
-    expect(standaloneStore.source.getSnapshot().startupPage).toBe("schedule")
+    expect(standaloneStore.source.getSnapshot()).not.toHaveProperty("startupPage")
     standaloneStore.dispose()
 
     // Verify debug panel slot contribution renders cleanly via ContributionOutlet

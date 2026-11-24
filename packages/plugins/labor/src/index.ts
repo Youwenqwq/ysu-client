@@ -20,6 +20,9 @@ import {
 
 export const LABOR_PLUGIN_ID = "orahako.labor"
 
+const ONE_HOUR_TTL_MS = 1000 * 60 * 60
+const SIX_HOUR_TTL_MS = 1000 * 60 * 60 * 6
+
 export type {
   LaborDictionary,
   LaborPageInject,
@@ -49,6 +52,10 @@ export const laborPlugin = definePlugin({
 
     let disposed = false
     const uiStore = laborUiStore.create()
+
+    query.registerPolicy("labor-summary", { ttl: SIX_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("labor-records", { ttl: SIX_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("labor-activities", { ttl: ONE_HOUR_TTL_MS, persist: true })
 
     const isEnabled = (): boolean =>
       !disposed &&

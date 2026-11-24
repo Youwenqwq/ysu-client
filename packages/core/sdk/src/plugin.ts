@@ -1,47 +1,9 @@
-import { Context, Lifecycle, Service, type Events } from "@cordisjs/core"
+import { Context, Service, type Events } from "@cordisjs/core"
 import type { PluginManifest } from "./manifest"
 import "./services"
 
 export { Context, Service }
 export type { Events }
-
-function ensureCordisWaterfallInstalled(): void {
-  if (typeof Lifecycle.prototype.waterfall !== "function") {
-    Lifecycle.prototype.waterfall = async function (
-      this: Lifecycle,
-      ...rawArgs: unknown[]
-    ): Promise<unknown> {
-      const args = [...rawArgs]
-      const iterator = this.dispatch("waterfall", args)
-      let step = iterator.next()
-      while (!step.done) {
-        const nextValue = await step.value
-        if (nextValue !== undefined) {
-          args[0] = nextValue
-        }
-        step = iterator.next()
-      }
-      return args[0]
-    }
-  }
-  if (typeof Context.prototype.waterfall !== "function") {
-    const installMethod = (
-      target: object,
-      fn: (this: Context, ...args: unknown[]) => Promise<unknown>
-    ) => {
-      Object.defineProperty(target, "waterfall", {
-        value: fn,
-        writable: true,
-        configurable: true,
-      })
-    }
-    installMethod(Context.prototype, function (this: Context, ...args: unknown[]) {
-      return this.lifecycle.waterfall(...args)
-    })
-  }
-}
-
-ensureCordisWaterfallInstalled()
 
 export type PluginConfig = Record<string, unknown>
 
@@ -117,6 +79,7 @@ export type InjectableServiceKey = Exclude<Extract<keyof Context, string>, Built
 
 export type CordisLifecycleKeys =
   | typeof Context.events
+  | "lifecycle"
   | "effect"
   | "on"
   | "once"
@@ -124,7 +87,6 @@ export type CordisLifecycleKeys =
   | "emit"
   | "parallel"
   | "serial"
-  | "waterfall"
   | "bail"
 
 export interface PluginServiceSetter {
@@ -135,38 +97,54 @@ export interface PluginServiceSetter {
 }
 
 /**
- * Statically exposes ONLY the services declared in `inject` plus Cordis
- * lifecycle/event methods and typed service registration (`set`).
+ * Optional services remain visible on the scoped context but may be absent
+ * at runtime. Cordis keeps such plugins active; the kernel remounts them when
+ * the optional service appears, is replaced, or is revoked.
  */
-export type ScopedPluginContext<K extends readonly InjectableServiceKey[] = readonly []> = Pick<
-  Context,
-  CordisLifecycleKeys | K[number]
-> &
+export type OptionalScopedPluginServices<O extends readonly InjectableServiceKey[]> = {
+  [P in O[number]]?: Context[P]
+}
+
+/**
+ * Statically exposes ONLY the services declared in `inject` plus optional
+ * services from `optionalInject`, Cordis lifecycle/event methods and typed
+ * service registration (`set`).
+ */
+export type ScopedPluginContext<
+  K extends readonly InjectableServiceKey[] = readonly [],
+  O extends readonly InjectableServiceKey[] = readonly [],
+> = Pick<Context, CordisLifecycleKeys | K[number]> &
+  OptionalScopedPluginServices<O> &
   PluginServiceSetter
 
 export interface PluginSpec<
   K extends readonly InjectableServiceKey[] = readonly [],
   C extends PluginConfig = PluginConfig,
+  O extends readonly InjectableServiceKey[] = readonly [],
 > {
   readonly manifest: PluginManifest
   readonly inject?: K
+  readonly optionalInject?: O
   readonly configSchema?: Record<string, unknown>
-  apply(ctx: ScopedPluginContext<K>, config: C): void | Promise<void>
+  apply(ctx: ScopedPluginContext<K, O>, config: C): void | Promise<void>
 }
 
 export interface DefinedPlugin<
   K extends readonly InjectableServiceKey[] = readonly InjectableServiceKey[],
   C extends PluginConfig = PluginConfig,
+  O extends readonly InjectableServiceKey[] = readonly InjectableServiceKey[],
 > {
   readonly manifest: PluginManifest
   readonly inject: readonly K[number][]
+  readonly optionalInject: readonly O[number][]
   readonly configSchema?: Record<string, unknown>
-  apply(ctx: ScopedPluginContext<K>, config: C): void | Promise<void>
+  apply(ctx: ScopedPluginContext<K, O>, config: C): void | Promise<void>
 }
 
 export interface AnyDefinedPlugin {
   readonly manifest: PluginManifest
   readonly inject: readonly InjectableServiceKey[]
+  readonly optionalInject?: readonly InjectableServiceKey[]
   readonly configSchema?: Record<string, unknown>
   apply(ctx: Context, config: never): void | Promise<void>
 }
@@ -174,10 +152,14 @@ export interface AnyDefinedPlugin {
 export function definePlugin<
   const K extends readonly InjectableServiceKey[] = readonly [],
   C extends PluginConfig = PluginConfig,
->(spec: PluginSpec<K, C>): DefinedPlugin<K, C> {
+  const O extends readonly InjectableServiceKey[] = readonly [],
+>(spec: PluginSpec<K, C, O>): DefinedPlugin<K, C, O> {
   const mergedInject = Array.from(
     new Set<string>([...(spec.manifest.inject ?? []), ...(spec.inject ?? [])])
   )
+  const resolvedOptionalInject: O[number][] = Array.from(
+    new Set<O[number]>(spec.optionalInject ?? [])
+  ).filter((name) => !mergedInject.includes(name))
   const resolvedSchema = spec.configSchema ?? spec.manifest.configSchema
   const manifest: PluginManifest = {
     ...spec.manifest,
@@ -189,6 +171,7 @@ export function definePlugin<
   return {
     manifest,
     inject: resolvedInject,
+    optionalInject: resolvedOptionalInject,
     ...(resolvedSchema !== undefined ? { configSchema: resolvedSchema } : {}),
     apply: spec.apply,
   }

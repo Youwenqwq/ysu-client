@@ -2,6 +2,8 @@ import {
   definePlugin,
   PLUGIN_API_VERSION,
   pluginPageHref,
+  type ObservableSource,
+  type PluginHostPreferenceSnapshot,
   type PluginLocale,
   type PluginManifest,
   type PluginSettingsCategory,
@@ -29,6 +31,13 @@ export {
   type SettingsStoreState,
 }
 
+const EMPTY_PREFERENCE_SNAPSHOT: PluginHostPreferenceSnapshot = {}
+
+const STATIC_PREFERENCE_SOURCE: ObservableSource<PluginHostPreferenceSnapshot> = {
+  getSnapshot: () => EMPTY_PREFERENCE_SNAPSHOT,
+  subscribe: () => () => {},
+}
+
 export const SETTINGS_PLUGIN_ID = "orahako.settings"
 
 export const manifest: PluginManifest = {
@@ -50,6 +59,7 @@ function readDefaultBrowserUserAgent(): string {
 export const uiSettingsPlugin = definePlugin({
   manifest,
   inject: ["ui", "slots", "settings", "router", "i18n", "storage", "http"] as const,
+  optionalInject: ["packageRuntime"] as const,
   apply(ctx) {
     const store = settingsStore.create(ctx.storage)
     ctx.effect(() => () => {
@@ -95,6 +105,7 @@ export const uiSettingsPlugin = definePlugin({
         inject: () => ({
           hooks: {
             categories: ctx.settings.state,
+            preference: ctx.packageRuntime?.preferenceState ?? STATIC_PREFERENCE_SOURCE,
           },
           setLocale: (locale: PluginLocale) => {
             ctx.i18n.setLocale(locale)
@@ -116,8 +127,12 @@ export const uiSettingsPlugin = definePlugin({
           },
           resolveCategoryTitle,
           resolveCategoryDescription,
-          onSelectStartupPage: (route: string) => {
-            ctx.emit("shell/landing-preference", route)
+          getStartupPage: () =>
+            ctx.packageRuntime?.preferenceState?.getSnapshot().startupPage ??
+            ctx.packageRuntime?.getStartupPage?.() ??
+            ctx.packageRuntime?.defaultLanding?.(),
+          setStartupPage: (route: string | undefined) => {
+            ctx.packageRuntime?.setStartupPage?.(route)
           },
           getDefaultUserAgent: readDefaultBrowserUserAgent,
         }),

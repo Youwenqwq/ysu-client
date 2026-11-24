@@ -5,6 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const capacitorMocks = vi.hoisted(() => ({
   isNative: false,
+  httpRequest: vi.fn(
+    async (options: {
+      readonly url: string
+      readonly headers?: Readonly<Record<string, string>>
+    }) => ({
+      status: 200,
+      headers: {},
+      data: "native-ok",
+      url: options.url,
+    })
+  ),
 }))
 
 vi.mock("@capacitor/core", () => ({
@@ -12,7 +23,7 @@ vi.mock("@capacitor/core", () => ({
     isNativePlatform: () => capacitorMocks.isNative,
   },
   CapacitorHttp: {
-    request: vi.fn(),
+    request: capacitorMocks.httpRequest,
   },
   registerPlugin: () => ({}),
 }))
@@ -302,6 +313,13 @@ let activeUnmount: (() => Promise<void>) | undefined
 
 beforeEach(() => {
   capacitorMocks.isNative = false
+  capacitorMocks.httpRequest.mockReset()
+  capacitorMocks.httpRequest.mockImplementation(async (options) => ({
+    status: 200,
+    headers: {},
+    data: "native-ok",
+    url: options.url,
+  }))
 })
 
 afterEach(async () => {
@@ -438,6 +456,83 @@ describe("@orahako/ui-activation", () => {
       expect(new Headers(secondInit?.headers).get("x-activation")).toBeNull()
     } finally {
       runtime.dispose()
+    }
+  })
+
+  it("never forwards x-activation through the native direct transport", async () => {
+    capacitorMocks.isNative = true
+    const localBackend = new MemoryKeyValueStorage()
+    const secureBackend = new MemoryKeyValueStorage()
+    secureBackend.data.set(
+      `orahako-plugin:${ACTIVATION_PLUGIN_ID}:activation`,
+      JSON.stringify({ version: 1, state: { token: "persisted-secret" } })
+    )
+
+    const runtime = new PluginRuntime()
+    let consumerHttp!: PluginHttpService
+
+    const customStoragePlugin = definePlugin({
+      manifest: {
+        id: "test.native-storage",
+        name: "Native Storage",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "runtime",
+        entry: "index.js",
+        provides: ["storage"],
+      },
+      apply(ctx) {
+        ctx.set(
+          "storage",
+          new NamespacedStorageService({ local: localBackend, secure: secureBackend })
+        )
+      },
+    })
+
+    const consumerPlugin = definePlugin({
+      manifest: {
+        id: "test.native-consumer",
+        name: "Native Consumer",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+        inject: ["http"],
+      },
+      inject: ["http"] as const,
+      apply(ctx) {
+        consumerHttp = ctx.http
+      },
+    })
+
+    try {
+      runtime.register(slotRegistryPlugin, "builtin")
+      runtime.register(i18nRegistryPlugin, "builtin")
+      runtime.register(customStoragePlugin, "builtin")
+      runtime.register(httpRuntimePlugin, "builtin")
+      runtime.register(activationPlugin, "builtin", { required: true })
+      runtime.register(consumerPlugin, "builtin")
+
+      await runtime.startAndWait(slotRegistryPlugin.manifest.id)
+      await runtime.startAndWait(i18nRegistryPlugin.manifest.id)
+      await runtime.startAndWait(customStoragePlugin.manifest.id)
+      await runtime.startAndWait(httpRuntimePlugin.manifest.id)
+      await runtime.startAndWait(activationPlugin.manifest.id)
+      await runtime.startAndWait(consumerPlugin.manifest.id)
+
+      const response = await consumerHttp.send({
+        method: "GET",
+        url: "https://third-party.example/api",
+        redirect: "manual",
+      })
+      expect(response.status).toBe(200)
+
+      const nativeInit = capacitorMocks.httpRequest.mock.calls[0]?.[0]
+      const headerNames = Object.keys(nativeInit?.headers ?? {}).map((name) => name.toLowerCase())
+      expect(headerNames).not.toContain(ACTIVATION_HEADER)
+    } finally {
+      runtime.dispose()
+      capacitorMocks.isNative = false
     }
   })
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { defineSchoolProvider } from "@orahako/academic-sdk"
 import {
   createMemoryPackageBackend,
@@ -169,6 +169,7 @@ describe("AcademicNotificationRegistry & notificationRegistryRuntimePlugin", () 
       },
     })
 
+    const libraryOnEnable = vi.fn()
     const customPlugin = definePlugin({
       manifest: {
         id: "ext.library",
@@ -183,6 +184,7 @@ describe("AcademicNotificationRegistry & notificationRegistryRuntimePlugin", () 
         ctx.notifications.registerChannel({
           id: "library-due",
           toPollingFlag: (enabled) => ({ libraryDue: enabled }),
+          onEnable: libraryOnEnable,
         })
       },
     })
@@ -202,6 +204,9 @@ describe("AcademicNotificationRegistry & notificationRegistryRuntimePlugin", () 
       { id: "schedule", pluginId: "orahako.schedule" },
       { id: "library-due", pluginId: "ext.library" },
     ])
+    expect(
+      registry.getSnapshot().find((channel) => channel.id === "library-due")?.onEnable
+    ).toBe(libraryOnEnable)
 
     // Stopping gradesPlugin revokes ONLY "grades"
     runtime.stop(gradesPlugin.manifest.id)

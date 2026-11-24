@@ -11,7 +11,7 @@ export const ysuBundle = defineBundle({
       "https://raw.githubusercontent.com/Youwenqwq/orahako-plugin-registry/main/dist/plugins.json",
   },
   defaults: { schoolId },
-  plugins: [{ id: "ysu.provider", protected: true }],
+  plugins: [{ id: "orahako.meter" }, { id: "ysu.provider", protected: true }],
   patches: [
     { id: "orahako.runtime.session", config: { defaultSchoolId: schoolId }, protected: true },
     { id: "orahako.runtime.provider", config: { defaultSchoolId: schoolId }, protected: true },

@@ -2,6 +2,8 @@ import { act, type ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  DEFAULT_TTL_MS,
+  ONE_HOUR_TTL_MS,
   providerRegistryRuntimePlugin,
   providerRuntimePlugin,
   queryRuntimePlugin,
@@ -328,7 +330,9 @@ describe("@orahako/plugin-ecard", () => {
       overviewPlugin,
       ecardPlugin,
     ]) {
-      if (
+      if (plugin.manifest.id === queryRuntimePlugin.manifest.id) {
+        runtime.register(plugin, "builtin", { policies: {} })
+      } else if (
         plugin.manifest.id === sessionRuntimePlugin.manifest.id ||
         plugin.manifest.id === providerRuntimePlugin.manifest.id
       ) {
@@ -338,6 +342,9 @@ describe("@orahako/plugin-ecard", () => {
       }
       runtime.start(plugin.manifest.id)
     }
+
+    const rootQuery = runtime.context.get("query")!
+    expect(rootQuery.policy("ecard")).toEqual({ ttl: ONE_HOUR_TTL_MS, persist: false })
 
     const ui = runtime.context.get("ui")!
     const slots = runtime.context.get("slots") as PluginSlotRegistry
@@ -537,6 +544,7 @@ describe("@orahako/plugin-ecard", () => {
     expect(ui.getSnapshot().navigation.some((n) => n.pluginId === ECARD_PLUGIN_ID)).toBe(false)
     expect(overview.getSnapshot().some((w) => w.pluginId === ECARD_PLUGIN_ID)).toBe(false)
     expect(slots.select("shell.header.actions")).toEqual([])
+    expect(rootQuery.policy("ecard")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
     expect(
       slots.select("overview.widget", `${ECARD_PLUGIN_ID}:${ECARD_BALANCE_WIDGET_ID}`)
     ).toEqual([])

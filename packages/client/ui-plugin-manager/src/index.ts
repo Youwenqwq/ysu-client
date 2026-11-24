@@ -4,10 +4,10 @@ import {
   definePlugin,
   isCapacitor,
   PLUGIN_API_VERSION,
-  type Context,
   type MarketplaceIndex,
   type ObservableSource,
 } from "@orahako/sdk"
+import type { ProviderRuntimeService } from "@orahako/academic-sdk"
 import {
   groupByPluginCategory,
   pluginCategory,
@@ -87,32 +87,35 @@ function isProviderRuntimeLike(value: unknown): value is ProviderRuntimeLike {
   )
 }
 
-function projectProviderSource(registrantCtx: Context): ObservableSource<OptionalProviderSnapshot> {
-  const raw: unknown = registrantCtx.get("provider")
-  if (!isProviderRuntimeLike(raw)) {
-    return STATIC_PROVIDER_SOURCE
-  }
-  const readProjected = (): OptionalProviderSnapshot => {
-    const snap = raw.state.getSnapshot()
-    const schoolId = snap.provider?.id ?? snap.schoolId
-    const supportedPlugins = snap.provider?.supportedPlugins
-    return {
-      schoolId,
-      ...(supportedPlugins !== undefined ? { supportedPlugins } : {}),
-    }
-  }
-  const projected = createObservableSource<OptionalProviderSnapshot>(readProjected())
+function projectProviderSnapshot(provider: ProviderRuntimeLike): OptionalProviderSnapshot {
+  const snap = provider.state.getSnapshot()
+  const supportedPlugins = snap.provider?.supportedPlugins
   return {
-    getSnapshot: () => {
-      const next = readProjected()
-      const prev = projected.getSnapshot()
-      if (prev.schoolId !== next.schoolId || prev.supportedPlugins !== next.supportedPlugins) {
-        projected.set(next)
-      }
-      return projected.getSnapshot()
-    },
-    subscribe: (listener) => raw.state.subscribe(listener),
+    schoolId: snap.provider?.id ?? snap.schoolId,
+    ...(supportedPlugins !== undefined ? { supportedPlugins } : {}),
   }
+}
+
+interface ProviderProjection {
+  readonly source: ObservableSource<OptionalProviderSnapshot>
+  dispose(): void
+}
+
+function createProviderProjection(provider: unknown): ProviderProjection {
+  if (!isProviderRuntimeLike(provider)) {
+    return { source: STATIC_PROVIDER_SOURCE, dispose: () => {} }
+  }
+  // The projection owns the derived snapshot. Updates happen on the provider's
+  // subscription only, so `getSnapshot` stays pure for React.
+  const projected = createObservableSource<OptionalProviderSnapshot>(
+    projectProviderSnapshot(provider),
+    (left, right) =>
+      left.schoolId === right.schoolId && left.supportedPlugins === right.supportedPlugins
+  )
+  const unsubscribe = provider.state.subscribe(() => {
+    projected.set(projectProviderSnapshot(provider))
+  })
+  return { source: projected, dispose: unsubscribe }
 }
 
 export const pluginManagerPlugin = definePlugin({
@@ -129,9 +132,14 @@ export const pluginManagerPlugin = definePlugin({
     description: "管理已安装插件、外部 ZIP 侧载、应用 Shell 选择与插件市场",
   },
   inject: ["ui", "slots", "router", "i18n", "storage", "pluginManager", "packageRuntime"] as const,
+  optionalInject: ["provider"] as const,
   apply(ctx) {
     const preferencesStore = pluginManagerPreferencesStore.create(ctx.storage)
     ctx.effect(() => () => preferencesStore.dispose())
+
+    const provider: ProviderRuntimeService | undefined = ctx.provider
+    const providerProjection = createProviderProjection(provider)
+    ctx.effect(() => () => providerProjection.dispose())
 
     ctx.i18n.register({
       zh: { ...pluginsDictionary.zh, plugins: pluginsDictionary.zh },
@@ -165,8 +173,7 @@ export const pluginManagerPlugin = definePlugin({
         parent: "me",
         dictionary: pluginsDictionary,
         store: preferencesStore,
-        inject: (registrantCtx: Context): PluginsPageInject => {
-          const providerSource = projectProviderSource(registrantCtx)
+        inject: (): PluginsPageInject => {
           return {
             enablePlugin: (id: string) => ctx.pluginManager.enable(id),
             disablePlugin: (id: string) => ctx.pluginManager.disable(id),
@@ -192,13 +199,17 @@ export const pluginManagerPlugin = definePlugin({
               sha256: string,
               expected: { id: string; version: string }
             ) => ctx.packageRuntime.installFromUrl(url, sha256, expected),
-            applyPluginBundle: (pluginIds: readonly string[], index: MarketplaceIndex) =>
-              ctx.packageRuntime.applyPluginBundle(pluginIds, index),
+            applyPluginBundle: (
+              pluginIds: readonly string[],
+              index: MarketplaceIndex,
+              marketBaseUrl: string
+            ) => ctx.packageRuntime.applyPluginBundle(pluginIds, index, marketBaseUrl),
             getMarketUrl: () => ctx.packageRuntime.marketUrl?.(),
             getAppVersion: () => ctx.packageRuntime.appVersion?.() ?? "0.0.0",
             getNativeCapabilities: () => ctx.packageRuntime.nativeCapabilities(),
             getLoadErrors: () => ctx.packageRuntime.loadErrors?.() ?? EMPTY_LOAD_ERRORS,
             getActiveShell: () => ctx.packageRuntime.getActiveShell?.(),
+            getDefaultShell: () => ctx.packageRuntime.defaultShell?.(),
             setActiveShell: (shellId: string | undefined) =>
               ctx.packageRuntime.setActiveShell?.(shellId),
             isSafeMode: () => ctx.packageRuntime.safeMode?.() ?? false,
@@ -206,7 +217,7 @@ export const pluginManagerPlugin = definePlugin({
             hooks: {
               states: ctx.pluginManager.state,
               ui: ctx.ui.state,
-              provider: providerSource,
+              provider: providerProjection.source,
             },
           }
         },

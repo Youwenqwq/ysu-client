@@ -207,7 +207,7 @@ export class ClassReminderAndWidgetController {
   private lifecycleRevision = 0
   private permissionRevision = 0
   private stopped = false
-  private channelDisabled = false
+  private channelActive = false
   private disposed = false
   private lastAlarmHash = ""
   private lastWidgetHash = ""
@@ -398,7 +398,6 @@ export class ClassReminderAndWidgetController {
       return false
     }
 
-    this.channelDisabled = false
     this.settingsStore.actions.setClassReminderEnabled(true)
     await this.alarmSync
     return true
@@ -420,7 +419,7 @@ export class ClassReminderAndWidgetController {
           !this.disposed &&
           revision === this.alarmRevision &&
           !this.stopped &&
-          !this.channelDisabled &&
+          this.channelActive &&
           this.session.getSnapshot().isAuthenticated
 
         if (!isValid() || !settings.classReminderEnabled || !this.isFeatureSupported()) {
@@ -494,7 +493,7 @@ export class ClassReminderAndWidgetController {
 
       if (
         this.stopped ||
-        this.channelDisabled ||
+        !this.channelActive ||
         !sessionSnap.isAuthenticated ||
         !this.isFeatureSupported()
       ) {
@@ -538,8 +537,14 @@ export class ClassReminderAndWidgetController {
 
   handleChannelDisabled(): Promise<void> {
     if (this.disposed) return Promise.resolve()
-    this.channelDisabled = true
+    this.channelActive = false
     return this.clearAlarmsAndWidgets()
+  }
+
+  handleChannelEnabled(): Promise<void> {
+    if (this.disposed) return Promise.resolve()
+    this.channelActive = true
+    return Promise.all([this.refreshAlarms(), this.refreshWidgets()]).then(() => undefined)
   }
 
   clearAlarmsAndWidgets(): Promise<void> {
@@ -595,9 +600,6 @@ export class ClassReminderAndWidgetController {
           widgetShowNextDaySchedule: current.widgetShowNextDaySchedule,
         }
 
-        if (current.classReminderEnabled) {
-          this.channelDisabled = false
-        }
         if (alarmChanged) {
           void this.refreshAlarms()
         }
@@ -631,7 +633,6 @@ export class ClassReminderAndWidgetController {
           void this.clearAlarmsAndWidgets()
           return
         }
-        this.channelDisabled = false
         void this.refreshAlarms()
         void this.refreshWidgets()
       }),
@@ -657,7 +658,6 @@ export class ClassReminderAndWidgetController {
           (!prev.isAuthenticated || current.username !== prev.username)
         ) {
           this.stopped = false
-          this.channelDisabled = false
         }
         if (
           current.isAuthenticated !== prev.isAuthenticated ||

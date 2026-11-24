@@ -112,6 +112,9 @@ export const activationPlugin = definePlugin({
     ctx.i18n.register(activationDictionary)
 
     ctx.on("http/request", async (req) => {
+      // The credential only authenticates the EdgeOne Web proxy. Native builds
+      // use CapacitorHttp directly and must never forward it to upstream hosts.
+      if (isCapacitor()) return undefined
       await hydrationBarrier.wait()
       const token = storeInstance.source.getSnapshot().token
       if (!token || token.length === 0) return undefined

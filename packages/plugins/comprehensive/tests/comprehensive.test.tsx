@@ -2,10 +2,12 @@ import { act, type ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  DEFAULT_TTL_MS,
   providerRegistryRuntimePlugin,
   providerRuntimePlugin,
   queryRuntimePlugin,
   sessionRuntimePlugin,
+  SIX_HOUR_TTL_MS,
 } from "@orahako/academic-runtime"
 import {
   defineSchoolProvider,
@@ -480,7 +482,9 @@ describe("@orahako/plugin-comprehensive", () => {
       providerPlugin,
       comprehensivePlugin,
     ]) {
-      if (
+      if (plugin.manifest.id === queryRuntimePlugin.manifest.id) {
+        runtime.register(plugin, "builtin", { policies: {} })
+      } else if (
         plugin.manifest.id === sessionRuntimePlugin.manifest.id ||
         plugin.manifest.id === providerRuntimePlugin.manifest.id
       ) {
@@ -490,6 +494,36 @@ describe("@orahako/plugin-comprehensive", () => {
       }
       runtime.start(plugin.manifest.id)
     }
+
+    const rootQuery = runtime.context.get("query")!
+    expect(rootQuery.policy("comprehensive-terms")).toEqual({
+      ttl: DEFAULT_TTL_MS,
+      persist: true,
+    })
+    expect(rootQuery.policy("comprehensive-result")).toEqual({
+      ttl: SIX_HOUR_TTL_MS,
+      persist: true,
+    })
+    expect(rootQuery.policy("comprehensive-indicators")).toEqual({
+      ttl: SIX_HOUR_TTL_MS,
+      persist: true,
+    })
+    expect(rootQuery.policy("comprehensive-radar")).toEqual({
+      ttl: SIX_HOUR_TTL_MS,
+      persist: true,
+    })
+    expect(rootQuery.policy("comprehensive-year-scores")).toEqual({
+      ttl: SIX_HOUR_TTL_MS,
+      persist: true,
+    })
+    expect(rootQuery.policy("comprehensive-report-years")).toEqual({
+      ttl: DEFAULT_TTL_MS,
+      persist: true,
+    })
+    expect(rootQuery.policy("comprehensive-report")).toEqual({
+      ttl: SIX_HOUR_TTL_MS,
+      persist: true,
+    })
 
     const ui = runtime.context.get("ui")!
     const slots = runtime.context.get("slots") as PluginSlotRegistry
@@ -631,6 +665,34 @@ describe("@orahako/plugin-comprehensive", () => {
       ui.getSnapshot().navigation.some((entry) => entry.pluginId === COMPREHENSIVE_PLUGIN_ID)
     ).toBe(false)
     expect(injected.hooks.selectedTerm.getSnapshot()).toBeNull()
+    expect(rootQuery.policy("comprehensive-terms")).toEqual({
+      ttl: DEFAULT_TTL_MS,
+      persist: false,
+    })
+    expect(rootQuery.policy("comprehensive-result")).toEqual({
+      ttl: DEFAULT_TTL_MS,
+      persist: false,
+    })
+    expect(rootQuery.policy("comprehensive-indicators")).toEqual({
+      ttl: DEFAULT_TTL_MS,
+      persist: false,
+    })
+    expect(rootQuery.policy("comprehensive-radar")).toEqual({
+      ttl: DEFAULT_TTL_MS,
+      persist: false,
+    })
+    expect(rootQuery.policy("comprehensive-year-scores")).toEqual({
+      ttl: DEFAULT_TTL_MS,
+      persist: false,
+    })
+    expect(rootQuery.policy("comprehensive-report-years")).toEqual({
+      ttl: DEFAULT_TTL_MS,
+      persist: false,
+    })
+    expect(rootQuery.policy("comprehensive-report")).toEqual({
+      ttl: DEFAULT_TTL_MS,
+      persist: false,
+    })
 
     activeUnmount = undefined
     await dom.unmount()

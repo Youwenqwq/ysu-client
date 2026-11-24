@@ -1,5 +1,5 @@
 import { Calendar, FileText } from "lucide-react"
-import { hasSlice, requireSlice, type Exam } from "@orahako/academic-sdk"
+import { hasSlice, requireSlice, type Exam, type ProviderQueryPolicy } from "@orahako/academic-sdk"
 import {
   definePlugin,
   PLUGIN_API_VERSION,
@@ -37,6 +37,10 @@ import {
 export const EXAMS_PLUGIN_ID = "orahako.exams"
 
 export type { ExamsDictionary, ExamsSettingsState, ExamsSettingsStoreInstance, ExamWidgetId }
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+const EXAMS_QUERY_POLICY: ProviderQueryPolicy = { ttl: DAY_MS, persist: true }
 
 const examsManifest: PluginManifest = {
   id: EXAMS_PLUGIN_ID,
@@ -95,6 +99,7 @@ export const examsPlugin = definePlugin({
     } = ctx
 
     i18n.register(examsDictionary)
+    query.registerPolicy("exams", EXAMS_QUERY_POLICY)
     let disposed = false
 
     const settingsStore = examsSettingsStore.create(storage)
@@ -106,39 +111,6 @@ export const examsPlugin = definePlugin({
       if (disposed) return
       void syncExamWidgetSnapshots(widgets, exams)
     }
-
-    let unregisterChannel: (() => void) | null = null
-    let lastNotifyExams = settingsStore.source.getSnapshot().notifyExams
-
-    const registerExamsChannel = (notifyExams: boolean): void => {
-      unregisterChannel?.()
-      unregisterChannel = notifications.registerChannel({
-        id: "exams",
-        slice: "exams",
-        toPollingFlag: (enabled) => {
-          const active = enabled && notifyExams
-          return {
-            checkExams: active,
-            exams: active,
-          }
-        },
-        onDisable: () => clearExamWidgets(),
-      })
-    }
-
-    registerExamsChannel(lastNotifyExams)
-    const detachSettings = settingsStore.source.subscribe(() => {
-      if (disposed) return
-      const current = settingsStore.source.getSnapshot().notifyExams
-      if (current !== lastNotifyExams) {
-        const disabledNow = lastNotifyExams && !current
-        lastNotifyExams = current
-        registerExamsChannel(current)
-        if (disabledNow) {
-          void clearExamWidgets()
-        }
-      }
-    })
 
     const buildExamsSource = (semester: string) => {
       const rawSource = query.source<Exam[], "exams">({
@@ -166,6 +138,44 @@ export const examsPlugin = definePlugin({
     const pageExamsController = createParameterizedExamQueryController((semester) =>
       semester ? buildExamsSource(semester) : defaultExamsSource
     )
+
+    let unregisterChannel: (() => void) | null = null
+    let lastNotifyExams = settingsStore.source.getSnapshot().notifyExams
+
+    const registerExamsChannel = (notifyExams: boolean): void => {
+      unregisterChannel?.()
+      unregisterChannel = notifications.registerChannel({
+        id: "exams",
+        slice: "exams",
+        toPollingFlag: (enabled) => {
+          const active = enabled && notifyExams
+          return {
+            checkExams: active,
+            exams: active,
+          }
+        },
+        onDisable: () => clearExamWidgets(),
+        onEnable: () => {
+          if (!settingsStore.source.getSnapshot().notifyExams) return
+          const exams = defaultExamsSource.getSnapshot().data
+          if (exams !== undefined) syncExamWidgets(exams)
+        },
+      })
+    }
+
+    registerExamsChannel(lastNotifyExams)
+    const detachSettings = settingsStore.source.subscribe(() => {
+      if (disposed) return
+      const current = settingsStore.source.getSnapshot().notifyExams
+      if (current !== lastNotifyExams) {
+        const disabledNow = lastNotifyExams && !current
+        lastNotifyExams = current
+        registerExamsChannel(current)
+        if (disabledNow) {
+          void clearExamWidgets()
+        }
+      }
+    })
 
     const resolveWidgetPreviewSrc = (fullCtx: Context, fileName: string): string => {
       const assets: PluginAssetService | undefined = fullCtx.get("assets")

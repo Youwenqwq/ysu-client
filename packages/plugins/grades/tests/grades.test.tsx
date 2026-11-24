@@ -30,11 +30,13 @@ vi.mock("sonner", () => ({
 }))
 
 import {
+  DEFAULT_TTL_MS,
   notificationRegistryRuntimePlugin,
   providerRegistryRuntimePlugin,
   providerRuntimePlugin,
   queryRuntimePlugin,
   sessionRuntimePlugin,
+  SHORT_TTL_MS,
 } from "@orahako/academic-runtime"
 import { defineSchoolProvider, type Grade, type SchoolProvider } from "@orahako/academic-sdk"
 import { PluginRuntime } from "@orahako/kernel"
@@ -733,7 +735,9 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       overviewPlugin,
       gradesPlugin,
     ]) {
-      if (
+      if (p.manifest.id === queryRuntimePlugin.manifest.id) {
+        runtime.register(p, "builtin", { policies: {} })
+      } else if (
         p.manifest.id === sessionRuntimePlugin.manifest.id ||
         p.manifest.id === providerRuntimePlugin.manifest.id
       ) {
@@ -743,6 +747,14 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       }
       runtime.start(p.manifest.id)
     }
+
+    const rootQuery = runtime.context.get("query")!
+    expect(rootQuery.policy("grades")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
+    expect(rootQuery.policy("gpa-stats")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
+    expect(rootQuery.policy("grade-statistics")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
+    expect(rootQuery.policy("grade-distribution")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
+    expect(rootQuery.policy("grade-ranking")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
+    expect(rootQuery.policy("current-week")).toEqual({ ttl: SHORT_TTL_MS, persist: true })
 
     const ui = runtime.context.get("ui")!
     const slots = runtime.context.get("slots") as PluginSlotRegistry
@@ -1033,6 +1045,12 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
     expect(settings.getSnapshot().filter((c) => c.pluginId === GRADES_PLUGIN_ID)).toEqual([])
     expect(notifications.getSnapshot().filter((c) => c.pluginId === GRADES_PLUGIN_ID)).toEqual([])
     expect(overview.getSnapshot().filter((w) => w.pluginId === GRADES_PLUGIN_ID)).toEqual([])
+    expect(rootQuery.policy("grades")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
+    expect(rootQuery.policy("gpa-stats")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
+    expect(rootQuery.policy("grade-statistics")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
+    expect(rootQuery.policy("grade-distribution")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
+    expect(rootQuery.policy("grade-ranking")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
+    expect(rootQuery.policy("current-week")).toEqual({ ttl: SHORT_TTL_MS, persist: true })
 
     activeUnmount = undefined
     await dom.unmount()

@@ -10,16 +10,45 @@ export interface ReloginApi {
   reloginYSU(): Promise<boolean>
 }
 
+const REMEMBERED_USERNAME_ARTIFACT = "remembered-username"
+const REMEMBERED_PASSWORD_ARTIFACT = "remembered-password"
+
+interface RememberedCredentials {
+  readonly schoolId: string
+  readonly username: string
+  readonly password: string
+}
+
 function text(i18n: PluginI18nService, key: string): string {
   return i18n.t(key)
 }
 
-function loadRememberedCredentials(ctx: YSUContext): { username: string; password: string } | null {
+function loadRememberedCredentials(ctx: YSUContext): RememberedCredentials | null {
   const schoolId = ctx.session.getSnapshot().activeSchoolId ?? ctx.config.id
   if (!schoolId) return null
-  const username = ctx.session.getArtifact("remembered-username", schoolId)
-  const password = ctx.session.getArtifact("remembered-password", schoolId)
-  return username && password ? { username, password } : null
+  const username = ctx.session.getArtifact(REMEMBERED_USERNAME_ARTIFACT, schoolId)
+  const password = ctx.session.getArtifact(REMEMBERED_PASSWORD_ARTIFACT, schoolId)
+  return username && password ? { schoolId, username, password } : null
+}
+
+function keepRememberedCredentials(ctx: YSUContext, remembered: RememberedCredentials): void {
+  // saveCredential resets artifacts for the school, so re-write the keys read by relogin.
+  ctx.session.setArtifact(REMEMBERED_USERNAME_ARTIFACT, remembered.username, remembered.schoolId)
+  ctx.session.setArtifact(
+    REMEMBERED_PASSWORD_ARTIFACT,
+    remembered.password,
+    remembered.schoolId
+  )
+}
+
+function saveReloginCredential(
+  ctx: YSUContext,
+  auth: CasAuthApi,
+  remembered: RememberedCredentials,
+  credential: string
+): void {
+  auth.saveCredential(credential, remembered.username)
+  keepRememberedCredentials(ctx, remembered)
 }
 
 export function createRelogin(
@@ -51,7 +80,7 @@ export function createRelogin(
 
           if (step1.authenticated) {
             const credential = await CASCredential.fromJar(cas.getJar(), ctx.urls.casCookieDomain)
-            auth.saveCredential(credential.toJSON(), remembered.username)
+            saveReloginCredential(ctx, auth, remembered, credential.toJSON())
             await lifecycle.initializeSession()
             return true
           }
@@ -69,7 +98,7 @@ export function createRelogin(
                   ctx.urls.casCookieDomain
                 )
                 if (credential.cookies.length > 0) {
-                  auth.saveCredential(credential.toJSON(), remembered.username)
+                  saveReloginCredential(ctx, auth, remembered, credential.toJSON())
                 }
                 await lifecycle.initializeSession()
                 return true
@@ -85,7 +114,7 @@ export function createRelogin(
                 },
                 result.code
               )
-              auth.saveCredential(credential.toJSON(), remembered.username)
+              saveReloginCredential(ctx, auth, remembered, credential.toJSON())
               await lifecycle.initializeSession()
               return true
             } catch {

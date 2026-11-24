@@ -12,6 +12,7 @@ vi.mock("sonner", () => ({
 }))
 
 import {
+  DEFAULT_TTL_MS,
   notificationRegistryRuntimePlugin,
   providerRegistryRuntimePlugin,
   providerRuntimePlugin,
@@ -590,6 +591,7 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
     const notifications = runtime.context.get("notifications")!
     const overview = runtime.context.get("overview")!
     const widgets = runtime.context.get("widgets")!
+    const query = runtime.context.get("query")!
 
     const updateSpy = vi.spyOn(widgets, "update").mockResolvedValue(undefined)
     const clearSpy = vi.spyOn(widgets, "clear").mockResolvedValue(undefined)
@@ -613,6 +615,7 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
       route: "exams",
       capability: "exams",
     })
+    expect(query.policy("exams")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
     const examsNav = ui
       .getSnapshot()
       .navigation.find((n) => n.pluginId === EXAMS_PLUGIN_ID && n.id === "exams")!
@@ -720,6 +723,15 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
     await examChannel.onDisable?.()
     expect(clearSpy).toHaveBeenCalledWith("exam")
     expect(clearSpy).toHaveBeenCalledWith("exam-compact")
+
+    // Re-enabling the channel restores widgets from the current exam data
+    updateSpy.mockClear()
+    await examChannel.onEnable?.()
+    expect(updateSpy).toHaveBeenCalledWith(
+      "exam",
+      expect.objectContaining({ exams: expect.any(Array) }),
+      expect.objectContaining({ syncReminderHours: expect.any(Number) })
+    )
 
     // Toggling notifyExams off in scoped examsSettingsStore also clears widgets & disables flag
     const notifContentEntry = slots.select("settings.notifications.content")[0]!

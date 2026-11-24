@@ -3,10 +3,10 @@ import {
   createObservableSource,
   definePlugin,
   PLUGIN_API_VERSION,
-  type Context,
   type ObservableSource,
   type PluginManifest,
 } from "@orahako/sdk"
+import type { SessionService } from "@orahako/academic-sdk"
 import type { MeterData, MeterHttp } from "./client"
 import { meterDictionary, type MeterDictionary } from "./dictionary"
 import {
@@ -29,7 +29,6 @@ import {
   type SessionAccountSnapshot,
 } from "./store"
 import {
-  isRecord,
   type DayUse,
   type MeterDevice,
   type MeterOverview,
@@ -60,11 +59,6 @@ export type {
   SessionAccountSnapshot,
 }
 
-interface HostSessionLike {
-  readonly state: ObservableSource<SessionAccountSnapshot>
-  getSnapshot(): SessionAccountSnapshot
-}
-
 const FALLBACK_SESSION_SNAPSHOT: SessionAccountSnapshot = {
   hasHydrated: true,
   username: null,
@@ -72,20 +66,6 @@ const FALLBACK_SESSION_SNAPSHOT: SessionAccountSnapshot = {
 
 const STATIC_FALLBACK_SESSION_SOURCE: ObservableSource<SessionAccountSnapshot> =
   createObservableSource(FALLBACK_SESSION_SNAPSHOT)
-
-function isObservableSource(value: unknown): value is ObservableSource<SessionAccountSnapshot> {
-  return (
-    isRecord(value) &&
-    typeof value.getSnapshot === "function" &&
-    typeof value.subscribe === "function"
-  )
-}
-
-function isHostSessionLike(value: unknown): value is HostSessionLike {
-  return (
-    isRecord(value) && typeof value.getSnapshot === "function" && isObservableSource(value.state)
-  )
-}
 
 const meterManifest: PluginManifest = {
   id: METER_PLUGIN_ID,
@@ -102,46 +82,24 @@ const meterManifest: PluginManifest = {
 export const meterPlugin = definePlugin({
   manifest: meterManifest,
   inject: ["ui", "slots", "router", "i18n", "storage", "http"] as const,
+  optionalInject: ["session"] as const,
   apply(ctx) {
     const { ui, slots, router, i18n, storage, http } = ctx
     i18n.register(meterDictionary)
 
+    // Fixed for this plugin generation: a session replacement restarts the
+    // plugin, so the controller and page injection never bind to a stale service.
+    const session: SessionService | undefined = ctx.session
+    const sessionSource: ObservableSource<SessionAccountSnapshot> =
+      session?.state ?? STATIC_FALLBACK_SESSION_SOURCE
+
     const roomStore = meterRoomStore.create(storage)
-    let attachedSession: HostSessionLike | null = null
-    const sessionListeners = new Set<() => void>()
-    let detachHostSession: (() => void) | undefined
-
-    const bindHostSession = (fullCtx: Context): HostSessionLike | null => {
-      const candidate: unknown = fullCtx.root.get("session")
-      if (!isHostSessionLike(candidate)) {
-        return null
-      }
-      if (attachedSession !== candidate) {
-        detachHostSession?.()
-        attachedSession = candidate
-        detachHostSession = candidate.state.subscribe(() => {
-          for (const listener of Array.from(sessionListeners)) {
-            listener()
-          }
-        })
-        for (const listener of Array.from(sessionListeners)) {
-          listener()
-        }
-      }
-      return candidate
-    }
-
     const controller = createMeterController({
       roomStore,
       http,
-      getSessionAccount: () =>
-        attachedSession ? attachedSession.getSnapshot() : FALLBACK_SESSION_SNAPSHOT,
-      subscribeSession: (listener) => {
-        sessionListeners.add(listener)
-        return () => {
-          sessionListeners.delete(listener)
-        }
-      },
+      getSessionAccount: () => session?.getSnapshot() ?? FALLBACK_SESSION_SNAPSHOT,
+      subscribeSession: (listener) =>
+        session ? session.subscribe(listener) : () => {},
     })
 
     ui.registerPage(
@@ -153,18 +111,15 @@ export const meterPlugin = definePlugin({
         requiresProvider: false,
         dictionary: meterDictionary,
         store: roomStore,
-        inject: (fullCtx: Context): MeterPageInject => {
-          const hostSession = bindHostSession(fullCtx)
-          return {
-            hooks: {
-              storeHydrated: roomStore.hydrated,
-              session: hostSession ? hostSession.state : STATIC_FALLBACK_SESSION_SOURCE,
-              meter: controller.query,
-            },
-            queryAccount: (account: string) => controller.queryAccount(account),
-            refresh: () => controller.refresh(),
-          }
-        },
+        inject: (): MeterPageInject => ({
+          hooks: {
+            storeHydrated: roomStore.hydrated,
+            session: sessionSource,
+            meter: controller.query,
+          },
+          queryAccount: (account: string) => controller.queryAccount(account),
+          refresh: () => controller.refresh(),
+        }),
       },
       MeterPage
     )
@@ -199,10 +154,6 @@ export const meterPlugin = definePlugin({
     })
 
     ctx.effect(() => () => {
-      detachHostSession?.()
-      detachHostSession = undefined
-      attachedSession = null
-      sessionListeners.clear()
       controller.dispose()
       roomStore.dispose()
     })

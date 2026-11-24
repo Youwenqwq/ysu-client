@@ -6,7 +6,12 @@ import {
   type SchoolProvider,
 } from "@orahako/academic-sdk"
 import type { PluginKeyValueStorage, PluginStorageService } from "@orahako/sdk"
-import { MIN_EPAY_CHECK_INTERVAL_MS, runEpayAutoCheck } from "../src/auto-check"
+import {
+  MIN_EPAY_CHECK_INTERVAL_MS,
+  runEpayAutoCheck,
+  shouldTriggerEpayCheckOnSession,
+  type EpaySessionTriggerState,
+} from "../src/auto-check"
 import { epaySettingsStore, type EpaySettingsStoreInstance } from "../src/store"
 
 function makeRecord(amountN: number, id = "1"): EpayRecord {
@@ -239,5 +244,33 @@ describe("runEpayAutoCheck (scoped epaySettingsStore)", () => {
     expect(result).toBeNull()
     expect(fetchPayments).not.toHaveBeenCalled()
     persistedStore.dispose()
+  })
+})
+
+describe("shouldTriggerEpayCheckOnSession", () => {
+  const signedIn: EpaySessionTriggerState = {
+    hasHydrated: true,
+    isAuthenticated: true,
+    username: "student-a",
+    credential: "session-a",
+  }
+
+  it("ignores notifications that do not move the relevant session fields", () => {
+    expect(shouldTriggerEpayCheckOnSession(signedIn, { ...signedIn })).toBe(false)
+  })
+
+  it("triggers when hydration, authentication, username or credential becomes ready", () => {
+    expect(
+      shouldTriggerEpayCheckOnSession({ ...signedIn, hasHydrated: false }, signedIn)
+    ).toBe(true)
+    expect(
+      shouldTriggerEpayCheckOnSession({ ...signedIn, isAuthenticated: false }, signedIn)
+    ).toBe(true)
+    expect(
+      shouldTriggerEpayCheckOnSession({ ...signedIn, username: null }, signedIn)
+    ).toBe(true)
+    expect(
+      shouldTriggerEpayCheckOnSession({ ...signedIn, credential: null }, signedIn)
+    ).toBe(true)
   })
 })

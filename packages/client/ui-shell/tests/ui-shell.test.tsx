@@ -359,7 +359,6 @@ describe("@orahako/ui-shell unit helpers", () => {
     store.actions.setBackgroundStyle("blur-overlay")
     store.actions.setBackgroundOverlayOpacity(60)
     store.actions.setBackgroundBlurAmount(24)
-    store.actions.setDefaultLandingPage("schedule")
     store.actions.setColorMode("dark")
     store.actions.setSidebarWidth(500) // clamped to MAX_SIDEBAR_WIDTH (384)
 
@@ -369,11 +368,11 @@ describe("@orahako/ui-shell unit helpers", () => {
       backgroundStyle: "blur-overlay",
       backgroundOverlayOpacity: 60,
       backgroundBlurAmount: 24,
-      defaultLandingPage: "schedule",
       colorMode: "dark",
       sidebarWidth: 384,
     })
 
+    expect(store.source.getSnapshot()).not.toHaveProperty("defaultLandingPage")
     expect(computeCardBgOpacity(false, "glass", 80)).toBe("1")
     expect(computeCardBgOpacity(true, "solid", 80)).toBe("1")
     expect(computeCardBgOpacity(true, "translucent", 80)).toBe("0.8")
@@ -614,6 +613,13 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
           ))
         )
 
+        ctx.slots.inject("shell.header.actions", (sCtx) =>
+          sCtx.slots.register(
+            { id: "community-header-action", slot: "shell.header.actions" },
+            () => <span>HEADER_ACTION</span>
+          )
+        )
+
         ctx.slots.inject("shell.overlay", (sCtx) =>
           sCtx.slots.register({ id: "community-overlay", slot: "shell.overlay" }, () => (
             <div>COMMUNITY_OVERLAY</div>
@@ -698,9 +704,20 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
 
     const router = host.runtime.context.get("router") as PluginRouter
 
-    // 1. Mount <OrahakoApp host={host} /> with NO children -> lands on `board`, wrapped in `shell.gate`, with sidebar footer & plugin-scoped mobile bottom nav!
+    // A stored startup preference wins over the composition default landing.
+    host.preferences.setStartupPage("settings")
     await dom.render(<OrahakoApp host={host} />)
+    expect(router.current.getSnapshot().href).toBe("/?plugin=orahako.settings&page=settings")
+
+    // Clearing the preference falls back to defaults.landing (`board`).
+    await act(async () => {
+      host.preferences.setStartupPage(undefined)
+      router.push("/")
+    })
     expect(router.current.getSnapshot().href).toBe("/?plugin=community.forum&page=board")
+
+    // 1. With no startup preference, root launch falls back to `board`, wrapped in
+    // `shell.gate`, with sidebar footer & plugin-scoped mobile bottom nav!
     expect(dom.container.toHtml()).toContain('data-community-gate="pass"')
     expect(dom.container.textContent).toContain("社区盒")
     expect(dom.container.textContent).toContain("FORUM_BOARD:社区广场")
@@ -708,7 +725,10 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     expect(dom.container.findByAttr("data-shell-banners")?.getAttribute("class")).toContain(
       "empty:hidden"
     )
-    expect(dom.container.textContent).toContain("ACTIVITY_DOT")
+    // The responsive header mounts each slot contribution exactly once across breakpoints.
+    expect(dom.container.toHtml().match(/ACTIVITY_DOT/g)).toHaveLength(1)
+    expect(dom.container.toHtml().match(/HEADER_ACTION/g)).toHaveLength(1)
+    expect(dom.container.findByAttr("data-shell-header")).toBeDefined()
     expect(dom.container.textContent).toContain("COMMUNITY_OVERLAY")
     // Plugin-scoped mobile bottom nav shows both `社区广场` and `讨论组` tabs while `community.forum` is active!
     expect(dom.container.textContent).toContain("讨论组")
@@ -719,7 +739,7 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     })
     expect(dom.container.toHtml()).toContain('data-plugin-theme="community.forum:sakura"')
     expect(dom.container.toHtml()).toContain('--primary: oklch(0.7 0.2 350)')
-    expect(dom.container.toHtml()).not.toContain("data-shell-theme")
+    expect(dom.container.toHtml()).not.toContain("data-shell-theme=")
     await act(async () => {
       host.preferences.setActiveTheme("")
     })
@@ -774,7 +794,7 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     await act(async () => {
       router.push({ route: "me" })
     })
-    expect(dom.container.findByAttr("data-shell-mobile-theme")).toBeDefined()
+    expect(dom.container.findByAttr("data-shell-theme-toggle")).toBeDefined()
 
     // 6. Switch locale to English -> full app re-renders in English!
     await act(async () => {

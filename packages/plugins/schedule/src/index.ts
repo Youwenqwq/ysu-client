@@ -8,6 +8,7 @@ import {
   type Course,
   type CurrentWeek,
   type Exam,
+  type ProviderQueryPolicy,
   type TermCalendar,
 } from "@orahako/academic-sdk"
 import { createMinuteClockSource, createParameterizedQuerySource } from "@orahako/academic-kit"
@@ -136,6 +137,17 @@ export type {
 
 const SETTINGS_CATEGORY_HOST_PLUGIN_ID = "orahako.settings"
 
+const HOUR_MS = 60 * 60 * 1000
+const DAY_MS = 24 * HOUR_MS
+
+const SCHEDULE_QUERY_POLICIES: Readonly<Record<string, ProviderQueryPolicy>> = {
+  schedule: { ttl: 7 * DAY_MS, persist: true },
+  "current-week": { ttl: 12 * HOUR_MS, persist: true },
+  "term-calendar": { ttl: 7 * DAY_MS, persist: true },
+  "class-periods": { ttl: 7 * DAY_MS, persist: true },
+  exams: { ttl: DAY_MS, persist: true },
+}
+
 function detectLiveUpdateSupported(isNative: boolean): boolean {
   if (!isNative) return false
   if (typeof navigator === "undefined" || typeof navigator.userAgent !== "string") {
@@ -165,6 +177,7 @@ const scheduleManifest: PluginManifest = {
     "slots",
     "settings",
     "router",
+    "navigation",
     "i18n",
     "storage",
     "provider",
@@ -185,6 +198,7 @@ export const schedulePlugin = definePlugin({
     "slots",
     "settings",
     "router",
+    "navigation",
     "i18n",
     "storage",
     "provider",
@@ -202,6 +216,7 @@ export const schedulePlugin = definePlugin({
       slots,
       settings,
       router,
+      navigation,
       i18n,
       storage,
       provider,
@@ -215,6 +230,9 @@ export const schedulePlugin = definePlugin({
     } = ctx
 
     i18n.register(scheduleDictionary)
+    for (const [feature, policy] of Object.entries(SCHEDULE_QUERY_POLICIES)) {
+      query.registerPolicy(feature, policy)
+    }
 
     const resolveWidgetAssetSrc = (fileName: string): string =>
       assets.url(`widgets/${fileName}`) ?? router.href(`/widgets/${fileName}`)
@@ -439,11 +457,16 @@ export const schedulePlugin = definePlugin({
       })
     }
 
+    const isSchoolScheduleRouteAvailable = (): boolean =>
+      navigation.resolve("school-schedule") !== undefined
+
     const openSchoolSchedule = (): void => {
+      if (!isSchoolScheduleRouteAvailable()) return
       router.push({ route: "school-schedule" })
     }
 
     const openFreeRooms = (params: FreeRoomTargetParams): void => {
+      if (!isSchoolScheduleRouteAvailable()) return
       router.push({
         route: "school-schedule",
         params: {
@@ -463,6 +486,7 @@ export const schedulePlugin = definePlugin({
       id: "schedule",
       slice: "timetable",
       onDisable: () => controller.handleChannelDisabled(),
+      onEnable: () => controller.handleChannelEnabled(),
     })
 
     router.registerBackGuard(() => {
@@ -505,12 +529,14 @@ export const schedulePlugin = definePlugin({
             termCalendar: pageTermCalendarSource,
             periods: periodsSource,
             exams: pageExamsSource,
+            navigation: navigation.state,
           },
           pluginId: SCHEDULE_PLUGIN_ID,
           patchMutators,
           mobileBridge,
           isNative: () => native.isNative,
           assistantSrc: widgetAssistantSrc,
+          canOpenSchoolSchedule: isSchoolScheduleRouteAvailable,
           setCompactMode: (compact) => settingsStore.actions.setCompactMode(compact),
           setWidgetAssistantHidden: (hidden) =>
             settingsStore.actions.setWidgetAssistantHidden(hidden),
@@ -697,9 +723,11 @@ export const schedulePlugin = definePlugin({
               currentWeek: pageCurrentWeekSource,
               termCalendar: pageTermCalendarSource,
               periods: periodsSource,
+              navigation: navigation.state,
             },
             pluginId: SCHEDULE_PLUGIN_ID,
             setCompactMode: (compact) => settingsStore.actions.setCompactMode(compact),
+            canOpenSchoolSchedule: isSchoolScheduleRouteAvailable,
             openSchoolSchedule,
             openFreeRooms,
           }),

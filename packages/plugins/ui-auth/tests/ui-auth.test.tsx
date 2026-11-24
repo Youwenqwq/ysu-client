@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client"
 import { renderToStaticMarkup } from "react-dom/server"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  DEFAULT_TTL_MS,
+  LONG_TTL_MS,
   notificationRegistryRuntimePlugin,
   providerRegistryRuntimePlugin,
   providerRuntimePlugin,
@@ -44,7 +46,11 @@ import {
   RATE_LIMIT_INTERVAL_MS,
   RATE_LIMIT_WINDOW_MS,
   rememberedCredentialsStore,
+  REMEMBERED_PASSWORD_ARTIFACT,
+  REMEMBERED_USERNAME_ARTIFACT,
 } from "../src"
+import type { AccountActionsInject } from "../src/components"
+import type { LoginPageInject } from "../src/login-page"
 
 const capacitorFlag = vi.hoisted(() => ({ native: false }))
 
@@ -359,6 +365,8 @@ function setupAuthRuntime(options?: {
   for (const p of plugins) {
     if (p.manifest.id === routerRuntimePlugin.manifest.id) {
       runtime.register(p, "builtin", { initialHref: options?.initialHref ?? "/?route=overview" })
+    } else if (p.manifest.id === queryRuntimePlugin.manifest.id) {
+      runtime.register(p, "builtin", { policies: {} })
     } else if (
       p.manifest.id === sessionRuntimePlugin.manifest.id ||
       p.manifest.id === providerRuntimePlugin.manifest.id
@@ -379,6 +387,10 @@ function setupAuthRuntime(options?: {
     ],
   })
   runtime.start(AUTH_UI_PLUGIN_ID)
+  expect(runtime.context.get("query")!.policy("student-info")).toEqual({
+    ttl: LONG_TTL_MS,
+    persist: true,
+  })
 
   return {
     runtime,
@@ -479,6 +491,9 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     await vi.waitFor(() => {
       expect(router1.current.getSnapshot().route).toBe("login")
     })
+    const query1 = env1.runtime.context.get("query")!
+    env1.runtime.stop(AUTH_UI_PLUGIN_ID)
+    expect(query1.policy("student-info")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
     env1.runtime.dispose()
 
     const env2 = setupAuthRuntime({ initialHref: "/?route=settings" })
@@ -488,6 +503,105 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     })
     expect(router2.current.getSnapshot().route).toBe("settings")
     env2.runtime.dispose()
+  })
+
+  it("writes quick-relogin artifacts after setCredential clears them", async () => {
+    const env = setupAuthRuntime({ initialHref: "/?route=settings" })
+    const session = env.runtime.context.get("session")!
+    const ui = env.runtime.context.get("ui")!
+    const slots = env.runtime.context.get("slots") as PluginSlotRegistry
+    await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
+
+    const loginPage = ui
+      .getSnapshot()
+      .pages.find((page) => page.pluginId === AUTH_UI_PLUGIN_ID && page.id === "login")!
+    const login = loginPage.inject!(env.runtime.context) as LoginPageInject
+    const rememberedPassword = "remembered-secret-1"
+    const nextRememberedPassword = "remembered-secret-2"
+
+    session.setArtifact(REMEMBERED_USERNAME_ARTIFACT, "stale-user", "demo")
+    session.setArtifact(REMEMBERED_PASSWORD_ARTIFACT, "stale-secret", "demo")
+    session.setArtifact("jwxtSession", "stale-session", "demo")
+
+    login.setCredential(
+      { schoolId: "demo", credential: "tgc-remembered", username: "20260001" },
+      { username: "20260001", password: rememberedPassword }
+    )
+    let artifacts = session.getSnapshot().artifacts
+    expect(artifacts[REMEMBERED_USERNAME_ARTIFACT]).toBe("20260001")
+    expect(artifacts[REMEMBERED_PASSWORD_ARTIFACT]).toBe(rememberedPassword)
+    expect(artifacts.jwxtSession).toBeUndefined()
+    await vi.waitFor(() => {
+      expect(
+        [...env.secureBackend.map.values()].some((value) =>
+          value.includes(rememberedPassword)
+        )
+      ).toBe(true)
+    })
+
+    login.setCredential(
+      { schoolId: "demo", credential: "tgc-second-account", username: "20260002" },
+      { username: "20260002", password: nextRememberedPassword }
+    )
+    artifacts = session.getSnapshot().artifacts
+    expect(artifacts[REMEMBERED_USERNAME_ARTIFACT]).toBe("20260002")
+    expect(artifacts[REMEMBERED_PASSWORD_ARTIFACT]).toBe(nextRememberedPassword)
+    await vi.waitFor(() => {
+      expect(
+        [...env.secureBackend.map.values()].some((value) =>
+          value.includes(nextRememberedPassword)
+        )
+      ).toBe(true)
+      expect(
+        [...env.secureBackend.map.values()].some((value) =>
+          value.includes(rememberedPassword)
+        )
+      ).toBe(false)
+    })
+
+    login.setCredential(
+      { schoolId: "demo", credential: "tgc-opted-out", username: "20260002" },
+      null
+    )
+    artifacts = session.getSnapshot().artifacts
+    expect(artifacts[REMEMBERED_USERNAME_ARTIFACT]).toBeUndefined()
+    expect(artifacts[REMEMBERED_PASSWORD_ARTIFACT]).toBeUndefined()
+    await vi.waitFor(() => {
+      expect(
+        [...env.secureBackend.map.values()].some((value) =>
+          value.includes(nextRememberedPassword)
+        )
+      ).toBe(false)
+    })
+
+    login.setCredential(
+      { schoolId: "demo", credential: "tgc-logout", username: "20260003" },
+      { username: "20260003", password: nextRememberedPassword }
+    )
+    await vi.waitFor(() => {
+      expect(
+        [...env.secureBackend.map.values()].some((value) =>
+          value.includes(nextRememberedPassword)
+        )
+      ).toBe(true)
+    })
+
+    slots.declare({ name: "settings.account", kind: "list" })
+    const [accountEntry] = slots.select("settings.account")
+    const account = accountEntry!.inject!(env.runtime.context) as AccountActionsInject
+    await account.logout()
+
+    artifacts = session.getSnapshot().artifacts
+    expect(artifacts[REMEMBERED_USERNAME_ARTIFACT]).toBeUndefined()
+    expect(artifacts[REMEMBERED_PASSWORD_ARTIFACT]).toBeUndefined()
+    await vi.waitFor(() => {
+      expect(
+        [...env.secureBackend.map.values()].some((value) =>
+          value.includes(nextRememberedPassword)
+        )
+      ).toBe(false)
+    })
+    env.runtime.dispose()
   })
 
   it("invalidates query and calls warmup when checkAuthStatus succeeds on provider/ready", async () => {
@@ -691,6 +805,9 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     )
     expect(loginHtml).toContain("酸橙盒")
     expect(loginHtml).toContain("记住密码")
+    expect(loginHtml).toContain("orahako-login-password")
+    expect(loginHtml).toContain('type="password"')
+    expect(loginHtml).toContain('autoComplete="current-password"')
 
     // Authenticate and mark sessionExpired -> banner & student profile render reactively
     session.setCredential({

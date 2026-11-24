@@ -43,6 +43,9 @@ import {
 
 export const OVERVIEW_PLUGIN_ID = "orahako.overview"
 
+const SHORT_TTL_MS = 1000 * 60 * 60 * 12
+const LONG_TTL_MS = 1000 * 60 * 60 * 24 * 7
+
 export {
   isWidgetSupportedByProvider,
   OVERVIEW_PAGE_CHILDREN,
@@ -116,6 +119,10 @@ export const overviewPlugin = definePlugin({
     const { ui, slots, settings, router, navigation, i18n, storage, provider, session, query } = ctx
     i18n.register(overviewDictionary)
     let disposed = false
+
+    query.registerPolicy("student-info", { ttl: LONG_TTL_MS, persist: true })
+    query.registerPolicy("current-week", { ttl: SHORT_TTL_MS, persist: true })
+    query.registerPolicy("term-calendar", { ttl: LONG_TTL_MS, persist: true })
 
     const registry = new OverviewRegistry()
     ctx.set("overview", registry)

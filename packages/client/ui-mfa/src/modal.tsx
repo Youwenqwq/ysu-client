@@ -97,18 +97,10 @@ function resolveAvailableMethods(
 function resolveInitialMethod(
   availableMethods: readonly MfaMethod[],
   requestedMethod: MfaMethod | undefined,
-  challengeMethod: MfaMethod | undefined,
-  showWechat: boolean
+  challengeMethod: MfaMethod | undefined
 ): MfaMethod {
-  const candidates = [challengeMethod, requestedMethod]
-  for (const candidate of candidates) {
-    if (!candidate) continue
-    if (candidate === "weixin" && !showWechat) continue
-    if (availableMethods.includes(candidate)) return candidate
-    return candidate
-  }
-  if (showWechat && availableMethods.includes("weixin")) {
-    return "weixin"
+  for (const candidate of [challengeMethod, requestedMethod]) {
+    if (candidate && availableMethods.includes(candidate)) return candidate
   }
   return availableMethods[0] ?? "sms"
 }
@@ -169,7 +161,7 @@ export function MFAModal(props: MFAModalProps): ReactNode {
   )
 
   const [mfaMethod, setMfaMethod] = useState<MfaMethod>(() =>
-    resolveInitialMethod(availableMethods, requestedMethod, preChallenge?.method, showWechat)
+    resolveInitialMethod(availableMethods, requestedMethod, preChallenge?.method)
   )
   const [code, setCode] = useState("")
   const [loading, setLoading] = useState(false)
@@ -221,8 +213,7 @@ export function MFAModal(props: MFAModalProps): ReactNode {
     const nextMethod = resolveInitialMethod(
       availableMethods,
       requestedMethod,
-      preChallenge?.method,
-      showWechat
+      preChallenge?.method
     )
     const preMethodCode = preChallenge?.methodCode ?? ""
     const preHint = preChallenge?.mobileHint ?? ""
@@ -236,7 +227,7 @@ export function MFAModal(props: MFAModalProps): ReactNode {
     setQrImageUrl("")
     wechatCtxRef.current = null
     stopWechatPolling()
-  }, [open, requestId, availableMethods, requestedMethod, preChallenge, showWechat])
+  }, [open, requestId, availableMethods, requestedMethod, preChallenge])
 
   useEffect(() => {
     if (!open || mfaMethod !== "weixin") {

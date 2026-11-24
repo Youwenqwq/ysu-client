@@ -99,7 +99,9 @@ export default definePlugin({
 })
 ```
 
-The definition's `inject` tuple determines which services `apply` can access.
+The definition's `inject` tuple determines which required services `apply` can access.
+Use `optionalInject: ["provider"]` for services that may be absent; their context properties are
+optional, and the consumer remounts when such a service appears, is replaced, or is revoked.
 Register resources in `apply`; use `ctx.effect` to attach cleanup for resources
 that are not already scoped by the service. After side-loading, open
 `/?route=example` relative to the app's base path. `requiresProvider: false`
@@ -163,14 +165,13 @@ Shell and page contributions carry a monotonically increasing `generation`.
 Error boundaries use it as their key/reset key, so a plugin that re-registers a
 contribution after a failure gets a clean boundary instead of the old fallback.
 
-The active shell and theme are host preferences, not shell-local state. The host
-exposes `packageRuntime.preferenceState` (a `PluginHostPreferenceSnapshot` with
-optional `activeShell` / `activeTheme`), plus
-`getActiveShell` / `setActiveShell` and `getActiveTheme` / `setActiveTheme`.
-`OrahakoApp` subscribes to that snapshot, so a shell change made by the plugin
-manager applies immediately. Shells must not keep their own theme store or emit
-a second theme `<style>` channel. When `activeTheme` is unset or empty, no theme
-is injected; there is no fallback to the first registered non-empty theme.
+The active shell, theme, and startup page are host preferences, not shell-local state. The host
+exposes `packageRuntime.preferenceState` (a `PluginHostPreferenceSnapshot` with optional
+`activeShell` / `activeTheme` / `startupPage`), plus corresponding getters and setters.
+`OrahakoApp` subscribes to that snapshot, so changes made by other plugins apply immediately.
+An unset `startupPage` falls back to `composition.defaults.landing`. Shells and settings must not
+keep duplicate preference stores. When `activeTheme` is unset or empty, no theme is injected;
+there is no fallback to the first registered non-empty theme.
 
 ## Stores and dictionaries
 
@@ -204,9 +205,10 @@ translation keys.
 
 Call `ctx.http.send` for platform transport and register middleware with
 `ctx.on("http/request", handler)` or `ctx.on("http/response", handler)` in
-`apply`. The runtime runs the request waterfall before transport and the response
-waterfall with the effective request afterward. A handler can return a replacement;
-returning `undefined` preserves the current value.
+`apply`. The runtime uses the explicit `runHttpRequestPipeline` and
+`runHttpResponsePipeline` helpers around transport, with the effective request supplied to
+response handlers. These local pipelines do not modify Cordis prototypes. A handler can return
+a replacement; returning `undefined` preserves the current value.
 
 Use `ctx.native.capabilities` to discover (`list`, `has`), acquire and invoke
 versioned capabilities. `acquire` returns a release function. Handle missing Web
@@ -225,7 +227,9 @@ The packer externalizes exactly `PLATFORM_MODULES` from `@orahako/sdk`:
 ```
 
 The loader accepts only package-relative imports and the exact bare specifiers
-above. Other supported dependencies can be bundled by esbuild, but host-private
+above. Dynamic imports must use a static string or a template literal without substitutions;
+computed expressions and globs are rejected. Other supported dependencies can be bundled by
+esbuild, but host-private
 paths, `@/` aliases and Next.js imports are not part of the SDK. In particular,
 `@orahako/academic-sdk` is not a shared module. Declare bundled entry CSS in
 `styles`; the packer appends `dist/tailwind.css` when it generates utilities.

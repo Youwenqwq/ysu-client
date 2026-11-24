@@ -20,6 +20,9 @@ import {
 
 export const ROUTER_RUNTIME_PLUGIN_ID = "orahako.runtime.router"
 
+const HISTORY_INDEX_KEY = "orahakoIndex"
+const HISTORY_ENTRIES_KEY = "orahakoEntries"
+
 export interface RouterRuntimeConfig {
   readonly basePath?: string
   readonly initialHref?: string
@@ -90,16 +93,21 @@ function isPromiseLikeBoolean(value: boolean | Promise<boolean>): value is Promi
   return typeof value === "object" && value !== null && "then" in value
 }
 
-function readStateIndex(state: unknown): number | undefined {
-  if (
-    typeof state === "object" &&
-    state !== null &&
-    "orahakoIndex" in state &&
-    typeof state.orahakoIndex === "number"
-  ) {
-    return state.orahakoIndex
-  }
-  return undefined
+interface HistoryRouteState {
+  readonly index: number
+  readonly entries: readonly string[]
+}
+
+function readHistoryState(state: unknown): HistoryRouteState | undefined {
+  if (typeof state !== "object" || state === null) return undefined
+  const record = state as Record<string, unknown>
+  const index = record[HISTORY_INDEX_KEY]
+  const entries = record[HISTORY_ENTRIES_KEY]
+  if (typeof index !== "number" || !Number.isSafeInteger(index) || index < 0) return undefined
+  if (!Array.isArray(entries) || entries.length === 0) return undefined
+  if (!entries.every((entry) => typeof entry === "string")) return undefined
+  if (index >= entries.length) return undefined
+  return { index, entries }
 }
 
 interface GuardEntry {
@@ -115,6 +123,11 @@ interface GuardEntry {
  * `registerBackGuard` evaluates active guards by descending priority, then LIFO:
  * returning `false` (or a Promise resolving to `false`) intercepts/cancels
  * history navigation, while returning `true` allows navigation to proceed.
+ * Async guard evaluation is single-flight and rejections veto the back request.
+ *
+ * The in-memory stack is mirrored in `history.state`. After a refresh the persisted
+ * index is only reused when it still points at the current href; otherwise the
+ * router rebuilds a single-entry safe stack and normalizes the current entry.
  */
 export class PluginRouter implements PluginRouterService, ScopedPluginService<PluginRouterService> {
   readonly current: ObservableSource<RouteLocation>
@@ -125,6 +138,7 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
   private readonly backGuards: GuardEntry[] = []
   private readonly backFallbacks: RouterBackFallback[] = []
   private index = 0
+  private backInFlight = false
   private disposed = false
   private hardwareListener?: HardwareBackListenerHandle
   private readonly handlePopState: (event: PopStateEvent) => void
@@ -151,21 +165,34 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
 
     this.handlePopState = (event: PopStateEvent) => {
       if (this.disposed || !this.browserWindow) return
-      const href = `${this.browserWindow.location.pathname || "/"}${this.browserWindow.location.search}`
-      const stateIndex = readStateIndex(event.state ?? this.browserWindow.history.state)
-      if (stateIndex !== undefined && stateIndex >= 0 && stateIndex < this.entries.length) {
-        this.index = stateIndex
-        this.entries[this.index] = href
-      } else if (this.index > 0 && this.entries[this.index - 1] === href) {
-        this.index -= 1
+      const href =
+        `${this.browserWindow.location.pathname || "/"}${this.browserWindow.location.search}`
+      const nextLocation = parseRouteLocation(href)
+      const stored = readHistoryState(event.state ?? this.browserWindow.history.state)
+      if (stored && stored.entries[stored.index] === nextLocation.href) {
+        this.entries.splice(0, this.entries.length, ...stored.entries)
+        this.index = stored.index
+      } else {
+        const matchedIndex = this.entries.lastIndexOf(nextLocation.href)
+        if (matchedIndex >= 0) {
+          this.index = matchedIndex
+          this.entries[matchedIndex] = nextLocation.href
+        } else {
+          this.entries.splice(0, this.entries.length, nextLocation.href)
+          this.index = 0
+        }
       }
-      this.currentSource.set(parseRouteLocation(href))
+      this.browserWindow.history.replaceState(this.createHistoryState(), "", nextLocation.href)
+      this.currentSource.set(nextLocation)
     }
 
     if (this.browserWindow) {
-      if (options.initialHref !== undefined) {
-        this.browserWindow.history.replaceState({ orahakoIndex: 0 }, "", initialLocation.href)
+      const stored = readHistoryState(this.browserWindow.history.state)
+      if (stored && stored.entries[stored.index] === initialLocation.href) {
+        this.entries.splice(0, this.entries.length, ...stored.entries)
+        this.index = stored.index
       }
+      this.browserWindow.history.replaceState(this.createHistoryState(), "", initialLocation.href)
       this.browserWindow.addEventListener("popstate", this.handlePopState)
     }
 
@@ -217,7 +244,7 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     this.entries.push(nextLocation.href)
     this.index = this.entries.length - 1
     if (this.browserWindow) {
-      this.browserWindow.history.pushState({ orahakoIndex: this.index }, "", nextLocation.href)
+      this.browserWindow.history.pushState(this.createHistoryState(), "", nextLocation.href)
     }
     this.currentSource.set(nextLocation)
   }
@@ -228,7 +255,7 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     const nextLocation = parseRouteLocation(nextHref)
     this.entries[this.index] = nextLocation.href
     if (this.browserWindow) {
-      this.browserWindow.history.replaceState({ orahakoIndex: this.index }, "", nextLocation.href)
+      this.browserWindow.history.replaceState(this.createHistoryState(), "", nextLocation.href)
     }
     this.currentSource.set(nextLocation)
   }
@@ -255,13 +282,22 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
   }
 
   back = (): void => {
-    if (this.disposed) return
+    if (this.disposed || this.backInFlight) return
     const snapshot = [...this.backGuards]
       .reverse()
       .sort((left, right) => right.priority - left.priority)
-    this.runGuardsSyncOrAsync(snapshot, 0, () => {
-      this.performHistoryBack()
-    })
+    this.backInFlight = true
+    let outcome: boolean | Promise<boolean>
+    try {
+      outcome = this.evaluateBackGuards(snapshot)
+    } catch {
+      outcome = false
+    }
+    if (isPromiseLikeBoolean(outcome)) {
+      void outcome.then((allowed) => this.finishBack(allowed), () => this.finishBack(false))
+      return
+    }
+    this.finishBack(outcome)
   }
 
   async dispatchHardwareBack(
@@ -269,24 +305,26 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     onExit?: () => void | Promise<void>
   ): Promise<boolean> {
     if (this.disposed) return false
+    if (this.backInFlight) return true
     const snapshot = [...this.backGuards]
       .reverse()
       .sort((left, right) => right.priority - left.priority)
-    for (const entry of snapshot) {
-      if (!entry.active) continue
-      const allowed = await entry.guard()
-      if (!allowed) {
-        return true
-      }
+    this.backInFlight = true
+    try {
+      const allowed = await this.evaluateBackGuards(snapshot)
+      if (this.disposed || !allowed) return true
+      if (this.performHistoryBack()) return true
+      await onExit?.()
+      return false
+    } finally {
+      this.backInFlight = false
     }
-    if (this.performHistoryBack()) return true
-    await onExit?.()
-    return false
   }
 
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
+    this.backInFlight = false
     this.backGuards.length = 0
     this.backFallbacks.length = 0
     if (this.browserWindow) {
@@ -299,25 +337,57 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     }
   }
 
-  private runGuardsSyncOrAsync(
+  private evaluateBackGuards(snapshot: readonly GuardEntry[]): boolean | Promise<boolean> {
+    for (let i = 0; i < snapshot.length; i += 1) {
+      const entry = snapshot[i]
+      if (!entry || !entry.active) continue
+      let outcome: boolean | Promise<boolean>
+      try {
+        outcome = entry.guard()
+      } catch {
+        return false
+      }
+      if (isPromiseLikeBoolean(outcome)) {
+        return this.evaluateRemainingBackGuards(outcome, snapshot, i + 1)
+      }
+      if (!outcome) return false
+    }
+    return true
+  }
+
+  private async evaluateRemainingBackGuards(
+    pending: Promise<boolean>,
     snapshot: readonly GuardEntry[],
-    startAt: number,
-    onAllowed: () => void
-  ): void {
+    startAt: number
+  ): Promise<boolean> {
+    try {
+      if (!(await pending) || this.disposed) return false
+    } catch {
+      return false
+    }
     for (let i = startAt; i < snapshot.length; i += 1) {
       const entry = snapshot[i]
       if (!entry || !entry.active) continue
-      const outcome = entry.guard()
-      if (isPromiseLikeBoolean(outcome)) {
-        void outcome.then((allowed) => {
-          if (this.disposed || !allowed) return
-          this.runGuardsSyncOrAsync(snapshot, i + 1, onAllowed)
-        })
-        return
+      try {
+        if (!(await entry.guard()) || this.disposed) return false
+      } catch {
+        return false
       }
-      if (!outcome) return
     }
-    onAllowed()
+    return true
+  }
+
+  private finishBack(allowed: boolean): void {
+    this.backInFlight = false
+    if (this.disposed || !allowed) return
+    this.performHistoryBack()
+  }
+
+  private createHistoryState(): Record<string, unknown> {
+    return {
+      [HISTORY_INDEX_KEY]: this.index,
+      [HISTORY_ENTRIES_KEY]: [...this.entries],
+    }
   }
 
   private performHistoryBack(): boolean {
@@ -344,7 +414,7 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
   private attachHardwareBack(adapter: HardwareBackAdapter): void {
     void adapter
       .addListener("backButton", ({ canGoBack }) => {
-        void this.dispatchHardwareBack(canGoBack, () => adapter.exitApp?.())
+        void this.dispatchHardwareBack(canGoBack, () => adapter.exitApp?.()).catch(() => {})
       })
       .then((handle) => {
         if (this.disposed) {

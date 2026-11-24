@@ -2,6 +2,7 @@ import { act, type ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  DEFAULT_TTL_MS,
   providerRegistryRuntimePlugin,
   providerRuntimePlugin,
   queryRuntimePlugin,
@@ -460,7 +461,9 @@ describe("@orahako/plugin-training-plan", () => {
       providerPlugin,
       trainingPlanPlugin,
     ]) {
-      if (
+      if (plugin.manifest.id === queryRuntimePlugin.manifest.id) {
+        runtime.register(plugin, "builtin", { policies: {} })
+      } else if (
         plugin.manifest.id === sessionRuntimePlugin.manifest.id ||
         plugin.manifest.id === providerRuntimePlugin.manifest.id
       ) {
@@ -470,6 +473,11 @@ describe("@orahako/plugin-training-plan", () => {
       }
       runtime.start(plugin.manifest.id)
     }
+
+    const rootQuery = runtime.context.get("query")!
+    expect(rootQuery.policy("training-plan")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
+    expect(rootQuery.policy("academic-completion")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
+    expect(rootQuery.policy("academic-warnings")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
 
     const ui = runtime.context.get("ui")!
     const slots = runtime.context.get("slots") as PluginSlotRegistry
@@ -562,6 +570,9 @@ describe("@orahako/plugin-training-plan", () => {
     expect(
       ui.getSnapshot().navigation.some((entry) => entry.pluginId === TRAINING_PLAN_PLUGIN_ID)
     ).toBe(false)
+    expect(rootQuery.policy("training-plan")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
+    expect(rootQuery.policy("academic-completion")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
+    expect(rootQuery.policy("academic-warnings")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
 
     activeUnmount = undefined
     await dom.unmount()

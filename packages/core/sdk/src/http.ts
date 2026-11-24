@@ -1,4 +1,49 @@
+import type { Context } from "@cordisjs/core"
 import type { ObservableSource } from "./observable"
+
+export type HttpValuePipelineContext = Pick<Context, "lifecycle">
+
+/**
+ * Runs the Cordis `waterfall` hook type locally for HTTP values. Cordis 3.18
+ * does not ship `Lifecycle.waterfall`/`Context.waterfall`; the HTTP runtime
+ * only needs this replacement-threading behavior on its two transport events.
+ */
+async function runHttpValuePipeline<T>(
+  ctx: HttpValuePipelineContext,
+  event: "http/request" | "http/response",
+  value: T,
+  ...rest: unknown[]
+): Promise<T> {
+  const args: unknown[] = [event, value, ...rest]
+  const iterator = ctx.lifecycle.dispatch("waterfall", args)
+  let step = iterator.next()
+  while (!step.done) {
+    const replacement = await step.value
+    if (replacement !== undefined) args[0] = replacement
+    step = iterator.next()
+  }
+  return args[0] as T
+}
+
+/** Applies every `http/request` listener in order, threading replacements. */
+export function runHttpRequestPipeline(
+  ctx: HttpValuePipelineContext,
+  request: HttpRequest
+): Promise<HttpRequest> {
+  return runHttpValuePipeline(ctx, "http/request", request)
+}
+
+/**
+ * Applies every `http/response` listener in order with the effective request
+ * as the second argument, threading response replacements.
+ */
+export function runHttpResponsePipeline(
+  ctx: HttpValuePipelineContext,
+  response: HttpResponse,
+  request: HttpRequest
+): Promise<HttpResponse> {
+  return runHttpValuePipeline(ctx, "http/response", response, request)
+}
 
 export interface CookieEntry {
   readonly name: string

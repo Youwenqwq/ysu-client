@@ -155,9 +155,19 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
       })),
     }
 
+    const consumer = index.plugins.find((plugin) => plugin.id === "ext.consumer")!
+    index.plugins.push({
+      ...consumer,
+      id: "ext.incompatible",
+      versions: consumer.versions.map((release) => ({
+        ...release,
+        requires: { "ext.base": "^2.0.0" },
+      })),
+    })
+
     const installedOrder: string[] = []
     vi.spyOn(host, "installFromUrl").mockImplementation(async (url, _sha, expected) => {
-      expect(url).toContain("/v1/")
+      expect(url).toMatch(/^https:\/\/custom\.market\.example\/v1\//)
       installedOrder.push(expected.id)
       const manifest = makeManifest(expected.id, {
         version: expected.version,
@@ -179,7 +189,20 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
       return manifest
     })
 
-    await host.applyPluginBundle(["ext.consumer"], index)
+    await expect(
+      host.applyPluginBundle(
+        ["ext.incompatible"],
+        index,
+        "https://custom.market.example/plugins.json"
+      )
+    ).rejects.toThrow("Plugin dependency ext.base@1.0.0 does not satisfy ^2.0.0")
+    expect(installedOrder).toEqual([])
+
+    await host.applyPluginBundle(
+      ["ext.consumer"],
+      index,
+      "https://custom.market.example/plugins.json"
+    )
     expect(installedOrder).toEqual(["ext.base", "ext.service", "ext.consumer"])
     host.dispose()
   })
@@ -663,7 +686,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
     normalHost.dispose()
   })
 
-  it("publishes shared preference snapshots only for shell and theme writes", () => {
+  it("publishes shared preference snapshots only for shell, theme, and startup writes", () => {
     const storage = new Map<string, string>()
     vi.stubGlobal("localStorage", {
       getItem: (key: string) => storage.get(key) ?? null,
@@ -683,19 +706,28 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
       activeShell: "app.shell:default",
       activeTheme: "app.theme:dark",
     })
-    expect(listener).toHaveBeenCalledTimes(2)
-
-    preferences.setPluginDisabled("ext.demo", true)
-    expect(listener).toHaveBeenCalledTimes(2)
+    preferences.setStartupPage("overview")
     expect(preferences.state.getSnapshot()).toEqual({
       activeShell: "app.shell:default",
       activeTheme: "app.theme:dark",
+      startupPage: "overview",
+    })
+    expect(listener).toHaveBeenCalledTimes(3)
+
+    preferences.setPluginDisabled("ext.demo", true)
+    expect(listener).toHaveBeenCalledTimes(3)
+    expect(preferences.state.getSnapshot()).toEqual({
+      activeShell: "app.shell:default",
+      activeTheme: "app.theme:dark",
+      startupPage: "overview",
     })
     expect(preferences.getActiveTheme()).toBe("app.theme:dark")
+    expect(preferences.getStartupPage()).toBe("overview")
     expect(JSON.parse(storage.get("test-preferences")!)).toEqual({
       disabledPluginIds: ["ext.demo"],
       activeShell: "app.shell:default",
       activeTheme: "app.theme:dark",
+      startupPage: "overview",
     })
     unsubscribe()
   })
@@ -705,18 +737,28 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
       {
         appVersion: "0.17.0",
         appBuild: "b-preferences",
-        composition: { id: "test.preferences", version: 1, defaults: {}, plugins: [] },
+        composition: {
+          id: "test.preferences",
+          version: 1,
+          defaults: { landing: "overview", shell: "app.shell:default" },
+          plugins: [],
+        },
         plugins: [],
       },
       { platformModules: {} }
     )
     const packageRuntime = host.runtime.context.get("packageRuntime")!
     expect(packageRuntime.preferenceState).toBe(host.preferences.state)
+    expect(packageRuntime.defaultLanding?.()).toBe("overview")
+    expect(packageRuntime.defaultShell?.()).toBe("app.shell:default")
 
     packageRuntime.setActiveTheme?.("app.theme:dark")
+    packageRuntime.setStartupPage?.("overview")
     expect(host.preferences.getActiveTheme()).toBe("app.theme:dark")
+    expect(host.preferences.getStartupPage()).toBe("overview")
     expect(packageRuntime.preferenceState?.getSnapshot()).toEqual({
       activeTheme: "app.theme:dark",
+      startupPage: "overview",
     })
     host.dispose()
   })

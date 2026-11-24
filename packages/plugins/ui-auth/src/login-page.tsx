@@ -34,6 +34,7 @@ import type { AuthUiDictionary } from "./dictionary"
 import {
   formatRateLimitMessage,
   type RateLimitResult,
+  type RememberedCredentialEntry,
   type RememberedCredentialsStoreInstance,
 } from "./stores"
 
@@ -53,7 +54,14 @@ export interface LoginPageInject {
   readonly canRemember: boolean
   readonly listSchools: () => readonly AuthSchoolChoice[]
   readonly selectSchool: (schoolId: string) => SchoolProvider | null
-  readonly setCredential: (input: CredentialInput) => void
+  readonly setCredential: (
+    input: CredentialInput,
+    remembered: RememberedCredentialEntry | null
+  ) => void
+  readonly rememberCredential: (
+    schoolId: string,
+    remembered: RememberedCredentialEntry | null
+  ) => void
   readonly redirectAfterLogin: () => void
   readonly checkRateLimit: () => RateLimitResult
   readonly recordLoginAttempt: () => void
@@ -77,7 +85,7 @@ function isCaptchaError(error: unknown): boolean {
 }
 
 export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
-  const { t, locale, useStore, actions } = props
+  const { t, locale, useStore } = props
   const session = props.useSession()
   const providerSnap = props.useProvider()
   const providersRevision = props.useProvidersRevision()
@@ -145,13 +153,8 @@ export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
     props.selectSchool(nextSchoolId)
   }
 
-  function syncRememberedPreference(targetSchool: string, user: string, pass: string) {
-    if (!props.canRemember || !targetSchool) return
-    if (remember) {
-      actions.save(targetSchool, { username: user, password: pass })
-    } else {
-      actions.remove(targetSchool)
-    }
+  function rememberedEntry(user: string, pass: string): RememberedCredentialEntry | null {
+    return props.canRemember && remember ? { username: user, password: pass } : null
   }
 
   function refreshCaptchaDisplay(activeProvider: SchoolProvider) {
@@ -209,12 +212,14 @@ export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
       })
 
       if (res.authenticated && res.credential) {
-        props.setCredential({
-          schoolId: activeProvider.id,
-          credential: res.credential,
-          username,
-        })
-        syncRememberedPreference(activeProvider.id, username, password)
+        props.setCredential(
+          {
+            schoolId: activeProvider.id,
+            credential: res.credential,
+            username,
+          },
+          rememberedEntry(username, password)
+        )
         toast.success(t("login.loginSuccess"))
         props.redirectAfterLogin()
         return
@@ -230,7 +235,7 @@ export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
         try {
           const mfaResult = await mfaPromise
           if (mfaResult.type === "wechat") {
-            syncRememberedPreference(activeProvider.id, username, password)
+            props.rememberCredential(activeProvider.id, rememberedEntry(username, password))
             toast.success(t("login.loginSuccess"))
             props.redirectAfterLogin()
             return
@@ -249,13 +254,17 @@ export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
             code: mfaResult.code,
           })
           if (mfaCredential) {
-            props.setCredential({
-              schoolId: activeProvider.id,
-              credential: mfaCredential,
-              username,
-            })
+            props.setCredential(
+              {
+                schoolId: activeProvider.id,
+                credential: mfaCredential,
+                username,
+              },
+              rememberedEntry(username, password)
+            )
+          } else {
+            props.rememberCredential(activeProvider.id, rememberedEntry(username, password))
           }
-          syncRememberedPreference(activeProvider.id, username, password)
           toast.success(t("login.loginSuccess"))
           props.redirectAfterLogin()
         } catch (err) {

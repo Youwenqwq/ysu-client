@@ -1,4 +1,4 @@
-import { Context, Inject, type ForkScope, type Plugin } from "@cordisjs/core"
+import { Context, Inject, type DisposableLike, type ForkScope, type Plugin } from "@cordisjs/core"
 import semver from "semver"
 
 /** Numeric value of Cordis `ScopeStatus.FAILED` (ambient const enum). */
@@ -35,11 +35,13 @@ export type RuntimePluginExecutable =
   | AnyDefinedPlugin
   | {
       readonly inject?: Inject
+      readonly optionalInject?: Inject | readonly string[]
       readonly configSchema?: Record<string, unknown>
       apply(ctx: Context, config: PluginConfig): void | Promise<void>
     }
   | (((ctx: Context, config: PluginConfig) => void | Promise<void>) & {
       readonly inject?: Inject
+      readonly optionalInject?: Inject | readonly string[]
       readonly configSchema?: Record<string, unknown>
     })
 
@@ -56,11 +58,15 @@ interface RegisteredPlugin {
   pendingCount: number
   status: PluginStatus
   error?: string
+  cleanup: Set<Promise<void>>
+  restarting: boolean
+  attempt: number
 }
 
 interface PluginContextBinding {
   plugin: RegisteredPlugin
   generation: number
+  attempt: number
 }
 
 function errorMessage(error: unknown): string {
@@ -87,12 +93,43 @@ function invokeExecutable(
   return (executable.apply as (c: Context, cfg: PluginConfig) => void | Promise<void>)(ctx, config)
 }
 
+type CleanupTracker = (promise: PromiseLike<unknown>) => void
+
+function wrapCleanup(dispose: () => unknown, track: CleanupTracker): () => unknown {
+  let disposed = false
+  return () => {
+    if (disposed) return
+    disposed = true
+    const result = dispose()
+    if (isPromiseLike(result)) track(result)
+    return result
+  }
+}
+
+function wrapDisposableLike(value: DisposableLike, track: CleanupTracker): DisposableLike {
+  if (typeof value === "function") {
+    return wrapCleanup(value, track)
+  }
+  if (value !== null && typeof value === "object" && "dispose" in value) {
+    const dispose = value.dispose
+    if (typeof dispose === "function") {
+      return { ...value, dispose: wrapCleanup(dispose.bind(value), track) }
+    }
+  }
+  return value
+}
+
 /**
  * Shadow `ctx.set` so `provides` is validated against services this plugin
- * actually published, not a root service that already happened to exist.
- * The tracking context delegates every other member to the scoped context.
+ * actually published. Cleanup callbacks registered through `effect`, `collect`
+ * or the `dispose` event are wrapped so the runtime can await their promises;
+ * Cordis 3.18 resets scopes without awaiting async disposers.
  */
-function trackProvidedServices(ctx: Context, provided: Set<string>): Context {
+function trackProvidedServices(
+  ctx: Context,
+  provided: Set<string>,
+  track: CleanupTracker
+): Context {
   return new Proxy(ctx, {
     get(target, property, receiver) {
       if (property === "set") {
@@ -100,6 +137,41 @@ function trackProvidedServices(ctx: Context, provided: Set<string>): Context {
           const dispose = target.set(name, value)
           if (value !== undefined && value !== null) provided.add(name)
           return dispose
+        }
+      }
+      if (property === "effect") {
+        return (
+          callback: (inner: Context, config: unknown) => DisposableLike,
+          config?: unknown
+        ) =>
+          target.effect(
+            (inner: Context, innerConfig: unknown) =>
+              wrapDisposableLike(callback(inner, innerConfig), track),
+            config
+          )
+      }
+      if (property === "collect") {
+        return (label: string, callback: () => DisposableLike) =>
+          target.collect(label, () => wrapDisposableLike(callback(), track))
+      }
+      if (property === "on" || property === "once") {
+        const register = Reflect.get(target, property, target) as (
+          name: string,
+          listener: (...args: unknown[]) => unknown,
+          options?: unknown
+        ) => unknown
+        return (name: string, listener: (...args: unknown[]) => unknown, options?: unknown) => {
+          if (name !== "dispose") return register.call(target, name, listener, options)
+          return register.call(
+            target,
+            name,
+            (...args: unknown[]) => {
+              const result = listener(...args)
+              if (isPromiseLike(result)) track(result)
+              return result
+            },
+            options
+          )
         }
       }
       return Reflect.get(target, property, receiver)
@@ -120,6 +192,8 @@ export class PluginRuntime {
   private readonly stateSource = createObservableSource<readonly PluginState[]>([])
   private readonly plugins = new Map<string, RegisteredPlugin>()
   private readonly contexts = new WeakMap<Context, PluginContextBinding>()
+  private readonly pendingMounts = new Set<Promise<void>>()
+  private readonly cleanupById = new Map<string, Set<Promise<void>>>()
 
   constructor() {
     this.state = {
@@ -134,9 +208,16 @@ export class PluginRuntime {
     })
     const handleScopedError = (source: Context, error: unknown) => {
       const binding = source === this.context ? undefined : this.contexts.get(source)
-      if (!binding || binding.plugin.generation !== binding.generation) return
+      if (
+        !binding ||
+        binding.plugin.generation !== binding.generation ||
+        binding.plugin.attempt !== binding.attempt
+      ) {
+        return
+      }
       binding.plugin.status = "failed"
       binding.plugin.error = errorMessage(error)
+      this.invalidateDependents(binding.plugin.manifest.id)
       this.publish()
     }
     this.context.on("internal/error", function (this: Context, error: unknown) {
@@ -145,7 +226,8 @@ export class PluginRuntime {
     this.context.on("internal/status", () => {
       this.syncAllStatuses()
     })
-    this.context.on("internal/service", () => {
+    this.context.on("internal/service", (name: string) => {
+      this.restartOptionalConsumers(name)
       this.syncAllStatuses()
     })
     this.context.on("internal/before-service", () => {
@@ -192,6 +274,9 @@ export class PluginRuntime {
       previous?.status === "starting" ||
       previous?.status === "waiting"
     if (previous) {
+      // Package `requires` ranges are re-evaluated on hot replacement; a newer
+      // dependency must not leave already-active dependents on a stale contract.
+      this.invalidateDependents(resolvedManifest.id, resolvedManifest.version)
       this.stop(resolvedManifest.id, false)
       this.context.registry.delete(previous.cordisPlugin)
     }
@@ -200,7 +285,14 @@ export class PluginRuntime {
       "inject" in executable && executable.inject !== undefined
         ? Inject.resolve(executable.inject as Inject)
         : {}
+    const definitionOptionalInject =
+      "optionalInject" in executable && executable.optionalInject !== undefined
+        ? Inject.resolve(executable.optionalInject as Inject)
+        : {}
     const inject: Record<string, Inject.Meta> = {
+      ...Object.fromEntries(
+        Object.entries(definitionOptionalInject).map(([name]) => [name, { required: false }])
+      ),
       ...definitionInject,
       ...Object.fromEntries(
         (resolvedManifest.inject ?? []).map((name) => [name, { required: true }])
@@ -211,23 +303,31 @@ export class PluginRuntime {
       const current = this.plugins.get(resolvedManifest.id)
       if (!current || !current.mounted) return
       const generation = current.generation
+      current.attempt += 1
+      const attempt = current.attempt
+      if (current.status === "failed") {
+        // Cordis can revive a scope after a service replacement without
+        // incrementing our mount generation; the new apply owns the status.
+        current.status = "starting"
+        current.error = undefined
+      }
       let scoped = ctx
       const scopedServices: Array<{
         name: string
         service: { [PLUGIN_SERVICE_SCOPE](c: Context, m: PluginManifest): unknown }
       }> = []
 
-      for (const [name, dependency] of Object.entries(current.inject)) {
-        if (!dependency.required) continue
+      for (const [name] of Object.entries(current.inject)) {
         const service: unknown = ctx.get(name)
-        if (isScopedPluginService(service)) {
-          scoped = scoped.isolate(name)
-          scopedServices.push({ name, service })
-        }
+        if (service == null || !isScopedPluginService(service)) continue
+        scoped = scoped.isolate(name)
+        scopedServices.push({ name, service })
       }
 
       const provided = new Set<string>()
-      const pluginCtx = trackProvidedServices(scoped, provided)
+      const pluginCtx = trackProvidedServices(scoped, provided, (promise) =>
+        this.trackPluginCleanup(current, promise)
+      )
 
       // Facades observe the exact final context passed to apply; service writes
       // themselves stay outside `provides` tracking because they are dependencies.
@@ -235,9 +335,9 @@ export class PluginRuntime {
         scoped.set(name, service[PLUGIN_SERVICE_SCOPE](pluginCtx, current.manifest))
       }
 
-      this.contexts.set(ctx, { plugin: current, generation })
-      this.contexts.set(scoped, { plugin: current, generation })
-      this.contexts.set(pluginCtx, { plugin: current, generation })
+      this.contexts.set(ctx, { plugin: current, generation, attempt })
+      this.contexts.set(scoped, { plugin: current, generation, attempt })
+      this.contexts.set(pluginCtx, { plugin: current, generation, attempt })
 
       let result: void | Promise<void>
       try {
@@ -245,6 +345,7 @@ export class PluginRuntime {
       } catch (error) {
         current.status = "failed"
         current.error = errorMessage(error)
+        this.invalidateDependents(current.manifest.id)
         this.publish()
         throw error
       }
@@ -257,19 +358,35 @@ export class PluginRuntime {
         ctx.scope.ensure(async () => {
           try {
             await result
-            if (current.generation !== generation || !current.mounted) return
+            if (
+              current.generation !== generation ||
+              current.attempt !== attempt ||
+              !current.mounted
+            ) {
+              return
+            }
             this.assertProvides(current, provided)
           } catch (error) {
-            if (current.generation === generation && current.mounted) {
-              current.status = "failed"
-              current.error = errorMessage(error)
+            if (
+              current.generation !== generation ||
+              current.attempt !== attempt ||
+              !current.mounted
+            ) {
+              // A service replacement already started a newer attempt; do not
+              // let the stale rejection cancel the revived Cordis scope.
+              return
             }
+            current.status = "failed"
+            current.error = errorMessage(error)
+            this.invalidateDependents(current.manifest.id)
             throw error
           } finally {
             if (current.generation === generation) {
               current.pendingCount = Math.max(0, current.pendingCount - 1)
             }
-            this.syncPluginStatus(current)
+            if (current.generation === generation && current.attempt === attempt) {
+              this.syncPluginStatus(current)
+            }
             this.publish()
           }
         })
@@ -279,6 +396,7 @@ export class PluginRuntime {
         } catch (error) {
           current.status = "failed"
           current.error = errorMessage(error)
+          this.invalidateDependents(current.manifest.id)
           this.publish()
           throw error
         }
@@ -289,6 +407,8 @@ export class PluginRuntime {
     }
     cordisPlugin.inject = inject
 
+    const cleanup = this.cleanupById.get(resolvedManifest.id) ?? new Set<Promise<void>>()
+    this.cleanupById.set(resolvedManifest.id, cleanup)
     this.plugins.set(resolvedManifest.id, {
       manifest: resolvedManifest,
       executable,
@@ -300,6 +420,9 @@ export class PluginRuntime {
       mounted: false,
       pendingCount: 0,
       status: "registered",
+      cleanup,
+      restarting: false,
+      attempt: 0,
     })
 
     if (shouldRemount) {
@@ -351,18 +474,66 @@ export class PluginRuntime {
       plugin.pendingCount = 0
       plugin.error = undefined
       plugin.mounted = true
-      plugin.scope?.dispose()
-      this.context.registry.delete(plugin.cordisPlugin)
-      plugin.scope = this.context.plugin(plugin.cordisPlugin, resolvedConfig)
-      this.syncPluginStatus(plugin)
+      this.mountPlugin(plugin, resolvedConfig)
     } catch (error) {
-      plugin.mounted = false
-      plugin.status = error instanceof PluginDependencyError ? "registered" : "failed"
-      plugin.error = error instanceof PluginDependencyError ? undefined : errorMessage(error)
+      this.resetFailedStart(plugin, error)
       this.publish()
       throw error
     }
     this.publish()
+  }
+
+  private mountPlugin(plugin: RegisteredPlugin, resolvedConfig: PluginConfig): void {
+    const generation = plugin.generation
+    const previousScope = plugin.scope
+    plugin.scope = undefined
+    previousScope?.dispose()
+    this.context.registry.delete(plugin.cordisPlugin)
+
+    if (plugin.cleanup.size > 0) {
+      // Cordis 3.18 resets scopes without awaiting async disposers. Never let
+      // the new generation run native setup before the old one finished
+      // releasing it; the sync start/stop API stays available.
+      plugin.status = "starting"
+      const mount: Promise<void> = this.waitForCleanup(plugin)
+        .then(() => {
+          if (plugin.generation !== generation || !plugin.mounted) return
+          try {
+            plugin.scope = this.context.plugin(plugin.cordisPlugin, resolvedConfig)
+            this.syncPluginStatus(plugin)
+          } catch (error) {
+            this.resetFailedStart(plugin, error)
+          }
+          this.publish()
+        })
+        .finally(() => {
+          this.pendingMounts.delete(mount)
+        })
+      this.pendingMounts.add(mount)
+      void mount.catch(() => {})
+      return
+    }
+
+    plugin.scope = this.context.plugin(plugin.cordisPlugin, resolvedConfig)
+    this.syncPluginStatus(plugin)
+  }
+
+  private async waitForCleanup(plugin: RegisteredPlugin): Promise<void> {
+    while (plugin.cleanup.size > 0) {
+      await Promise.allSettled(Array.from(plugin.cleanup))
+    }
+  }
+
+  private resetFailedStart(plugin: RegisteredPlugin, error: unknown): void {
+    plugin.mounted = false
+    plugin.pendingCount = 0
+    const scope = plugin.scope
+    plugin.scope = undefined
+    scope?.dispose()
+    this.context.registry.delete(plugin.cordisPlugin)
+    plugin.status = error instanceof PluginDependencyError ? "registered" : "failed"
+    plugin.error = error instanceof PluginDependencyError ? undefined : errorMessage(error)
+    this.invalidateDependents(plugin.manifest.id)
   }
 
   async startAndWait(id: string, timeoutMs = 10_000): Promise<void> {
@@ -405,6 +576,7 @@ export class PluginRuntime {
       plugin.scope = undefined
       plugin.status = "failed"
       plugin.error = message
+      this.invalidateDependents(plugin.manifest.id)
       // Unsubscribe before publishing the generation change; otherwise the
       // listener reports a generic stop instead of this timeout.
       settle(new Error(message))
@@ -433,8 +605,74 @@ export class PluginRuntime {
   }
 
   async flush(): Promise<void> {
-    await this.context.events.flush()
+    while (true) {
+      await this.context.events.flush()
+      const pending = this.pendingWork()
+      if (pending.length === 0) break
+      await Promise.allSettled(pending)
+    }
     this.syncAllStatuses()
+  }
+
+  private pendingWork(): Promise<void>[] {
+    return [
+      ...this.pendingMounts,
+      ...Array.from(this.cleanupById.values(), (cleanup) => Array.from(cleanup)).flat(),
+    ]
+  }
+
+  private trackPluginCleanup(
+    plugin: RegisteredPlugin,
+    promise: PromiseLike<unknown>
+  ): void {
+    const tracked: Promise<void> = Promise.resolve(promise).then(
+      () => {
+        plugin.cleanup.delete(tracked)
+      },
+      () => {
+        plugin.cleanup.delete(tracked)
+      }
+    )
+    plugin.cleanup.add(tracked)
+  }
+
+  /**
+   * Cordis only restarts consumers for required inject changes. Optional
+   * services must remount on appearance, replacement and revocation so the
+   * plugin can rebuild its scoped facade and observe the new value.
+   */
+  private restartOptionalConsumers(name: string): void {
+    for (const plugin of this.plugins.values()) {
+      const dependency = plugin.inject[name]
+      if (!dependency || dependency.required) continue
+      if (!plugin.mounted || !plugin.scope || plugin.restarting) continue
+      if (plugin.manifest.provides?.includes(name)) continue
+      plugin.restarting = true
+      try {
+        plugin.mounted = false
+        this.start(plugin.manifest.id)
+      } catch {
+        // `start` already recorded its own failure; service events must not
+        // escape back into Cordis' service setter.
+      } finally {
+        plugin.restarting = false
+      }
+    }
+  }
+
+  /**
+   * Re-checks package `requires` when the dependency changes. `version` is
+   * supplied for hot replacements; omitting it invalidates every dependent
+   * after the dependency failed to start.
+   */
+  private invalidateDependents(id: string, version?: string): void {
+    for (const dependent of this.plugins.values()) {
+      if (dependent.manifest.id === id || !dependent.mounted) continue
+      const range = dependent.manifest.requires?.[id]
+      if (!range) continue
+      if (version !== undefined && semver.satisfies(version, range)) continue
+      this.stop(dependent.manifest.id)
+    }
   }
 
   stop(id: string, cascade = true): void {
@@ -511,7 +749,7 @@ export class PluginRuntime {
       return
     }
     const rawStatus: number = runtimeScope.status
-    if (rawStatus === CORDIS_SCOPE_FAILED || runtimeScope.error != null) {
+    if (rawStatus === CORDIS_SCOPE_FAILED) {
       plugin.status = "failed"
       plugin.error = plugin.error ?? errorMessage(runtimeScope.error ?? "Plugin failed")
       return

@@ -16,7 +16,6 @@ export interface AppearanceStoreState {
   readonly backgroundBlurAmount: number
   readonly cardStyle: CardStyle
   readonly cardOpacity: number
-  readonly defaultLandingPage: string
   readonly sidebarWidth: number
 }
 
@@ -63,7 +62,6 @@ export const appearanceStore = defineStore({
     backgroundBlurAmount: 20,
     cardStyle: "solid",
     cardOpacity: 100,
-    defaultLandingPage: "",
     sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   }),
   persist: {
@@ -95,9 +93,6 @@ export const appearanceStore = defineStore({
     setCardOpacity(ctx, opacity: number) {
       const clamped = Math.min(100, Math.max(50, Math.round(opacity)))
       ctx.set((prev) => ({ ...prev, cardOpacity: clamped }))
-    },
-    setDefaultLandingPage(ctx, defaultLandingPage: string) {
-      ctx.set((prev) => ({ ...prev, defaultLandingPage }))
     },
     setSidebarWidth(ctx, width: number) {
       ctx.set((prev) => ({ ...prev, sidebarWidth: clampSidebarWidth(width) }))

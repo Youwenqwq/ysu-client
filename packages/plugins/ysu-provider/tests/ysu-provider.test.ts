@@ -21,7 +21,7 @@ import {
   YSU_SESSION_ARTIFACT_JWXT,
   YSU_SESSION_ARTIFACT_MOBILE,
 } from "../src"
-import { createTestContext, emptyResponse, textResponse } from "./test-helper"
+import { createTestContext, emptyResponse, textResponse, type JarFetch } from "./test-helper"
 
 const LOGIN_PAGE_HTML = `<!doctype html>
 <html><body>
@@ -78,6 +78,35 @@ function jsonResponse(url: string, payload: unknown, status = 200) {
   return textResponse(url, JSON.stringify(payload), status, {
     "content-type": "application/json; charset=utf-8",
   })
+}
+
+/** Simulates a successful first-factor CAS login plus the status probe that verifies it. */
+function createDirectCasFetch(tgc = "TGT-direct"): JarFetch {
+  const cerBase = YSU_CONFIG.cas.cerBaseUrl
+  const authIndex = `${cerBase}/authserver/index.do`
+  const authLogin = `${cerBase}/authserver/login`
+
+  return async (jar, req) => {
+    if (req.url === authIndex) {
+      const cookies = await jar.getCookieString(req.url)
+      return cookies.includes(`CASTGC=${tgc}`)
+        ? textResponse(req.url, "", 302, { location: `${cerBase}/personalInfo/index.html` })
+        : textResponse(req.url, "", 302, { location: authLogin })
+    }
+    if (req.url.startsWith(authLogin) && req.method === "GET") {
+      return textResponse(req.url, LOGIN_PAGE_HTML, 200, { "content-type": "text/html" })
+    }
+    if (req.url.includes("checkNeedCaptcha.htl")) {
+      return jsonResponse(req.url, { isNeed: false })
+    }
+    if (req.url.startsWith(authLogin) && req.method === "POST") {
+      await jar.setCookie(`CASTGC=${tgc}; Domain=cer.ysu.edu.cn; Path=/authserver`, req.url)
+      return textResponse(req.url, "", 302, {
+        location: `${cerBase}/personalInfo/personCenter/index.html`,
+      })
+    }
+    return emptyResponse(req.url)
+  }
 }
 
 describe("YSU SchoolProvider API v1 contract & grade scale", () => {
@@ -825,6 +854,108 @@ describe("YSU SchoolProvider lifecycle, concurrency, relogin, and session expiry
     await provider.initialize()
     await provider.logout()
     expect(ctx.session.getSnapshot().isAuthenticated).toBe(false)
+  })
+
+  it("relogins with credentials written after a login and keeps them", async () => {
+    const { ctx, state } = createTestContext({
+      initialState: {
+        activeSchoolId: "ysu",
+        username: "20230001",
+        credential: makeStoredCasJson(),
+        isAuthenticated: true,
+        sessionExpired: true,
+      },
+      fetchWithJar: createDirectCasFetch(),
+    })
+
+    const provider = createYsuSchoolProvider({
+      session: ctx.session,
+      http: ctx.http,
+      storage: ctx.storage,
+      native: ctx.native,
+      i18n: ctx.i18n,
+      query: ctx.query,
+      mfa: ctx.mfa,
+    })
+
+    // Mirrors ui-auth: setCredential wipes artifacts, remembered keys are written afterwards.
+    ctx.session.setCredential({
+      schoolId: "ysu",
+      credential: makeStoredCasJson(),
+      username: "20230001",
+    })
+    ctx.session.setArtifact("remembered-username", "20230001", "ysu")
+    ctx.session.setArtifact("remembered-password", "secret-1", "ysu")
+
+    await expect(provider.relogin()).resolves.toBe(true)
+    expect(state.artifacts["remembered-username"]).toBe("20230001")
+    expect(state.artifacts["remembered-password"]).toBe("secret-1")
+
+    await expect(provider.relogin()).resolves.toBe(true)
+    expect(state.artifacts["remembered-username"]).toBe("20230001")
+    expect(state.artifacts["remembered-password"]).toBe("secret-1")
+  })
+
+  it("returns false from relogin when the login did not remember credentials", async () => {
+    const { ctx } = createTestContext({
+      initialState: {
+        activeSchoolId: "ysu",
+        username: "20230001",
+        credential: makeStoredCasJson(),
+        isAuthenticated: true,
+      },
+      fetchWithJar: createDirectCasFetch(),
+    })
+
+    const provider = createYsuSchoolProvider({
+      session: ctx.session,
+      http: ctx.http,
+      storage: ctx.storage,
+      native: ctx.native,
+      i18n: ctx.i18n,
+      query: ctx.query,
+      mfa: ctx.mfa,
+    })
+
+    ctx.session.setCredential({
+      schoolId: "ysu",
+      credential: makeStoredCasJson(),
+      username: "20230001",
+    })
+    await expect(provider.relogin()).resolves.toBe(false)
+  })
+
+  it("tolerates a malformed persisted CAS credential and still allows a fresh login", async () => {
+    const { ctx, state } = createTestContext({
+      initialState: {
+        activeSchoolId: "ysu",
+        username: "20230001",
+        credential: "{not-json",
+        isAuthenticated: true,
+        artifacts: {
+          [YSU_SESSION_ARTIFACT_JWXT]: "{not-json",
+          [YSU_SESSION_ARTIFACT_MOBILE]: "{not-json",
+        },
+      },
+      fetchWithJar: createDirectCasFetch("TGT-relogin"),
+    })
+
+    const provider = createYsuSchoolProvider({
+      session: ctx.session,
+      http: ctx.http,
+      storage: ctx.storage,
+      native: ctx.native,
+      i18n: ctx.i18n,
+      query: ctx.query,
+      mfa: ctx.mfa,
+    })
+
+    await expect(provider.initialize()).resolves.toBeUndefined()
+    await expect(
+      provider.slices.auth!.login({ username: "20230001", password: "secret-1" })
+    ).resolves.toBeUndefined()
+    expect(state.credential).not.toBe("{not-json")
+    expect(provider.slices.auth!.isAuthenticated()).toBe(true)
   })
 
   it("maps JWXT NotAuthenticatedError during reauthorization to AUTH_SESSION_EXPIRED while preserving isAuthenticated", async () => {

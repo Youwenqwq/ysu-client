@@ -175,11 +175,24 @@ export async function analyzeModuleImports(
     )
   }
 
+  const label = name ?? "plugin module"
   const references: ModuleImportReference[] = []
   for (const item of imports) {
     if (item.type === "import-meta") continue
     if (item.type === "dynamic") {
-      if (!item.specifier || item.glob || item.probablyTypeOnly) continue
+      if (item.glob) {
+        throw new ExternalPluginError(
+          "unsupported-import",
+          `Dynamic import glob "${item.specifier ?? ""}" in ${label} cannot be resolved; ` +
+            "only static string specifiers are supported"
+        )
+      }
+      if (item.specifier === undefined) {
+        throw new ExternalPluginError(
+          "unsupported-import",
+          `Dynamic import in ${label} must use a static string literal specifier`
+        )
+      }
       references.push({
         specifier: item.specifier,
         start: item.start,
@@ -188,7 +201,7 @@ export async function analyzeModuleImports(
       })
       continue
     }
-    if (item.typeOnly || !item.specifier) continue
+    if (item.typeOnly) continue
     references.push({
       specifier: item.specifier,
       start: item.start,

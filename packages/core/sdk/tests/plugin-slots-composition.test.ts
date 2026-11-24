@@ -19,9 +19,12 @@ import {
   parseRouteLocation,
   PLUGIN_API_VERSION,
   pluginPageHref,
+  runHttpRequestPipeline,
+  runHttpResponsePipeline,
   trackPluginRegistration,
   WIDGETS_GENERIC_CAPABILITY,
   type HttpRequest,
+  type HttpResponse,
   type InjectFace,
   type ObservableSource,
   type PluginSlotService,
@@ -46,7 +49,7 @@ declare module "@orahako/sdk" {
   }
 }
 
-describe("definePlugin static context narrowing & Cordis waterfall/effects", () => {
+describe("definePlugin static context narrowing & HTTP pipeline/effects", () => {
   it("exposes ONLY declared injected services plus lifecycle/event methods", () => {
     const plugin = definePlugin({
       manifest: {
@@ -71,7 +74,6 @@ describe("definePlugin static context narrowing & Cordis waterfall/effects", () 
         void ctx.emit
         void ctx.parallel
         void ctx.serial
-        void ctx.waterfall
         void ctx.bail
         void config.pageLimit
 
@@ -82,18 +84,50 @@ describe("definePlugin static context narrowing & Cordis waterfall/effects", () 
           void ctx.router
           // @ts-expect-error raw ctx.get is not exposed on ScopedPluginContext
           void ctx.get
+          // @ts-expect-error the SDK no longer patches a waterfall onto scopes
+          void ctx.waterfall
         }
       },
     })
 
     expect(plugin.manifest.inject).toEqual(["ui", "storage"])
     expect(plugin.inject).toEqual(["ui", "storage"])
+    expect(plugin.optionalInject).toEqual([])
     expect(plugin.manifest.configSchema).toBeDefined()
   })
 
-  it("executes http/request waterfall hooks in order and cleans up on fork disposal", async () => {
+  it("types optional services as possibly undefined without making them manifest inject", () => {
+    const plugin = definePlugin({
+      manifest: {
+        id: "test.optional",
+        name: "Optional",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+      },
+      optionalInject: ["ui"],
+      apply(ctx) {
+        void ctx.ui
+        if (false) {
+          // @ts-expect-error optional ui may be absent
+          const requiredUi: NonNullable<typeof ctx.ui> = ctx.ui
+          void requiredUi
+        }
+      },
+    })
+
+    expect(plugin.manifest.inject).toBeUndefined()
+    expect(plugin.optionalInject).toEqual(["ui"])
+  })
+
+  it("executes http/request pipeline hooks in order and cleans up on fork disposal", async () => {
     const root = new Context()
     await root.start()
+
+    // The SDK must not install a waterfall onto Cordis prototypes.
+    expect(Object.prototype.hasOwnProperty.call(root, "waterfall")).toBe(false)
+    expect(Object.prototype.hasOwnProperty.call(root.lifecycle, "waterfall")).toBe(false)
 
     const fork = root.plugin((ctx) => {
       ctx.on("http/request", async (req) => ({
@@ -112,12 +146,43 @@ describe("definePlugin static context narrowing & Cordis waterfall/effects", () 
       redirect: "follow",
     }
 
-    const first = await root.waterfall("http/request", baseRequest)
+    const first = await runHttpRequestPipeline(root, baseRequest)
     expect(first.headers).toEqual({ "x-plugin": "active", "x-root": "1" })
 
     fork.dispose()
-    const second = await root.waterfall("http/request", baseRequest)
+    const second = await runHttpRequestPipeline(root, baseRequest)
     expect(second.headers).toEqual({ "x-root": "1" })
+    await root.stop()
+  })
+
+  it("threads http/response replacements with the effective request", async () => {
+    const root = new Context()
+    await root.start()
+
+    const request: HttpRequest = {
+      method: "POST",
+      url: "https://example.edu/api",
+      redirect: "follow",
+    }
+    const baseResponse: HttpResponse = {
+      status: 200,
+      headers: {},
+      url: request.url,
+      text: async () => "",
+      arrayBuffer: async () => new ArrayBuffer(0),
+    }
+
+    const seenRequests: HttpRequest[] = []
+    root.on("http/response", (response, effectiveRequest) => {
+      seenRequests.push(effectiveRequest)
+      return { ...response, status: 201 }
+    })
+    root.on("http/response", (response) => ({ ...response, headers: { "x-final": "1" } }))
+
+    const response = await runHttpResponsePipeline(root, baseResponse, request)
+    expect(response.status).toBe(201)
+    expect(response.headers).toEqual({ "x-final": "1" })
+    expect(seenRequests[0]).toBe(request)
     await root.stop()
   })
 

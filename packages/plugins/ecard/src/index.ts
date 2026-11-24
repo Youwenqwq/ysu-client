@@ -19,6 +19,8 @@ import {
 
 export const ECARD_PLUGIN_ID = "orahako.ecard"
 
+const ONE_HOUR_TTL_MS = 1000 * 60 * 60
+
 export type {
   EcardDictionary,
   EcardHeaderActionsInject,
@@ -46,6 +48,8 @@ export const ecardPlugin = definePlugin({
     const { ui, slots, router, i18n, provider, session, query, overview } = ctx
     i18n.register(ecardDictionary)
     let disposed = false
+
+    query.registerPolicy("ecard", { ttl: ONE_HOUR_TTL_MS, persist: false })
 
     const ecardSource = query.source<EcardSessionStatus, "ecard">({
       feature: "ecard",

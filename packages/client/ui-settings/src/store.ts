@@ -3,7 +3,6 @@ import { defineStore, type HttpRequest } from "@orahako/sdk"
 export interface SettingsStoreState {
   readonly customUserAgentEnabled: boolean
   readonly customUserAgent: string
-  readonly startupPage: string
 }
 
 export function normalizeCustomUserAgent(value: string): string {
@@ -48,7 +47,6 @@ export const settingsStore = defineStore({
   init: (): SettingsStoreState => ({
     customUserAgentEnabled: false,
     customUserAgent: "",
-    startupPage: "",
   }),
   persist: {
     key: "preferences",
@@ -64,9 +62,6 @@ export const settingsStore = defineStore({
     },
     resetCustomUserAgent(ctx) {
       ctx.set((prev) => ({ ...prev, customUserAgentEnabled: false, customUserAgent: "" }))
-    },
-    setStartupPage(ctx, startupPage: string) {
-      ctx.set((prev) => ({ ...prev, startupPage }))
     },
   },
 })

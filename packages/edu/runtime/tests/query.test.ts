@@ -10,6 +10,8 @@ import {
   type Grade,
   type ProviderRuntimeService,
   type ProviderRuntimeSnapshot,
+  type ProviderQueryPolicy,
+  type QuerySnapshot,
   type SchoolProvider,
   type SessionService,
   type SessionSnapshot,
@@ -20,13 +22,12 @@ import {
   createObservableSource,
   definePlugin,
   PLUGIN_API_VERSION,
+  type ObservableSource,
   type PluginKeyValueStorage,
   type PluginStorageService,
 } from "@orahako/sdk"
 import {
   DEFAULT_TTL_MS,
-  defaultAcademicQueryPolicies,
-  LONG_TTL_MS,
   QueryRuntimeService,
   queryRuntimePlugin,
 } from "../src"
@@ -69,6 +70,7 @@ function createQueryTestRig(options?: {
   username?: string | null
   isAuthenticated?: boolean
   storage?: PluginStorageService
+  policies?: Readonly<Record<string, ProviderQueryPolicy>>
 }) {
   const ctx = new Context()
   const { storage, localMap } = options?.storage
@@ -154,6 +156,7 @@ function createQueryTestRig(options?: {
     provider: providerService,
     session: sessionService,
     storage,
+    policies: options?.policies,
   })
 
   return {
@@ -188,13 +191,13 @@ afterEach(() => {
 })
 
 describe("QueryRuntimeService & queryRuntimePlugin", () => {
-  it("exports defaultAcademicQueryPolicies and manages LIFO policy overrides with revocation on plugin dispose", async () => {
-    expect(defaultAcademicQueryPolicies.schedule).toEqual({ ttl: LONG_TTL_MS, persist: true })
-    expect(defaultAcademicQueryPolicies.grades).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
-    expect(defaultAcademicQueryPolicies.ecard?.persist).toBe(false)
-
+  it("ships only the generic default policy and manages LIFO overrides with revocation on plugin dispose", async () => {
     const { storage } = createTrackedStorage()
     const freshRig = createQueryTestRig({ storage })
+    const genericPolicy = { ttl: DEFAULT_TTL_MS, persist: false }
+    expect(freshRig.query.policy("grades")).toEqual(genericPolicy)
+    expect(freshRig.query.policy("schedule")).toEqual(genericPolicy)
+    expect(freshRig.query.policy("ecard")).toEqual(genericPolicy)
     freshRig.query.dispose()
 
     const runtime = new PluginRuntime()
@@ -218,10 +221,13 @@ describe("QueryRuntimeService & queryRuntimePlugin", () => {
     runtime.context.set("session", freshRig.sessionService)
     runtime.context.set("storage", storage)
 
-    runtime.register(queryRuntimePlugin, "builtin")
+    runtime.register(queryRuntimePlugin, "builtin", {
+      policies: { schedule: { ttl: 2_000, persist: true } },
+    })
     await runtime.startAndWait(queryRuntimePlugin.manifest.id)
     const rootQuery = runtime.context.get("query")!
-    expect(rootQuery.policy("grades")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
+    expect(rootQuery.policy("grades")).toEqual(genericPolicy)
+    expect(rootQuery.policy("schedule")).toEqual({ ttl: 2_000, persist: true })
 
     const overrideA = definePlugin({
       manifest: {
@@ -265,7 +271,7 @@ describe("QueryRuntimeService & queryRuntimePlugin", () => {
     runtime.stop(overrideB.manifest.id)
     expect(rootQuery.policy("grades")).toEqual({ ttl: 5_000, persist: true })
     runtime.stop(overrideA.manifest.id)
-    expect(rootQuery.policy("grades")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
+    expect(rootQuery.policy("grades")).toEqual(genericPolicy)
 
     runtime.dispose()
   })
@@ -480,9 +486,10 @@ describe("QueryRuntimeService & queryRuntimePlugin", () => {
     const ysu = makeProvider("ysu", {
       grades: { getGrades: async () => [SAMPLE_GRADE] },
     })
+    const policies = { grades: { ttl: DEFAULT_TTL_MS, persist: true } }
 
     // First session writes persistent cache
-    const rig1 = createQueryTestRig({ provider: ysu, storage })
+    const rig1 = createQueryTestRig({ provider: ysu, storage, policies })
     await rig1.query.hydrated
     const src1 = rig1.query.source({
       feature: "grades",
@@ -497,7 +504,7 @@ describe("QueryRuntimeService & queryRuntimePlugin", () => {
     // Cold-start 1 hour later (within 24h TTL): serves cached data immediately WITHOUT calling fetcher!
     vi.advanceTimersByTime(60 * 60 * 1000)
     const coldFetcher = vi.fn(async () => [{ ...SAMPLE_GRADE, score: "100" }])
-    const rig2 = createQueryTestRig({ provider: ysu, storage })
+    const rig2 = createQueryTestRig({ provider: ysu, storage, policies })
     await rig2.query.hydrated
 
     const src2 = rig2.query.source({
@@ -521,7 +528,7 @@ describe("QueryRuntimeService & queryRuntimePlugin", () => {
     vi.advanceTimersByTime(25 * 60 * 60 * 1000)
     const revalidateGate = Promise.withResolvers<Grade[]>()
     const expiredFetcher = vi.fn(() => revalidateGate.promise)
-    const rig3 = createQueryTestRig({ provider: ysu, storage })
+    const rig3 = createQueryTestRig({ provider: ysu, storage, policies })
     await rig3.query.hydrated
 
     const src3 = rig3.query.source({
@@ -577,7 +584,12 @@ describe("QueryRuntimeService & queryRuntimePlugin", () => {
       },
     })
 
-    const rig = createQueryTestRig({ provider: ysu, storage, isAuthenticated: true })
+    const rig = createQueryTestRig({
+      provider: ysu,
+      storage,
+      isAuthenticated: true,
+      policies: { grades: { ttl: DEFAULT_TTL_MS, persist: true } },
+    })
     await rig.query.hydrated
 
     // 1. Seed persistent cache for "grades"
@@ -638,6 +650,194 @@ describe("QueryRuntimeService & queryRuntimePlugin", () => {
     rig.query.dispose()
   })
 
+  it("isolates scoped source handles per consumer manifest id while sharing the data record", async () => {
+    const { storage } = createTrackedStorage()
+    const fetcherA = vi.fn(async (): Promise<Grade[]> => [{ ...SAMPLE_GRADE, courseName: "A" }])
+    const fetcherB = vi.fn(async (): Promise<Grade[]> => [{ ...SAMPLE_GRADE, courseName: "B" }])
+    const enabledA = { value: false }
+    const ysu = makeProvider("ysu", { grades: { getGrades: async () => [SAMPLE_GRADE] } })
+    const rig = createQueryTestRig({ provider: ysu, storage })
+    await rig.query.hydrated
+
+    const runtime = new PluginRuntime()
+    runtime.context.set("provider", rig.providerService)
+    runtime.context.set("session", rig.sessionService)
+    runtime.context.set("storage", storage)
+    runtime.register(queryRuntimePlugin, "builtin")
+    await runtime.startAndWait(queryRuntimePlugin.manifest.id)
+
+    let sourceA: ObservableSource<QuerySnapshot<Grade[]>> | null = null
+    let sourceB: ObservableSource<QuerySnapshot<Grade[]>> | null = null
+    let reconfigureA: (() => void) | null = null
+
+    const consumerA = definePlugin({
+      manifest: {
+        id: "ext.consumer-a",
+        name: "Consumer A",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+      },
+      inject: ["query"],
+      apply(ctx) {
+        const open = () => {
+          const next = ctx.query.source<Grade[]>({
+            feature: "grades",
+            slice: "grades",
+            params: { consumer: "shared" },
+            enabled: () => enabledA.value,
+            fetcher: fetcherA,
+          })
+          sourceA = next
+          return next
+        }
+        open().subscribe(() => {})
+        reconfigureA = open
+      },
+    })
+
+    const consumerB = definePlugin({
+      manifest: {
+        id: "ext.consumer-b",
+        name: "Consumer B",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+      },
+      inject: ["query"],
+      apply(ctx) {
+        const next = ctx.query.source<Grade[]>({
+          feature: "grades",
+          slice: "grades",
+          params: { consumer: "shared" },
+          fetcher: fetcherB,
+        })
+        sourceB = next
+        next.subscribe(() => {})
+      },
+    })
+
+    runtime.register(consumerA, "external")
+    await runtime.startAndWait(consumerA.manifest.id)
+    expect(sourceA).not.toBeNull()
+    expect(sourceA!.getSnapshot().status).toBe("idle")
+    expect(fetcherA).not.toHaveBeenCalled()
+
+    runtime.register(consumerB, "external")
+    await runtime.startAndWait(consumerB.manifest.id)
+    expect(sourceA).not.toBe(sourceB)
+    expect(fetcherB).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(sourceB!.getSnapshot().data?.[0]?.courseName).toBe("B"))
+    expect(fetcherA).not.toHaveBeenCalled()
+
+    // Enabling A and refreshing uses A's own fetcher on the shared record.
+    enabledA.value = true
+    reconfigureA!()
+    await sourceA!.getSnapshot().refresh()
+    expect(fetcherA).toHaveBeenCalledTimes(1)
+    expect(fetcherB).toHaveBeenCalledTimes(1)
+    expect(sourceA!.getSnapshot().data?.[0]?.courseName).toBe("A")
+
+    // Disabling A must not reset B's record or block B's next refresh.
+    enabledA.value = false
+    reconfigureA!()
+    expect(sourceB!.getSnapshot().data?.[0]?.courseName).toBe("A")
+    await sourceB!.getSnapshot().refresh()
+    expect(fetcherB).toHaveBeenCalledTimes(2)
+    expect(fetcherA).toHaveBeenCalledTimes(1)
+    expect(sourceB!.getSnapshot().data?.[0]?.courseName).toBe("B")
+
+    // Disposing A leaves B subscribed and fetching independently.
+    runtime.stop(consumerA.manifest.id)
+    expect(sourceB!.getSnapshot().data?.[0]?.courseName).toBe("B")
+    const rootQuery = runtime.context.get("query")!
+    rootQuery.invalidate({ feature: "grades" })
+    await vi.waitFor(() => expect(fetcherB).toHaveBeenCalledTimes(3))
+    expect(fetcherA).toHaveBeenCalledTimes(1)
+
+    runtime.stop(consumerB.manifest.id)
+    expect(rig.getListenerCounts()).toEqual({ providerListeners: 0, sessionListeners: 0 })
+    runtime.dispose()
+    rig.query.dispose()
+  })
+
+  it("clears failed fetch state and retries the current identity after session expiry recovery", async () => {
+    const ysu = makeProvider("ysu", {
+      exams: { getExams: async () => [{ name: "OS", startAt: "2026-01-10T09:00:00" }] },
+    })
+    const rig = createQueryTestRig({ provider: ysu })
+    await rig.query.hydrated
+
+    let mode: "fail" | "ok" = "fail"
+    const fetcher = vi.fn(async (): Promise<Exam[]> => {
+      if (mode === "fail") {
+        throw new ProviderError(ProviderErrorCode.NETWORK_ERROR, "offline", undefined, 503)
+      }
+      return [{ name: "OS", startAt: "2026-01-10T09:00:00" }]
+    })
+
+    const source = rig.query.source({
+      feature: "exams",
+      slice: "exams",
+      fetcher,
+    })
+    const unsub = source.subscribe(() => {})
+    await vi.waitFor(() => expect(source.getSnapshot().status).toBe("error"))
+    expect(fetcher).toHaveBeenCalledTimes(1)
+
+    rig.sessionState.set((prev) => ({ ...prev, sessionExpired: true }))
+    await Promise.resolve()
+    expect(fetcher).toHaveBeenCalledTimes(1)
+
+    mode = "ok"
+    rig.sessionState.set((prev) => ({ ...prev, sessionExpired: false }))
+    await vi.waitFor(() => expect(source.getSnapshot().status).toBe("success"))
+    expect(fetcher).toHaveBeenCalledTimes(2)
+
+    unsub()
+    rig.query.dispose()
+  })
+
+  it("retries the current identity after valid credentials are restored", async () => {
+    const ysu = makeProvider("ysu", {
+      exams: { getExams: async () => [{ name: "OS", startAt: "2026-01-10T09:00:00" }] },
+    })
+    const rig = createQueryTestRig({ provider: ysu, isAuthenticated: false })
+    await rig.query.hydrated
+
+    let mode: "fail" | "ok" = "fail"
+    const fetcher = vi.fn(async (): Promise<Exam[]> => {
+      if (mode === "fail") {
+        throw new ProviderError(ProviderErrorCode.NETWORK_ERROR, "offline", undefined, 503)
+      }
+      return [{ name: "OS", startAt: "2026-01-10T09:00:00" }]
+    })
+
+    const source = rig.query.source({
+      feature: "exams",
+      slice: "exams",
+      fetcher,
+    })
+    const unsub = source.subscribe(() => {})
+    await vi.waitFor(() => expect(source.getSnapshot().status).toBe("error"))
+    expect(fetcher).toHaveBeenCalledTimes(1)
+
+    mode = "ok"
+    rig.sessionState.set((prev) => ({
+      ...prev,
+      credential: "fresh-token",
+      isAuthenticated: true,
+      sessionExpired: false,
+    }))
+    await vi.waitFor(() => expect(source.getSnapshot().status).toBe("success"))
+    expect(fetcher).toHaveBeenCalledTimes(2)
+
+    unsub()
+    rig.query.dispose()
+  })
+
   it("isolates accounts & provider generations, handles enabled toggles, external query/invalidate events, clearPersistent, and scoped plugin disposal", async () => {
     const { storage } = createTrackedStorage()
     const aliceGate = Promise.withResolvers<Grade[]>()
@@ -652,6 +852,7 @@ describe("QueryRuntimeService & queryRuntimePlugin", () => {
       storage,
       username: "alice",
       isAuthenticated: true,
+      policies: { grades: { ttl: DEFAULT_TTL_MS, persist: true } },
     })
     await rig.query.hydrated
 

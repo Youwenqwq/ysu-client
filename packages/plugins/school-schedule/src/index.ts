@@ -10,6 +10,7 @@ import {
   type Course,
   type CurrentWeek,
   type MajorInfo,
+  type ProviderQueryPolicy,
   type SchoolClassInfo,
   type SchoolClassQueryOptions,
   type TermCalendar,
@@ -45,6 +46,24 @@ import "./slots"
 
 export const SCHOOL_SCHEDULE_PLUGIN_ID = "orahako.school-schedule"
 
+const HOUR_MS = 60 * 60 * 1000
+const DAY_MS = 24 * HOUR_MS
+
+const SCHOOL_SCHEDULE_QUERY_POLICIES: Readonly<Record<string, ProviderQueryPolicy>> = {
+  "current-week": { ttl: 12 * HOUR_MS, persist: true },
+  "term-calendar": { ttl: 7 * DAY_MS, persist: true },
+  "class-periods": { ttl: 7 * DAY_MS, persist: true },
+  "school-grade-years": { ttl: 7 * DAY_MS, persist: true },
+  "school-departments": { ttl: 7 * DAY_MS, persist: true },
+  "school-majors": { ttl: 7 * DAY_MS, persist: true },
+  "school-classes": { ttl: DAY_MS, persist: true },
+  "school-class-schedule": { ttl: 7 * DAY_MS, persist: true },
+  "school-campuses": { ttl: 7 * DAY_MS, persist: true },
+  "school-buildings": { ttl: 7 * DAY_MS, persist: true },
+  "school-classrooms": { ttl: 7 * DAY_MS, persist: true },
+  "school-classroom-schedule": { ttl: 7 * DAY_MS, persist: true },
+}
+
 export type {
   FreeRoomContext,
   SchoolScheduleDictionary,
@@ -75,6 +94,9 @@ export const schoolSchedulePlugin = definePlugin({
   apply(ctx) {
     const { ui, slots, router, i18n, provider, session, query } = ctx
     i18n.register(schoolScheduleDictionary)
+    for (const [feature, policy] of Object.entries(SCHOOL_SCHEDULE_QUERY_POLICIES)) {
+      query.registerPolicy(feature, policy)
+    }
 
     let disposed = false
     const filterStore = schoolScheduleFilterStore.create()

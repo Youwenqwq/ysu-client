@@ -37,6 +37,7 @@ import type {
   DerivedComponentProps,
   ObservableSource,
   PluginLocale,
+  PluginHostPreferenceSnapshot,
   PluginPageContribution,
   PluginUIServiceSnapshot,
   RouteLocation,
@@ -84,9 +85,10 @@ export interface DefaultShellInject {
     readonly ui: ObservableSource<PluginUIServiceSnapshot>
     readonly navRevision: ObservableSource<number>
     readonly backgroundUrl: ObservableSource<string | null>
-    readonly storeHydrated: ObservableSource<boolean>
+    readonly preference: ObservableSource<PluginHostPreferenceSnapshot>
   }
   readonly getAppName: (locale: PluginLocale) => string
+  readonly getStartupPreference: () => string
   readonly resolveChrome: (
     location: RouteLocation,
     uiSnapshot: PluginUIServiceSnapshot,
@@ -96,7 +98,6 @@ export interface DefaultShellInject {
   readonly navigateToSettings: () => void
   readonly handleBack: (activePage: PluginPageContribution | undefined) => void
   readonly registerBackHandler: RegisterBackLayer
-  readonly applyLandingPreference: (landingRoute: string) => void
 }
 
 export type DefaultShellProps = DerivedComponentProps<
@@ -350,7 +351,8 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
   const uiSnapshot = props.useUi()
   const navRevision = props.useNavRevision()
   const backgroundUrl = props.useBackgroundUrl()
-  const storeHydrated = props.useStoreHydrated()
+  const preference = props.usePreference()
+  const startupPage = preference.startupPage ?? props.getStartupPreference()
 
   const colorMode: ColorMode = useStore((s) => s.colorMode)
   const backgroundImage = useStore((s) => s.backgroundImage)
@@ -359,12 +361,10 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
   const blurAmount = useStore((s) => s.backgroundBlurAmount)
   const cardStyle = useStore((s) => s.cardStyle)
   const cardOpacity = useStore((s) => s.cardOpacity)
-  const defaultLandingPage = useStore((s) => s.defaultLandingPage)
   const sidebarWidth = useStore((s) => s.sidebarWidth)
 
   const [systemDark, setSystemDark] = useState<boolean>(detectSystemPrefersDark)
   const [defaultSidebarOpen] = useState<boolean>(readInitialSidebarOpen)
-  const didApplyInitialLandingRef = useRef(false)
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
@@ -406,21 +406,12 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [])
 
-  // Honor user-configured defaultLandingPage when launching at root `/`
-  useEffect(() => {
-    if (!storeHydrated || didApplyInitialLandingRef.current) return
-    didApplyInitialLandingRef.current = true
-    if (!location.route && !location.pluginId && defaultLandingPage) {
-      props.applyLandingPreference(defaultLandingPage)
-    }
-  }, [defaultLandingPage, location.pluginId, location.route, props, storeHydrated])
-
   const chrome = useMemo(() => {
-    // Navigation filters and the landing preference live outside uiSnapshot.
+    // Navigation filters and the startup preference live outside uiSnapshot.
     void navRevision
-    void defaultLandingPage
+    void startupPage
     return props.resolveChrome(location, uiSnapshot, locale)
-  }, [defaultLandingPage, locale, location, navRevision, props, uiSnapshot])
+  }, [locale, location, navRevision, props, startupPage, uiSnapshot])
 
   const hasBackground = Boolean(backgroundImage || backgroundUrl)
   const showMobileThemeToggle = Boolean(
@@ -538,48 +529,6 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
             : "pb-[var(--mobile-bottom-nav-height,calc(4rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))))]"
         )}
       >
-        {/* Mobile TopBar */}
-        <header
-          data-shell-mobile-topbar=""
-          className={cn(
-            "fixed top-0 z-30 flex h-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] w-full items-center justify-between gap-3 px-4 pt-[var(--safe-area-inset-top,env(safe-area-inset-top,0px))] backdrop-blur md:hidden",
-            hasBackground
-              ? "bg-background/60 supports-[backdrop-filter]:bg-background/40"
-              : "bg-background/95 supports-[backdrop-filter]:bg-background/80"
-          )}
-        >
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            {chrome.showBack && (
-              <button
-                type="button"
-                data-shell-back=""
-                onClick={() => props.handleBack(chrome.activePage)}
-                className="-ml-1 flex size-8 shrink-0 items-center justify-center rounded-full text-foreground transition-colors active:bg-muted"
-                aria-label={t("shell.back")}
-              >
-                <ArrowLeft className="size-5" />
-              </button>
-            )}
-            <h1 className="truncate text-base font-semibold">{chrome.pageTitle}</h1>
-            {activityNode}
-          </div>
-          <div className="flex items-center gap-1">
-            {showMobileThemeToggle && (
-              <Button
-                type="button"
-                data-shell-mobile-theme=""
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => actions.setColorMode(isDark ? "light" : "dark")}
-                aria-label={t("shell.toggleTheme")}
-              >
-                {isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
-              </Button>
-            )}
-            {headerActionsNode}
-          </div>
-        </header>
-
         <div
           className="mx-4 mt-4 flex flex-col gap-3 empty:hidden md:mx-6 md:mt-6"
           data-shell-banners=""
@@ -587,26 +536,65 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
           {bannerNode}
         </div>
 
-        {/* Desktop Header */}
+        {/* One header tree for both breakpoints: fixed top bar on mobile, in-flow on desktop. */}
         <header
-          data-shell-desktop-header=""
-          className="relative hidden border-b px-6 py-4 md:block"
+          data-shell-header=""
+          className={cn(
+            "fixed inset-x-0 top-0 z-30 flex w-full items-center justify-between gap-3 px-4",
+            "h-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))]",
+            "pt-[var(--safe-area-inset-top,env(safe-area-inset-top,0px))] backdrop-blur",
+            "md:relative md:inset-auto md:z-auto md:h-auto md:border-b md:bg-transparent",
+            "md:px-6 md:py-4 md:pt-0 md:backdrop-blur-none",
+            hasBackground
+              ? cn(
+                  "bg-background/60 supports-[backdrop-filter]:bg-background/40",
+                  "md:supports-[backdrop-filter]:bg-transparent"
+                )
+              : cn(
+                  "bg-background/95 supports-[backdrop-filter]:bg-background/80",
+                  "md:supports-[backdrop-filter]:bg-transparent"
+                )
+          )}
         >
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
+            <div className="md:hidden">
+              {chrome.showBack && (
+                <button
+                  type="button"
+                  data-shell-back=""
+                  onClick={() => props.handleBack(chrome.activePage)}
+                  className={cn(
+                    "-ml-1 flex size-8 shrink-0 items-center justify-center rounded-full",
+                    "text-foreground transition-colors active:bg-muted"
+                  )}
+                  aria-label={t("shell.back")}
+                >
+                  <ArrowLeft className="size-5" />
+                </button>
+              )}
+            </div>
+            <div className="hidden md:block">
               <SidebarTrigger
                 aria-label={t("shell.toggleSidebar")}
                 title={t("shell.toggleSidebar")}
               />
-              <h1 className="animate-in text-lg font-semibold duration-300 fade-in slide-in-from-left-2">
-                {chrome.pageTitle}
-              </h1>
-              {activityNode}
             </div>
-            <div className="flex items-center gap-2">
-              {headerActionsNode}
+            <h1
+              className={cn(
+                "truncate text-base font-semibold",
+                "md:animate-in md:text-lg md:duration-300 md:fade-in md:slide-in-from-left-2"
+              )}
+            >
+              {chrome.pageTitle}
+            </h1>
+            {activityNode}
+          </div>
+          <div className="flex shrink-0 items-center gap-1 md:gap-2">
+            {headerActionsNode}
+            <div className={cn("flex items-center", showMobileThemeToggle ? "" : "hidden md:flex")}>
               <Button
                 type="button"
+                data-shell-theme-toggle=""
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => actions.setColorMode(isDark ? "light" : "dark")}
@@ -614,6 +602,8 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
               >
                 {isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
               </Button>
+            </div>
+            <div className="hidden items-center md:flex">
               <Button
                 type="button"
                 variant="ghost"

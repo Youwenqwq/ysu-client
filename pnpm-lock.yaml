@@ -801,6 +801,9 @@ importers:
       '@cordisjs/core':
         specifier: 3.18.1
         version: 3.18.1
+      '@orahako/academic-sdk':
+        specifier: workspace:*
+        version: link:../../edu/sdk
       '@orahako/kernel':
         specifier: workspace:*
         version: link:../../core/kernel
@@ -1937,6 +1940,9 @@ importers:
       '@cordisjs/core':
         specifier: 3.18.1
         version: 3.18.1
+      '@orahako/academic-sdk':
+        specifier: workspace:*
+        version: link:../../edu/sdk
       '@orahako/kernel':
         specifier: workspace:*
         version: link:../../core/kernel

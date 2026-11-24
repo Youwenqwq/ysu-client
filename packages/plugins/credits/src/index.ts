@@ -15,6 +15,10 @@ import "./slots"
 
 export const CREDITS_PLUGIN_ID = "orahako.credits"
 
+const ONE_HOUR_TTL_MS = 1000 * 60 * 60
+const SIX_HOUR_TTL_MS = 1000 * 60 * 60 * 6
+const DEFAULT_TTL_MS = 1000 * 60 * 60 * 24
+
 export type {
   CreditsController,
   CreditsControllerOptions,
@@ -43,6 +47,13 @@ export const creditsPlugin = definePlugin({
   apply(ctx) {
     const { ui, slots, router, i18n, provider, session, query } = ctx
     i18n.register(creditsDictionary)
+
+    query.registerPolicy("credit-summary", { ttl: SIX_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("credit-batches", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("credit-declarations", { ttl: ONE_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("credit-records", { ttl: SIX_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("credit-competitions", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("credit-library-activities", { ttl: DEFAULT_TTL_MS, persist: true })
 
     const controller = createCreditsController({
       provider,

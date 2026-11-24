@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@cordisjs/core": "3.18.1",
+    "@orahako/academic-sdk": "workspace:*",
     "@orahako/kernel": "workspace:*",
     "@orahako/runtime-i18n": "workspace:*",
     "@orahako/runtime-router": "workspace:*",

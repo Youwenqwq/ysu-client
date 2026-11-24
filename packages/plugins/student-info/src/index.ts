@@ -6,6 +6,8 @@ import { StudentInfoPage, type StudentInfoPageInject, type StudentInfoPageProps 
 
 export const STUDENT_INFO_PLUGIN_ID = "orahako.student-info"
 
+const LONG_TTL_MS = 1000 * 60 * 60 * 24 * 7
+
 export type { StudentInfoDictionary, StudentInfoPageInject, StudentInfoPageProps }
 
 const studentInfoManifest: PluginManifest = {
@@ -26,6 +28,8 @@ export const studentInfoPlugin = definePlugin({
     const { ui, i18n, provider, session, query } = ctx
     i18n.register(studentInfoDictionary)
     let disposed = false
+
+    query.registerPolicy("student-info", { ttl: LONG_TTL_MS, persist: true })
 
     const studentInfoSource = query.source<StudentInfo, "studentProfile">({
       feature: "student-info",

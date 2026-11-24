@@ -22,10 +22,13 @@ vi.mock("sonner", () => ({
 }))
 
 import {
+  DEFAULT_TTL_MS,
+  ONE_HOUR_TTL_MS,
   providerRegistryRuntimePlugin,
   providerRuntimePlugin,
   queryRuntimePlugin,
   sessionRuntimePlugin,
+  SIX_HOUR_TTL_MS,
 } from "@orahako/academic-runtime"
 import { defineSchoolProvider, type SchoolProvider } from "@orahako/academic-sdk"
 import { PluginRuntime } from "@orahako/kernel"
@@ -344,7 +347,9 @@ describe("@orahako/plugin-labor", () => {
       providerPlugin,
       laborPlugin,
     ]) {
-      if (
+      if (plugin.manifest.id === queryRuntimePlugin.manifest.id) {
+        runtime.register(plugin, "builtin", { policies: {} })
+      } else if (
         plugin.manifest.id === sessionRuntimePlugin.manifest.id ||
         plugin.manifest.id === providerRuntimePlugin.manifest.id
       ) {
@@ -354,6 +359,11 @@ describe("@orahako/plugin-labor", () => {
       }
       runtime.start(plugin.manifest.id)
     }
+
+    const rootQuery = runtime.context.get("query")!
+    expect(rootQuery.policy("labor-summary")).toEqual({ ttl: SIX_HOUR_TTL_MS, persist: true })
+    expect(rootQuery.policy("labor-records")).toEqual({ ttl: SIX_HOUR_TTL_MS, persist: true })
+    expect(rootQuery.policy("labor-activities")).toEqual({ ttl: ONE_HOUR_TTL_MS, persist: true })
 
     const ui = runtime.context.get("ui")!
     const slots = runtime.context.get("slots") as PluginSlotRegistry
@@ -423,6 +433,9 @@ describe("@orahako/plugin-labor", () => {
       runtime.stop(LABOR_PLUGIN_ID)
     })
     expect(ui.getSnapshot().pages.some((p) => p.pluginId === LABOR_PLUGIN_ID)).toBe(false)
+    expect(rootQuery.policy("labor-summary")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
+    expect(rootQuery.policy("labor-records")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
+    expect(rootQuery.policy("labor-activities")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
 
     activeUnmount = undefined
     await dom.unmount()

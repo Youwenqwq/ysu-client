@@ -6,7 +6,8 @@ set -euo pipefail
 # the app talks to the same-origin edge proxy at /api/proxy.
 echo ""
 echo "Building web app bundle..."
-APP_BASE_PATH=/app pnpm run build
+# EdgeOne is the only deployment that enables the activation-gated PWA proxy.
+APP_BASE_PATH=/app APP_DEPLOYMENT=edgeone-pwa pnpm run build
 rm -rf website/public/app
 mkdir -p website/public/app
 cp -r dist/. website/public/app/

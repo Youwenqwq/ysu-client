@@ -45,6 +45,9 @@ import {
 
 export const GRADES_PLUGIN_ID = "orahako.grades"
 
+const SHORT_TTL_MS = 1000 * 60 * 60 * 12
+const DEFAULT_TTL_MS = 1000 * 60 * 60 * 24
+
 export type {
   GachaTier,
   GradeAnalyticsResult,
@@ -119,6 +122,13 @@ export const gradesPlugin = definePlugin({
 
     i18n.register(gradesDictionary)
     let disposed = false
+
+    query.registerPolicy("grades", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("gpa-stats", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("grade-statistics", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("grade-distribution", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("grade-ranking", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("current-week", { ttl: SHORT_TTL_MS, persist: true })
 
     const settingsStore = gradesSettingsStore.create(storage)
     const gachaStore = gradeGachaStore.create(storage)

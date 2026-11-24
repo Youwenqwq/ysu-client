@@ -58,13 +58,11 @@ export const platformPlugins = [
   uiSettingsPlugin,
   uiProfilePlugin,
   pluginManagerPlugin,
-  activationPlugin,
   mfaPlugin,
   updaterPlugin,
   announcementPlugin,
   analyticsPlugin,
   networkActivityPlugin,
-  meterPlugin,
 ] satisfies readonly AnyDefinedPlugin[]
 
 export const officialPlugins = [
@@ -87,5 +85,17 @@ export const officialPlugins = [
   laborPlugin,
   creditsPlugin,
   comprehensivePlugin,
+  meterPlugin,
   ysuProviderPlugin,
 ] satisfies readonly AnyDefinedPlugin[]
+
+export interface OfficialPluginOptions {
+  /** EdgeOne PWA deployments are the only composition that installs activation. */
+  readonly activation?: boolean
+}
+
+export function createOfficialPlugins(
+  options: OfficialPluginOptions = {}
+): readonly AnyDefinedPlugin[] {
+  return options.activation ? [...officialPlugins, activationPlugin] : officialPlugins
+}

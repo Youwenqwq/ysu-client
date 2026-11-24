@@ -126,6 +126,10 @@ export function formatRateLimitMessage<K extends string>(
   return t(intervalKey, { seconds })
 }
 
+/** Session artifacts read by provider quick re-login; keep in sync with provider plugins. */
+export const REMEMBERED_USERNAME_ARTIFACT = "remembered-username"
+export const REMEMBERED_PASSWORD_ARTIFACT = "remembered-password"
+
 export interface RememberedCredentialEntry {
   readonly username: string
   readonly password: string

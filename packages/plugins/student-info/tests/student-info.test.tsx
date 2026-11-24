@@ -2,6 +2,8 @@ import { act, type ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  DEFAULT_TTL_MS,
+  LONG_TTL_MS,
   providerRegistryRuntimePlugin,
   providerRuntimePlugin,
   queryRuntimePlugin,
@@ -292,7 +294,9 @@ describe("@orahako/plugin-student-info", () => {
       providerPlugin,
       studentInfoPlugin,
     ]) {
-      if (
+      if (plugin.manifest.id === queryRuntimePlugin.manifest.id) {
+        runtime.register(plugin, "builtin", { policies: {} })
+      } else if (
         plugin.manifest.id === sessionRuntimePlugin.manifest.id ||
         plugin.manifest.id === providerRuntimePlugin.manifest.id
       ) {
@@ -302,6 +306,9 @@ describe("@orahako/plugin-student-info", () => {
       }
       runtime.start(plugin.manifest.id)
     }
+
+    const rootQuery = runtime.context.get("query")!
+    expect(rootQuery.policy("student-info")).toEqual({ ttl: LONG_TTL_MS, persist: true })
 
     const ui = runtime.context.get("ui")!
     const slots = runtime.context.get("slots") as PluginSlotRegistry
@@ -368,6 +375,7 @@ describe("@orahako/plugin-student-info", () => {
     expect(
       ui.getSnapshot().navigation.some((entry) => entry.pluginId === STUDENT_INFO_PLUGIN_ID)
     ).toBe(false)
+    expect(rootQuery.policy("student-info")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
 
     activeUnmount = undefined
     await dom.unmount()

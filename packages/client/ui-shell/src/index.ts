@@ -1,6 +1,5 @@
 import {
   definePlugin,
-  parseRouteLocation,
   PLUGIN_API_VERSION,
   type ObservableSource,
   type PluginHostPreferenceSnapshot,
@@ -168,9 +167,11 @@ export const uiShellPlugin = definePlugin<
     })
     void media.syncToken(store.source.getSnapshot().backgroundImage)
 
-    ctx.on("shell/landing-preference", (route: string) => {
-      store.actions.setDefaultLandingPage(route)
-    })
+    const resolveStartupPage = (): string =>
+      ctx.packageRuntime.preferenceState?.getSnapshot().startupPage ??
+      ctx.packageRuntime.getStartupPage?.() ??
+      ctx.packageRuntime.defaultLanding?.() ??
+      ""
 
     const disposeWebViewLifecycle = attachNativeWebViewLifecycle({
       native: ctx.native,
@@ -221,12 +222,11 @@ export const uiShellPlugin = definePlugin<
       uiSnapshot: PluginUIServiceSnapshot,
       locale: PluginLocale
     ): ResolvedShellChrome => {
-      const landingPref = store.source.getSnapshot().defaultLandingPage
       const activePage = resolveActivePageForLocation(
         location,
         uiSnapshot.pages,
         ctx.navigation,
-        landingPref
+        resolveStartupPage()
       )
 
       const pageTitle = activePage
@@ -301,7 +301,7 @@ export const uiShellPlugin = definePlugin<
         location,
         snapshot.pages,
         ctx.navigation,
-        store.source.getSnapshot().defaultLandingPage
+        resolveStartupPage()
       )
       if (!activePage || activePage.root || isPagePrimary(activePage, snapshot.navigation)) {
         return undefined
@@ -342,16 +342,6 @@ export const uiShellPlugin = definePlugin<
         return false
       }, priority)
 
-    const applyLandingPreference = (landingRoute: string): void => {
-      const current = ctx.router.current.getSnapshot()
-      if (current.route || current.pluginId) return
-      const landingHref = ctx.navigation.landing(landingRoute)
-      if (!landingHref) return
-      if (parseRouteLocation(ctx.router.href(landingHref)).href !== current.href) {
-        ctx.router.replace(landingHref)
-      }
-    }
-
     for (const [name, spec] of Object.entries(defaultShellChildren)) {
       ctx.slots.declare({ name: name as SlotName, kind: spec.kind })
     }
@@ -370,9 +360,13 @@ export const uiShellPlugin = definePlugin<
             ui: ctx.ui.state,
             navRevision: ctx.navigation.state,
             backgroundUrl: media.urlSource,
-            storeHydrated: store.hydrated,
+            preference: ctx.packageRuntime.preferenceState ?? STATIC_PREFERENCE_SOURCE,
           },
           getAppName,
+          getStartupPreference: () =>
+            ctx.packageRuntime.preferenceState?.getSnapshot().startupPage ??
+            ctx.packageRuntime.getStartupPage?.() ??
+            "",
           resolveChrome,
           settingsHref: ctx.router.href({ route: "settings" }),
           navigateToSettings: () => {
@@ -380,7 +374,6 @@ export const uiShellPlugin = definePlugin<
           },
           handleBack,
           registerBackHandler,
-          applyLandingPreference,
         }),
       },
       DefaultShell

@@ -59,9 +59,13 @@ export function createSessionLifecycle(
 
     const snapshot = ctx.session.getSnapshot()
     if (snapshot.credential) {
-      const casCredential = CASCredential.fromJSON(snapshot.credential, ctx.urls.casCookieDomain)
-      await cas.restoreCredential(casCredential)
-      await cas.saveCASTGC().catch(() => {})
+      try {
+        const casCredential = CASCredential.fromJSON(snapshot.credential, ctx.urls.casCookieDomain)
+        await cas.restoreCredential(casCredential)
+        await cas.saveCASTGC().catch(() => {})
+      } catch {
+        // Ignore malformed persisted CAS credential; login can replace it.
+      }
     }
 
     const jwxtSession = ctx.session.getArtifact(YSU_SESSION_ARTIFACT_JWXT, ctx.config.id)

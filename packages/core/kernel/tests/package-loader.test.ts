@@ -164,6 +164,111 @@ describe("external-loader", () => {
     hostRegistry.dispose()
   })
 
+  it("rejects dynamic imports without a static string literal specifier", async () => {
+    const expressions = [
+      `import(target)`,
+      "import(`./${target}.js`)",
+      `import("./helper" + target)`,
+      `import(target, { with: { type: "json" } })`,
+      `typeof import(target)`,
+    ]
+    for (const expression of expressions) {
+      await expect(analyzeModuleImports(`export default ${expression}`)).rejects.toMatchObject({
+        code: "unsupported-import",
+      })
+    }
+  })
+
+  it("rejects plugin modules with computed dynamic imports before creating URLs", async () => {
+    const { api, blobs } = createFakeBlobUrls()
+    const expressions = [
+      `import(target)`,
+      "import(`./${target}.js`)",
+      `import("./helper" + target)`,
+    ]
+    for (const expression of expressions) {
+      const pkg = parsePluginPackage(
+        encodeZip({
+          "manifest.json": JSON.stringify(validManifest()),
+          "dist/helper.js": `export const label = "helper"\n`,
+          "dist/index.js": `export default { apply() { return ${expression} } }\n`,
+        })
+      )
+
+      await expect(
+        loadExternalPlugin(pkg, {
+          blobUrls: api,
+          hostModules: {},
+          importModule: async () => {
+            throw new Error("a computed dynamic import must fail before evaluation")
+          },
+        })
+      ).rejects.toMatchObject({ code: "unsupported-import" })
+    }
+
+    const barePkg = parsePluginPackage(
+      encodeZip({
+        "manifest.json": JSON.stringify(validManifest()),
+        "dist/index.js": `export default { apply() { return import("left-pad") } }\n`,
+      })
+    )
+    await expect(
+      loadExternalPlugin(barePkg, { blobUrls: api, hostModules: {} })
+    ).rejects.toMatchObject({ code: "unsupported-import" })
+
+    expect(blobs.size).toBe(0)
+  })
+
+  it("rewrites statically analyzable dynamic imports to module URLs", async () => {
+    const { api, blobs } = createFakeBlobUrls()
+    const hostRegistry = createHostModuleRegistry(
+      { "@orahako/sdk": { PLUGIN_API_VERSION: 1 } },
+      api
+    )
+    const pkg = parsePluginPackage(
+      encodeZip({
+        "manifest.json": JSON.stringify(validManifest()),
+        "dist/helper.js": `export const label = "helper"\n`,
+        "dist/index.js": [
+          `import { PLUGIN_API_VERSION } from "@orahako/sdk"`,
+          `export default {`,
+          `  apply() {`,
+          `    return Promise.all([`,
+          `      import("./helper"),`,
+          "      import(`./helper.js`),",
+          `      import("@orahako/sdk"),`,
+          `      typeof import("./helper"),`,
+          `    ])`,
+          `  },`,
+          `}`,
+          ``,
+        ].join("\n"),
+      })
+    )
+
+    let entryUrl: string | undefined
+    const loaded = await loadExternalPlugin(pkg, {
+      hostModules: hostRegistry,
+      blobUrls: api,
+      importModule: async (url) => {
+        entryUrl = url
+        return { default: { apply: () => {} } }
+      },
+    })
+
+    const entrySource = await blobs.get(entryUrl!)!.text()
+    const dynamicImports = entrySource.match(/import\("blob:fake-\d+"\)/g) ?? []
+    expect(dynamicImports).toHaveLength(4)
+    expect(entrySource).not.toContain("./helper")
+    expect(entrySource).not.toContain("@orahako/sdk")
+
+    const [reference] = await analyzeModuleImports("import(`./helper.js`)")
+    expect(reference).toMatchObject({ specifier: "./helper.js", dynamic: true })
+
+    loaded.dispose()
+    hostRegistry.dispose()
+  })
+
   it("rejects unsupported bare imports and cyclic relative imports", async () => {
     const { api } = createFakeBlobUrls()
 

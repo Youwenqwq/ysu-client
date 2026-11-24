@@ -21,6 +21,7 @@ import {
   pluginCategory,
   pluginManagerPlugin,
   type PluginManagerPreferencesStoreInstance,
+  type PluginsPageInject,
 } from "../src/index"
 
 class MiniDomNode {
@@ -90,6 +91,17 @@ class MiniDomNode {
 
   addEventListener(): void {}
   removeEventListener(): void {}
+  findAll(predicate: (node: MiniDomNode) => boolean): MiniDomNode[] {
+    const matches: MiniDomNode[] = []
+    const visit = (node: MiniDomNode) => {
+      if (predicate(node)) matches.push(node)
+      for (const child of node.childNodes) {
+        visit(child)
+      }
+    }
+    visit(this)
+    return matches
+  }
   closest(): null {
     return null
   }
@@ -181,6 +193,28 @@ function mountDom() {
   }
 }
 
+function findReactProps(node: MiniDomNode): Record<string, unknown> {
+  for (const [key, value] of Object.entries(node)) {
+    if (key.startsWith("__reactProps$") && typeof value === "object" && value !== null) {
+      return value as Record<string, unknown>
+    }
+  }
+  return {}
+}
+
+function findButton(container: MiniDomNode, label: string): MiniDomNode | undefined {
+  return container
+    .findAll((node) => node.tagName === "BUTTON")
+    .find((node) => node.textContent.trim() === label)
+}
+
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const copy = new Uint8Array(bytes.byteLength)
+  copy.set(bytes)
+  const digest = await crypto.subtle.digest("SHA-256", copy.buffer)
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")
+}
+
 describe("@orahako/ui-plugin-manager", () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -188,6 +222,7 @@ describe("@orahako/ui-plugin-manager", () => {
   })
 
   it("classifies and groups plugins by kind and category in canonical order", () => {
+    expect(pluginManagerPlugin.optionalInject).toEqual(["provider"])
     expect(pluginCategory({ kind: "provider" })).toBe("provider")
     expect(pluginCategory({ kind: "runtime" })).toBe("system")
     expect(pluginCategory({ kind: "shell" })).toBe("system")
@@ -227,6 +262,21 @@ describe("@orahako/ui-plugin-manager", () => {
       ),
       "index.js": encoder.encode("export default { apply() {} }\n"),
     })
+    const themeZip = zipSync({
+      "manifest.json": encoder.encode(
+        JSON.stringify({
+          id: "community.theme",
+          name: "Mint Theme",
+          version: "1.0.0",
+          apiVersion: 1,
+          kind: "feature",
+          categories: ["theme"],
+          entry: "index.js",
+        })
+      ),
+      "index.js": encoder.encode("export default { apply() {} }\n"),
+    })
+    const themeHash = await sha256Hex(themeZip)
 
     const marketIndex: MarketplaceIndex = {
       schemaVersion: 1,
@@ -270,8 +320,8 @@ describe("@orahako/ui-plugin-manager", () => {
               version: "1.0.0",
               apiVersion: 1,
               platforms: ["web", "android"],
-              zipUrl: "/v1/mint-1.0.0.zip",
-              sha256: "c".repeat(64),
+              zipUrl: "v1/mint-1.0.0.zip",
+              sha256: themeHash,
               size: 150,
               publishedAt: "2026-11-18T00:00:00Z",
             },
@@ -288,10 +338,14 @@ describe("@orahako/ui-plugin-manager", () => {
       ],
     }
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(JSON.stringify(marketIndex), { status: 200 }))
-    )
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url === "https://market.example.com/v1/mint-1.0.0.zip") {
+        return new Response(themeZip, { status: 200 })
+      }
+      return new Response(JSON.stringify(marketIndex), { status: 200 })
+    })
+    vi.stubGlobal("fetch", fetchMock)
 
     const shellA = definePlugin({
       manifest: {
@@ -308,6 +362,23 @@ describe("@orahako/ui-plugin-manager", () => {
       apply(ctx) {
         ctx.ui.registerShell({ id: "default", name: "酸橙盒默认" }, (props) => props.children)
         ctx.ui.registerShell({ id: "compact", name: "紧凑界面" }, (props) => props.children)
+      },
+    })
+
+    const shellB = definePlugin({
+      manifest: {
+        id: "demo.shell",
+        name: "Demo Shell",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "shell",
+        required: true,
+        entry: "index.js",
+        inject: ["ui"],
+      },
+      inject: ["ui"] as const,
+      apply(ctx) {
+        ctx.ui.registerShell({ id: "alt", name: "演示界面" }, (props) => props.children)
       },
     })
 
@@ -348,8 +419,8 @@ describe("@orahako/ui-plugin-manager", () => {
         composition: {
           id: "test.pm",
           version: 1,
-          defaults: { shell: "orahako.shell:default" },
-          market: { indexUrl: "https://market.example.com/plugins.json" },
+          defaults: { shell: "demo.shell:alt" },
+          market: { indexUrl: "https://default-market.example.org/plugins.json" },
           plugins: [
             { id: slotRegistryPlugin.manifest.id, protected: true },
             { id: uiRegistryPlugin.manifest.id, protected: true },
@@ -357,6 +428,7 @@ describe("@orahako/ui-plugin-manager", () => {
             { id: i18nRegistryPlugin.manifest.id, protected: true },
             { id: storageRuntimePlugin.manifest.id, protected: true },
             { id: shellA.manifest.id, protected: true },
+            { id: shellB.manifest.id, protected: true },
             { id: optionalFeature.manifest.id },
             { id: requiredFeature.manifest.id },
             { id: pluginManagerPlugin.manifest.id, protected: true },
@@ -369,6 +441,7 @@ describe("@orahako/ui-plugin-manager", () => {
           i18nRegistryPlugin,
           storageRuntimePlugin,
           shellA,
+          shellB,
           optionalFeature,
           requiredFeature,
           pluginManagerPlugin,
@@ -382,10 +455,28 @@ describe("@orahako/ui-plugin-manager", () => {
     const setContextService: (name: string, value: object) => void = host.runtime.context.set.bind(
       host.runtime.context
     )
-    setContextService("provider", { state: providerState })
+    const readPageProvider = () => {
+      const page = host.ui?.findPage("orahako.plugin-manager", "plugins")
+      if (!page) throw new Error("Plugin manager page is not registered")
+      return (page.inject!(host.runtime.context) as PluginsPageInject).hooks.provider
+    }
 
     try {
       await host.bootstrap()
+
+      // The page must register before the optional academic provider exists.
+      await vi.waitFor(() => {
+        expect(readPageProvider().getSnapshot()).toEqual({ schoolId: null })
+      })
+
+      setContextService("provider", { state: providerState })
+      await vi.waitFor(() => {
+        expect(readPageProvider().getSnapshot()).toEqual({
+          schoolId: "ysu",
+          supportedPlugins: ["demo.grades"],
+        })
+      })
+
       // Sideload external v1.0.0 toy plugin via packageRuntime!
       const pkgRuntime = host.runtime.context.get("packageRuntime")!
       await pkgRuntime.installPackage!(extZipV1)
@@ -405,6 +496,26 @@ describe("@orahako/ui-plugin-manager", () => {
         page: "plugins",
         group: "account",
       })
+
+      const pageInject = pageEntry!.inject!(host.runtime.context) as PluginsPageInject
+      const initialProvider = pageInject.hooks.provider.getSnapshot()
+      expect(initialProvider).toEqual({
+        schoolId: "ysu",
+        supportedPlugins: ["demo.grades"],
+      })
+      // Reading a snapshot must not mutate or recreate the projected source.
+      expect(pageInject.hooks.provider.getSnapshot()).toBe(initialProvider)
+
+      providerState.set({
+        schoolId: "ysu",
+        provider: { id: "ysu", supportedPlugins: ["demo.grades", "demo.extra"] },
+      })
+      const updatedProvider = pageInject.hooks.provider.getSnapshot()
+      expect(updatedProvider).toEqual({
+        schoolId: "ysu",
+        supportedPlugins: ["demo.grades", "demo.extra"],
+      })
+      expect(pageInject.hooks.provider.getSnapshot()).toBe(updatedProvider)
 
       // Static SSR check: system plugins and the market stay out of the default page.
       const preferences = pageEntry!.store as PluginManagerPreferencesStoreInstance
@@ -444,9 +555,129 @@ describe("@orahako/ui-plugin-manager", () => {
       expect(text).not.toContain("v9.0.0") // v2 release filtered out!
       expect(text).toContain("更新全部（1）")
       expect(text).toContain("Mint Theme")
-      expect(fetch).toHaveBeenCalledWith("https://market.example.com/custom.json", {
+      expect(fetchMock).toHaveBeenCalledWith("https://market.example.com/custom.json", {
         cache: "no-store",
       })
+
+      // Shell selection persists the clicked fully-qualified id, including the default shell.
+      const shellVariant = (label: string): string | undefined =>
+        findButton(dom.container, label)?.attributes.get("data-variant")
+      expect(shellVariant("演示界面")).toBe("default")
+      expect(shellVariant("酸橙盒默认")).toBe("outline")
+
+      const clickButton = async (label: string): Promise<void> => {
+        const button = findButton(dom.container, label)
+        expect(button).toBeDefined()
+        await act(async () => {
+          const onClick = findReactProps(button!).onClick as (() => void) | undefined
+          onClick?.()
+        })
+      }
+
+      await clickButton("酸橙盒默认")
+      expect(host.preferences.getActiveShell()).toBe("orahako.shell:default")
+      expect(shellVariant("酸橙盒默认")).toBe("default")
+      expect(shellVariant("演示界面")).toBe("outline")
+
+      await clickButton("紧凑界面")
+      expect(host.preferences.getActiveShell()).toBe("orahako.shell:compact")
+
+      await clickButton("演示界面")
+      expect(host.preferences.getActiveShell()).toBe("demo.shell:alt")
+
+      // Bundles resolve relative ZIPs against the market currently shown on the page.
+      await clickButton("一键开启")
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      })
+      expect(fetchMock).toHaveBeenCalledWith("https://market.example.com/v1/mint-1.0.0.zip")
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        "https://default-market.example.org/v1/mint-1.0.0.zip"
+      )
+
+      await dom.unmount()
+    } finally {
+      host.dispose()
+    }
+  })
+
+  it("keeps failed market checks eligible and records the timestamp only on success", async () => {
+    const marketIndex: MarketplaceIndex = {
+      schemaVersion: 1,
+      updatedAt: "2026-11-18T00:00:00Z",
+      plugins: [],
+      bundles: [],
+    }
+    const fetchMock = vi.fn(async () => new Response("unavailable", { status: 503 }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b1",
+        composition: {
+          id: "test.pm.refresh",
+          version: 1,
+          defaults: {},
+          market: { indexUrl: "https://market.example.com/plugins.json" },
+          plugins: [
+            { id: slotRegistryPlugin.manifest.id, protected: true },
+            { id: uiRegistryPlugin.manifest.id, protected: true },
+            { id: routerRuntimePlugin.manifest.id, protected: true },
+            { id: i18nRegistryPlugin.manifest.id, protected: true },
+            { id: storageRuntimePlugin.manifest.id, protected: true },
+            { id: pluginManagerPlugin.manifest.id, protected: true },
+          ],
+        },
+        plugins: [
+          slotRegistryPlugin,
+          uiRegistryPlugin,
+          routerRuntimePlugin,
+          i18nRegistryPlugin,
+          storageRuntimePlugin,
+          pluginManagerPlugin,
+        ],
+      },
+      {
+        platformModules: { "@orahako/sdk": SdkNamespace },
+        packages: new PluginPackageStore({ backend: createMemoryPackageBackend() }),
+      }
+    )
+
+    try {
+      await host.bootstrap()
+      const pageEntry = host.ui?.findPage("orahako.plugin-manager", "plugins")
+      const preferences = pageEntry!.store as PluginManagerPreferencesStoreInstance
+      preferences.actions.setMarketEnabled(true)
+
+      const dom = mountDom()
+      await dom.render(
+        <ContributionOutlet entry={pageEntry!} slots={host.slots} i18n={host.i18n} />
+      )
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      })
+
+      // A failed auto check must not suppress the next attempt by recording success.
+      expect(preferences.source.getSnapshot().lastUpdateCheck).toBe(0)
+      expect(dom.container.textContent).toContain("插件更新检查")
+
+      fetchMock.mockImplementation(
+        async () => new Response(JSON.stringify(marketIndex), { status: 200 })
+      )
+      const refresh = dom.container.findAll(
+        (node) => node.attributes.get("aria-label") === "刷新市场"
+      )[0]
+      expect(refresh).toBeDefined()
+      await act(async () => {
+        const onClick = findReactProps(refresh!).onClick as (() => void) | undefined
+        onClick?.()
+      })
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      })
+
+      expect(preferences.source.getSnapshot().lastUpdateCheck).toBeGreaterThan(0)
 
       await dom.unmount()
     } finally {

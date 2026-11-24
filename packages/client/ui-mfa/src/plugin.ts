@@ -2,7 +2,6 @@ import {
   definePlugin,
   isTablet,
   PLUGIN_API_VERSION,
-  type Context,
   type ObservableSource,
 } from "@orahako/sdk"
 import type {
@@ -34,18 +33,17 @@ export const STATIC_UNAVAILABLE_PROVIDER_SOURCE: ObservableSource<ProviderRuntim
   subscribe: () => NOOP_UNSUBSCRIBE,
 }
 
-export function buildMfaModalInject(registrantCtx: Context): MfaModalInject {
-  const initialProvider = registrantCtx.get("provider")
-  const initialSession = registrantCtx.get("session")
-
-  const resolveProviderService = (): ProviderRuntimeService | undefined =>
-    registrantCtx.get("provider") ?? initialProvider
-
-  const resolveSessionService = (): SessionService | undefined =>
-    registrantCtx.get("session") ?? initialSession
-
+/**
+ * Optional services are captured for the lifetime of this registration. Cordis
+ * restarts the plugin when they appear, are replaced, or disappear, so each
+ * inject closure keeps observing one fixed facade pair.
+ */
+export function buildMfaModalInject(
+  provider: ProviderRuntimeService | undefined,
+  session: SessionService | undefined
+): MfaModalInject {
   const resolveAuthSlice = (): AuthSlice | undefined =>
-    resolveProviderService()?.getSnapshot().provider?.slices.auth
+    provider?.getSnapshot().provider?.slices.auth
 
   return {
     isTablet: () => isTablet(),
@@ -79,11 +77,10 @@ export function buildMfaModalInject(registrantCtx: Context): MfaModalInject {
           throw new Error("WeChat MFA is unavailable on the active provider")
         }
         const credential = await wechat.completeWechatMfa(code, state)
-        const session = resolveSessionService()
         if (session) {
           const schoolId =
             session.getSnapshot().activeSchoolId ??
-            resolveProviderService()?.getSnapshot().schoolId ??
+            provider?.getSnapshot().schoolId ??
             null
           if (!schoolId) {
             throw new Error("No active school for MFA credential")
@@ -94,7 +91,7 @@ export function buildMfaModalInject(registrantCtx: Context): MfaModalInject {
       },
     },
     hooks: {
-      providerState: initialProvider ? initialProvider.state : STATIC_UNAVAILABLE_PROVIDER_SOURCE,
+      providerState: provider?.state ?? STATIC_UNAVAILABLE_PROVIDER_SOURCE,
     },
   }
 }
@@ -112,7 +109,10 @@ export const mfaPlugin = definePlugin({
     inject: ["slots", "i18n"],
   },
   inject: ["slots", "i18n"] as const,
+  optionalInject: ["provider", "session"] as const,
   apply(ctx) {
+    const provider: ProviderRuntimeService | undefined = ctx.provider
+    const session: SessionService | undefined = ctx.session
     const mfaService = createMfaService()
 
     ctx.effect(() => () => {
@@ -129,7 +129,7 @@ export const mfaPlugin = definePlugin({
           slot: "shell.overlay",
           dictionary: mfaDictionary,
           store: mfaService.store,
-          inject: buildMfaModalInject,
+          inject: () => buildMfaModalInject(provider, session),
         },
         MFAModal
       )

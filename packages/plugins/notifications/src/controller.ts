@@ -514,6 +514,7 @@ export class AcademicPollingController {
 
     const providerChanged =
       this.previousProviderId !== null && currentProviderId !== this.previousProviderId
+    const previousActive = this.previousActiveChannels
 
     if (providerChanged) {
       if (this.previousBoundHandlerNeedsStop(currentProviderId)) {
@@ -522,20 +523,26 @@ export class AcademicPollingController {
           await this.stopPollingNative(previousHandlerId)
         })
       }
-      for (const prevChannel of this.previousActiveChannels.values()) {
-        this.invokeChannelOnDisable(prevChannel)
+      for (const prevChannel of previousActive.values()) {
+        this.invokeChannelHook(prevChannel, "onDisable")
       }
       void this.widgets.clear()
     } else {
       let anyDisabled = false
-      for (const [channelId, prevChannel] of this.previousActiveChannels.entries()) {
+      for (const [channelId, prevChannel] of previousActive.entries()) {
         if (!nextActive.has(channelId)) {
           anyDisabled = true
-          this.invokeChannelOnDisable(prevChannel)
+          this.invokeChannelHook(prevChannel, "onDisable")
         }
       }
       if (anyDisabled) {
         void this.widgets.clear()
+      }
+    }
+
+    for (const [channelId, channel] of nextActive.entries()) {
+      if (providerChanged || !previousActive.has(channelId)) {
+        this.invokeChannelHook(channel, "onEnable")
       }
     }
 
@@ -549,17 +556,21 @@ export class AcademicPollingController {
 
   private notifyAllChannelsDisabled(): void {
     for (const channel of this.previousActiveChannels.values()) {
-      this.invokeChannelOnDisable(channel)
+      this.invokeChannelHook(channel, "onDisable")
     }
     this.previousActiveChannels.clear()
   }
 
-  private invokeChannelOnDisable(channel: AcademicNotificationChannel): void {
-    if (typeof channel.onDisable !== "function") return
+  private invokeChannelHook(
+    channel: AcademicNotificationChannel,
+    hook: "onDisable" | "onEnable"
+  ): void {
+    const callback = channel[hook]
+    if (typeof callback !== "function") return
     try {
-      void Promise.resolve(channel.onDisable()).catch(() => {})
+      void Promise.resolve(callback()).catch(() => {})
     } catch {
-      // Disabling a single channel must never interrupt notification reconciliation.
+      // A single channel's lifecycle hook must never interrupt reconciliation.
     }
   }
 

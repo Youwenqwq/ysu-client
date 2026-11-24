@@ -2,10 +2,13 @@ import {
   definePlugin,
   PLUGIN_API_VERSION,
   PLUGIN_SERVICE_SCOPE,
+  runHttpRequestPipeline,
+  runHttpResponsePipeline,
   trackPluginRegistration,
   type Context,
   type HttpRequest,
   type HttpResponse,
+  type HttpValuePipelineContext,
   type NetworkActivityOutcome,
   type NetworkActivitySink,
   type NetworkActivitySnapshot,
@@ -71,7 +74,7 @@ export type HttpRuntimeConfig = {
 }
 
 export interface HttpServiceOptions extends TransportOptions {
-  readonly ctx?: Pick<Context, "waterfall">
+  readonly ctx?: HttpValuePipelineContext
 }
 
 function beginActivity(
@@ -107,8 +110,7 @@ export class StatelessHttpService implements ScopedPluginService<PluginHttpServi
   }
 
   [PLUGIN_SERVICE_SCOPE](consumerCtx: Context): PluginHttpService {
-    const waterfallCtx: Pick<Context, "waterfall"> | undefined =
-      this.options.ctx ?? (typeof consumerCtx.waterfall === "function" ? consumerCtx : undefined)
+    const pipelineCtx: HttpValuePipelineContext = this.options.ctx ?? consumerCtx
 
     const scopedSubscribe = (listener: () => void): (() => void) =>
       trackPluginRegistration(consumerCtx, () => this.recorder.subscribe(listener))
@@ -120,15 +122,15 @@ export class StatelessHttpService implements ScopedPluginService<PluginHttpServi
 
     return {
       send: async (request: HttpRequest): Promise<HttpResponse> => {
-        const effectiveRequest = waterfallCtx
-          ? await waterfallCtx.waterfall("http/request", request)
-          : request
+        const effectiveRequest = await runHttpRequestPipeline(pipelineCtx, request)
         const finish = beginActivity(this.recorder, effectiveRequest)
         try {
           const response = await executeStatelessTransport(effectiveRequest, this.options)
-          const finalResponse = waterfallCtx
-            ? await waterfallCtx.waterfall("http/response", response, effectiveRequest)
-            : response
+          const finalResponse = await runHttpResponsePipeline(
+            pipelineCtx,
+            response,
+            effectiveRequest
+          )
           finish("ok")
           return finalResponse
         } catch (error) {

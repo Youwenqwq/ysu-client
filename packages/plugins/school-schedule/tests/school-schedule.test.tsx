@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client"
 import { renderToStaticMarkup } from "react-dom/server"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  DEFAULT_TTL_MS,
+  LONG_TTL_MS,
   providerRegistryRuntimePlugin,
   providerRuntimePlugin,
   queryRuntimePlugin,
@@ -595,6 +597,7 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
     const i18n = runtime.context.get("i18n") as PluginI18nRegistryService
     const session = runtime.context.get("session")!
     const providerRuntime = runtime.context.get("provider")!
+    const query = runtime.context.get("query")!
 
     await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
     session.setCredential({
@@ -614,6 +617,9 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
     expect(pageEntry.capability).toBe("schoolSchedule")
     expect(navEntry.group).toBe("platform")
     expect(navEntry.capability).toBe("schoolSchedule")
+    expect(query.policy("school-classrooms")).toEqual({ ttl: LONG_TTL_MS, persist: true })
+    expect(query.policy("school-class-schedule")).toEqual({ ttl: LONG_TTL_MS, persist: true })
+    expect(query.policy("current-week")).toEqual({ ttl: 12 * 60 * 60 * 1000, persist: true })
 
     router.push({ route: "school-schedule" })
     await dom.render(
@@ -760,6 +766,10 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
     expect(
       ui.getSnapshot().navigation.filter((n) => n.pluginId === SCHOOL_SCHEDULE_PLUGIN_ID)
     ).toEqual([])
+    expect(query.policy("school-classrooms")).toEqual({
+      ttl: DEFAULT_TTL_MS,
+      persist: false,
+    })
 
     activeUnmount = undefined
     await dom.unmount()
