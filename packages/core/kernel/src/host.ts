@@ -398,11 +398,10 @@ export class PluginHost {
         await this.enable(id)
         continue
       }
-      await this.installFromUrl(
-        new URL(release.zipUrl, marketBaseUrl).toString(),
-        release.sha256,
-        { id, version: release.version }
-      )
+      await this.installFromUrl(new URL(release.zipUrl, marketBaseUrl).toString(), release.sha256, {
+        id,
+        version: release.version,
+      })
     }
     const manifest = this.runtime.get(pluginIds[0]!)?.manifest
     if (!manifest) throw new Error(`Plugin was not installed: ${pluginIds[0]}`)

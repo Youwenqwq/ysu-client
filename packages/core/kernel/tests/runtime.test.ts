@@ -197,7 +197,10 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
     let receivedConfig: unknown
 
     const configurable = definePlugin({
-      manifest: makeManifest("example.configurable", { kind: "runtime", provides: ["kernelTelemetry"] }),
+      manifest: makeManifest("example.configurable", {
+        kind: "runtime",
+        provides: ["kernelTelemetry"],
+      }),
       configSchema: {
         type: "object",
         properties: {
@@ -504,9 +507,13 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
     const never = Promise.withResolvers<void>()
     const manifest = makeManifest("example.never-settles")
 
-    runtime.register(manifest, async () => {
-      await never.promise
-    }, "builtin")
+    runtime.register(
+      manifest,
+      async () => {
+        await never.promise
+      },
+      "builtin"
+    )
     const pending = runtime.startAndWait(manifest.id, 5_000)
     const assertion = expect(pending).rejects.toThrow("Plugin startup timed out")
     await vi.advanceTimersByTimeAsync(5_000)
@@ -581,7 +588,6 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
     expect(runtime.get(manifest.id)).toBeUndefined()
     await runtime.dispose()
   })
-
 
   it("does not restart optional consumers while disposing", async () => {
     const runtime = new PluginRuntime()

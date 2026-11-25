@@ -165,10 +165,7 @@ function trackProvidedServices(
         }
       }
       if (property === "effect") {
-        return (
-          callback: (inner: Context, config: unknown) => DisposableLike,
-          config?: unknown
-        ) =>
+        return (callback: (inner: Context, config: unknown) => DisposableLike, config?: unknown) =>
           target.effect(
             (inner: Context, innerConfig: unknown) =>
               wrapDisposableLike(callback(inner, innerConfig), track),
@@ -406,11 +403,7 @@ export class PluginRuntime {
       try {
         await Promise.race([this.waitForCleanup(plugin), abandon.signal])
         if (abandon.abandoned) return
-        if (
-          plugin.generation !== generation ||
-          !plugin.mounted ||
-          plugin.attempt !== attempt
-        ) {
+        if (plugin.generation !== generation || !plugin.mounted || plugin.attempt !== attempt) {
           return
         }
         this.applyAttempt(ctx, plugin, generation, attempt, resolvedConfig)
@@ -440,11 +433,7 @@ export class PluginRuntime {
     attempt: number,
     resolvedConfig: PluginConfig
   ): void {
-    if (
-      current.generation !== generation ||
-      !current.mounted ||
-      current.attempt !== attempt
-    ) {
+    if (current.generation !== generation || !current.mounted || current.attempt !== attempt) {
       return
     }
     let scoped = ctx
@@ -547,10 +536,7 @@ export class PluginRuntime {
     }
   }
 
-  private createApplyAbandon(
-    plugin: RegisteredPlugin,
-    generation: number
-  ): ApplyAbandon {
+  private createApplyAbandon(plugin: RegisteredPlugin, generation: number): ApplyAbandon {
     const { promise, resolve } = Promise.withResolvers<void>()
     const handle: ApplyAbandon = {
       plugin,
@@ -687,10 +673,7 @@ export class PluginRuntime {
       // releasing it; the sync start/stop API stays available.
       plugin.status = "starting"
       const abandon = this.createApplyAbandon(plugin, generation)
-      const mount: Promise<void> = Promise.race([
-        this.waitForCleanup(plugin),
-        abandon.signal,
-      ])
+      const mount: Promise<void> = Promise.race([this.waitForCleanup(plugin), abandon.signal])
         .then(() => {
           if (abandon.abandoned) return
           if (plugin.generation !== generation || !plugin.mounted) return
@@ -824,10 +807,7 @@ export class PluginRuntime {
     ]
   }
 
-  private trackPluginCleanup(
-    plugin: RegisteredPlugin,
-    promise: PromiseLike<unknown>
-  ): void {
+  private trackPluginCleanup(plugin: RegisteredPlugin, promise: PromiseLike<unknown>): void {
     const tracked: Promise<void> = Promise.resolve(promise).then(
       () => {
         plugin.cleanup.delete(tracked)

@@ -3,9 +3,23 @@ import styles from "./boot-splash.module.css"
 import { flightSilhouette } from "./boot-silhouettes"
 
 const SPEED_LINES = [
-  { id: "line-1", left: "79.17%", top: "16.11%", width: "13.33%", delay: "-0.2s", duration: "0.9s" },
+  {
+    id: "line-1",
+    left: "79.17%",
+    top: "16.11%",
+    width: "13.33%",
+    delay: "-0.2s",
+    duration: "0.9s",
+  },
   { id: "line-2", left: "87.5%", top: "33.89%", width: "8.75%", delay: "-0.55s", duration: "0.8s" },
-  { id: "line-3", left: "77.08%", top: "62.22%", width: "15.83%", delay: "-0.75s", duration: "1.1s" },
+  {
+    id: "line-3",
+    left: "77.08%",
+    top: "62.22%",
+    width: "15.83%",
+    delay: "-0.75s",
+    duration: "1.1s",
+  },
   { id: "line-4", left: "91.67%", top: "79.44%", width: "10%", delay: "-0.35s", duration: "0.85s" },
   { id: "line-5", left: "83.33%", top: "90.56%", width: "12.92%", delay: "-0.6s", duration: "1s" },
 ] as const
