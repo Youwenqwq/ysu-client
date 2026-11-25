@@ -743,8 +743,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
       activeTheme: "app.theme:light",
     }
     vi.stubGlobal("localStorage", {
-      getItem: (key: string) =>
-        key === "test-preferences-lossy" ? JSON.stringify(stale) : null,
+      getItem: (key: string) => (key === "test-preferences-lossy" ? JSON.stringify(stale) : null),
       setItem: () => {
         throw new Error("quota exceeded")
       },
@@ -1082,14 +1081,87 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
 
     // enable must honour the host's configured startup bound instead of the
     // runtime's 10s default.
-    await expect(host.enable(hanging.manifest.id)).rejects.toThrow(
-      "Plugin startup timed out"
-    )
+    await expect(host.enable(hanging.manifest.id)).rejects.toThrow("Plugin startup timed out")
     expect(host.runtime.get(hanging.manifest.id)?.status).toBe("failed")
 
     // The abandoned apply must not keep host disposal waiting forever.
     await host.dispose()
     expect(host.runtime.get(hanging.manifest.id)).toBeUndefined()
     gate.resolve()
+  })
+
+  it("boots cleanly without loadErrors when an async root service unblocks an optional provider and consumer together", async () => {
+    const observed: Array<string | undefined> = []
+
+    const asyncRoot = definePlugin({
+      manifest: makeManifest("app.async-root", { kind: "runtime", provides: ["native"] }),
+      async apply(ctx) {
+        await Promise.resolve()
+        ctx.set("native", {
+          isNative: true,
+          capabilities: { list: () => [] },
+        } as unknown as PluginNativeService)
+      },
+    })
+
+    const optionalProvider = definePlugin({
+      manifest: makeManifest("app.optional-provider", {
+        kind: "feature",
+        inject: ["native"],
+        provides: ["kernelTelemetry"],
+      }),
+      inject: ["native"] as const,
+      apply(ctx) {
+        ctx.set("kernelTelemetry", {
+          endpoint: "https://telemetry.example",
+          track: async () => ({ tracked: false, reason: "disabled", date: null }),
+        })
+      },
+    })
+
+    const consumer = definePlugin({
+      manifest: makeManifest("app.optional-consumer", {
+        kind: "feature",
+        inject: ["native"],
+      }),
+      inject: ["native"] as const,
+      optionalInject: ["kernelTelemetry"] as const,
+      apply(ctx) {
+        observed.push(ctx.kernelTelemetry?.endpoint ?? undefined)
+      },
+    })
+
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b-async-optional",
+        composition: {
+          id: "test.async-optional",
+          version: 1,
+          defaults: {},
+          plugins: [
+            { id: asyncRoot.manifest.id, protected: true },
+            { id: optionalProvider.manifest.id },
+            { id: consumer.manifest.id },
+          ],
+        },
+        plugins: [asyncRoot, optionalProvider, consumer],
+      },
+      {
+        platformModules: { "@orahako/sdk": SdkNamespace },
+        packages: new PluginPackageStore({ backend: createMemoryPackageBackend() }),
+      }
+    )
+
+    try {
+      await host.bootstrap()
+      expect([...host.loadErrors]).toEqual([])
+      expect(host.runtime.get(asyncRoot.manifest.id)?.status).toBe("active")
+      expect(host.runtime.get(optionalProvider.manifest.id)?.status).toBe("active")
+      expect(host.runtime.get(consumer.manifest.id)?.status).toBe("active")
+      expect(observed).toEqual(["https://telemetry.example"])
+    } finally {
+      await host.dispose()
+    }
   })
 })

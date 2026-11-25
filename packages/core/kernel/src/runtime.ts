@@ -56,6 +56,7 @@ interface RegisteredPlugin {
   manifest: PluginManifest
   executable: RuntimePluginExecutable
   config: PluginConfig
+  resolvedConfig?: PluginConfig
   source: PluginSource
   cordisPlugin: Plugin.Function<Context, PluginConfig>
   inject: Record<string, Inject.Meta>
@@ -339,6 +340,8 @@ export class PluginRuntime {
       // attempt so a superseded delayed apply cannot run twice.
       current.attempt += 1
       const attempt = current.attempt
+      current.pendingCount = 0
+      this.abandonApplies(current, generation)
       if (current.status === "failed") {
         // Cordis can revive a scope after a service replacement without
         // incrementing our mount generation; the new apply owns the status.
@@ -417,8 +420,9 @@ export class PluginRuntime {
         throw error
       } finally {
         abandon.release()
-        if (plugin.generation === generation) {
+        if (plugin.generation === generation && plugin.attempt === attempt) {
           plugin.pendingCount = Math.max(0, plugin.pendingCount - 1)
+          this.syncPluginStatus(plugin)
         }
         this.publish()
       }
@@ -510,10 +514,8 @@ export class PluginRuntime {
           throw error
         } finally {
           abandon.release()
-          if (current.generation === generation) {
-            current.pendingCount = Math.max(0, current.pendingCount - 1)
-          }
           if (current.generation === generation && current.attempt === attempt) {
+            current.pendingCount = Math.max(0, current.pendingCount - 1)
             this.syncPluginStatus(current)
           }
           this.publish()
@@ -647,6 +649,7 @@ export class PluginRuntime {
       }
 
       const resolvedConfig = validatePluginConfig(plugin.manifest, plugin.config)
+      plugin.resolvedConfig = resolvedConfig
       plugin.generation += 1
       plugin.pendingCount = 0
       plugin.error = undefined
@@ -677,6 +680,7 @@ export class PluginRuntime {
         .then(() => {
           if (abandon.abandoned) return
           if (plugin.generation !== generation || !plugin.mounted) return
+          abandon.release()
           try {
             plugin.scope = this.context.plugin(plugin.cordisPlugin, resolvedConfig)
             this.syncPluginStatus(plugin)
@@ -823,6 +827,11 @@ export class PluginRuntime {
    * Cordis only restarts consumers for required inject changes. Optional
    * services must remount on appearance, replacement and revocation so the
    * plugin can rebuild its scoped facade and observe the new value.
+   *
+   * Waiting scopes have not applied yet and will observe the updated optional
+   * service automatically once their required dependencies arrive. Active or
+   * starting scopes remount within the same mount generation so an in-flight
+   * `startAndWait` is not falsely aborted as a stop.
    */
   private restartOptionalConsumers(name: string): void {
     if (this.disposed) return
@@ -830,18 +839,37 @@ export class PluginRuntime {
       const dependency = plugin.inject[name]
       if (!dependency || dependency.required) continue
       if (!plugin.mounted || !plugin.scope || plugin.restarting) continue
+      if (!plugin.scope.runtime.isActive) continue
       if (plugin.manifest.provides?.includes(name)) continue
       plugin.restarting = true
       try {
-        plugin.mounted = false
-        this.start(plugin.manifest.id)
+        this.remountOptionalConsumer(plugin)
       } catch {
-        // `start` already recorded its own failure; service events must not
-        // escape back into Cordis' service setter.
+        // `remountOptionalConsumer` already recorded its own failure; service
+        // events must not escape back into Cordis' service setter.
       } finally {
         plugin.restarting = false
       }
     }
+  }
+
+  private remountOptionalConsumer(plugin: RegisteredPlugin): void {
+    try {
+      const resolvedConfig =
+        plugin.resolvedConfig ?? validatePluginConfig(plugin.manifest, plugin.config)
+      plugin.resolvedConfig = resolvedConfig
+      plugin.attempt += 1
+      plugin.pendingCount = 0
+      plugin.status = "starting"
+      plugin.error = undefined
+      this.abandonApplies(plugin, plugin.generation)
+      this.mountPlugin(plugin, resolvedConfig)
+    } catch (error) {
+      this.resetFailedStart(plugin, error)
+      this.publish()
+      throw error
+    }
+    this.publish()
   }
 
   /**

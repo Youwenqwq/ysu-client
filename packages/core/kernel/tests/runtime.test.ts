@@ -722,4 +722,94 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
     unsubscribe()
     await runtime.dispose()
   })
+
+  it("does not abort startAndWait when an optional service arrives while the consumer is waiting on required services", async () => {
+    const runtime = new PluginRuntime()
+    const releaseBase = Promise.withResolvers<void>()
+    const consumerObserved: Array<string | undefined> = []
+
+    const baseProvider = makeManifest("example.async-base", {
+      kind: "runtime",
+      provides: ["storage"],
+    })
+    const optionalProvider = makeManifest("example.opt-provider", {
+      kind: "feature",
+      inject: ["storage"],
+      provides: ["ui"],
+    })
+    const consumer = definePlugin({
+      manifest: makeManifest("example.opt-consumer", {
+        kind: "feature",
+        inject: ["storage"],
+      }),
+      inject: ["storage"] as const,
+      optionalInject: ["ui"] as const,
+      apply(ctx) {
+        consumerObserved.push(readFacadeLabel(ctx.ui))
+      },
+    })
+
+    runtime.register(
+      baseProvider,
+      async (ctx) => {
+        await releaseBase.promise
+        ctx.set("storage", new LabelledRootService("storage-ready"))
+      },
+      "builtin"
+    )
+    runtime.register(
+      optionalProvider,
+      (ctx) => {
+        ctx.set("ui", new LabelledRootService("ui-ready"))
+      },
+      "builtin"
+    )
+    runtime.register(consumer, "builtin")
+
+    const pending = Promise.all([
+      runtime.startAndWait(baseProvider.id),
+      runtime.startAndWait(optionalProvider.id),
+      runtime.startAndWait(consumer.manifest.id),
+    ])
+
+    expect(runtime.get(consumer.manifest.id)?.status).toBe("waiting")
+    releaseBase.resolve()
+    await pending
+
+    expect(runtime.get(consumer.manifest.id)?.status).toBe("active")
+    expect(consumerObserved).toEqual(["ui-ready"])
+    await runtime.dispose()
+  })
+
+  it("remounts an in-flight async plugin on optional service arrival without failing startAndWait", async () => {
+    const runtime = new PluginRuntime()
+    const firstAttemptGate = Promise.withResolvers<void>()
+    const observed: Array<string | undefined> = []
+
+    const consumer = definePlugin({
+      manifest: makeManifest("example.async-opt-consumer", { kind: "feature" }),
+      optionalInject: ["ui"] as const,
+      async apply(ctx) {
+        const label = readFacadeLabel(ctx.ui)
+        observed.push(label)
+        if (label === undefined) {
+          await firstAttemptGate.promise
+        }
+      },
+    })
+
+    runtime.register(consumer, "builtin")
+    const pending = runtime.startAndWait(consumer.manifest.id)
+    expect(runtime.get(consumer.manifest.id)?.status).toBe("starting")
+
+    // Providing the optional service remounts the consumer in-place without
+    // bumping the mount generation or leaving stale pendingCount behind.
+    runtime.context.set("ui", new LabelledRootService("late-ui"))
+    await pending
+
+    expect(runtime.get(consumer.manifest.id)?.status).toBe("active")
+    expect(observed).toEqual([undefined, "late-ui"])
+    firstAttemptGate.resolve()
+    await runtime.dispose()
+  })
 })
