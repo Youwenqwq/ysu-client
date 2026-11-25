@@ -2,7 +2,9 @@
   --paper: #ffffff;
   --ink: #0a0a0a;
 
-  position: relative;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
   display: grid;
   min-height: 100vh;
   min-height: 100dvh;
@@ -14,12 +16,6 @@
   opacity: 1;
   transition: opacity 180ms ease-out;
   will-change: opacity;
-}
-
-.splashOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
 }
 
 .splashExiting {

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 
 export interface ViewTransitionLike {
   readonly finished: Promise<void>
@@ -20,13 +20,7 @@ export interface WindowWithMatchMedia {
   matchMedia?: (query: string) => { readonly matches: boolean }
 }
 
-export interface PageTransitionSnapshot<TChrome> {
-  readonly routeKey: string
-  readonly chrome: TChrome
-  readonly children: ReactNode
-}
-
-export type FallbackPageTransitionMode = "none" | "slide" | "enter"
+export type PageOutletTransitionMode = "none" | "slide" | "enter"
 
 const VIEW_TRANSITION_ATTR = "data-shell-view-transition"
 const VIEW_TRANSITION_VALUE = "page"
@@ -34,11 +28,14 @@ const VIEW_TRANSITION_VALUE = "page"
 /**
  * Self-contained page transition stylesheet for DefaultShell.
  *
- * - View Transitions (`:root[data-shell-view-transition="page"]`) keep the old
- *   viewport snapshot static underneath (`mix-blend-mode: normal`) and cross-fade
- *   the new snapshot on top. Because `[data-shell-page-outlet]` stays free of
- *   `opacity < 1`, `filter`, and `view-transition-name`, glass cards render their
- *   live `backdrop-filter` directly into the captured snapshot with no pop-in.
+ * - View Transitions (`:root[data-shell-view-transition="page"]`) capture the
+ *   old viewport with the page outlet hidden (`visibility: hidden`), so the old
+ *   snapshot contains only the background and shell chrome (no old-page ghosting
+ *   or cross-fade). When the update callback reveals the new page,
+ *   `::view-transition-new(root)` fades in (`opacity: 0 -> 1`) over that clean
+ *   backdrop while `[data-shell-page-outlet]` slides up (`translate3d(0, 0.5rem, 0) -> 0`).
+ *   Because the outlet never sets `opacity < 1`, `filter`, or `view-transition-name`,
+ *   glass cards sample the real background with live `backdrop-filter` throughout.
  * - Fallback CSS transitions omit `filter` completely (unlike `tw-animate-css`'s
  *   `animate-in`, which always emits `filter: blur(0)` and creates a Backdrop Root).
  *   In glass mode, the fallback animates `transform` only so cards keep live blur.
@@ -46,7 +43,7 @@ const VIEW_TRANSITION_VALUE = "page"
 export const PAGE_TRANSITION_STYLE = `
 @keyframes orahako-shell-page-slide {
   from {
-    transform: translate3d(0, 8px, 0);
+    transform: translate3d(0, 0.5rem, 0);
   }
   to {
     transform: translate3d(0, 0, 0);
@@ -55,7 +52,7 @@ export const PAGE_TRANSITION_STYLE = `
 @keyframes orahako-shell-page-enter {
   from {
     opacity: 0;
-    transform: translate3d(0, 8px, 0);
+    transform: translate3d(0, 0.5rem, 0);
   }
   to {
     opacity: 1;
@@ -70,14 +67,17 @@ export const PAGE_TRANSITION_STYLE = `
     opacity: 1;
   }
 }
+[data-shell-page-outlet][data-shell-capturing] {
+  visibility: hidden;
+}
 [data-shell-page-outlet][data-shell-transition="slide"] {
-  animation: orahako-shell-page-slide 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: orahako-shell-page-slide 350ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 [data-shell-page-outlet][data-shell-transition="enter"] {
-  animation: orahako-shell-page-enter 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: orahako-shell-page-enter 350ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 :root[${VIEW_TRANSITION_ATTR}="${VIEW_TRANSITION_VALUE}"]::view-transition-group(root) {
-  animation-duration: 240ms;
+  animation-duration: 350ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 :root[${VIEW_TRANSITION_ATTR}="${VIEW_TRANSITION_VALUE}"]::view-transition-old(root) {
@@ -85,7 +85,7 @@ export const PAGE_TRANSITION_STYLE = `
   mix-blend-mode: normal;
 }
 :root[${VIEW_TRANSITION_ATTR}="${VIEW_TRANSITION_VALUE}"]::view-transition-new(root) {
-  animation: orahako-shell-vt-fade-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: orahako-shell-vt-fade-in 350ms cubic-bezier(0.22, 1, 0.36, 1) both;
   mix-blend-mode: normal;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -122,7 +122,7 @@ export function canUsePageViewTransition(
   return true
 }
 
-export function resolveFallbackPageTransitionMode({
+export function resolvePageOutletTransitionMode({
   fullscreen,
   useViewTransition,
   hasBackground,
@@ -132,52 +132,42 @@ export function resolveFallbackPageTransitionMode({
   readonly useViewTransition: boolean
   readonly hasBackground: boolean
   readonly isGlassCards: boolean
-}): FallbackPageTransitionMode {
-  if (fullscreen || useViewTransition) return "none"
-  return hasBackground && isGlassCards ? "slide" : "enter"
+}): PageOutletTransitionMode {
+  if (fullscreen) return "none"
+  if (useViewTransition || (hasBackground && isGlassCards)) return "slide"
+  return "enter"
 }
 
-export interface UsePageViewTransitionResult<TChrome> {
-  readonly snapshot: PageTransitionSnapshot<TChrome>
+export interface UsePageViewTransitionResult {
+  /** True during the single capture frame before View Transition reveals the new page. */
+  readonly capturing: boolean
+  /** Whether the browser View Transitions API is active for this render. */
   readonly useViewTransition: boolean
 }
 
-export function usePageViewTransition<TChrome>({
-  routeKey,
-  chrome,
-  children,
-}: PageTransitionSnapshot<TChrome>): UsePageViewTransitionResult<TChrome> {
+export function usePageViewTransition(routeKey: string): UsePageViewTransitionResult {
   const vtAvailable = canUsePageViewTransition()
+  const [committedRouteKey, setCommittedRouteKey] = useState(routeKey)
 
-  const [displayed, setDisplayed] = useState<PageTransitionSnapshot<TChrome>>(() => ({
-    routeKey,
-    chrome,
-    children,
-  }))
-
-  const latestTargetRef = useRef<PageTransitionSnapshot<TChrome>>({ routeKey, chrome, children })
+  const latestRouteKeyRef = useRef(routeKey)
   const pendingResolveRef = useRef<(() => void) | null>(null)
   const pendingCommitRouteKeyRef = useRef<string | null>(null)
   const awaitingCallbackRef = useRef(false)
   const activeTransitionRef = useRef<ViewTransitionLike | null>(null)
 
   useLayoutEffect(() => {
-    latestTargetRef.current = { routeKey, chrome, children }
+    latestRouteKeyRef.current = routeKey
 
-    // Resolve an in-flight View Transition as soon as its committed route mounts,
+    // Resolve an in-flight View Transition as soon as its committed route reveals,
     // even if a newer route has already arrived in the meantime.
-    if (pendingResolveRef.current && displayed.routeKey === pendingCommitRouteKeyRef.current) {
+    if (pendingResolveRef.current && committedRouteKey === pendingCommitRouteKeyRef.current) {
       const resolve = pendingResolveRef.current
       pendingResolveRef.current = null
       pendingCommitRouteKeyRef.current = null
       resolve()
     }
 
-    // Same route: keep the cached snapshot fresh for the next transition.
-    if (displayed.routeKey === routeKey) {
-      if (displayed.chrome !== chrome || displayed.children !== children) {
-        setDisplayed({ routeKey, chrome, children })
-      }
+    if (committedRouteKey === routeKey) {
       return
     }
 
@@ -191,17 +181,17 @@ export function usePageViewTransition<TChrome>({
         pendingCommitRouteKeyRef.current = null
         resolve()
       }
-      setDisplayed({ routeKey, chrome, children })
+      setCommittedRouteKey(routeKey)
       return
     }
 
-    // If a transition is already waiting for its update callback, the updated
-    // `latestTargetRef` will be committed automatically when that callback runs.
+    // If a transition is already waiting for its update callback, `latestRouteKeyRef`
+    // will be revealed automatically when that callback runs.
     if (awaitingCallbackRef.current) {
       return
     }
 
-    // If React is still committing a prior transition target, wait for it to finish.
+    // If React is still committing a prior reveal, wait for it to finish.
     if (pendingResolveRef.current) {
       return
     }
@@ -226,17 +216,17 @@ export function usePageViewTransition<TChrome>({
       transition = doc!.startViewTransition!(() => {
         callbackInvoked = true
         awaitingCallbackRef.current = false
-        const target = latestTargetRef.current
+        const targetRouteKey = latestRouteKeyRef.current
         return new Promise<void>((resolve) => {
           pendingResolveRef.current = resolve
-          pendingCommitRouteKeyRef.current = target.routeKey
-          setDisplayed(target)
+          pendingCommitRouteKeyRef.current = targetRouteKey
+          setCommittedRouteKey(targetRouteKey)
         })
       })
     } catch {
       awaitingCallbackRef.current = false
       rootEl?.removeAttribute(VIEW_TRANSITION_ATTR)
-      setDisplayed(latestTargetRef.current)
+      setCommittedRouteKey(latestRouteKeyRef.current)
       return
     }
 
@@ -255,12 +245,12 @@ export function usePageViewTransition<TChrome>({
           pendingCommitRouteKeyRef.current = null
           resolve()
         }
-        setDisplayed(latestTargetRef.current)
+        setCommittedRouteKey(latestRouteKeyRef.current)
       }
     }
 
     void transition.finished.then(finishCleanup, finishCleanup)
-  }, [children, chrome, displayed.children, displayed.chrome, displayed.routeKey, routeKey])
+  }, [committedRouteKey, routeKey])
 
   // Always release any pending View Transition on unmount.
   useEffect(() => {
@@ -286,16 +276,8 @@ export function usePageViewTransition<TChrome>({
     }
   }, [])
 
-  // When on the same route or when View Transitions are unavailable, render live
-  // props directly with zero deferral. While capturing the old state for a View
-  // Transition, hold the previous route's snapshot until the update callback runs.
-  const isHoldingForViewTransition = vtAvailable && displayed.routeKey !== routeKey
-  const snapshot: PageTransitionSnapshot<TChrome> = isHoldingForViewTransition
-    ? displayed
-    : { routeKey, chrome, children }
-
   return {
-    snapshot,
+    capturing: vtAvailable && committedRouteKey !== routeKey,
     useViewTransition: vtAvailable,
   }
 }

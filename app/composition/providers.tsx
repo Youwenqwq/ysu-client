@@ -80,18 +80,24 @@ export function AppComposition() {
     }
   }, [])
 
-  // Start the splash exit transition on the frame after OrahakoApp commits so
-  // the initial app mount does not compete with the fade-out frames.
+  // Start the splash exit transition after OrahakoApp paints its first frame
+  // underneath so the initial mount does not compete with fade-out frames.
   useEffect(() => {
     if (!host || !splashVisible) return
     if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
       setSplashExiting(true)
       return
     }
-    const frame = window.requestAnimationFrame(() => {
-      setSplashExiting(true)
+    let secondFrame = 0
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        setSplashExiting(true)
+      })
     })
-    return () => window.cancelAnimationFrame(frame)
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      if (secondFrame) window.cancelAnimationFrame(secondFrame)
+    }
   }, [host, splashVisible])
 
   const handleSplashExited = useCallback(() => {
@@ -99,15 +105,12 @@ export function AppComposition() {
   }, [])
 
   if (error !== undefined) return <KernelRecovery message={error} />
-  if (host) {
-    return (
-      <>
-        <OrahakoApp host={host} />
-        {splashVisible && (
-          <BootSplash overlay exiting={splashExiting} onExited={handleSplashExited} />
-        )}
-      </>
-    )
-  }
-  return <BootSplash />
+  // Keep BootSplash in the exact same tree position before and after `host`
+  // resolves so React never remounts it or restarts its compositor animations.
+  return (
+    <>
+      {host ? <OrahakoApp host={host} /> : null}
+      {splashVisible ? <BootSplash exiting={splashExiting} onExited={handleSplashExited} /> : null}
+    </>
+  )
 }

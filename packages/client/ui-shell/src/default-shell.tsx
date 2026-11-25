@@ -49,7 +49,7 @@ import type { ShellDictionary } from "./dictionary"
 import type { ShellMobileTab, ShellSidebarGroup, ShellSidebarItem } from "./nav-helpers"
 import {
   PAGE_TRANSITION_STYLE,
-  resolveFallbackPageTransitionMode,
+  resolvePageOutletTransitionMode,
   usePageViewTransition,
 } from "./page-transition"
 import {
@@ -410,23 +410,19 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [])
 
-  const resolvedChrome = useMemo(() => {
+  const chrome = useMemo(() => {
     // Navigation filters and the startup preference live outside uiSnapshot.
     void navRevision
     void startupPage
     return props.resolveChrome(location, uiSnapshot, locale)
   }, [locale, location, navRevision, props, startupPage, uiSnapshot])
 
-  const { snapshot: pageSnapshot, useViewTransition } = usePageViewTransition({
-    routeKey: resolvedChrome.routeKey,
-    chrome: resolvedChrome,
-    children: props.children,
-  })
-  const chrome = pageSnapshot.chrome
-  const pageChildren = pageSnapshot.children
+  const { capturing: isCapturingTransition, useViewTransition } = usePageViewTransition(
+    chrome.routeKey
+  )
 
   const hasBackground = Boolean(backgroundImage || backgroundUrl)
-  const fallbackTransitionMode = resolveFallbackPageTransitionMode({
+  const outletTransitionMode = resolvePageOutletTransitionMode({
     fullscreen: chrome.fullscreen,
     useViewTransition,
     hasBackground,
@@ -643,15 +639,18 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
         <div
           key={chrome.routeKey}
           data-shell-page-outlet=""
+          data-shell-capturing={isCapturingTransition ? "" : undefined}
           data-shell-transition={
-            fallbackTransitionMode === "none" ? undefined : fallbackTransitionMode
+            isCapturingTransition || outletTransitionMode === "none"
+              ? undefined
+              : outletTransitionMode
           }
           className={cn(
             "flex flex-1 flex-col md:p-8",
             chrome.fullscreen ? "min-h-0 overflow-hidden" : "p-4"
           )}
         >
-          {pageChildren}
+          {props.children}
         </div>
       </main>
 

@@ -33,8 +33,6 @@ const SPARKLES = [
 const EXIT_FALLBACK_MS = 260
 
 export interface BootSplashProps {
-  /** Render as a fixed full-viewport overlay on top of the mounted app during reveal. */
-  readonly overlay?: boolean
   /** Start the compositor-driven fade-out transition. */
   readonly exiting?: boolean
   /** Called once the exit transition finishes (or immediately under reduced motion). */
@@ -49,7 +47,7 @@ export interface BootSplashProps {
  * browser's GPU compositor thread to keep frames smooth even while the JS main
  * thread evaluates modules and bootstraps plugins.
  */
-export function BootSplash({ overlay = false, exiting = false, onExited }: BootSplashProps = {}) {
+export function BootSplash({ exiting = false, onExited }: BootSplashProps = {}) {
   const notifiedRef = useRef(false)
 
   useEffect(() => {
@@ -73,13 +71,7 @@ export function BootSplash({ overlay = false, exiting = false, onExited }: BootS
     return () => window.clearTimeout(timer)
   }, [exiting, onExited])
 
-  const className = [
-    styles.splash,
-    overlay ? styles.splashOverlay : "",
-    exiting ? styles.splashExiting : "",
-  ]
-    .filter(Boolean)
-    .join(" ")
+  const className = exiting ? `${styles.splash} ${styles.splashExiting}` : styles.splash
 
   return (
     <main

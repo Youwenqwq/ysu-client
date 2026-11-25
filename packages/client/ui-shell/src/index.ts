@@ -38,7 +38,7 @@ import {
 import {
   canUsePageViewTransition,
   PAGE_TRANSITION_STYLE,
-  resolveFallbackPageTransitionMode,
+  resolvePageOutletTransitionMode,
 } from "./page-transition"
 import { BackgroundPage } from "./pages/background-page"
 import { buildThemePreviewDocument, ThemePage } from "./pages/theme-page"
@@ -78,7 +78,7 @@ export {
   parseDeepLink,
   resolveActivePageForLocation,
   resolveActiveScopedNavId,
-  resolveFallbackPageTransitionMode,
+  resolvePageOutletTransitionMode,
   shellDictionary,
   ThemePage,
   type AppearanceStoreState,

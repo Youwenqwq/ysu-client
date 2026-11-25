@@ -36,7 +36,7 @@ import {
   NATIVE_WEBVIEW_CAPABILITY,
   PAGE_TRANSITION_STYLE,
   parseDeepLink,
-  resolveFallbackPageTransitionMode,
+  resolvePageOutletTransitionMode,
   SHELL_PLUGIN_ID,
   uiShellPlugin,
 } from "../src"
@@ -831,15 +831,15 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     expect(PAGE_TRANSITION_STYLE).not.toMatch(/\bfilter\s*:/)
 
     expect(
-      resolveFallbackPageTransitionMode({
+      resolvePageOutletTransitionMode({
         fullscreen: false,
         useViewTransition: true,
         hasBackground: true,
         isGlassCards: true,
       })
-    ).toBe("none")
+    ).toBe("slide")
     expect(
-      resolveFallbackPageTransitionMode({
+      resolvePageOutletTransitionMode({
         fullscreen: false,
         useViewTransition: false,
         hasBackground: true,
@@ -847,7 +847,7 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
       })
     ).toBe("slide")
     expect(
-      resolveFallbackPageTransitionMode({
+      resolvePageOutletTransitionMode({
         fullscreen: false,
         useViewTransition: false,
         hasBackground: false,
@@ -855,9 +855,9 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
       })
     ).toBe("enter")
     expect(
-      resolveFallbackPageTransitionMode({
+      resolvePageOutletTransitionMode({
         fullscreen: true,
-        useViewTransition: false,
+        useViewTransition: true,
         hasBackground: false,
         isGlassCards: false,
       })
@@ -982,17 +982,20 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     expect(docWithVt.startViewTransition).not.toHaveBeenCalled()
     expect(
       dom.container.findByAttr("data-shell-page-outlet")?.getAttribute("data-shell-transition")
-    ).toBeNull()
+    ).toBe("slide")
 
-    // Navigate Alpha -> Beta: old page stays mounted until startViewTransition runs its callback.
+    // Navigate Alpha -> Beta: outlet hides during old-state capture so the old
+    // page clears immediately (no cross-fade ghosting) and slide waits for reveal.
     await act(async () => {
       router.push({ pluginId: "demo.vt", pageId: "beta" })
     })
     expect(docWithVt.startViewTransition).toHaveBeenCalledTimes(1)
     expect(dom.docElement.getAttribute("data-shell-view-transition")).toBe("page")
-    expect(dom.container.textContent).toContain("PAGE_ALPHA")
+    const capturingOutlet = dom.container.findByAttr("data-shell-page-outlet")
+    expect(capturingOutlet?.hasAttribute("data-shell-capturing")).toBe(true)
+    expect(capturingOutlet?.getAttribute("data-shell-transition")).toBeNull()
 
-    // Browser invokes updateCallback -> React commits Beta and resolves the callback Promise.
+    // Browser invokes updateCallback -> outlet reveals Beta with upward slide and resolves Promise.
     let callbackResolved = false
     await act(async () => {
       const result = pendingCallbacks.shift()?.()
@@ -1002,7 +1005,10 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
         })
       }
     })
+    const revealedOutlet = dom.container.findByAttr("data-shell-page-outlet")
     expect(dom.container.textContent).toContain("PAGE_BETA")
+    expect(revealedOutlet?.hasAttribute("data-shell-capturing")).toBe(false)
+    expect(revealedOutlet?.getAttribute("data-shell-transition")).toBe("slide")
     expect(callbackResolved).toBe(true)
 
     // Rapid navigation Beta -> Gamma before Alpha->Beta finishes skips the active transition.
