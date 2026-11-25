@@ -38,11 +38,13 @@ import {
 import { NamespacedStorageService } from "@orahako/runtime-storage"
 import { uiRegistryPlugin } from "@orahako/runtime-ui"
 import {
+  createObservableSource,
   definePlugin,
   PLUGIN_API_VERSION,
   validatePluginManifest,
   type PluginI18nRegistryService,
   type PluginKeyValueStorage,
+  type ScheduleEntry,
 } from "@orahako/sdk"
 import * as publicApi from "../src"
 import { SCHEDULE_PLUGIN_ID, schedulePlugin } from "../src"
@@ -553,6 +555,7 @@ describe("@orahako/plugin-schedule export discipline & manifest", () => {
       WIDGETS_GENERIC_CAPABILITY,
       WIDGETS_SCHEDULE_CAPABILITY,
     ])
+    expect(validated.provides).toEqual(["schedule"])
     expect(validated.inject).toEqual([
       "ui",
       "slots",
@@ -561,15 +564,17 @@ describe("@orahako/plugin-schedule export discipline & manifest", () => {
       "navigation",
       "i18n",
       "storage",
-      "provider",
-      "session",
-      "query",
-      "notifications",
       "native",
       "widgets",
       "assets",
     ])
-    expect(schedulePlugin.optionalInject).toEqual(["overview"])
+    expect(schedulePlugin.optionalInject).toEqual([
+      "provider",
+      "session",
+      "query",
+      "notifications",
+      "overview",
+    ])
   })
 })
 
@@ -1126,7 +1131,8 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     expect(query.policy("current-week")).toEqual({ ttl: SHORT_TTL_MS, persist: true })
     expect(query.policy("class-periods")).toEqual({ ttl: LONG_TTL_MS, persist: true })
     expect(query.policy("term-calendar")).toEqual({ ttl: LONG_TTL_MS, persist: true })
-    expect(query.policy("exams")).toEqual({ ttl: DEFAULT_TTL_MS, persist: true })
+    // Exams query policy belongs to orahako.exams, not orahako.schedule.
+    expect(query.policy("exams")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
 
     // Enable class reminders via plugin settings store -> schedules native alarms on reminders.classes@1
     const scheduleStore = widgetsCategory.store as ScheduleSettingsStoreInstance
@@ -1145,6 +1151,27 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
         liveUpdateEnabled: true,
         vibrationEnabled: true,
       })
+    })
+
+    // External exam source registered onto ctx.schedule renders on SchedulePage
+    const examEntries = createObservableSource<readonly ScheduleEntry[]>([
+      {
+        id: "exam:english-placement",
+        sourceId: "exams",
+        sourcePluginId: "orahako.exams",
+        category: "exam",
+        title: "英语分级考",
+        location: "西区301",
+        date: "2026-09-09",
+        weekDay: 3,
+        time: { startMinute: 9 * 60, endMinute: 11 * 60 },
+      },
+    ])
+    const unregisterExamSource = runtime.context.get("schedule")!.registerSource({
+      id: "exams",
+      order: 40,
+      category: "exam",
+      entries: examEntries,
     })
 
     // Render SchedulePage + OverviewPage + Settings panels cleanly
@@ -1166,6 +1193,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       expect(dom.container.textContent).toContain("英语分级考")
       expect(dom.container.textContent).toContain("日程查询")
     })
+    unregisterExamSource()
 
     // Without a registered school-schedule route, both entries stay hidden
     await dom.render(<ContributionOutlet entry={schedulePage} slots={slots} i18n={i18n} />)
@@ -1594,5 +1622,155 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     activeUnmount = undefined
     await dom.unmount()
     i18nRuntime.dispose()
+  })
+
+  it("boots standalone with ZERO academic services, exposes open ScheduleService + slots, and supports personal/external sources + remindable free-time alarms", async () => {
+    const dom = mountMiniDom()
+    activeUnmount = dom.unmount
+
+    const externalEntries = createObservableSource<readonly ScheduleEntry[]>([
+      {
+        id: "club:weekly-sync",
+        sourceId: "club-calendar",
+        sourcePluginId: "community.club",
+        category: "personal",
+        title: "开源社团例会",
+        location: "活动中心 302",
+        weekDay: 3,
+        time: { startMinute: 19 * 60 + 30, endMinute: 21 * 60 },
+        remindable: true,
+        badge: "社团",
+      },
+    ])
+
+    const communityCalendarPlugin = definePlugin({
+      manifest: {
+        id: "community.club",
+        name: "Community Club Calendar",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+        providerIndependent: true,
+      },
+      inject: ["slots"] as const,
+      optionalInject: ["schedule"] as const,
+      apply(ctx) {
+        ctx.schedule?.registerSource({
+          id: "club-calendar",
+          order: 50,
+          category: "personal",
+          entries: externalEntries,
+        })
+        ctx.slots.inject("schedule.toolbar.actions", () =>
+          ctx.slots.register({ id: "club-sync-btn", slot: "schedule.toolbar.actions" }, () => (
+            <button type="button">CLUB_TOOLBAR_ACTION</button>
+          ))
+        )
+        ctx.slots.inject("schedule.entry.detail", () =>
+          ctx.slots.register({ id: "club-detail-ext", slot: "schedule.entry.detail" }, (props) => (
+            <div>CLUB_DETAIL:{props.entry.title}</div>
+          ))
+        )
+      },
+    })
+
+    const runtime = new PluginRuntime()
+    runtime.context.set(
+      "storage",
+      new NamespacedStorageService({
+        local: createMemoryStorage(),
+        secure: createMemoryStorage(),
+      })
+    )
+    runtime.context.set("http", new StatelessHttpService())
+    runtime.context.set("native", createNativeService({ isNative: () => false }))
+    runtime.context.set("assets", { url: (p: string) => `/assets/${p}` })
+
+    // Boot ONLY universal platform runtime plugins + schedulePlugin + communityCalendarPlugin
+    // ZERO academic services (no provider, no session, no query, no notifications, no overview)!
+    for (const plugin of [
+      slotRegistryPlugin,
+      uiRegistryPlugin,
+      settingsRegistryPlugin,
+      i18nRegistryPlugin,
+      routerRuntimePlugin,
+      navigationRuntimePlugin,
+      widgetRuntimePlugin,
+      schedulePlugin,
+      communityCalendarPlugin,
+    ]) {
+      runtime.register(plugin, "builtin")
+      runtime.start(plugin.manifest.id)
+    }
+
+    expect(runtime.context.get("provider")).toBeUndefined()
+    expect(runtime.context.get("session")).toBeUndefined()
+    expect(runtime.context.get("query")).toBeUndefined()
+
+    const scheduleService = runtime.context.get("schedule")!
+    expect(scheduleService).toBeDefined()
+    expect(scheduleService.getSources().map((s) => s.scopedId)).toEqual([
+      "orahako.schedule:personal",
+      "community.club:club-calendar",
+    ])
+    expect(scheduleService.getEffectiveSnapshot().entries).toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: "开源社团例会" })])
+    )
+
+    // Render SchedulePage standalone: external source & toolbar slot render cleanly!
+    const ui = runtime.context.get("ui")!
+    const slots = runtime.context.get("slots") as PluginSlotRegistry
+    const i18n = runtime.context.get("i18n") as PluginI18nRegistryService
+    const schedulePage = ui
+      .getSnapshot()
+      .pages.find((p) => p.pluginId === SCHEDULE_PLUGIN_ID && p.id === "index")!
+    expect(schedulePage.requiresProvider).toBe(false)
+
+    await dom.render(<ContributionOutlet entry={schedulePage} slots={slots} i18n={i18n} />)
+    await vi.waitFor(() => {
+      expect(dom.container.textContent).toContain("CLUB_TOOLBAR_ACTION")
+      expect(dom.container.textContent).toContain("开源社团例会")
+      expect(dom.container.textContent).toContain("新建")
+      expect(dom.container.textContent).toContain("管理")
+    })
+
+    // Free-time remindable entries generate exact-minute alarms even alongside courses
+    const extraAlarms = computeClassAlarms(
+      [],
+      null,
+      samplePeriods,
+      7,
+      undefined,
+      15,
+      new Date("2026-09-09T09:00:00+08:00"),
+      "Asia/Shanghai",
+      scheduleService.getEffectiveSnapshot().entries
+    )
+    expect(extraAlarms).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          courseName: "开源社团例会",
+          classroom: "活动中心 302",
+          startTime: "19:30",
+          endTime: "21:00",
+        }),
+      ])
+    )
+
+    // Stopping the community plugin automatically unregisters its source and UI slots!
+    await act(async () => {
+      runtime.stop("community.club")
+    })
+    expect(scheduleService.getSources().map((s) => s.scopedId)).toEqual([
+      "orahako.schedule:personal",
+    ])
+    expect(scheduleService.getEffectiveSnapshot().entries).toEqual([])
+    expect(slots.select("schedule.toolbar.actions")).toEqual([])
+    expect(slots.select("schedule.entry.detail")).toEqual([])
+
+    activeUnmount = undefined
+    await dom.unmount()
+    runtime.dispose()
   })
 })

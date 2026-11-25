@@ -1,10 +1,6 @@
 import { useMemo, useState } from "react"
-import type {
-  AcademicScheduleRules,
-  ClassPeriod,
-  Course,
-  CurrentWeek,
-} from "@orahako/academic-sdk"
+import type { AcademicScheduleRules, ClassPeriod, Course, CurrentWeek } from "@orahako/academic-sdk"
+import type { ScheduleEntry } from "@orahako/sdk"
 import {
   Card,
   CardContent,
@@ -27,6 +23,11 @@ import { CalendarOff, Layers } from "lucide-react"
 import { courseBgClass, type CourseColorMap } from "./course-color"
 import type { ExamBlock } from "./exam-blocks"
 import { formatExamTime } from "./exam-utils"
+import {
+  computeOverlayBlocks,
+  computeWeekIsoDates,
+  type ScheduleOverlayBlock,
+} from "./schedule-entries"
 import { scheduleDate, scheduleOccurrence } from "./schedule-patches"
 import {
   buildSectionTimeMap,
@@ -42,13 +43,17 @@ import {
 import {
   DEFAULT_SCHEDULE_EDITOR_STATE,
   SCHEDULE_DAYS,
+  ScheduleCourseAdjustedIndicator,
+  ScheduleDayAdjustedIndicator,
   ScheduleDayHandle,
   ScheduleDayLabel,
   ScheduleGridTraces,
+  ScheduleOnlineBadge,
   SchedulePatchedLabel,
   computeScheduleGridRows,
   courseHasScheduleTrace,
   type ScheduleEditorState,
+  type ScheduleEmptyCellTarget,
   type ScheduleLabels,
 } from "./schedule-view-shared"
 
@@ -56,6 +61,7 @@ export interface ScheduleTabletProps {
   courses: readonly Course[]
   colorMap: CourseColorMap
   examBlocks?: readonly ExamBlock[]
+  overlayEntries?: readonly ScheduleEntry[]
   periods: readonly ClassPeriod[]
   currentWeekday: number
   currentWeek: CurrentWeek | null
@@ -68,15 +74,41 @@ export interface ScheduleTabletProps {
   editor?: ScheduleEditorState
   /** School timezone and break rows from the provider's timetable slice. */
   scheduleRules?: AcademicScheduleRules
+  /** Keep the interactive grid visible even when a week has no courses or overlays. */
+  showGridWhenEmpty?: boolean
   onCourseTap?: (course: Course, week: number) => void
+  onEntryTap?: (entry: ScheduleEntry) => void
+  onEmptyCellTap?: (cell: ScheduleEmptyCellTarget) => void
 }
 
 const NO_EXAM_BLOCKS: readonly ExamBlock[] = []
+const NO_OVERLAY_ENTRIES: readonly ScheduleEntry[] = []
+
+function overlayBlockClass(block: ScheduleOverlayBlock): string {
+  if (block.entry.category === "exam") {
+    return "bg-amber-500/15 ring-1 ring-inset ring-amber-500/50"
+  }
+  if (block.entry.category === "personal") {
+    return "bg-indigo-500/12 ring-1 ring-inset ring-indigo-500/45"
+  }
+  return "bg-emerald-500/12 ring-1 ring-inset ring-emerald-500/45"
+}
+
+function overlayTagClass(block: ScheduleOverlayBlock): string {
+  if (block.entry.category === "exam") {
+    return "text-amber-600 dark:text-amber-400"
+  }
+  if (block.entry.category === "personal") {
+    return "text-indigo-600 dark:text-indigo-400"
+  }
+  return "text-emerald-600 dark:text-emerald-400"
+}
 
 export function ScheduleTablet({
   courses,
   colorMap,
   examBlocks = NO_EXAM_BLOCKS,
+  overlayEntries = NO_OVERLAY_ENTRIES,
   periods,
   currentWeekday,
   currentWeek,
@@ -87,13 +119,22 @@ export function ScheduleTablet({
   labels,
   editor = DEFAULT_SCHEDULE_EDITOR_STATE,
   scheduleRules,
+  showGridWhenEmpty = false,
   onCourseTap,
+  onEntryTap,
+  onEmptyCellTap,
 }: ScheduleTabletProps) {
-  const dateForDay = (day: number) =>
-    editor.termStartDate ? scheduleDate(editor.termStartDate, selectedWeek, day) : undefined
-  const hasTraces = editor.traces.some((trace) =>
-    SCHEDULE_DAYS.some((day) => dateForDay(day) === trace.date)
+  const weekIsoDates = useMemo(
+    () => computeWeekIsoDates(weekAnchor, selectedWeek, termStartDate ?? editor.termStartDate),
+    [weekAnchor, selectedWeek, termStartDate, editor.termStartDate]
   )
+  const dateForDay = (day: number) =>
+    editor.termStartDate
+      ? scheduleDate(editor.termStartDate, selectedWeek, day)
+      : weekIsoDates?.[day - 1]
+  const hasTraces =
+    editor.editing &&
+    editor.traces.some((trace) => SCHEDULE_DAYS.some((day) => dateForDay(day) === trace.date))
   const [overlapDialog, setOverlapDialog] = useState<{
     day: number
     section: number
@@ -133,14 +174,17 @@ export function ScheduleTablet({
   }, [totalRows, lunchRow, dinnerRow])
 
   const mergedBlocks = useMemo(() => computeMergedBlocks(courses, periods), [courses, periods])
+  const overlayBlocks = useMemo(
+    () => computeOverlayBlocks(overlayEntries, periods, weekAnchor, selectedWeek, termStartDate),
+    [overlayEntries, periods, weekAnchor, selectedWeek, termStartDate]
+  )
 
   function openCourse(course: Course) {
     if (editor.editing && !editor.enabled) return
     if (editor.selectCourse?.(course)) return
     const occurrence = scheduleOccurrence(course)
-    const sourceCourse = occurrence?.source.course ?? course
     const sourceWeek = occurrence?.source.week ?? selectedWeek
-    onCourseTap?.(sourceCourse, sourceWeek)
+    onCourseTap?.(course, sourceWeek)
   }
 
   function blockStyle(block: { day: number; start: number; end: number }) {
@@ -153,7 +197,14 @@ export function ScheduleTablet({
     }
   }
 
-  if (courses.length === 0 && examBlocks.length === 0 && !editor.editing && !hasTraces) {
+  if (
+    !showGridWhenEmpty &&
+    courses.length === 0 &&
+    examBlocks.length === 0 &&
+    overlayBlocks.length === 0 &&
+    !editor.editing &&
+    !hasTraces
+  ) {
     return (
       <Empty>
         <EmptyHeader>
@@ -183,24 +234,24 @@ export function ScheduleTablet({
             <div
               key={d}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 border-b border-border py-1.5 text-[10px] font-medium",
+                "relative flex flex-col items-center justify-center gap-0.5 border-b border-border py-1.5 text-[10px] font-medium",
                 idx < 6 && "border-r",
                 isCurrentWeek && d === currentWeekday
                   ? "bg-primary/5 text-primary"
                   : "text-muted-foreground"
               )}
             >
-              <ScheduleDayLabel
-                week={selectedWeek}
-                day={d}
-                weekdayShort={labels.weekdayShort}
-                editor={editor}
-                editorLabels={labels.editor}
-              />
+              <ScheduleDayLabel day={d} weekdayShort={labels.weekdayShort} />
               {weekDates[d - 1] && (
                 <span className="text-[9px] opacity-70">{weekDates[d - 1]}</span>
               )}
               <ScheduleDayHandle
+                week={selectedWeek}
+                day={d}
+                editor={editor}
+                editorLabels={labels.editor}
+              />
+              <ScheduleDayAdjustedIndicator
                 week={selectedWeek}
                 day={d}
                 editor={editor}
@@ -247,15 +298,28 @@ export function ScheduleTablet({
             periods.map((p) => {
               const row = sectionToRow.get(p.section)
               if (!row) return null
+              const cellDate = dateForDay(d)
               return (
                 <div
                   key={`cell-${d}-${p.section}`}
-                  data-schedule-date={dateForDay(d)}
+                  data-schedule-date={cellDate}
                   data-schedule-section={p.section}
+                  onClick={
+                    onEmptyCellTap && !editor.editing
+                      ? () =>
+                          onEmptyCellTap({
+                            week: selectedWeek,
+                            day: d,
+                            section: p.section,
+                            ...(cellDate ? { date: cellDate } : {}),
+                          })
+                      : undefined
+                  }
                   className={cn(
                     "border-b border-border",
                     d < 7 && "border-r",
-                    isCurrentWeek && d === currentWeekday && "bg-primary/5"
+                    isCurrentWeek && d === currentWeekday && "bg-primary/5",
+                    onEmptyCellTap && !editor.editing && "cursor-pointer hover:bg-accent/30"
                   )}
                   style={{ gridRow: row, gridColumn: d + 1 }}
                 />
@@ -266,24 +330,30 @@ export function ScheduleTablet({
           {mergedBlocks.map((block, idx) => {
             if (block.courses.length === 1) {
               const c = block.courses[0]!
+              const occurrenceId = editor.enabled ? scheduleOccurrence(c)?.occurrenceId : undefined
+              const isBeingDragged = Boolean(
+                occurrenceId && editor.draggingOccurrenceIds?.has(occurrenceId)
+              )
               return (
                 <button
                   key={`block-${idx}`}
                   type="button"
-                  data-schedule-course={
-                    editor.enabled ? scheduleOccurrence(c)?.occurrenceId : undefined
-                  }
+                  draggable={false}
+                  data-schedule-course={occurrenceId}
                   className={cn(
-                    "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1.5 text-left transition-opacity active:opacity-60",
+                    "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1.5 text-left transition-[opacity,transform] active:opacity-60",
                     courseBgClass(colorMap, c),
-                    courseHasScheduleTrace(c, editor.traces) && "pb-7",
-                    isBlockCurrent(block) && "ring-1 ring-primary"
+                    editor.editing && courseHasScheduleTrace(c, editor.traces) && "pb-7",
+                    isBlockCurrent(block) && "ring-1 ring-primary",
+                    occurrenceId &&
+                      "cursor-grab touch-none ring-1 ring-primary/30 active:cursor-grabbing",
+                    isBeingDragged && "scale-[0.97] opacity-35 ring-2 ring-primary/60"
                   )}
                   style={blockStyle(block)}
                   onClick={() => openCourse(c)}
                 >
                   <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">
-                    <SchedulePatchedLabel course={c} editor={editor} editorLabels={labels.editor} />
+                    <ScheduleOnlineBadge course={c} label={labels.onlineTag} />
                     {c.name}
                   </span>
                   {c.classroom && (
@@ -296,6 +366,11 @@ export function ScheduleTablet({
                       {c.teacher}
                     </span>
                   )}
+                  <ScheduleCourseAdjustedIndicator
+                    course={c}
+                    editor={editor}
+                    editorLabels={labels.editor}
+                  />
                 </button>
               )
             }
@@ -305,7 +380,8 @@ export function ScheduleTablet({
                 type="button"
                 className={cn(
                   "relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60",
-                  block.courses.some((course) => courseHasScheduleTrace(course, editor.traces)) &&
+                  editor.editing &&
+                    block.courses.some((course) => courseHasScheduleTrace(course, editor.traces)) &&
                     "pb-7"
                 )}
                 style={blockStyle(block)}
@@ -335,26 +411,70 @@ export function ScheduleTablet({
             <button
               key={`exam-${idx}`}
               type="button"
-              className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md border border-amber-500/50 bg-amber-500/15 p-1.5 text-left transition-opacity active:opacity-60"
+              className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md bg-amber-500/15 p-1.5 text-left ring-1 ring-amber-500/50 transition-opacity ring-inset active:opacity-60"
               style={blockStyle(block)}
               onClick={(e) => {
                 e.currentTarget.blur()
                 setExamDialog(block)
               }}
             >
-              <span className="line-clamp-1 text-[9px] font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
+              <span className="line-clamp-1 text-[9px] leading-tight font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
                 {labels.examTag}
               </span>
               <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">
                 {block.exam.name}
               </span>
               {block.exam.examLocation && (
-                <span className="line-clamp-1 text-[9px] leading-tight text-foreground/70">
+                <span className="line-clamp-2 text-[9px] leading-tight text-foreground/70">
                   {block.exam.examLocation}
                 </span>
               )}
             </button>
           ))}
+          {overlayBlocks.map((block) => {
+            const tag =
+              block.entry.badge ||
+              (block.entry.category === "exam"
+                ? labels.examTag
+                : block.entry.deliveryMode === "online"
+                  ? labels.onlineTag
+                  : labels.personalTag)
+            return (
+              <button
+                key={`overlay-${block.entry.id}`}
+                type="button"
+                data-schedule-entry={block.entry.id}
+                className={cn(
+                  "relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1.5 text-left transition-opacity active:opacity-60",
+                  overlayBlockClass(block)
+                )}
+                style={blockStyle(block)}
+                onClick={(e) => {
+                  e.currentTarget.blur()
+                  onEntryTap?.(block.entry)
+                }}
+              >
+                {(tag || block.timeLabel) && (
+                  <span
+                    className={cn(
+                      "line-clamp-1 text-[9px] leading-tight font-semibold tracking-wide",
+                      overlayTagClass(block)
+                    )}
+                  >
+                    {[tag, block.timeLabel].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+                <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">
+                  {block.entry.title}
+                </span>
+                {block.entry.location && (
+                  <span className="line-clamp-2 text-[9px] leading-tight text-foreground/70">
+                    {block.entry.location}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
       </div>
 

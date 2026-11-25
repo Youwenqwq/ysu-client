@@ -6,6 +6,7 @@ import type { PluginNativeService } from "./native"
 import type { PluginNavigationService } from "./navigation"
 import type { ObservableSource } from "./observable"
 import type { PluginRouterService } from "./router"
+import type { ScheduleService } from "./schedule"
 import type { PluginSettingsService } from "./settings"
 import type { PluginSlotService } from "./slots"
 import type { PluginUIService } from "./ui"
@@ -125,6 +126,7 @@ export interface OrahakoServiceMap {
   plugins: PluginInstallerService
   packageRuntime: PluginPackageRuntime
   pluginManager: PluginManagerService
+  schedule: ScheduleService
 }
 
 declare module "@cordisjs/core" {

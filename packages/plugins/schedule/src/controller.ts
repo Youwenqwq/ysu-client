@@ -1,7 +1,9 @@
 import {
   buildScheduleWidgetSnapshot,
+  formatClockMinute,
   getAcademicClock,
   isCourseActiveInWeek,
+  isScheduleEntryActiveOnDate,
   parseAcademicDateTime,
   periodIsInUse,
   resolveAcademicWeek,
@@ -26,11 +28,14 @@ import {
   type ObservableSource,
   type PluginNativeService,
   type PluginWidgetService,
+  type ScheduleEffectiveSnapshot,
+  type ScheduleEntry,
   type WidgetSettings,
   type WidgetSnapshot,
 } from "@orahako/sdk"
 import {
   computeEffectiveScheduleSnapshot,
+  type ScheduleCustomizationsStoreInstance,
   type SchedulePatchesStoreInstance,
   type ScheduleSettingsStoreInstance,
 } from "./stores"
@@ -80,7 +85,8 @@ export function computeClassAlarms(
   calendar?: TermCalendar,
   remindMinutes = 15,
   now = new Date(),
-  timeZone?: string
+  timeZone?: string,
+  extraEntries: readonly ScheduleEntry[] = []
 ): ClassAlarmConfig[] {
   const alarms: ClassAlarmConfig[] = []
   const periodMap = new Map(periods.map((period) => [period.section, period]))
@@ -89,61 +95,84 @@ export function computeClassAlarms(
   for (let dayOffset = 0; dayOffset < days; dayOffset += 1) {
     const date = scheduleDate(today, 1, dayOffset + 1)
     const targetWeek = resolveAcademicWeek(currentWeek, calendar, date, currentWeek?.semester)
-    if (!targetWeek) continue
     const dayStart = parseAcademicDateTime(`${date}T00:00:00`, timeZone)?.getTime()
     if (dayStart === undefined) continue
-    const dayCourses = courses.filter(
-      (course) =>
-        course.weekDay === targetWeek.weekday && isCourseActiveInWeek(course, targetWeek.week)
-    )
 
-    for (const course of dayCourses) {
-      const startSection = course.startSection
-      const startPeriod = periodMap.get(startSection)
-      const startTime = startPeriod?.startTime
-      if (!startTime) continue
+    const weekday =
+      targetWeek?.weekday ?? getAcademicClock(new Date(dayStart + 43_200_000), timeZone).weekday
 
-      const startMinutes = parseClockToMinutes(startTime)
-      if (startMinutes === undefined) continue
-      const endPeriod = periodMap.get(course.endSection)
-      const endMinutes = endPeriod?.endTime ? parseClockToMinutes(endPeriod.endTime) : undefined
-      const endAt =
-        endMinutes !== undefined && endMinutes > startMinutes
-          ? dayStart + endMinutes * 60_000
-          : undefined
-      const alarmTime = dayStart + (startMinutes - remindMinutes) * 60_000
-      const expiresAt = endAt ?? dayStart + startMinutes * 60_000
-      if (
-        !Number.isFinite(alarmTime) ||
-        alarmTime <= now.getTime() ||
-        expiresAt <= now.getTime()
+    if (targetWeek) {
+      const dayCourses = courses.filter(
+        (course) =>
+          course.weekDay === targetWeek.weekday && isCourseActiveInWeek(course, targetWeek.week)
       )
-        continue
 
-      const alarmId = `${date}|${startSection}`
-      const existing = alarms.find((alarm) => alarm.alarmId === alarmId)
-      if (existing) {
-        const before = existing.courseName
-        existing.courseName = mergeUniqueText(existing.courseName, course.name)
-        existing.classroom = mergeUniqueText(existing.classroom, course.classroom || "")
-        if (existing.courseName !== before) {
-          existing.conflictCount = (existing.conflictCount ?? 1) + 1
+      for (const course of dayCourses) {
+        const startSection = course.startSection
+        const startPeriod = periodMap.get(startSection)
+        const startTime = startPeriod?.startTime
+        if (!startTime) continue
+
+        const startMinutes = parseClockToMinutes(startTime)
+        if (startMinutes === undefined) continue
+        const endPeriod = periodMap.get(course.endSection)
+        const endMinutes = endPeriod?.endTime ? parseClockToMinutes(endPeriod.endTime) : undefined
+        const endAt =
+          endMinutes !== undefined && endMinutes > startMinutes
+            ? dayStart + endMinutes * 60_000
+            : undefined
+        const alarmTime = dayStart + (startMinutes - remindMinutes) * 60_000
+        const expiresAt = endAt ?? dayStart + startMinutes * 60_000
+        if (!Number.isFinite(alarmTime) || alarmTime <= now.getTime() || expiresAt <= now.getTime())
+          continue
+
+        const alarmId = `${date}|${startSection}`
+        const existing = alarms.find((alarm) => alarm.alarmId === alarmId)
+        if (existing) {
+          const before = existing.courseName
+          existing.courseName = mergeUniqueText(existing.courseName, course.name)
+          existing.classroom = mergeUniqueText(existing.classroom, course.classroom || "")
+          if (existing.courseName !== before) {
+            existing.conflictCount = (existing.conflictCount ?? 1) + 1
+          }
+          if (endAt !== undefined && (existing.endAt === undefined || endAt > existing.endAt)) {
+            existing.endAt = endAt
+            existing.endTime = endPeriod?.endTime
+          }
+          continue
         }
-        if (endAt !== undefined && (existing.endAt === undefined || endAt > existing.endAt)) {
-          existing.endAt = endAt
-          existing.endTime = endPeriod?.endTime
-        }
+
+        alarms.push({
+          alarmId,
+          alarmTime,
+          courseName: course.name,
+          classroom: course.classroom || "",
+          startTime,
+          remindMinutes,
+          ...(endAt !== undefined ? { endAt, endTime: endPeriod?.endTime } : {}),
+        })
+      }
+    }
+
+    for (const entry of extraEntries) {
+      if (!entry.remindable || !entry.time) continue
+      if (!isScheduleEntryActiveOnDate(entry, date, weekday, targetWeek?.week)) continue
+      const startMinutes = entry.time.startMinute
+      const endMinutes = entry.time.endMinute
+      const alarmTime = dayStart + (startMinutes - remindMinutes) * 60_000
+      const endAt = endMinutes > startMinutes ? dayStart + endMinutes * 60_000 : undefined
+      const expiresAt = endAt ?? dayStart + startMinutes * 60_000
+      if (!Number.isFinite(alarmTime) || alarmTime <= now.getTime() || expiresAt <= now.getTime()) {
         continue
       }
-
       alarms.push({
-        alarmId,
+        alarmId: `entry:${date}|${entry.id}`,
         alarmTime,
-        courseName: course.name,
-        classroom: course.classroom || "",
-        startTime,
+        courseName: entry.title,
+        classroom: entry.location || "",
+        startTime: formatClockMinute(startMinutes),
         remindMinutes,
-        ...(endAt !== undefined ? { endAt, endTime: endPeriod?.endTime } : {}),
+        ...(endAt !== undefined ? { endAt, endTime: formatClockMinute(endMinutes) } : {}),
       })
     }
   }
@@ -162,6 +191,8 @@ export interface ClassReminderAndWidgetControllerOptions {
   readonly pluginId: string
   readonly settingsStore: ScheduleSettingsStoreInstance
   readonly patchesStore: SchedulePatchesStoreInstance
+  readonly customizationsStore?: ScheduleCustomizationsStoreInstance
+  readonly scheduleStateSource?: ObservableSource<ScheduleEffectiveSnapshot>
   readonly provider: ProviderRuntimeService
   readonly session: SessionService
   readonly native: PluginNativeService
@@ -194,6 +225,8 @@ export class ClassReminderAndWidgetController {
   private readonly pluginId: string
   private readonly settingsStore: ScheduleSettingsStoreInstance
   private readonly patchesStore: SchedulePatchesStoreInstance
+  private readonly customizationsStore: ScheduleCustomizationsStoreInstance | undefined
+  private readonly scheduleStateSource: ObservableSource<ScheduleEffectiveSnapshot> | undefined
   private readonly provider: ProviderRuntimeService
   private readonly session: SessionService
   private readonly native: PluginNativeService
@@ -239,6 +272,8 @@ export class ClassReminderAndWidgetController {
     this.pluginId = options.pluginId
     this.settingsStore = options.settingsStore
     this.patchesStore = options.patchesStore
+    this.customizationsStore = options.customizationsStore
+    this.scheduleStateSource = options.scheduleStateSource
     this.provider = options.provider
     this.session = options.session
     this.native = options.native
@@ -309,6 +344,8 @@ export class ClassReminderAndWidgetController {
       sessionSnapshot: this.session.getSnapshot(),
       patchesState: this.patchesStore.source.getSnapshot(),
       patchesHydrated: this.patchesStore.hydrated.getSnapshot(),
+      customizationsState: this.customizationsStore?.source.getSnapshot(),
+      customizationsHydrated: this.customizationsStore?.hydrated.getSnapshot(),
     })
 
     const nowDate = getAcademicClock(this.now(), this.resolveTimeZone()).date
@@ -417,76 +454,75 @@ export class ClassReminderAndWidgetController {
     if (this.disposed) return Promise.resolve()
     const revision = ++this.alarmRevision
 
-    const task = this.enqueueNative(
-      async () => {
-        if (this.disposed || !this.native.isNative || revision !== this.alarmRevision) return
-        const sessionSnap = this.session.getSnapshot()
-        const settingsHydrated = this.settingsStore.hydrated.getSnapshot()
-        if (!sessionSnap.hasHydrated || !settingsHydrated) return
+    const task = this.enqueueNative(async () => {
+      if (this.disposed || !this.native.isNative || revision !== this.alarmRevision) return
+      const sessionSnap = this.session.getSnapshot()
+      const settingsHydrated = this.settingsStore.hydrated.getSnapshot()
+      if (!sessionSnap.hasHydrated || !settingsHydrated) return
 
-        const settings = this.settingsStore.source.getSnapshot()
-        const isValid = (): boolean =>
-          !this.disposed &&
-          revision === this.alarmRevision &&
-          !this.stopped &&
-          this.channelActive &&
-          this.session.getSnapshot().isAuthenticated
+      const settings = this.settingsStore.source.getSnapshot()
+      const isValid = (): boolean =>
+        !this.disposed &&
+        revision === this.alarmRevision &&
+        !this.stopped &&
+        this.channelActive &&
+        this.session.getSnapshot().isAuthenticated
 
-        if (!isValid() || !settings.classReminderEnabled || !this.isFeatureSupported()) {
-          await this.cancelNativeAlarms()
-          this.lastAlarmHash = ""
-          return
-        }
-
-        const schedule = this.resolveCurrentScheduleInput()
-        if (!schedule) return
-
-        if (!(await this.checkNotificationPermission())) {
-          if (!isValid()) return
-          this.settingsStore.actions.setClassReminderEnabled(false)
-          await this.cancelNativeAlarms()
-          this.lastAlarmHash = ""
-          return
-        }
-        if (!isValid()) return
-
-        const alarms = computeClassAlarms(
-          schedule.courses,
-          schedule.currentWeek,
-          schedule.periods,
-          settings.classReminderDays,
-          schedule.calendar,
-          settings.classReminderMinutes,
-          this.now(),
-          this.resolveTimeZone()
-        )
-        for (const alarm of alarms) {
-          alarm.liveUpdateEnabled = settings.classLiveUpdateEnabled
-          alarm.vibrationEnabled = settings.classVibrationEnabled
-        }
-        alarms.sort((a, b) => a.alarmId.localeCompare(b.alarmId) || a.alarmTime - b.alarmTime)
-
-        const hash = JSON.stringify(alarms)
-        if (hash === this.lastAlarmHash) return
-
-        if (alarms.length === 0) {
-          await this.cancelNativeAlarms()
-          this.lastAlarmHash = hash
-          return
-        }
-
+      if (!isValid() || !settings.classReminderEnabled || !this.isFeatureSupported()) {
+        await this.cancelNativeAlarms()
         this.lastAlarmHash = ""
+        return
+      }
+
+      const schedule = this.resolveCurrentScheduleInput()
+      if (!schedule) return
+
+      if (!(await this.checkNotificationPermission())) {
         if (!isValid()) return
-        if (await this.capabilityAvailable(REMINDERS_CLASSES_CAPABILITY)) {
-          await this.native.capabilities.invoke(REMINDERS_CLASSES_CAPABILITY, "schedule", {
-            alarms,
-          })
-          if (!isValid()) return
-        }
+        this.settingsStore.actions.setClassReminderEnabled(false)
+        await this.cancelNativeAlarms()
+        this.lastAlarmHash = ""
+        return
+      }
+      if (!isValid()) return
+
+      const extraEntries = this.scheduleStateSource?.getSnapshot().entries ?? []
+      const alarms = computeClassAlarms(
+        schedule.courses,
+        schedule.currentWeek,
+        schedule.periods,
+        settings.classReminderDays,
+        schedule.calendar,
+        settings.classReminderMinutes,
+        this.now(),
+        this.resolveTimeZone(),
+        extraEntries
+      )
+      for (const alarm of alarms) {
+        alarm.liveUpdateEnabled = settings.classLiveUpdateEnabled
+        alarm.vibrationEnabled = settings.classVibrationEnabled
+      }
+      alarms.sort((a, b) => a.alarmId.localeCompare(b.alarmId) || a.alarmTime - b.alarmTime)
+
+      const hash = JSON.stringify(alarms)
+      if (hash === this.lastAlarmHash) return
+
+      if (alarms.length === 0) {
+        await this.cancelNativeAlarms()
         this.lastAlarmHash = hash
-      },
-      options.propagateError === true
-    )
+        return
+      }
+
+      this.lastAlarmHash = ""
+      if (!isValid()) return
+      if (await this.capabilityAvailable(REMINDERS_CLASSES_CAPABILITY)) {
+        await this.native.capabilities.invoke(REMINDERS_CLASSES_CAPABILITY, "schedule", {
+          alarms,
+        })
+        if (!isValid()) return
+      }
+      this.lastAlarmHash = hash
+    }, options.propagateError === true)
 
     this.alarmSync = task.catch(() => {})
     return task
@@ -639,6 +675,31 @@ export class ClassReminderAndWidgetController {
           void this.refreshWidgets()
         }
       }),
+      ...(this.customizationsStore
+        ? [
+            this.customizationsStore.source.subscribe(() => {
+              if (this.latestExplicitSchedule === null) {
+                void this.refreshAlarms()
+                void this.refreshWidgets()
+              }
+            }),
+            this.customizationsStore.hydrated.subscribe(() => {
+              if (this.latestExplicitSchedule === null) {
+                void this.refreshAlarms()
+                void this.refreshWidgets()
+              }
+            }),
+          ]
+        : []),
+      ...(this.scheduleStateSource
+        ? [
+            this.scheduleStateSource.subscribe(() => {
+              if (this.latestExplicitSchedule === null) {
+                void this.refreshAlarms()
+              }
+            }),
+          ]
+        : []),
       this.provider.state.subscribe(() => {
         if (!this.isFeatureSupported()) {
           this.latestExplicitSchedule = null

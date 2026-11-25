@@ -1,7 +1,9 @@
 import {
+  formatWeekList,
   resolveSchedulePatches,
   resolveScheduleTerm,
   schedulePatchDependents,
+  type CourseOverride,
   type ScheduleDrop,
   type ScheduleIssue,
   type ScheduleOccurrence,
@@ -15,7 +17,7 @@ import type {
   SessionSnapshot,
   TermCalendar,
 } from "@orahako/academic-sdk"
-import { defineStore } from "@orahako/sdk"
+import { defineStore, type ScheduleDeliveryMode, type ScheduleEntry } from "@orahako/sdk"
 
 export interface WidgetAssistantPosition {
   readonly x: number
@@ -172,10 +174,7 @@ function mergePatchLists(
   }
   for (const patch of right) {
     const existing = byId.get(patch.id)
-    if (
-      existing === undefined ||
-      Date.parse(patch.createdAt) >= Date.parse(existing.createdAt)
-    ) {
+    if (existing === undefined || Date.parse(patch.createdAt) >= Date.parse(existing.createdAt)) {
       byId.set(patch.id, patch)
     }
   }
@@ -281,6 +280,212 @@ export const schedulePatchesStore = defineStore({
 
 export type SchedulePatchesStoreInstance = ReturnType<typeof schedulePatchesStore.create>
 
+export type CustomScheduleKind = "course" | "event"
+export type CustomScheduleTimeMode = "section" | "time"
+export type CustomScheduleRecurrence = "once" | "weekly" | "academic-weeks"
+
+export interface CustomScheduleItem {
+  readonly id: string
+  readonly kind: CustomScheduleKind
+  readonly title: string
+  readonly location?: string
+  readonly teacher?: string
+  readonly deliveryMode?: ScheduleDeliveryMode
+  readonly note?: string
+  readonly remindable?: boolean
+  readonly timeMode: CustomScheduleTimeMode
+  readonly startSection?: number
+  readonly endSection?: number
+  readonly startMinute?: number
+  readonly endMinute?: number
+  readonly recurrence: CustomScheduleRecurrence
+  readonly date?: string
+  readonly weekDay?: number
+  readonly weekList?: readonly number[]
+  /** Academic scope key when scoped to a school/user/semester; null/undefined means global personal item. */
+  readonly semesterScope?: string | null
+  readonly createdAt: string
+  readonly updatedAt: string
+}
+
+export interface ScheduleCustomizationsState {
+  readonly overridesByScope: Readonly<Record<string, readonly CourseOverride[]>>
+  readonly customItems: readonly CustomScheduleItem[]
+}
+
+const EMPTY_OVERRIDES: readonly CourseOverride[] = []
+const EMPTY_CUSTOM_ITEMS: readonly CustomScheduleItem[] = []
+const EMPTY_CUSTOMIZATIONS: ScheduleCustomizationsState = {
+  overridesByScope: {},
+  customItems: EMPTY_CUSTOM_ITEMS,
+}
+
+export const scheduleCustomizationsStore = defineStore({
+  init: (): ScheduleCustomizationsState => ({
+    overridesByScope: {},
+    customItems: [],
+  }),
+  persist: {
+    key: "schedule-customizations",
+    mode: "secure",
+    version: 1,
+  },
+  actions: {
+    upsertOverride(ctx, scope: string, override: CourseOverride) {
+      if (!scope) return
+      ctx.set((state) => {
+        const current = state.overridesByScope[scope] ?? EMPTY_OVERRIDES
+        const idx = current.findIndex((item) => item.courseKey === override.courseKey)
+        const nextList =
+          idx >= 0
+            ? current.map((item, i) => (i === idx ? override : item))
+            : [...current, override]
+        return {
+          ...state,
+          overridesByScope: {
+            ...state.overridesByScope,
+            [scope]: nextList,
+          },
+        }
+      })
+    },
+    removeOverride(ctx, scope: string, courseKey: string) {
+      if (!scope) return
+      ctx.set((state) => {
+        const current = state.overridesByScope[scope] ?? EMPTY_OVERRIDES
+        const nextList = current.filter((item) => item.courseKey !== courseKey)
+        if (nextList.length === current.length) return state
+        return {
+          ...state,
+          overridesByScope: {
+            ...state.overridesByScope,
+            [scope]: nextList,
+          },
+        }
+      })
+    },
+    upsertCustomItem(ctx, item: CustomScheduleItem) {
+      ctx.set((state) => {
+        const idx = state.customItems.findIndex((existing) => existing.id === item.id)
+        const nextItems =
+          idx >= 0
+            ? state.customItems.map((existing, i) => (i === idx ? item : existing))
+            : [...state.customItems, item]
+        return { ...state, customItems: nextItems }
+      })
+    },
+    removeCustomItem(ctx, id: string) {
+      ctx.set((state) => {
+        const nextItems = state.customItems.filter((item) => item.id !== id)
+        if (nextItems.length === state.customItems.length) return state
+        return { ...state, customItems: nextItems }
+      })
+    },
+    reset(ctx) {
+      ctx.reset()
+    },
+  },
+})
+
+export type ScheduleCustomizationsStoreInstance = ReturnType<
+  typeof scheduleCustomizationsStore.create
+>
+
+export function isCustomItemActiveInScope(item: CustomScheduleItem, scope: string | null): boolean {
+  if (!item.semesterScope) return true
+  return scope !== null && item.semesterScope === scope
+}
+
+export function customItemToCourse(item: CustomScheduleItem, totalWeeks: number): Course | null {
+  if (item.timeMode !== "section") return null
+  const startSection = item.startSection ?? 1
+  const endSection = Math.max(startSection, item.endSection ?? startSection)
+  const weekDay = item.weekDay ?? 1
+  if (!Number.isInteger(weekDay) || weekDay < 1 || weekDay > 7) return null
+
+  const maxWeeks = Math.max(1, totalWeeks || 20)
+  const weekList =
+    item.recurrence === "academic-weeks" && item.weekList && item.weekList.length > 0
+      ? [...new Set(item.weekList.filter((w) => Number.isInteger(w) && w >= 1))].sort(
+          (a, b) => a - b
+        )
+      : Array.from({ length: maxWeeks }, (_, i) => i + 1)
+
+  return {
+    name: item.title,
+    classroom: item.location,
+    teacher: item.teacher,
+    weekDay,
+    startSection,
+    endSection,
+    weekList,
+    weeks: formatWeekList(weekList),
+    scheduleId: `custom:${item.id}`,
+    ...(item.deliveryMode ? { deliveryMode: item.deliveryMode } : {}),
+    ...(item.note ? { note: item.note } : {}),
+  }
+}
+
+export function customItemToOverlayEntry(
+  item: CustomScheduleItem,
+  pluginId: string
+): ScheduleEntry | null {
+  if (item.timeMode === "section" && item.recurrence !== "once") {
+    return null
+  }
+  const parsedDateWeekday = item.date ? parseIsoWeekday(item.date) : null
+  const weekDay =
+    item.recurrence === "once" ? (parsedDateWeekday ?? item.weekDay ?? 1) : (item.weekDay ?? 1)
+  if (!Number.isInteger(weekDay) || weekDay < 1 || weekDay > 7) return null
+
+  const sections =
+    item.timeMode === "section" && item.startSection
+      ? {
+          startSection: item.startSection,
+          endSection: Math.max(item.startSection, item.endSection ?? item.startSection),
+        }
+      : undefined
+  const time =
+    item.timeMode === "time" &&
+    typeof item.startMinute === "number" &&
+    typeof item.endMinute === "number" &&
+    item.endMinute > item.startMinute
+      ? { startMinute: item.startMinute, endMinute: item.endMinute }
+      : undefined
+  if (!sections && !time) return null
+
+  return {
+    id: `custom:${item.id}`,
+    seriesId: `custom:${item.id}`,
+    sourceId: "personal",
+    sourcePluginId: pluginId,
+    category: item.kind === "course" ? "custom" : "personal",
+    title: item.title,
+    ...(item.location ? { location: item.location } : {}),
+    ...(item.teacher ? { subtitle: item.teacher } : {}),
+    ...(item.deliveryMode ? { deliveryMode: item.deliveryMode } : {}),
+    ...(item.note ? { note: item.note } : {}),
+    ...(item.recurrence === "once" && item.date ? { date: item.date } : {}),
+    weekDay,
+    ...(item.recurrence === "academic-weeks" && item.weekList && item.weekList.length > 0
+      ? { weekList: item.weekList }
+      : {}),
+    ...(sections ? { sections } : {}),
+    ...(time ? { time } : {}),
+    remindable: item.remindable !== false,
+    metadata: { customItemId: item.id, customKind: item.kind },
+  }
+}
+
+function parseIsoWeekday(isoDate: string): number | null {
+  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(isoDate)
+  if (!match) return null
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12)
+  if (Number.isNaN(date.getTime())) return null
+  const day = date.getDay()
+  return day === 0 ? 7 : day
+}
+
 export function computeSchedulePatchScope(options: {
   readonly providerSnapshot: ProviderRuntimeSnapshot
   readonly sessionSnapshot: SessionSnapshot
@@ -297,11 +502,7 @@ export function computeSchedulePatchScope(options: {
   ) {
     return null
   }
-  return JSON.stringify([
-    providerSnapshot.provider.id,
-    sessionSnapshot.username,
-    semester,
-  ])
+  return JSON.stringify([providerSnapshot.provider.id, sessionSnapshot.username, semester])
 }
 
 export function validateCandidatePatches(options: {
@@ -311,9 +512,28 @@ export function validateCandidatePatches(options: {
   readonly rawCourses: readonly Course[]
   readonly termStartDate: string
   readonly totalWeeks: number
+  readonly overrides?: readonly CourseOverride[]
+  readonly customCourses?: readonly Course[]
 }): void {
-  const { id, candidate, baseline, rawCourses, termStartDate, totalWeeks } = options
-  const resolved = resolveSchedulePatches(rawCourses, termStartDate, totalWeeks, candidate)
+  const {
+    id,
+    candidate,
+    baseline,
+    rawCourses,
+    termStartDate,
+    totalWeeks,
+    overrides,
+    customCourses,
+  } = options
+  const resolveOpts =
+    overrides?.length || customCourses?.length ? { overrides, customCourses } : undefined
+  const resolved = resolveSchedulePatches(
+    rawCourses,
+    termStartDate,
+    totalWeeks,
+    candidate,
+    resolveOpts
+  )
   const blocked = resolved.issues.find(
     (issue) => issue.patchId === id && BLOCKING_SCHEDULE_ISSUES[issue.reason]
   )
@@ -321,7 +541,13 @@ export function validateCandidatePatches(options: {
     throw new Error(`scheduleEditor.issue_${blocked.reason}`)
   }
 
-  const baselineResolved = resolveSchedulePatches(rawCourses, termStartDate, totalWeeks, baseline)
+  const baselineResolved = resolveSchedulePatches(
+    rawCourses,
+    termStartDate,
+    totalWeeks,
+    baseline,
+    resolveOpts
+  )
   if (
     resolved.issues.some(
       (issue) =>
@@ -352,6 +578,8 @@ export function createValidatedSchedulePatch(options: {
   readonly rawCourses: readonly Course[]
   readonly termStartDate: string
   readonly totalWeeks: number
+  readonly overrides?: readonly CourseOverride[]
+  readonly customCourses?: readonly Course[]
   readonly generateId?: () => string
   readonly nowMs?: number
 }): SchedulePatch {
@@ -361,6 +589,8 @@ export function createValidatedSchedulePatch(options: {
     rawCourses,
     termStartDate,
     totalWeeks,
+    overrides,
+    customCourses,
     generateId = () => crypto.randomUUID(),
     nowMs = Date.now(),
   } = options
@@ -385,6 +615,8 @@ export function createValidatedSchedulePatch(options: {
     rawCourses,
     termStartDate,
     totalWeeks,
+    overrides,
+    customCourses,
   })
   return patch
 }
@@ -396,6 +628,9 @@ export interface EffectiveScheduleSnapshot {
   readonly traces: readonly ScheduleTrace[]
   readonly issues: readonly ScheduleIssue[]
   readonly patches: readonly SchedulePatch[]
+  readonly overrides: readonly CourseOverride[]
+  readonly customCourses: readonly Course[]
+  readonly customItems: readonly CustomScheduleItem[]
   readonly termStartDate: string
   readonly totalWeeks: number
 }
@@ -409,6 +644,8 @@ export function computeEffectiveScheduleSnapshot(options: {
   readonly sessionSnapshot: SessionSnapshot
   readonly patchesState: SchedulePatchesState
   readonly patchesHydrated: boolean
+  readonly customizationsState?: ScheduleCustomizationsState
+  readonly customizationsHydrated?: boolean
 }): EffectiveScheduleSnapshot {
   const term = resolveScheduleTerm(options.calendar, options.currentWeek, options.requestedSemester)
   const scope = computeSchedulePatchScope({
@@ -416,11 +653,31 @@ export function computeEffectiveScheduleSnapshot(options: {
     sessionSnapshot: options.sessionSnapshot,
     semester: term?.semester,
   })
+  const customizations = options.customizationsState ?? EMPTY_CUSTOMIZATIONS
+  const customizationsHydrated = options.customizationsHydrated ?? true
   const patches = scope ? (options.patchesState.byScope[scope] ?? EMPTY_PATCHES) : EMPTY_PATCHES
-  const ready = Boolean(scope) && options.patchesHydrated && options.rawCourses !== undefined
+  const overrides = scope
+    ? (customizations.overridesByScope[scope] ?? EMPTY_OVERRIDES)
+    : EMPTY_OVERRIDES
+  const scopedCustomItems = customizations.customItems.filter((item) =>
+    isCustomItemActiveInScope(item, scope)
+  )
+  const customCourses = scopedCustomItems
+    .filter((item) => item.timeMode === "section" && item.recurrence !== "once")
+    .map((item) => customItemToCourse(item, term?.totalWeeks ?? 20))
+    .filter((course): course is Course => course !== null)
+
+  const ready =
+    Boolean(scope) &&
+    options.patchesHydrated &&
+    customizationsHydrated &&
+    options.rawCourses !== undefined
   const resolved =
     ready && term && options.rawCourses
-      ? resolveSchedulePatches(options.rawCourses, term.termStartDate, term.totalWeeks, patches)
+      ? resolveSchedulePatches(options.rawCourses, term.termStartDate, term.totalWeeks, patches, {
+          overrides,
+          customCourses,
+        })
       : {
           courses: EMPTY_OCCURRENCES,
           traces: EMPTY_TRACES,
@@ -434,6 +691,9 @@ export function computeEffectiveScheduleSnapshot(options: {
     traces: resolved.traces,
     issues: resolved.issues,
     patches,
+    overrides,
+    customCourses,
+    customItems: scopedCustomItems,
     termStartDate: term?.termStartDate ?? "",
     totalWeeks: term?.totalWeeks ?? 0,
   }
@@ -444,6 +704,8 @@ export interface SchedulePatchMutationContext {
   readonly rawCourses: readonly Course[] | undefined
   readonly termStartDate: string
   readonly totalWeeks: number
+  readonly overrides?: readonly CourseOverride[]
+  readonly customCourses?: readonly Course[]
 }
 
 export interface SchedulePatchMutators {
@@ -511,6 +773,8 @@ export function createSchedulePatchMutators(deps: {
         rawCourses: ready.rawCourses,
         termStartDate: ready.termStartDate,
         totalWeeks: ready.totalWeeks,
+        overrides: mutationCtx.overrides,
+        customCourses: mutationCtx.customCourses,
       })
       deps.patchesStore.actions.add(ready.scope, patch)
       return patch.id
@@ -530,6 +794,8 @@ export function createSchedulePatchMutators(deps: {
           rawCourses: ready.rawCourses,
           termStartDate: ready.termStartDate,
           totalWeeks: ready.totalWeeks,
+          overrides: mutationCtx.overrides,
+          customCourses: mutationCtx.customCourses,
         })
       }
       deps.patchesStore.actions.setEnabled(ready.scope, id, enabled)
@@ -563,6 +829,7 @@ export interface ScheduleViewState {
   readonly pendingDrop: PendingScheduleDrop | null
   readonly manager: ActivePatchManager | null
   readonly undo: PendingPatchUndo | null
+  readonly createRequestNonce: number
 }
 
 export const scheduleViewStore = defineStore({
@@ -576,6 +843,7 @@ export const scheduleViewStore = defineStore({
     pendingDrop: null,
     manager: null,
     undo: null,
+    createRequestNonce: 0,
   }),
   actions: {
     setWeekOverride(ctx, weekOverride: number | null) {
@@ -628,6 +896,13 @@ export const scheduleViewStore = defineStore({
     },
     setUndo(ctx, undo: PendingPatchUndo | null) {
       ctx.set((prev) => ({ ...prev, undo }))
+    },
+    requestCreate(ctx) {
+      ctx.set((prev) => ({
+        ...prev,
+        filterDrawerOpen: false,
+        createRequestNonce: prev.createRequestNonce + 1,
+      }))
     },
     reset(ctx) {
       ctx.reset()

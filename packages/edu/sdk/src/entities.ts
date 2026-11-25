@@ -271,6 +271,8 @@ export interface Course {
   syxzdm?: string
   scheduleId?: string
   classType?: string
+  deliveryMode?: "in_person" | "online"
+  note?: string
   raw?: Record<string, unknown>
 }
 

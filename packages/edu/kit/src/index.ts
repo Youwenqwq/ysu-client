@@ -34,7 +34,10 @@ export {
   type ScheduleCourse,
 } from "./schedule-utils"
 export {
+  applyCourseOverrides,
+  courseIdentity,
   expandScheduleCourses,
+  formatWeekList,
   isScheduleOccurrence,
   resolveSchedulePatches,
   resolveScheduleTerm,
@@ -43,6 +46,8 @@ export {
   schedulePatchAffectsWeek,
   schedulePatchDependents,
   scheduleWeek,
+  type AppliedCourseRecord,
+  type CourseOverride,
   type ScheduleDrop,
   type ScheduleIssue,
   type ScheduleOccurrence,
@@ -50,6 +55,16 @@ export {
   type ScheduleSelection,
   type ScheduleTrace,
 } from "./schedule-patches"
+export {
+  computeOverlayBlocks,
+  computeWeekIsoDates,
+  DEFAULT_STANDALONE_PERIODS,
+  formatClockMinute,
+  formatMinuteRange,
+  isScheduleEntryActiveOnDate,
+  mapTimeRangeToSections,
+  type ScheduleOverlayBlock,
+} from "./schedule-entries"
 export {
   compareExamStartTime,
   formatExamTime,
@@ -96,14 +111,19 @@ export {
   DEFAULT_SCHEDULE_EDITOR_STATE,
   SCHEDULE_DAYS,
   ScheduleAdjustmentBadge,
+  ScheduleCourseAdjustedIndicator,
+  ScheduleDayAdjustedIndicator,
   ScheduleDayHandle,
   ScheduleDayLabel,
   ScheduleGridTraces,
+  ScheduleOnlineBadge,
   SchedulePatchedLabel,
   computeScheduleGridRows,
   courseHasScheduleTrace,
+  isCourseAdjusted,
   type ScheduleEditorLabels,
   type ScheduleEditorState,
+  type ScheduleEmptyCellTarget,
   type ScheduleLabels,
   type WeekdayTuple,
 } from "./schedule-view-shared"

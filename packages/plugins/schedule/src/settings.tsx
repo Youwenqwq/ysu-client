@@ -66,11 +66,7 @@ export type ScheduleStartupOptionProps = DerivedComponentProps<
 export const ScheduleStartupOption: SlotComponent<ScheduleStartupOptionProps> = (props) => {
   const providerSnap = props.useProvider()
   const activeProvider = providerSnap.provider
-  if (
-    !activeProvider ||
-    !supportsPlugin(activeProvider.supportedPlugins, props.pluginId) ||
-    !hasSlice(activeProvider, "timetable")
-  ) {
+  if (activeProvider && !supportsPlugin(activeProvider.supportedPlugins, props.pluginId)) {
     return null
   }
 

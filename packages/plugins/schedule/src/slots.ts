@@ -1,4 +1,4 @@
-import "@orahako/sdk"
+import type { ScheduleEntryDetailOwner } from "@orahako/sdk"
 
 declare module "@orahako/sdk" {
   interface SlotMap {
@@ -7,5 +7,7 @@ declare module "@orahako/sdk" {
     "settings.widgets.add": { kind: "list"; owner: Record<string, never> }
     "settings.notifications.reminders": { kind: "list"; owner: Record<string, never> }
     "shell.header.actions": { kind: "list"; owner: Record<string, never> }
+    "schedule.toolbar.actions": { kind: "list"; owner: Record<string, never> }
+    "schedule.entry.detail": { kind: "list"; owner: ScheduleEntryDetailOwner }
   }
 }

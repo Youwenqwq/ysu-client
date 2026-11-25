@@ -1,12 +1,38 @@
 import type { Course, CurrentWeek, TermCalendar } from "@orahako/academic-sdk"
+import type { ScheduleDeliveryMode } from "@orahako/sdk"
 
 import { isCourseActiveInWeek } from "./schedule-utils"
+
+export interface CourseOverride {
+  /** Matches `courseIdentity(rawCourse)`. */
+  readonly courseKey: string
+  /** Snapshot display name for management UI even if upstream course disappears. */
+  readonly originalName: string
+  /** When true, hides this entire course from timetable, overview, reminders, and widgets. */
+  readonly hidden?: boolean
+  readonly name?: string
+  readonly classroom?: string
+  readonly teacher?: string
+  readonly weekDay?: number
+  readonly startSection?: number
+  readonly endSection?: number
+  readonly weekList?: readonly number[]
+  readonly deliveryMode?: ScheduleDeliveryMode
+  readonly note?: string
+  readonly updatedAt: string
+}
 
 export interface ScheduleOccurrence extends Course {
   occurrenceId: string
   date: string
   source: { course: Course; week: number; date: string }
   patchIds: string[]
+  /** Stable logical course identity key (from `courseIdentity(rawCourse)`). */
+  courseKey?: string
+  /** True when a course-level override was applied to this occurrence. */
+  overridden?: boolean
+  /** Present when this occurrence comes from a user-created custom course. */
+  customItemId?: string
 }
 
 export function isScheduleOccurrence(course: Course): course is ScheduleOccurrence {
@@ -35,6 +61,7 @@ export interface SchedulePatch {
   targetDate: string
   targetStartSection?: number
   classroom?: string
+  deliveryMode?: ScheduleDeliveryMode
   note: string
   createdAt: string
   enabled: boolean
@@ -153,7 +180,29 @@ export function resolveScheduleTerm(
   return start ? { semester, termStartDate: dateString(start), totalWeeks } : null
 }
 
-function courseIdentity(course: Course): string {
+export function formatWeekList(weeks: readonly number[]): string {
+  const sorted = [...new Set(weeks.filter((w) => Number.isInteger(w) && w >= 1))].sort(
+    (a, b) => a - b
+  )
+  if (sorted.length === 0) return ""
+  const ranges: string[] = []
+  let start = sorted[0]!
+  let prev = start
+  for (let i = 1; i < sorted.length; i += 1) {
+    const current = sorted[i]!
+    if (current === prev + 1) {
+      prev = current
+    } else {
+      ranges.push(start === prev ? `${start}` : `${start}-${prev}`)
+      start = current
+      prev = current
+    }
+  }
+  ranges.push(start === prev ? `${start}` : `${start}-${prev}`)
+  return ranges.join(", ")
+}
+
+export function courseIdentity(course: Course): string {
   const slot = [course.weekDay, course.startSection, course.endSection]
   return JSON.stringify(
     course.scheduleId
@@ -180,6 +229,81 @@ function courseIdentity(course: Course): string {
   )
 }
 
+export interface AppliedCourseRecord {
+  readonly course: Course
+  readonly originalCourse: Course
+  readonly courseKey: string
+  readonly overridden: boolean
+  readonly customItemId?: string
+}
+
+export function applyCourseOverrides(
+  rawCourses: readonly Course[],
+  overrides: readonly CourseOverride[],
+  customCourses: readonly Course[] = []
+): AppliedCourseRecord[] {
+  const overrideMap = new Map(overrides.map((item) => [item.courseKey, item]))
+  const records: AppliedCourseRecord[] = []
+
+  for (const rawCourse of rawCourses) {
+    const key = courseIdentity(rawCourse)
+    const override = overrideMap.get(key)
+    if (override?.hidden) continue
+
+    if (!override) {
+      records.push({
+        course: rawCourse,
+        originalCourse: rawCourse,
+        courseKey: key,
+        overridden: false,
+      })
+      continue
+    }
+
+    const overriddenWeekList =
+      override.weekList && override.weekList.length > 0
+        ? [...new Set(override.weekList.filter((w) => Number.isInteger(w) && w >= 1))].sort(
+            (a, b) => a - b
+          )
+        : undefined
+    const merged: Course = {
+      ...rawCourse,
+      ...(override.name !== undefined ? { name: override.name } : {}),
+      ...(override.classroom !== undefined ? { classroom: override.classroom } : {}),
+      ...(override.teacher !== undefined ? { teacher: override.teacher } : {}),
+      ...(override.weekDay !== undefined ? { weekDay: override.weekDay } : {}),
+      ...(override.startSection !== undefined ? { startSection: override.startSection } : {}),
+      ...(override.endSection !== undefined ? { endSection: override.endSection } : {}),
+      ...(overriddenWeekList
+        ? { weekList: overriddenWeekList, weeks: formatWeekList(overriddenWeekList) }
+        : {}),
+      ...(override.deliveryMode !== undefined ? { deliveryMode: override.deliveryMode } : {}),
+      ...(override.note !== undefined ? { note: override.note } : {}),
+    }
+    records.push({
+      course: merged,
+      originalCourse: rawCourse,
+      courseKey: key,
+      overridden: true,
+    })
+  }
+
+  for (const custom of customCourses) {
+    const customItemId = custom.scheduleId?.startsWith("custom:")
+      ? custom.scheduleId.slice("custom:".length)
+      : custom.scheduleId
+    records.push({
+      course: custom,
+      originalCourse: custom,
+      courseKey: courseIdentity(custom),
+      overridden: false,
+      ...(customItemId ? { customItemId } : {}),
+    })
+  }
+
+  return records
+}
+
 function occurrenceSignature(course: ScheduleOccurrence): string {
   return JSON.stringify([
     course.date,
@@ -195,12 +319,29 @@ function occurrenceSignature(course: ScheduleOccurrence): string {
 export function expandScheduleCourses(
   courses: readonly Course[],
   termStartDate: string,
-  totalWeeks: number
+  totalWeeks: number,
+  options?: {
+    readonly overrides?: readonly CourseOverride[]
+    readonly customCourses?: readonly Course[]
+  }
 ): ScheduleOccurrence[] {
+  const applied =
+    options?.overrides?.length || options?.customCourses?.length
+      ? applyCourseOverrides(courses, options.overrides ?? [], options.customCourses ?? [])
+      : courses.map((course) => ({
+          course,
+          originalCourse: course,
+          courseKey: courseIdentity(course),
+          overridden: false,
+          customItemId: course.scheduleId?.startsWith("custom:")
+            ? course.scheduleId.slice("custom:".length)
+            : undefined,
+        }))
+
   const result: ScheduleOccurrence[] = []
-  for (const course of courses) {
+  for (const record of applied) {
+    const { course, courseKey, overridden, customItemId } = record
     if (!Number.isInteger(course.weekDay) || course.weekDay < 1 || course.weekDay > 7) continue
-    const identity = courseIdentity(course)
     for (let week = 1; week <= totalWeeks; week++) {
       if (!isCourseActiveInWeek(course, week)) continue
       const date = scheduleDate(termStartDate, week, course.weekDay)
@@ -208,10 +349,13 @@ export function expandScheduleCourses(
         ...course,
         weeks: String(week),
         weekList: [week],
-        occurrenceId: JSON.stringify([identity, date]),
+        occurrenceId: JSON.stringify([courseKey, date]),
         date,
         source: { course, week, date },
         patchIds: [],
+        courseKey,
+        ...(overridden ? { overridden: true } : {}),
+        ...(customItemId ? { customItemId } : {}),
       })
     }
   }
@@ -238,9 +382,13 @@ export function resolveSchedulePatches(
   rawCourses: readonly Course[],
   termStartDate: string,
   totalWeeks: number,
-  patches: readonly SchedulePatch[]
+  patches: readonly SchedulePatch[],
+  options?: {
+    readonly overrides?: readonly CourseOverride[]
+    readonly customCourses?: readonly Course[]
+  }
 ): { courses: ScheduleOccurrence[]; traces: ScheduleTrace[]; issues: ScheduleIssue[] } {
-  let courses = expandScheduleCourses(rawCourses, termStartDate, totalWeeks)
+  let courses = expandScheduleCourses(rawCourses, termStartDate, totalWeeks, options)
   const traces: ScheduleTrace[] = []
   const issues: ScheduleIssue[] = []
   const issue = (patch: SchedulePatch, reason: ScheduleIssue["reason"]) => {
@@ -424,6 +572,11 @@ export function resolveSchedulePatches(
                 patch.classroom !== undefined && patch.kind === "course"
                   ? patch.classroom
                   : item.classroom,
+              deliveryMode:
+                patch.deliveryMode !== undefined && patch.kind === "course"
+                  ? patch.deliveryMode
+                  : item.deliveryMode,
+              note: patch.note && patch.kind === "course" ? patch.note : item.note,
               occurrenceId: JSON.stringify(["patch", patch.id, item.occurrenceId]),
               patchIds: [...new Set([...item.patchIds, patch.id])],
             }

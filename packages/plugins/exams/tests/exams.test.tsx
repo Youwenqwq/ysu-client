@@ -455,7 +455,7 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
       "native",
       "widgets",
     ])
-    expect(examsPlugin.optionalInject).toEqual(["overview", "assets"])
+    expect(examsPlugin.optionalInject).toEqual(["overview", "assets", "schedule"])
   })
 
   it("computes school-timezone exam day countdowns accurately", () => {
@@ -825,6 +825,157 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
 
     activeUnmount = undefined
     await dom.unmount()
+    runtime.dispose()
+  })
+
+  it("registers exams into an optional open schedule service and cleans up on plugin stop", async () => {
+    const registeredSources: Array<{ id: string; getEntries: () => readonly unknown[] }> = []
+    let disposedCount = 0
+
+    const mockSchedulePlugin = definePlugin({
+      manifest: {
+        id: "test.schedule-service",
+        name: "Mock Schedule",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+        provides: ["schedule"],
+      },
+      apply(ctx) {
+        const sourcesSource = { getSnapshot: () => [], subscribe: () => () => {} }
+        const stateSource = {
+          getSnapshot: () => ({ entries: [], sources: [] }),
+          subscribe: () => () => {},
+        }
+        ctx.set("schedule", {
+          sources: sourcesSource,
+          state: stateSource,
+          getSources: () => [],
+          getEffectiveSnapshot: () => ({ entries: [], sources: [] }),
+          subscribe: () => () => {},
+          registerSource(spec) {
+            const record = { id: spec.id, getEntries: () => spec.entries.getSnapshot() }
+            registeredSources.push(record)
+            return () => {
+              disposedCount += 1
+              const idx = registeredSources.indexOf(record)
+              if (idx >= 0) registeredSources.splice(idx, 1)
+            }
+          },
+        })
+      },
+    })
+
+    const examSchool = defineSchoolProvider({
+      id: "exam-sched-school",
+      name: "考试日程大学",
+      timeZone: "Asia/Shanghai",
+      slices: {
+        exams: {
+          getExams: async (): Promise<Exam[]> => [
+            {
+              name: "操作系统",
+              examName: "期末考试",
+              startAt: "2026-12-22T09:00:00",
+              endAt: "2026-12-22T11:00:00",
+              examLocation: "东区 205",
+              seatNumber: "18",
+            },
+          ],
+        },
+      },
+      async initialize() {},
+      async reset() {},
+      async logout() {},
+      async dispose() {},
+      async relogin() {
+        return true
+      },
+    })
+
+    const providerPlugin = definePlugin({
+      manifest: {
+        id: "test.exam-sched-provider",
+        name: "Exam Sched Provider",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "provider",
+        entry: "index.js",
+        inject: ["providers"],
+      },
+      inject: ["providers"] as const,
+      apply(ctx) {
+        ctx.providers.registerProvider("exam-sched-school", () => examSchool)
+      },
+    })
+
+    const runtime = new PluginRuntime()
+    runtime.context.set(
+      "storage",
+      new NamespacedStorageService({
+        local: createMemoryStorage(),
+        secure: createMemoryStorage(),
+      })
+    )
+    runtime.context.set("http", new StatelessHttpService())
+    runtime.context.set("native", createNativeService({ isNative: () => false }))
+
+    for (const plugin of [
+      slotRegistryPlugin,
+      uiRegistryPlugin,
+      settingsRegistryPlugin,
+      i18nRegistryPlugin,
+      routerRuntimePlugin,
+      navigationRuntimePlugin,
+      widgetRuntimePlugin,
+      providerRegistryRuntimePlugin,
+      sessionRuntimePlugin,
+      providerRuntimePlugin,
+      queryRuntimePlugin,
+      notificationRegistryRuntimePlugin,
+      mockSchedulePlugin,
+      providerPlugin,
+      examsPlugin,
+    ]) {
+      if (
+        plugin.manifest.id === sessionRuntimePlugin.manifest.id ||
+        plugin.manifest.id === providerRuntimePlugin.manifest.id
+      ) {
+        runtime.register(plugin, "builtin", { defaultSchoolId: "exam-sched-school" })
+      } else {
+        runtime.register(plugin, "builtin")
+      }
+      runtime.start(plugin.manifest.id)
+    }
+
+    const session = runtime.context.get("session")!
+    const providerRuntime = runtime.context.get("provider")!
+    await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
+    session.setCredential({
+      schoolId: "exam-sched-school",
+      credential: "ticket-exam-sched",
+      username: "20250999",
+    })
+    await providerRuntime.initialize()
+
+    expect(registeredSources).toHaveLength(1)
+    expect(registeredSources[0]?.id).toBe("exams")
+    await vi.waitFor(() => {
+      expect(registeredSources[0]?.getEntries()).toEqual([
+        expect.objectContaining({
+          category: "exam",
+          title: "操作系统",
+          location: "东区 205",
+          date: "2026-12-22",
+          time: { startMinute: 540, endMinute: 660 },
+        }),
+      ])
+    })
+
+    runtime.stop(EXAMS_PLUGIN_ID)
+    expect(disposedCount).toBe(1)
+    expect(registeredSources).toHaveLength(0)
     runtime.dispose()
   })
 })

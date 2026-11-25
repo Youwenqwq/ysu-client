@@ -33,6 +33,13 @@ export interface ScheduleEditorLabels {
   movedTo: (date: string) => string
 }
 
+export interface ScheduleEmptyCellTarget {
+  readonly week: number
+  readonly day: number
+  readonly section: number
+  readonly date?: string
+}
+
 export interface ScheduleLabels {
   weekdayShort: WeekdayTuple
   weekdayNames: WeekdayTuple
@@ -44,6 +51,8 @@ export interface ScheduleLabels {
   overlapCourses: (params: { count: number }) => string
   weeks?: string
   sections?: string
+  onlineTag?: string
+  personalTag?: string
   examTag: string
   examTime: string
   examLocation: string
@@ -61,6 +70,8 @@ export interface ScheduleEditorState {
   termStartDate: string
   traces: readonly ScheduleTrace[]
   courses: readonly ScheduleOccurrence[]
+  draggingOccurrenceIds?: ReadonlySet<string>
+  draggingDate?: string | null
   isDragging?: () => boolean
   selectCourse?: (course: Course) => boolean
   selectDay?: (date: string) => void
@@ -145,27 +156,69 @@ export function ScheduleAdjustmentBadge({
   )
 }
 
+export function isCourseAdjusted(course: Course, editor: ScheduleEditorState): boolean {
+  const occurrence = scheduleOccurrence(course)
+  if (!occurrence) return false
+  return editor.adjustedCourses.has(occurrence.occurrenceId) || Boolean(occurrence.overridden)
+}
+
 export function ScheduleDayLabel({
-  week,
   day,
   weekdayShort,
+}: {
+  week?: number
+  day: (typeof SCHEDULE_DAYS)[number]
+  weekdayShort: WeekdayTuple
+  editor?: ScheduleEditorState
+  editorLabels?: ScheduleEditorLabels
+}) {
+  return <span className="inline-flex items-center text-[11px]">{weekdayShort[day - 1]}</span>
+}
+
+export function ScheduleDayAdjustedIndicator({
+  week,
+  day,
   editor,
   editorLabels,
 }: {
   week: number
   day: (typeof SCHEDULE_DAYS)[number]
-  weekdayShort: WeekdayTuple
   editor: ScheduleEditorState
   editorLabels?: ScheduleEditorLabels
 }) {
   const adjusted =
     Boolean(editor.termStartDate) &&
     editor.adjustedDates.has(scheduleDate(editor.termStartDate, week, day))
+  if (!adjusted) return null
+  const label = editorLabels?.dayAdjusted
   return (
-    <span className="inline-flex items-center text-[11px]">
-      {adjusted && <ScheduleAdjustmentBadge kind="day" editorLabels={editorLabels} />}
-      {weekdayShort[day - 1]}
-    </span>
+    <span
+      data-schedule-adjusted="day"
+      title={label}
+      aria-label={label}
+      className="pointer-events-none absolute right-0 bottom-0.5 left-0 mx-auto h-[2.5px] w-4 rounded-full bg-primary/65"
+    />
+  )
+}
+
+export function ScheduleCourseAdjustedIndicator({
+  course,
+  editor,
+  editorLabels,
+}: {
+  course: Course
+  editor: ScheduleEditorState
+  editorLabels?: ScheduleEditorLabels
+}) {
+  if (!isCourseAdjusted(course, editor)) return null
+  const label = editorLabels?.courseAdjusted
+  return (
+    <span
+      data-schedule-adjusted="course"
+      title={label}
+      aria-label={label}
+      className="pointer-events-none absolute right-0 bottom-1 left-0 mx-auto h-[2.5px] w-5 rounded-full bg-foreground/35"
+    />
   )
 }
 
@@ -182,12 +235,17 @@ export function ScheduleDayHandle({
 }) {
   if (!editor.editing || !editor.termStartDate) return null
   const date = scheduleDate(editor.termStartDate, week, day)
+  const isDraggingDay = editor.draggingDate === date
   return (
     <button
       type="button"
+      draggable={false}
       data-schedule-day={date}
       disabled={!editor.enabled}
-      className="flex min-h-7 w-full touch-none items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-ring enabled:hover:bg-accent disabled:opacity-50"
+      className={cn(
+        "flex min-h-7 w-full cursor-grab touch-none items-center justify-center rounded-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring active:cursor-grabbing enabled:hover:bg-accent disabled:opacity-50",
+        isDraggingDay && "bg-primary/15 text-primary"
+      )}
       aria-label={editorLabels ? editorLabels.dragDay(date) : date}
       onClick={() => editor.selectDay?.(date)}
     >
@@ -206,8 +264,21 @@ export function SchedulePatchedLabel({
   editorLabels?: ScheduleEditorLabels
 }) {
   const occurrence = scheduleOccurrence(course)
-  if (!occurrence || !editor.adjustedCourses.has(occurrence.occurrenceId)) return null
+  if (!occurrence) return null
+  if (!editor.adjustedCourses.has(occurrence.occurrenceId) && !occurrence.overridden) return null
   return <ScheduleAdjustmentBadge kind="course" editorLabels={editorLabels} />
+}
+
+export function ScheduleOnlineBadge({ course, label }: { course: Course; label?: string }) {
+  if (course.deliveryMode !== "online" || !label) return null
+  return (
+    <Badge
+      variant="outline"
+      className="mr-0.5 h-[12px] border-sky-500/50 bg-sky-500/15 px-1 py-0 align-baseline text-[8px] leading-none text-sky-700 dark:text-sky-300"
+    >
+      {label}
+    </Badge>
+  )
 }
 
 export function ScheduleGridTraces({
@@ -221,7 +292,7 @@ export function ScheduleGridTraces({
   editor: ScheduleEditorState
   editorLabels?: ScheduleEditorLabels
 }) {
-  if (!editor.termStartDate || editor.traces.length === 0) return null
+  if (!editor.editing || !editor.termStartDate || editor.traces.length === 0) return null
   const groups = new Map<
     string,
     { day: number; start: number; end: number; traces: ScheduleTrace[] }
@@ -250,10 +321,10 @@ export function ScheduleGridTraces({
       <div
         key={key}
         className={cn(
-          "pointer-events-none relative z-30 m-0.5 flex flex-col gap-0.5 rounded-md",
+          "pointer-events-none relative z-30 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md",
           occupied
             ? "justify-end"
-            : "justify-center border border-dashed border-muted-foreground/60"
+            : "justify-start border border-dashed border-muted-foreground/60 bg-background/75"
         )}
         style={{ gridColumn: group.day + 1, gridRow: `${group.start} / ${group.end + 1}` }}
       >
@@ -269,20 +340,15 @@ export function ScheduleGridTraces({
               type="button"
               disabled={editor.editing && !editor.enabled}
               className={cn(
-                "pointer-events-auto flex flex-col rounded-sm bg-background/95 px-0.5 py-0.5 text-left text-[9px] leading-tight text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
-                occupied && "border border-dashed border-muted-foreground/60"
+                "pointer-events-auto flex w-full flex-col gap-0.5 text-left text-[9.5px] leading-tight text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
+                occupied
+                  ? "rounded-sm border border-dashed border-muted-foreground/60 bg-background/95 px-1 py-0.5"
+                  : "flex-1 p-1 transition-colors hover:bg-accent/40"
               )}
               title={`${trace.name} · ${kindText} · ${trace.targetDate}`}
               onClick={() => editor.onTraceClick?.(trace.patchId)}
             >
-              {!occupied && (
-                <span className="line-clamp-3 font-medium">
-                  {editor.coursePatchIds.has(trace.patchId) && (
-                    <ScheduleAdjustmentBadge kind="course" editorLabels={editorLabels} />
-                  )}
-                  {trace.name}
-                </span>
-              )}
+              {!occupied && <span className="line-clamp-3 font-medium">{trace.name}</span>}
               <span className="flex items-start gap-0.5">
                 <History className="mt-px size-2.5 shrink-0" />
                 <span>{statusText}</span>

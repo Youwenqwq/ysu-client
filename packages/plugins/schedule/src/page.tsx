@@ -1,32 +1,40 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import {
   CalendarDays,
   CalendarSearch,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Eye,
   Grid3x2,
   Grid3x3,
   History,
   Pencil,
+  Plus,
   Search,
+  SlidersHorizontal,
   TriangleAlert,
   Undo2,
 } from "lucide-react"
 import {
   buildCourseColorMap,
-  computeExamBlocks,
+  courseIdentity,
+  DEFAULT_STANDALONE_PERIODS,
   getAcademicClock,
   isCourseActiveInWeek,
   parseTimeToMinutes,
   periodIsInUse,
   resolveAcademicWeek,
+  scheduleOccurrence,
   schedulePatchAffectsWeek,
   scheduleWeek,
   ScheduleMobile,
   ScheduleTablet,
+  type CourseOverride,
   type ScheduleDrop,
+  type ScheduleEmptyCellTarget,
   type ScheduleSelection,
 } from "@orahako/academic-kit"
 import {
@@ -37,7 +45,6 @@ import {
   type ClassPeriod,
   type Course,
   type CurrentWeek,
-  type Exam,
   type ProviderRuntimeSnapshot,
   type QuerySnapshot,
   type SessionSnapshot,
@@ -47,7 +54,10 @@ import type {
   DerivedComponentProps,
   ObservableSource,
   RouteLocation,
+  ScheduleEffectiveSnapshot,
+  ScheduleEntry,
   SlotComponent,
+  Translator,
 } from "@orahako/sdk"
 import {
   Alert,
@@ -77,6 +87,11 @@ import {
   useIsMobile,
 } from "@orahako/ui-primitives"
 import {
+  ScheduleEntryDetailDialog,
+  ScheduleItemFormDialog,
+  type ScheduleItemFormTarget,
+} from "./custom-dialogs"
+import {
   buildScheduleLabels,
   formatScheduleEditorError,
   type ScheduleDictionary,
@@ -88,8 +103,13 @@ import {
   type ScheduleAdjustmentsDialogView,
 } from "./editor-dialogs"
 import { CourseActivityModal, CourseSigninModal, type MobileLessonBridge } from "./modals"
+import "./slots"
 import {
   computeEffectiveScheduleSnapshot,
+  customItemToCourse,
+  isCustomItemActiveInScope,
+  type CustomScheduleItem,
+  type ScheduleCustomizationsState,
   type SchedulePatchDraft,
   type SchedulePatchesState,
   type SchedulePatchMutators,
@@ -98,6 +118,15 @@ import {
   type WidgetAssistantPosition,
 } from "./stores"
 import { WidgetDiscovery } from "./widget-discovery"
+
+export const SCHEDULE_PAGE_CHILDREN = {
+  "schedule.toolbar.actions": { kind: "list" },
+  "schedule.entry.detail": { kind: "list" },
+} as const
+
+const STANDALONE_TODAY_WEEK = 53
+const STANDALONE_TOTAL_WEEKS = 105
+const STANDALONE_SCOPE = "__personal__"
 
 export interface FreeRoomTargetParams {
   readonly week: number
@@ -111,16 +140,24 @@ export interface SchedulePageInject {
     readonly settings: ObservableSource<ScheduleSettingsState>
     readonly patches: ObservableSource<SchedulePatchesState>
     readonly patchesHydrated: ObservableSource<boolean>
+    readonly customizations: ObservableSource<ScheduleCustomizationsState>
+    readonly customizationsHydrated: ObservableSource<boolean>
+    readonly scheduleState: ObservableSource<ScheduleEffectiveSnapshot>
     readonly provider: ObservableSource<ProviderRuntimeSnapshot>
     readonly session: ObservableSource<SessionSnapshot>
     readonly schedule: ObservableSource<QuerySnapshot<Course[]>>
     readonly currentWeek: ObservableSource<QuerySnapshot<CurrentWeek>>
     readonly termCalendar: ObservableSource<QuerySnapshot<TermCalendar>>
     readonly periods: ObservableSource<QuerySnapshot<ClassPeriod[]>>
-    readonly exams: ObservableSource<QuerySnapshot<Exam[]>>
     readonly navigation: ObservableSource<number>
   }
   readonly patchMutators: SchedulePatchMutators
+  readonly upsertOverride: (scope: string, override: CourseOverride) => void
+  readonly removeOverride: (scope: string, courseKey: string) => void
+  readonly upsertCustomItem: (item: CustomScheduleItem) => void
+  readonly removeCustomItem: (id: string) => void
+  readonly onSemesterChange: (semester: string) => void
+  readonly refreshSources: () => Promise<void>
   readonly mobileBridge: MobileLessonBridge
   readonly pluginId: string
   readonly isNative: () => boolean
@@ -139,7 +176,7 @@ export interface SchedulePageInject {
 export type SchedulePageProps = DerivedComponentProps<
   Record<string, never>,
   ScheduleDictionary,
-  undefined,
+  typeof SCHEDULE_PAGE_CHILDREN,
   ScheduleViewStoreInstance,
   SchedulePageInject
 >
@@ -169,20 +206,119 @@ function isUnsupportedError(error: Error | null): boolean {
   return "code" in error && error.code === ProviderErrorCode.FEATURE_NOT_SUPPORTED
 }
 
+function computeStandaloneCalendarAnchor(
+  isoToday: string,
+  weekday: number
+): {
+  readonly termStartDate: string
+  readonly currentWeek: CurrentWeek
+} {
+  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(isoToday)
+  const year = match ? Number(match[1]) : new Date().getFullYear()
+  const month = match ? Number(match[2]) - 1 : new Date().getMonth()
+  const day = match ? Number(match[3]) : new Date().getDate()
+  const todayDate = new Date(year, month, day, 12)
+  const mondayThisWeek = new Date(todayDate)
+  mondayThisWeek.setDate(todayDate.getDate() - (weekday - 1))
+  const start = new Date(mondayThisWeek)
+  start.setDate(mondayThisWeek.getDate() - (STANDALONE_TODAY_WEEK - 1) * 7)
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+  return {
+    termStartDate: fmt(start),
+    currentWeek: {
+      week: STANDALONE_TODAY_WEEK,
+      weekday,
+      date: fmt(todayDate),
+      weekStartDate: fmt(mondayThisWeek),
+    },
+  }
+}
+
+function courseToDetailEntry(course: Course, pluginId: string): ScheduleEntry {
+  const occ = scheduleOccurrence(course)
+  return {
+    id: occ?.occurrenceId ?? courseIdentity(course),
+    seriesId: occ?.courseKey ?? courseIdentity(course),
+    sourceId: occ?.customItemId ? "personal" : "academic-timetable",
+    sourcePluginId: pluginId,
+    category: occ?.customItemId ? "custom" : "course",
+    title: course.name,
+    ...(course.classroom ? { location: course.classroom } : {}),
+    ...(course.teacher ? { subtitle: course.teacher } : {}),
+    ...(course.deliveryMode ? { deliveryMode: course.deliveryMode } : {}),
+    ...(course.note ? { note: course.note } : {}),
+    ...(occ?.date ? { date: occ.date } : {}),
+    weekDay: course.weekDay,
+    ...(course.weekList ? { weekList: course.weekList } : {}),
+    sections: { startSection: course.startSection, endSection: course.endSection },
+  }
+}
+
+function ScheduleEditActionButtons({
+  hasUndo,
+  onUndo,
+  onOpenManager,
+  onDone,
+  t,
+}: {
+  readonly hasUndo: boolean
+  readonly onUndo: () => void
+  readonly onOpenManager: () => void
+  readonly onDone: () => void
+  readonly t: Translator<ScheduleDictionary>
+}): ReactNode {
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        disabled={!hasUndo}
+        onClick={onUndo}
+        aria-label={t("scheduleEditor.undoLast")}
+      >
+        <Undo2 />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={onOpenManager}
+        aria-label={t("scheduleEditor.manage")}
+      >
+        <History />
+      </Button>
+      <Button type="button" size="sm" onClick={onDone}>
+        <Check data-icon="inline-start" />
+        {t("scheduleEditor.done")}
+      </Button>
+    </div>
+  )
+}
+
 export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
-  const { t, useStore, actions, canOpenSchoolSchedule: canOpenSchoolScheduleRoute } = props
+  const {
+    t,
+    useStore,
+    actions,
+    renderSlot,
+    canOpenSchoolSchedule: canOpenSchoolScheduleRoute,
+  } = props
   const isMobile = useIsMobile()
   const clockTick = props.useClockTick()
   const settings = props.useSettings()
   const patchesState = props.usePatches()
   const patchesHydrated = props.usePatchesHydrated()
+  const customizationsState = props.useCustomizations()
+  const customizationsHydrated = props.useCustomizationsHydrated()
+  const scheduleState = props.useScheduleState()
   const providerSnap = props.useProvider()
   const sessionSnap = props.useSession()
   const scheduleQuery = props.useSchedule()
   const currentWeekQuery = props.useCurrentWeek()
   const termCalendarQuery = props.useTermCalendar()
   const periodsQuery = props.usePeriods()
-  const examsQuery = props.useExams()
   props.useNavigation()
   const canOpenSchoolSchedule = canOpenSchoolScheduleRoute()
 
@@ -195,6 +331,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   const pendingDrop = useStore((s) => s.pendingDrop)
   const manager = useStore((s) => s.manager)
   const undo = useStore((s) => s.undo)
+  const createRequestNonce = useStore((s) => s.createRequestNonce)
 
   const [activityCourse, setActivityCourse] = useState<Course | null>(null)
   const [activityWeek, setActivityWeek] = useState(1)
@@ -202,6 +339,16 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   const [signinActivityId, setSigninActivityId] = useState<string | null>(null)
   const [signinType, setSigninType] = useState(1)
   const [signinOpen, setSigninOpen] = useState(false)
+  const [itemFormTarget, setItemFormTarget] = useState<ScheduleItemFormTarget>(null)
+  const [detailEntry, setDetailEntry] = useState<ScheduleEntry | null>(null)
+  const lastCreateNonceRef = useRef(createRequestNonce)
+
+  const activeProvider = providerSnap.provider
+  const hasAcademicTimetable = Boolean(
+    activeProvider &&
+    hasSlice(activeProvider, "timetable") &&
+    supportsPlugin(activeProvider.supportedPlugins, props.pluginId)
+  )
 
   const compactMode = settings.compactMode
   const rawCourses = useMemo(() => scheduleQuery.data ?? [], [scheduleQuery.data])
@@ -209,23 +356,37 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   const rawCalendar = termCalendarQuery.data
   const semester = queriedTerm || snapshot?.semester
   const termCalendar =
-    semester && rawCalendar?.semester && rawCalendar.semester !== semester
-      ? undefined
-      : rawCalendar
+    semester && rawCalendar?.semester && rawCalendar.semester !== semester ? undefined : rawCalendar
   const weekAnchor =
     queriedTerm && snapshot?.semester && snapshot.semester !== queriedTerm ? null : snapshot
 
-  const scheduleRules = providerSnap.provider?.slices.timetable?.scheduleRules
+  const scheduleRules = activeProvider?.slices.timetable?.scheduleRules
   const timeZone = scheduleRules?.timeZone
   const clock = useMemo(
     () => getAcademicClock(new Date(clockTick), timeZone),
     [clockTick, timeZone]
   )
-  const currentWeek = useMemo(
+
+  const standaloneAnchor = useMemo(
+    () => computeStandaloneCalendarAnchor(clock.date, clock.weekday),
+    [clock.date, clock.weekday]
+  )
+
+  const academicCurrentWeek = useMemo(
     () => resolveAcademicWeek(snapshot, rawCalendar, clock.date, queriedTerm || undefined),
     [clock.date, queriedTerm, rawCalendar, snapshot]
   )
-  const selectedWeek = weekOverride ?? currentWeek?.week ?? 1
+  const isStandalone = !hasAcademicTimetable
+  const currentWeek = isStandalone ? standaloneAnchor.currentWeek : academicCurrentWeek
+  const effectiveWeekAnchor = isStandalone ? standaloneAnchor.currentWeek : weekAnchor
+  const effectiveTermStartDate = isStandalone
+    ? standaloneAnchor.termStartDate
+    : termCalendar?.startDate
+  const effectiveTotalWeeks = isStandalone
+    ? STANDALONE_TOTAL_WEEKS
+    : (termCalendar?.totalWeeks ?? 0)
+  const selectedWeek =
+    weekOverride ?? currentWeek?.week ?? (isStandalone ? STANDALONE_TODAY_WEEK : 1)
 
   const effective = useMemo(
     () =>
@@ -238,8 +399,12 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         sessionSnapshot: sessionSnap,
         patchesState,
         patchesHydrated,
+        customizationsState,
+        customizationsHydrated,
       }),
     [
+      customizationsHydrated,
+      customizationsState,
       patchesHydrated,
       patchesState,
       providerSnap,
@@ -251,18 +416,42 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     ]
   )
 
-  const periods = useMemo(
+  const providerPeriods = useMemo(
     () => (periodsQuery.data ?? []).filter(periodIsInUse).sort((a, b) => a.section - b.section),
     [periodsQuery.data]
   )
+  const periods = providerPeriods.length > 0 ? providerPeriods : DEFAULT_STANDALONE_PERIODS
 
-  const canEdit = effective.ready && periods.length > 0
+  const activeScope = effective.scope ?? (isStandalone ? STANDALONE_SCOPE : null)
+
+  const standaloneCustomCourses = useMemo(
+    () =>
+      isStandalone
+        ? customizationsState.customItems
+            .filter(
+              (item) =>
+                isCustomItemActiveInScope(item, null) &&
+                item.timeMode === "section" &&
+                item.recurrence !== "once"
+            )
+            .map((item) => customItemToCourse(item, STANDALONE_TOTAL_WEEKS))
+            .filter((course): course is Course => course !== null)
+        : [],
+    [customizationsState.customItems, isStandalone]
+  )
+
+  const canEdit = hasAcademicTimetable && effective.ready && providerPeriods.length > 0
   const editing =
     effective.ready && editScope !== null && editScope === effective.scope && !showOriginal
-  const mobileFullscreen = isMobile && (editing || showOriginal)
-  const courses = effective.ready && !showOriginal ? effective.courses : rawCourses
+  const courses = isStandalone
+    ? standaloneCustomCourses
+    : effective.ready && !showOriginal
+      ? effective.courses
+      : rawCourses
+  const overlayEntries = showOriginal ? [] : scheduleState.entries
+
   const activePending = pendingDrop?.scope === effective.scope ? pendingDrop : null
-  const activeManager = manager?.scope === effective.scope ? manager : null
+  const activeManager = manager?.scope === activeScope ? manager : null
   const undoPatch =
     undo?.scope === effective.scope
       ? effective.patches.find((patch) => patch.id === undo.id)
@@ -282,6 +471,8 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   }, [weekAdjustments, effective.issues])
   const weekAdjustmentCount = weekAdjustments.length
   const reviewCount = new Set(weekIssues.map((issue) => issue.patchId)).size
+  const totalCustomizationCount =
+    effective.overrides.length + effective.customItems.length + effective.patches.length
 
   const adjustmentsView = useMemo<ScheduleAdjustmentsDialogView>(
     () =>
@@ -293,6 +484,19 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     [undoPatch, undo, activeManager]
   )
 
+  useEffect(() => {
+    if (createRequestNonce !== lastCreateNonceRef.current) {
+      lastCreateNonceRef.current = createRequestNonce
+      setItemFormTarget({
+        mode: "create",
+        initialKind: isStandalone ? "event" : "course",
+        initialDay: clock.weekday,
+        initialDate: clock.date,
+        initialWeek: selectedWeek,
+      })
+    }
+  }, [clock.date, clock.weekday, createRequestNonce, isStandalone, selectedWeek])
+
   useBackHandler(() => actions.finishEditing(), editing)
   useBackHandler(() => actions.setShowOriginal(false), showOriginal)
 
@@ -301,29 +505,37 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     rawCourses: scheduleQuery.data,
     termStartDate: effective.termStartDate,
     totalWeeks: effective.totalWeeks,
+    overrides: effective.overrides,
+    customCourses: effective.customCourses,
   }
 
   const enterEditor = (): void => {
     if (!canEdit || !effective.scope) return
-    actions.enterEditor(
-      effective.scope,
-      Math.min(effective.totalWeeks, Math.max(1, selectedWeek))
-    )
+    actions.enterEditor(effective.scope, Math.min(effective.totalWeeks, Math.max(1, selectedWeek)))
   }
 
   const openManager = (id: string | null = null): void => {
-    if (effective.scope) {
-      actions.setManager({ scope: effective.scope, id })
+    if (activeScope) {
+      actions.setManager({ scope: activeScope, id })
     }
   }
 
   const openAdjustment = (drop: ScheduleDrop): void => {
-    if (editing && effective.scope) {
+    if (effective.scope) {
       actions.setPendingDrop({ scope: effective.scope, drop })
     }
   }
 
   const selectAdjustment = (selection: ScheduleSelection): void => {
+    if (
+      selection.kind === "course" &&
+      selection.courses.length === 1 &&
+      selection.courses[0] &&
+      !selection.courses[0].customItemId
+    ) {
+      handleEditCourseFromModal(selection.courses[0], "once")
+      return
+    }
     openAdjustment({
       selection,
       targetDate: selection.date,
@@ -360,40 +572,159 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     }
   }
 
+  const handleSaveCustomItem = (item: CustomScheduleItem): void => {
+    props.upsertCustomItem(item)
+    toast.success(t("scheduleCustom.savedToast"))
+  }
+
+  const handleDeleteCustomItem = (id: string, title: string): void => {
+    const existing = customizationsState.customItems.find((item) => item.id === id)
+    props.removeCustomItem(id)
+    toast.success(t("scheduleCustom.deletedToast", { name: title }), {
+      ...(existing
+        ? {
+            action: {
+              label: t("scheduleEditor.undo"),
+              onClick: () => props.upsertCustomItem(existing),
+            },
+          }
+        : {}),
+    })
+  }
+
+  const handleSaveOverride = (override: CourseOverride): void => {
+    if (!effective.scope) return
+    props.upsertOverride(effective.scope, override)
+    toast.success(t("scheduleCustom.savedToast"))
+  }
+
+  const handleRestoreOverride = (courseKey: string, name: string): void => {
+    if (!effective.scope) return
+    props.removeOverride(effective.scope, courseKey)
+    toast.success(t("scheduleCustom.restoredToast", { name }))
+  }
+
+  const handleHideCourse = (course: Course): void => {
+    if (!effective.scope) return
+    const occ = scheduleOccurrence(course)
+    const courseKey = occ?.courseKey ?? courseIdentity(course)
+    const originalCourse = rawCourses.find((raw) => courseIdentity(raw) === courseKey) ?? course
+    props.upsertOverride(effective.scope, {
+      courseKey,
+      originalName: originalCourse.name,
+      hidden: true,
+      updatedAt: new Date().toISOString(),
+    })
+    toast.success(t("scheduleCustom.hiddenToast", { name: course.name }), {
+      action: {
+        label: t("scheduleEditor.undo"),
+        onClick: () => {
+          if (effective.scope) props.removeOverride(effective.scope, courseKey)
+        },
+      },
+    })
+  }
+
+  const handleEditCourseFromModal = (
+    course: Course,
+    initialScope: "whole" | "once" = "whole"
+  ): void => {
+    const occ = scheduleOccurrence(course)
+    const courseKey = occ?.courseKey ?? courseIdentity(course)
+    const rawCourse = rawCourses.find((raw) => courseIdentity(raw) === courseKey) ?? course
+    const existingOverride = effective.overrides.find((item) => item.courseKey === courseKey)
+    setItemFormTarget({
+      mode: "override-course",
+      courseKey,
+      rawCourse,
+      ...(occ ? { occurrence: occ } : {}),
+      existingOverride,
+      initialScope,
+    })
+  }
+
+  const handleEditOverrideByRecord = (override: CourseOverride): void => {
+    const rawCourse = rawCourses.find((raw) => courseIdentity(raw) === override.courseKey)
+    if (!rawCourse) return
+    setItemFormTarget({
+      mode: "override-course",
+      courseKey: override.courseKey,
+      rawCourse,
+      existingOverride: override,
+    })
+  }
+
+  const handleEditCustomById = (customItemId: string): void => {
+    const found = customizationsState.customItems.find((item) => item.id === customItemId)
+    if (found) {
+      setItemFormTarget({ mode: "edit-custom", item: found })
+    }
+  }
+
+  const handleCancelSingleFromModal = (course: Course): void => {
+    const occ = scheduleOccurrence(course)
+    if (!occ || !effective.scope) return
+    try {
+      saveAdjustment({
+        kind: "course",
+        mode: "clear",
+        sourceDate: occ.date,
+        targetDate: occ.date,
+        note: "",
+        source: [occ],
+        replaced: [],
+        dependsOn: [...occ.patchIds],
+      })
+    } catch (error) {
+      toast.error(formatScheduleEditorError(t, error))
+    }
+  }
+
+  const handleEmptyCellTap = (cell: ScheduleEmptyCellTarget): void => {
+    setItemFormTarget({
+      mode: "create",
+      initialKind: isStandalone ? "event" : "course",
+      initialDay: cell.day,
+      initialDate: cell.date,
+      initialSection: cell.section,
+      initialWeek: cell.week,
+    })
+  }
+
   const loading =
-    scheduleQuery.isLoading ||
-    scheduleQuery.isRefreshing ||
-    currentWeekQuery.isLoading ||
-    currentWeekQuery.isRefreshing ||
-    termCalendarQuery.isLoading ||
-    termCalendarQuery.isRefreshing ||
-    periodsQuery.isLoading ||
-    periodsQuery.isRefreshing ||
-    examsQuery.isLoading ||
-    examsQuery.isRefreshing
+    hasAcademicTimetable &&
+    (scheduleQuery.isLoading ||
+      scheduleQuery.isRefreshing ||
+      currentWeekQuery.isLoading ||
+      currentWeekQuery.isRefreshing ||
+      termCalendarQuery.isLoading ||
+      termCalendarQuery.isRefreshing ||
+      periodsQuery.isLoading ||
+      periodsQuery.isRefreshing)
 
   const selectWeek = (week: number): void => {
-    const nextWeek = Math.max(1, week)
+    const maxW = effectiveTotalWeeks || Infinity
+    const nextWeek = Math.min(maxW, Math.max(1, week))
     actions.setWeekOverride(!editing && nextWeek === currentWeek?.week ? null : nextWeek)
   }
 
   const shiftWeek = (delta: number): void => {
-    selectWeek(Math.min(effective.totalWeeks || Infinity, Math.max(1, selectedWeek + delta)))
+    selectWeek(selectedWeek + delta)
   }
 
   useEffect(() => {
+    if (!hasAcademicTimetable) return
     const errors = [
       scheduleQuery.error,
       currentWeekQuery.error,
       termCalendarQuery.error,
       periodsQuery.error,
-      examsQuery.error,
     ].filter((err): err is Error => err !== null && !isUnsupportedError(err))
     if (errors.length === 0) return
     toast.error(errors[0]?.message || t("updating"))
   }, [
     currentWeekQuery.error,
-    examsQuery.error,
+    hasAcademicTimetable,
     periodsQuery.error,
     scheduleQuery.error,
     t,
@@ -402,6 +733,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
 
   const handleQuery = async (): Promise<void> => {
     const nextTerm = termInput.trim()
+    props.onSemesterChange(nextTerm)
     if (nextTerm === queriedTerm) {
       actions.setFilterDrawerOpen(false)
       await Promise.allSettled([
@@ -409,7 +741,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         currentWeekQuery.refresh(),
         termCalendarQuery.refresh(),
         periodsQuery.refresh(),
-        examsQuery.refresh(),
+        props.refreshSources(),
       ])
     } else {
       actions.commitQueriedTerm(nextTerm)
@@ -438,64 +770,17 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
 
   const courseColors = useMemo(() => buildCourseColorMap(courses), [courses])
 
-  const examBlocks = useMemo(
-    () =>
-      computeExamBlocks(
-        examsQuery.data ?? [],
-        periods,
-        weekAnchor,
-        selectedWeek,
-        termCalendar?.startDate,
-        timeZone
-      ),
-    [examsQuery.data, periods, selectedWeek, termCalendar?.startDate, timeZone, weekAnchor]
-  )
-
   const handleCourseTap = (course: Course, week: number): void => {
     setActivityCourse(course)
     setActivityWeek(week)
     setActivityOpen(true)
   }
 
-  const editorActions = (
-    <div className="flex items-center gap-1">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        disabled={!lastAdjustment}
-        onClick={() => {
-          if (lastAdjustment) requestUndo(lastAdjustment.id)
-        }}
-        aria-label={t("scheduleEditor.undoLast")}
-      >
-        <Undo2 />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        onClick={() => openManager()}
-        aria-label={t("scheduleEditor.manage")}
-      >
-        <History />
-      </Button>
-      <Button type="button" size="sm" onClick={() => actions.finishEditing()}>
-        <Check data-icon="inline-start" />
-        {t("scheduleEditor.done")}
-      </Button>
-    </div>
-  )
-
-  const activeProvider = providerSnap.provider
-  if (
-    !supportsPlugin(activeProvider?.supportedPlugins, props.pluginId) ||
-    !hasSlice(activeProvider, "timetable")
-  ) {
+  if (activeProvider && !supportsPlugin(activeProvider.supportedPlugins, props.pluginId)) {
     return null
   }
 
-  if (loading && courses.length === 0) {
+  if (loading && courses.length === 0 && overlayEntries.length === 0) {
     return (
       <div className="flex flex-col gap-4" data-page="schedule-loading">
         <Skeleton className="h-12" />
@@ -504,17 +789,27 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     )
   }
 
+  const toolbarExtraActions = renderSlot("schedule.toolbar.actions")
+  const detailCustomItem =
+    detailEntry && typeof detailEntry.metadata?.customItemId === "string"
+      ? (customizationsState.customItems.find(
+          (item) => item.id === detailEntry.metadata?.customItemId
+        ) ?? null)
+      : null
+
   const renderFilterControls = (idPrefix: string): ReactNode => (
     <FieldGroup className="flex flex-row flex-wrap items-end gap-3">
-      <Field className="w-48">
-        <FieldLabel htmlFor={`${idPrefix}-term`}>{t("schedule.termLabel")}</FieldLabel>
-        <Input
-          id={`${idPrefix}-term`}
-          value={termInput}
-          onChange={(event) => actions.setTermInput(event.target.value)}
-          placeholder={t("schedule.termPlaceholder")}
-        />
-      </Field>
+      {hasAcademicTimetable && (
+        <Field className="w-48">
+          <FieldLabel htmlFor={`${idPrefix}-term`}>{t("schedule.termLabel")}</FieldLabel>
+          <Input
+            id={`${idPrefix}-term`}
+            value={termInput}
+            onChange={(event) => actions.setTermInput(event.target.value)}
+            placeholder={t("schedule.termPlaceholder")}
+          />
+        </Field>
+      )}
       <Field className="min-w-[16rem]">
         <FieldLabel htmlFor={`${idPrefix}-week`}>{t("schedule.weekLabel")}</FieldLabel>
         <div className="flex flex-wrap items-center gap-2">
@@ -528,14 +823,25 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
             >
               <ChevronLeft />
             </Button>
-            <Input
-              id={`${idPrefix}-week`}
-              type="number"
-              value={selectedWeek || ""}
-              onChange={(event) => selectWeek(Number.parseInt(event.target.value, 10) || 1)}
-              placeholder={t("schedule.weeks")}
-              className="w-20 text-center"
-            />
+            {isStandalone ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => selectWeek(STANDALONE_TODAY_WEEK)}
+              >
+                {t("schedule.today")}
+              </Button>
+            ) : (
+              <Input
+                id={`${idPrefix}-week`}
+                type="number"
+                value={selectedWeek || ""}
+                onChange={(event) => selectWeek(Number.parseInt(event.target.value, 10) || 1)}
+                placeholder={t("schedule.weeks")}
+                className="w-20 text-center"
+              />
+            )}
             <Button
               type="button"
               variant="outline"
@@ -546,55 +852,136 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
               <ChevronRight />
             </Button>
           </div>
-          {currentWeek && currentWeek.week >= 1 && (
+          {!isStandalone && currentWeek && currentWeek.week >= 1 && (
             <Badge variant="secondary">
               {t("schedule.currentWeekBadge", { week: currentWeek.week })}
             </Badge>
           )}
         </div>
       </Field>
-      <Button type="button" onClick={() => void handleQuery()} disabled={loading}>
-        {loading ? <Spinner data-icon="inline-start" /> : <Search data-icon="inline-start" />}
-        {t("schedule.query")}
-      </Button>
-      <Button type="button" variant="outline" disabled={!canEdit} onClick={enterEditor}>
-        <Pencil data-icon="inline-start" />
-        {t("scheduleEditor.enter")}
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        disabled={!effective.ready}
-        onClick={() => {
-          actions.setFilterDrawerOpen(false)
-          openManager()
-        }}
-      >
-        <History data-icon="inline-start" />
-        {t("scheduleEditor.manage")}
-      </Button>
-      {!canEdit && <p className="text-sm text-muted-foreground">{t("scheduleEditor.notReady")}</p>}
+      {editing ? (
+        <ScheduleEditActionButtons
+          hasUndo={Boolean(lastAdjustment)}
+          onUndo={() => {
+            if (lastAdjustment) requestUndo(lastAdjustment.id)
+          }}
+          onOpenManager={() => {
+            actions.setFilterDrawerOpen(false)
+            openManager()
+          }}
+          onDone={() => {
+            actions.setFilterDrawerOpen(false)
+            actions.finishEditing()
+          }}
+          t={t}
+        />
+      ) : (
+        <>
+          {hasAcademicTimetable && (
+            <Button type="button" onClick={() => void handleQuery()} disabled={loading}>
+              {loading ? <Spinner data-icon="inline-start" /> : <Search data-icon="inline-start" />}
+              {t("schedule.query")}
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant={hasAcademicTimetable ? "outline" : "default"}
+            data-schedule-add-item=""
+            onClick={() => {
+              actions.setFilterDrawerOpen(false)
+              setItemFormTarget({
+                mode: "create",
+                initialKind: isStandalone ? "event" : "course",
+                initialDay: clock.weekday,
+                initialDate: clock.date,
+                initialWeek: selectedWeek,
+              })
+            }}
+          >
+            <Plus data-icon="inline-start" />
+            {t("schedule.addEntry")}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!activeScope}
+                data-schedule-manage-menu=""
+              >
+                <SlidersHorizontal data-icon="inline-start" />
+                {t("schedule.manageMenu")}
+                {totalCustomizationCount > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {totalCustomizationCount}
+                  </Badge>
+                )}
+                <ChevronDown className="ml-0.5 size-3.5 opacity-70" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {hasAcademicTimetable && (
+                <DropdownMenuItem
+                  disabled={!canEdit}
+                  onSelect={() => {
+                    actions.setFilterDrawerOpen(false)
+                    enterEditor()
+                  }}
+                >
+                  <Pencil className="mr-2 size-4" />
+                  {t("schedule.manageDragAdjust")}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                disabled={!activeScope}
+                onSelect={() => {
+                  actions.setFilterDrawerOpen(false)
+                  openManager()
+                }}
+              >
+                <History className="mr-2 size-4" />
+                <span className="flex-1">{t("schedule.manageRecords")}</span>
+                {totalCustomizationCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {totalCustomizationCount}
+                  </Badge>
+                )}
+              </DropdownMenuItem>
+              {hasAcademicTimetable && (
+                <DropdownMenuItem
+                  disabled={!effective.ready}
+                  onSelect={() => {
+                    actions.setFilterDrawerOpen(false)
+                    actions.setShowOriginal(true)
+                  }}
+                >
+                  <Eye className="mr-2 size-4" />
+                  {t("scheduleEditor.showOriginal")}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      )}
     </FieldGroup>
   )
 
   return (
     <div
       data-page="schedule"
-      className={
-        isMobile && (compactMode || mobileFullscreen)
-          ? "flex min-h-0 flex-1 flex-col"
-          : "flex flex-col gap-6"
-      }
+      className={isMobile && compactMode ? "flex min-h-0 flex-1 flex-col" : "flex flex-col gap-6"}
     >
       <Card className="hidden md:block">
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="flex flex-col gap-1.5">
             <CardTitle>{t("schedule.title")}</CardTitle>
-            <CardDescription>{t("schedule.description")}</CardDescription>
+            <CardDescription>
+              {isStandalone ? t("schedule.standaloneHint") : t("schedule.description")}
+            </CardDescription>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {editing && editorActions}
-            {canOpenSchoolSchedule && (
+            {toolbarExtraActions}
+            {canOpenSchoolSchedule && hasAcademicTimetable && (
               <>
                 <Button type="button" variant="outline" onClick={handleOpenFreeRooms}>
                   <CalendarSearch data-icon="inline-start" />
@@ -608,24 +995,22 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
             )}
           </div>
         </CardHeader>
-        {!editing && <CardContent>{renderFilterControls("schedule-desktop")}</CardContent>}
+        <CardContent>{renderFilterControls("schedule-desktop")}</CardContent>
       </Card>
 
-      {showOriginal && (
-        <Alert className={cn("shrink-0", isMobile && "rounded-none border-x-0 border-t-0")}>
+      {showOriginal && !isMobile && (
+        <Alert className="shrink-0">
           <AlertTitle>{t("scheduleEditor.showOriginal")}</AlertTitle>
           <AlertDescription>
             <p>{t("scheduleEditor.originalNotice")}</p>
-            {!isMobile && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => actions.setShowOriginal(false)}
-              >
-                {t("scheduleEditor.showEffective")}
-              </Button>
-            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => actions.setShowOriginal(false)}
+            >
+              {t("scheduleEditor.showEffective")}
+            </Button>
           </AlertDescription>
         </Alert>
       )}
@@ -657,7 +1042,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
 
       <ScheduleDragSurface
         editing={editing}
-        enabled={editing && !activePending && !activeManager && !undoPatch}
+        enabled={editing && !activePending && !activeManager && !undoPatch && !itemFormTarget}
         selectedWeek={selectedWeek || 1}
         totalWeeks={effective.totalWeeks}
         termStartDate={effective.termStartDate}
@@ -674,13 +1059,11 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
           isMobile ? (
             <div
               className={cn(
-                mobileFullscreen
-                  ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-                  : "-mx-4 -mt-4 -mb-4 flex flex-col md:m-0",
+                "-mx-4 -mt-4 -mb-4 flex flex-col md:m-0",
                 compactMode && "min-h-0 flex-1 overflow-hidden"
               )}
               style={
-                compactMode || mobileFullscreen
+                compactMode
                   ? undefined
                   : {
                       minHeight:
@@ -688,45 +1071,68 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                     }
               }
             >
+              {showOriginal && (
+                <Alert className="shrink-0 rounded-none border-x-0 border-t-0">
+                  <AlertTitle>{t("scheduleEditor.showOriginal")}</AlertTitle>
+                  <AlertDescription>
+                    <p>{t("scheduleEditor.originalNotice")}</p>
+                  </AlertDescription>
+                </Alert>
+              )}
+              {editing && (
+                <p className="shrink-0 border-b border-border/60 bg-muted/40 px-3 py-1.5 text-center text-xs text-muted-foreground">
+                  {t("scheduleEditor.dragHint")}
+                </p>
+              )}
               <ScheduleMobile
                 courses={courses}
-                exams={examsQuery.data}
+                overlayEntries={overlayEntries}
                 periods={periods}
                 scheduleRules={scheduleRules}
                 currentWeekday={clock.weekday}
                 currentWeek={currentWeek}
-                weekAnchor={weekAnchor}
+                weekAnchor={effectiveWeekAnchor}
                 selectedWeek={selectedWeek}
-                termStartDate={termCalendar?.startDate}
+                termStartDate={effectiveTermStartDate}
                 nowMinutes={clock.minutes}
                 labels={labels}
                 editor={editor}
-                compact={compactMode || mobileFullscreen}
-                fullscreen={mobileFullscreen}
+                compact={compactMode}
+                showGridWhenEmpty={periods.length > 0}
                 onPrevWeek={() => shiftWeek(-1)}
                 onNextWeek={() => shiftWeek(1)}
                 colorMap={courseColors}
                 onCourseTap={handleCourseTap}
+                onEntryTap={setDetailEntry}
+                onEmptyCellTap={showOriginal ? undefined : handleEmptyCellTap}
               />
             </div>
           ) : (
             <Card>
               <CardContent className="pt-6">
+                {editing && (
+                  <p className="mb-3 rounded-md bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+                    {t("scheduleEditor.dragHint")}
+                  </p>
+                )}
                 <ScheduleTablet
                   courses={filteredCourses}
-                  examBlocks={examBlocks}
+                  overlayEntries={overlayEntries}
                   periods={periods}
                   scheduleRules={scheduleRules}
                   currentWeekday={clock.weekday}
                   currentWeek={currentWeek}
-                  weekAnchor={weekAnchor}
+                  weekAnchor={effectiveWeekAnchor}
                   selectedWeek={selectedWeek}
-                  termStartDate={termCalendar?.startDate}
+                  termStartDate={effectiveTermStartDate}
                   nowMinutes={clock.minutes}
                   labels={labels}
                   editor={editor}
+                  showGridWhenEmpty={periods.length > 0}
                   colorMap={courseColors}
                   onCourseTap={handleCourseTap}
+                  onEntryTap={setDetailEntry}
+                  onEmptyCellTap={showOriginal ? undefined : handleEmptyCellTap}
                 />
               </CardContent>
             </Card>
@@ -749,6 +1155,14 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         view={adjustmentsView}
         patches={effective.patches}
         issues={effective.issues}
+        overrides={effective.overrides}
+        customItems={
+          isStandalone
+            ? customizationsState.customItems.filter((item) =>
+                isCustomItemActiveInScope(item, null)
+              )
+            : effective.customItems
+        }
         t={t}
         onClose={() => {
           if (undoPatch) actions.setUndo(null)
@@ -761,10 +1175,51 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
           else requestUndo(id, false)
         }}
         onJump={(date) => {
-          selectWeek(scheduleWeek(date, effective.termStartDate).week)
+          if (effective.termStartDate) {
+            selectWeek(scheduleWeek(date, effective.termStartDate).week)
+          }
           actions.setManager(null)
         }}
         onShowOriginal={() => actions.setShowOriginal(true)}
+        onEditOverride={hasAcademicTimetable ? handleEditOverrideByRecord : undefined}
+        onRestoreOverride={hasAcademicTimetable ? handleRestoreOverride : undefined}
+        onEditCustomItem={(item) => setItemFormTarget({ mode: "edit-custom", item })}
+        onDeleteCustomItem={handleDeleteCustomItem}
+      />
+
+      <ScheduleItemFormDialog
+        target={itemFormTarget}
+        courses={effective.courses}
+        periods={periods}
+        termStartDate={effective.termStartDate}
+        totalWeeks={effective.totalWeeks || 20}
+        hasAcademicScope={Boolean(effective.scope)}
+        semesterScope={effective.scope}
+        t={t}
+        onClose={() => setItemFormTarget(null)}
+        onSaveCustom={handleSaveCustomItem}
+        onDeleteCustom={handleDeleteCustomItem}
+        onSaveOverride={handleSaveOverride}
+        onRestoreOverride={handleRestoreOverride}
+        onSaveSinglePatch={canEdit ? saveAdjustment : undefined}
+      />
+
+      <ScheduleEntryDetailDialog
+        entry={detailEntry}
+        customItem={detailCustomItem}
+        t={t}
+        extraDetailNode={
+          detailEntry
+            ? renderSlot("schedule.entry.detail", {
+                entry: detailEntry,
+                ...(detailEntry.date ? { date: detailEntry.date } : {}),
+                week: selectedWeek,
+              })
+            : null
+        }
+        onClose={() => setDetailEntry(null)}
+        onEditCustom={(item) => setItemFormTarget({ mode: "edit-custom", item })}
+        onDeleteCustom={handleDeleteCustomItem}
       />
 
       <CourseActivityModal
@@ -773,12 +1228,34 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         open={activityOpen}
         mobileBridge={props.mobileBridge}
         t={t}
+        extraDetailNode={
+          activityCourse
+            ? renderSlot("schedule.entry.detail", {
+                entry: courseToDetailEntry(activityCourse, props.pluginId),
+                ...(scheduleOccurrence(activityCourse)?.date
+                  ? { date: scheduleOccurrence(activityCourse)!.date }
+                  : {}),
+                week: activityWeek,
+              })
+            : null
+        }
         onOpenChange={setActivityOpen}
         onSigninActivity={(activityId, type) => {
           setSigninActivityId(activityId)
           setSigninType(type)
           setSigninOpen(true)
         }}
+        onEditCourse={
+          hasAcademicTimetable && effective.ready && !showOriginal
+            ? handleEditCourseFromModal
+            : undefined
+        }
+        onCancelSingle={canEdit && !showOriginal ? handleCancelSingleFromModal : undefined}
+        onHideCourse={
+          hasAcademicTimetable && effective.ready && !showOriginal ? handleHideCourse : undefined
+        }
+        onEditCustomCourse={handleEditCustomById}
+        onDeleteCustomCourse={handleDeleteCustomItem}
       />
 
       <CourseSigninModal
@@ -794,7 +1271,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         open={filterDrawerOpen}
         onOpenChange={actions.setFilterDrawerOpen}
         title={t("schedule.title")}
-        description={t("schedule.description")}
+        description={isStandalone ? t("schedule.standaloneHint") : t("schedule.description")}
       >
         {renderFilterControls("schedule-drawer")}
       </FilterDrawer>
@@ -803,7 +1280,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         isNative={props.isNative()}
         hidden={settings.widgetAssistantHidden}
         position={settings.widgetAssistantPosition}
-        suspended={mobileFullscreen || editing || showOriginal}
+        suspended={editing || showOriginal || isStandalone}
         assistantSrc={props.assistantSrc}
         widgetsSettingsHref={props.widgetsSettingsHref}
         t={t}
@@ -823,6 +1300,8 @@ export interface ScheduleHeaderActionsInject {
     readonly settings: ObservableSource<ScheduleSettingsState>
     readonly patches: ObservableSource<SchedulePatchesState>
     readonly patchesHydrated: ObservableSource<boolean>
+    readonly customizations: ObservableSource<ScheduleCustomizationsState>
+    readonly customizationsHydrated: ObservableSource<boolean>
     readonly provider: ObservableSource<ProviderRuntimeSnapshot>
     readonly session: ObservableSource<SessionSnapshot>
     readonly schedule: ObservableSource<QuerySnapshot<Course[]>>
@@ -853,6 +1332,8 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
   const settings = props.useSettings()
   const patchesState = props.usePatches()
   const patchesHydrated = props.usePatchesHydrated()
+  const customizationsState = props.useCustomizations()
+  const customizationsHydrated = props.useCustomizationsHydrated()
   const providerSnap = props.useProvider()
   const sessionSnap = props.useSession()
   const scheduleQuery = props.useSchedule()
@@ -867,28 +1348,30 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
   const editScope = useStore((s) => s.editScope)
   const showOriginal = useStore((s) => s.showOriginal)
 
-  const onSchedulePage =
-    location.route === "schedule" || location.pluginId === props.pluginId
+  const onSchedulePage = location.route === "schedule" || location.pluginId === props.pluginId
   const activeProvider = providerSnap.provider
   if (
     !onSchedulePage ||
-    !supportsPlugin(activeProvider?.supportedPlugins, props.pluginId) ||
-    !hasSlice(activeProvider, "timetable")
+    (activeProvider && !supportsPlugin(activeProvider.supportedPlugins, props.pluginId))
   ) {
     return null
   }
 
+  const hasAcademicTimetable = Boolean(activeProvider && hasSlice(activeProvider, "timetable"))
   const snapshot = currentWeekQuery.data ?? null
   const rawCalendar = termCalendarQuery.data
   const semester = queriedTerm || snapshot?.semester
   const termCalendar =
-    semester && rawCalendar?.semester && rawCalendar.semester !== semester
-      ? undefined
-      : rawCalendar
+    semester && rawCalendar?.semester && rawCalendar.semester !== semester ? undefined : rawCalendar
 
   const timeZone = activeProvider?.slices.timetable?.scheduleRules?.timeZone
   const clock = getAcademicClock(new Date(clockTick), timeZone)
-  const currentWeek = resolveAcademicWeek(snapshot, rawCalendar, clock.date, queriedTerm || undefined)
+  const currentWeek = resolveAcademicWeek(
+    snapshot,
+    rawCalendar,
+    clock.date,
+    queriedTerm || undefined
+  )
   const selectedWeek = weekOverride ?? currentWeek?.week ?? 1
 
   const effective = computeEffectiveScheduleSnapshot({
@@ -900,12 +1383,16 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
     sessionSnapshot: sessionSnap,
     patchesState,
     patchesHydrated,
+    customizationsState,
+    customizationsHydrated,
   })
 
   const editing =
     effective.ready && editScope !== null && editScope === effective.scope && !showOriginal
   const lastAdjustment = effective.patches.filter((patch) => patch.enabled).at(-1)
-  const periods = (periodsQuery.data ?? []).filter(periodIsInUse).sort((a, b) => a.section - b.section)
+  const periods = (periodsQuery.data ?? [])
+    .filter(periodIsInUse)
+    .sort((a, b) => a.section - b.section)
   const currentSection = computeCurrentOrUpcomingSection(periods, clock.weekday, clock.minutes)
 
   return (
@@ -920,13 +1407,10 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
           {t("scheduleEditor.showEffective")}
         </Button>
       ) : editing ? (
-        <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            disabled={!lastAdjustment}
-            onClick={() => {
+        <>
+          <ScheduleEditActionButtons
+            hasUndo={Boolean(lastAdjustment)}
+            onUndo={() => {
               if (lastAdjustment && effective.scope) {
                 actions.setUndo({
                   scope: effective.scope,
@@ -935,31 +1419,36 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
                 })
               }
             }}
-            aria-label={t("scheduleEditor.undoLast")}
-          >
-            <Undo2 />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => {
+            onOpenManager={() => {
               if (effective.scope) {
                 actions.setManager({ scope: effective.scope, id: null })
               }
             }}
-            aria-label={t("scheduleEditor.manage")}
-          >
-            <History />
-          </Button>
-          <Button type="button" size="sm" onClick={() => actions.finishEditing()}>
-            <Check data-icon="inline-start" />
-            {t("scheduleEditor.done")}
-          </Button>
-        </div>
+            onDone={() => actions.finishEditing()}
+            t={t}
+          />
+          <FilterTrigger
+            label={
+              hasAcademicTimetable && selectedWeek
+                ? t("schedule.weekShort", { week: selectedWeek })
+                : t("schedule.today")
+            }
+            onClick={() => actions.setFilterDrawerOpen(true)}
+          />
+        </>
       ) : (
         <>
-          {canOpenSchoolSchedule && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-8 w-8"
+            onClick={() => actions.requestCreate()}
+            aria-label={t("schedule.addEntry")}
+          >
+            <Plus className="size-4" />
+          </Button>
+          {canOpenSchoolSchedule && hasAcademicTimetable && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -998,17 +1487,13 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
             className="h-8 w-8"
             aria-label={t("schedule.compactHint")}
           >
-            {settings.compactMode ? (
-              <Grid3x3 className="size-4" />
-            ) : (
-              <Grid3x2 className="size-4" />
-            )}
+            {settings.compactMode ? <Grid3x3 className="size-4" /> : <Grid3x2 className="size-4" />}
           </Button>
           <FilterTrigger
             label={
-              selectedWeek
+              hasAcademicTimetable && selectedWeek
                 ? t("schedule.weekShort", { week: selectedWeek })
-                : t("schedule.weekLabel")
+                : t("schedule.today")
             }
             onClick={() => actions.setFilterDrawerOpen(true)}
           />

@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
+import { createPortal } from "react-dom"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import {
   scheduleOccurrence,
@@ -18,7 +19,7 @@ import {
   type ScheduleTrace,
 } from "@orahako/academic-kit"
 import type { Translator } from "@orahako/sdk"
-import { BACK_PRIORITY, Button, cn, useBackHandler } from "@orahako/ui-primitives"
+import { BACK_PRIORITY, cn, useBackHandler } from "@orahako/ui-primitives"
 import type { ScheduleDictionary } from "./dictionary"
 
 export interface ScheduleDragSurfaceProps {
@@ -51,6 +52,9 @@ interface Gesture {
   edgeAt: number
 }
 
+const EMPTY_STRING_SET: ReadonlySet<string> = new Set<string>()
+const DRAG_ACTIVATION_PX = 6
+
 export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode {
   const { t } = props
   const latest = useRef(props)
@@ -61,6 +65,7 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
   const root = useRef<HTMLDivElement>(null)
   const gesture = useRef<Gesture | null>(null)
   const cancelGesture = useRef<(() => void) | null>(null)
+  const syncVisualRef = useRef<((navigate: boolean) => void) | null>(null)
   const [hasGesture, setHasGesture] = useState(false)
   const suppressClickUntil = useRef(0)
   const overlay = useRef<HTMLDivElement>(null)
@@ -93,21 +98,34 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
     return () => document.removeEventListener("click", onClick, true)
   }, [])
 
+  // Position the newly mounted floating ghost & drop preview synchronously before paint.
+  useLayoutEffect(() => {
+    if (active) {
+      syncVisualRef.current?.(false)
+    }
+  }, [active])
+
   useEffect(() => {
     if (!props.enabled) return
     if (typeof document === "undefined" || typeof document.addEventListener !== "function") {
       return
     }
 
-    let timer: ReturnType<typeof setTimeout> | undefined
     let frame = 0
     let destination: ScheduleDrop | null = null
     let labelKey = ""
     let touchTarget: Element | null = null
 
+    function positionOverlay(g: Gesture): void {
+      const node = overlay.current
+      if (!node || typeof window === "undefined") return
+      const left = Math.max(8, Math.min(g.x + 12, window.innerWidth - 204))
+      const top = Math.max(8, Math.min(g.y - 56, window.innerHeight - 96))
+      node.style.transform = `translate3d(${left}px, ${top}px, 0)`
+    }
+
     function finish(commit: boolean): void {
       const g = gesture.current
-      clearTimeout(timer)
       if (typeof cancelAnimationFrame === "function") {
         cancelAnimationFrame(frame)
       }
@@ -136,9 +154,7 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
       const g = gesture.current
       const host = root.current
       if (!g?.active || !host) return
-      if (overlay.current) {
-        overlay.current.style.transform = `translate3d(${Math.min(g.x + 12, window.innerWidth - 188)}px, ${Math.max(8, g.y - 60)}px, 0)`
-      }
+      positionOverlay(g)
       const { selectedWeek, totalWeeks } = latest.current
       const grid = Array.from(
         host.querySelectorAll<HTMLElement>(`[data-schedule-grid="${selectedWeek}"]`)
@@ -245,7 +261,7 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
             height: `${b.bottom - a.top}px`,
             borderColor: valid ? "var(--primary)" : "var(--destructive)",
             background: valid
-              ? "color-mix(in srgb, var(--primary) 15%, transparent)"
+              ? "color-mix(in srgb, var(--primary) 16%, transparent)"
               : "color-mix(in srgb, var(--destructive) 12%, transparent)",
           })
         }
@@ -269,7 +285,7 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
 
     function activate(): void {
       const g = gesture.current
-      if (!g || !latest.current.enabled) return
+      if (!g || g.active || !latest.current.enabled) return
       g.active = true
       setActive(g.selection)
       if (typeof requestAnimationFrame === "function") {
@@ -324,16 +340,11 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
       }
       setHasGesture(true)
       if (touch) {
+        // Touch events stay targeted on the initial element even if the week switches mid-drag.
         touchTarget = event.target
         touchTarget.addEventListener("touchmove", move, { capture: true, passive: false })
         touchTarget.addEventListener("touchend", end, { capture: true, passive: false })
         touchTarget.addEventListener("touchcancel", cancel, true)
-      }
-      if (touch && source.dataset.scheduleDay) {
-        activate()
-        event.stopPropagation()
-      } else if (touch) {
-        timer = setTimeout(activate, 400)
       }
     }
 
@@ -359,18 +370,15 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
       }
       g.x = point.clientX
       g.y = point.clientY
-      if (Math.hypot(g.x - g.originX, g.y - g.originY) >= 5) g.moved = true
-      if (!g.active) {
-        const distance = Math.hypot(g.x - g.originX, g.y - g.originY)
-        if (isTouch && distance > 8) {
-          finish(false)
-          return
-        }
-        if (!isTouch && distance >= 5) activate()
+      const distance = Math.hypot(g.x - g.originX, g.y - g.originY)
+      if (distance >= DRAG_ACTIVATION_PX) {
+        g.moved = true
+        if (!g.active) activate()
       }
       if (g.active) {
         event.preventDefault()
         event.stopPropagation()
+        positionOverlay(g)
       }
     }
 
@@ -393,7 +401,9 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
         g.x = point.clientX
         g.y = point.clientY
       }
-      if (Math.hypot(g.x - g.originX, g.y - g.originY) >= 5) g.moved = true
+      if (Math.hypot(g.x - g.originX, g.y - g.originY) >= DRAG_ACTIVATION_PX) {
+        g.moved = true
+      }
       if (g.active) {
         event.preventDefault()
         event.stopPropagation()
@@ -402,11 +412,7 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
         }
         update(false)
       }
-      const dayTap = g.active && g.touchId !== null && g.selection.kind === "day" && !g.moved
-      finish(!dayTap)
-      if (dayTap && latest.current.enabled) {
-        latest.current.onSelect(g.selection)
-      }
+      finish(true)
     }
 
     function cancel(): void {
@@ -429,6 +435,7 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
     }
 
     cancelGesture.current = cancel
+    syncVisualRef.current = update
     document.addEventListener("mousedown", begin, true)
     document.addEventListener("touchstart", begin, { capture: true, passive: true })
     document.addEventListener("mousemove", move, true)
@@ -442,6 +449,7 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
     return () => {
       cancel()
       cancelGesture.current = null
+      syncVisualRef.current = null
       document.removeEventListener("mousedown", begin, true)
       document.removeEventListener("touchstart", begin, true)
       document.removeEventListener("mousemove", move, true)
@@ -481,28 +489,37 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
     return { adjustedDates, adjustedCourses, coursePatchIds }
   }, [props.patches, props.courses, props.traces])
 
+  const draggingOccurrenceIds = useMemo<ReadonlySet<string>>(
+    () =>
+      active ? new Set(active.courses.map((course) => course.occurrenceId)) : EMPTY_STRING_SET,
+    [active]
+  )
+  const draggingDate = active?.kind === "day" ? active.date : null
+
   const isDragging = useCallback(() => active !== null, [active])
+
+  const { enabled: editorEnabled, courses: editorCourses, onSelect: onSelectItem } = props
 
   const selectCourse = useCallback(
     (course: Parameters<NonNullable<ScheduleEditorState["selectCourse"]>>[0]): boolean => {
       const occurrence = scheduleOccurrence(course)
-      if (!props.enabled || !occurrence) return false
-      props.onSelect({ kind: "course", date: occurrence.date, courses: [occurrence] })
+      if (!editorEnabled || !occurrence) return false
+      onSelectItem({ kind: "course", date: occurrence.date, courses: [occurrence] })
       return true
     },
-    [props]
+    [editorEnabled, onSelectItem]
   )
 
   const selectDay = useCallback(
     (date: string): void => {
-      if (!props.enabled) return
-      props.onSelect({
+      if (!editorEnabled) return
+      onSelectItem({
         kind: "day",
         date,
-        courses: props.courses.filter((c) => c.date === date),
+        courses: editorCourses.filter((c) => c.date === date),
       })
     },
-    [props]
+    [editorCourses, editorEnabled, onSelectItem]
   )
 
   const editor = useMemo<ScheduleEditorState>(
@@ -513,12 +530,16 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
       termStartDate: props.termStartDate,
       courses: props.courses,
       traces: props.traces,
+      draggingOccurrenceIds,
+      draggingDate,
       isDragging,
       selectCourse,
       selectDay,
       onTraceClick: props.onTraceClick,
     }),
     [
+      draggingDate,
+      draggingOccurrenceIds,
       isDragging,
       markers,
       props.courses,
@@ -532,6 +553,47 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
     ]
   )
 
+  const dragVisuals = active ? (
+    <>
+      <div
+        ref={preview}
+        style={{ display: "none" }}
+        className="pointer-events-none fixed z-50 rounded-md border-2 border-dashed shadow-sm"
+      />
+      <div
+        ref={overlay}
+        className="pointer-events-none fixed top-0 left-0 z-50 flex w-48 flex-col gap-1 rounded-lg border border-primary/40 bg-popover/95 p-2.5 text-sm text-popover-foreground shadow-xl backdrop-blur-sm"
+      >
+        <span className="truncate font-medium">
+          {active.kind === "day"
+            ? t("scheduleEditor.draggingDay", { count: active.courses.length })
+            : t("scheduleEditor.draggingCourse", { name: active.courses[0]?.name ?? "" })}
+        </span>
+        {edgeDirection !== 0 && (
+          <span
+            className="flex items-center gap-1 text-xs font-semibold text-primary"
+            role="status"
+          >
+            {edgeDirection < 0 ? (
+              <ChevronLeft className="size-3.5 shrink-0" />
+            ) : (
+              <ChevronRight className="size-3.5 shrink-0" />
+            )}
+            {t(edgeDirection < 0 ? "scheduleEditor.edgePrevious" : "scheduleEditor.edgeNext")}
+          </span>
+        )}
+        <span className="text-xs text-muted-foreground" role="status">
+          {targetLabel?.valid
+            ? t("scheduleEditor.dropTarget", {
+                date: targetLabel.date,
+                section: targetLabel.section,
+              })
+            : t("scheduleEditor.invalidDrop")}
+        </span>
+      </div>
+    </>
+  ) : null
+
   return (
     <>
       <div
@@ -540,80 +602,12 @@ export function ScheduleDragSurface(props: ScheduleDragSurfaceProps): ReactNode 
         data-schedule-editing={props.editing || undefined}
         inert={props.editing && !props.enabled}
       >
-        {props.editing && (
-          <div className="flex shrink-0 flex-col gap-1 border-b border-border px-2 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={t("scheduleEditor.previousWeek")}
-                disabled={!props.enabled || props.selectedWeek <= 1}
-                onClick={() => props.onShiftWeek(-1)}
-              >
-                <ChevronLeft />
-              </Button>
-              <span className="text-sm font-medium" aria-live="polite">
-                {t("scheduleEditor.viewedWeek", { week: props.selectedWeek })}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={t("scheduleEditor.nextWeek")}
-                disabled={!props.enabled || props.selectedWeek >= props.totalWeeks}
-                onClick={() => props.onShiftWeek(1)}
-              >
-                <ChevronRight />
-              </Button>
-            </div>
-            <p className="text-center text-xs text-muted-foreground">
-              {t("scheduleEditor.dragHint")}
-            </p>
-          </div>
-        )}
         {props.children(editor)}
       </div>
-
-      {active && (
-        <>
-          <div
-            ref={preview}
-            className="pointer-events-none fixed z-50 rounded border-2 border-dashed"
-          />
-          <div
-            ref={overlay}
-            className="pointer-events-none fixed top-0 left-0 z-50 flex w-44 flex-col gap-1 rounded-lg border border-border bg-popover p-3 text-sm text-popover-foreground shadow-lg"
-          >
-            <span className="font-medium">
-              {active.kind === "day"
-                ? t("scheduleEditor.draggingDay", { count: active.courses.length })
-                : t("scheduleEditor.draggingCourse", { name: active.courses[0]?.name ?? "" })}
-            </span>
-            {edgeDirection !== 0 && (
-              <span
-                className="flex items-center gap-1 text-xs font-semibold text-primary"
-                role="status"
-              >
-                {edgeDirection < 0 ? (
-                  <ChevronLeft className="size-3.5 shrink-0" />
-                ) : (
-                  <ChevronRight className="size-3.5 shrink-0" />
-                )}
-                {t(edgeDirection < 0 ? "scheduleEditor.edgePrevious" : "scheduleEditor.edgeNext")}
-              </span>
-            )}
-            <span className="text-xs text-muted-foreground" role="status">
-              {targetLabel?.valid
-                ? t("scheduleEditor.dropTarget", {
-                    date: targetLabel.date,
-                    section: targetLabel.section,
-                  })
-                : t("scheduleEditor.invalidDrop")}
-            </span>
-          </div>
-        </>
-      )}
+      {dragVisuals &&
+        (typeof document !== "undefined" && document.body
+          ? createPortal(dragVisuals, document.body)
+          : dragVisuals)}
     </>
   )
 }

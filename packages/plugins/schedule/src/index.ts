@@ -7,12 +7,21 @@ import {
   type ClassPeriod,
   type Course,
   type CurrentWeek,
-  type Exam,
   type ProviderQueryPolicy,
+  type ProviderRuntimeSnapshot,
+  type QuerySnapshot,
+  type SessionSnapshot,
   type TermCalendar,
 } from "@orahako/academic-sdk"
 import { createMinuteClockSource, createParameterizedQuerySource } from "@orahako/academic-kit"
-import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/sdk"
+import {
+  createObservableSource,
+  definePlugin,
+  PLUGIN_API_VERSION,
+  type ObservableSource,
+  type PluginManifest,
+  type ScheduleEntry,
+} from "@orahako/sdk"
 import {
   ClassReminderAndWidgetController,
   NOTIFICATIONS_CORE_CAPABILITY,
@@ -24,6 +33,7 @@ import {
   type ScheduleSyncInput,
   type ScheduleWidgetId,
 } from "./controller"
+import type { ScheduleItemFormTarget } from "./custom-dialogs"
 import { scheduleDictionary, type ScheduleDictionary } from "./dictionary"
 import type { ScheduleDragSurfaceProps } from "./drag-surface"
 import type { ScheduleAdjustmentsDialogView } from "./editor-dialogs"
@@ -42,6 +52,7 @@ import {
   type TodayCoursesWidgetProps,
 } from "./overview-widgets"
 import {
+  SCHEDULE_PAGE_CHILDREN,
   ScheduleHeaderActions,
   SchedulePage,
   type FreeRoomTargetParams,
@@ -50,6 +61,7 @@ import {
   type SchedulePageInject,
   type SchedulePageProps,
 } from "./page"
+import { ScheduleRegistry } from "./registry"
 import {
   ClassReminderSettings,
   ScheduleStartupOption,
@@ -68,13 +80,21 @@ import {
 import "./slots"
 import {
   createSchedulePatchMutators,
+  customItemToOverlayEntry,
+  scheduleCustomizationsStore,
   schedulePatchesStore,
   scheduleSettingsStore,
   scheduleViewStore,
   type ActivePatchManager,
+  type CustomScheduleItem,
+  type CustomScheduleKind,
+  type CustomScheduleRecurrence,
+  type CustomScheduleTimeMode,
   type EffectiveScheduleSnapshot,
   type PendingPatchUndo,
   type PendingScheduleDrop,
+  type ScheduleCustomizationsState,
+  type ScheduleCustomizationsStoreInstance,
   type SchedulePatchDraft,
   type SchedulePatchesState,
   type SchedulePatchesStoreInstance,
@@ -96,6 +116,10 @@ export type {
   ClassReminderSettingsInject,
   ClassReminderSettingsProps,
   CourseProgressWidgetProps,
+  CustomScheduleItem,
+  CustomScheduleKind,
+  CustomScheduleRecurrence,
+  CustomScheduleTimeMode,
   EffectiveScheduleSnapshot,
   FreeRoomTargetParams,
   GeolocationCoordinatesSnapshot,
@@ -103,10 +127,13 @@ export type {
   PendingPatchUndo,
   PendingScheduleDrop,
   ScheduleAdjustmentsDialogView,
+  ScheduleCustomizationsState,
+  ScheduleCustomizationsStoreInstance,
   ScheduleDictionary,
   ScheduleDragSurfaceProps,
   ScheduleHeaderActionsInject,
   ScheduleHeaderActionsProps,
+  ScheduleItemFormTarget,
   ScheduleOverviewWidgetInject,
   SchedulePageInject,
   SchedulePageProps,
@@ -139,7 +166,51 @@ const SCHEDULE_QUERY_POLICIES: Readonly<Record<string, ProviderQueryPolicy>> = {
   "current-week": { ttl: 12 * HOUR_MS, persist: true },
   "term-calendar": { ttl: 7 * DAY_MS, persist: true },
   "class-periods": { ttl: 7 * DAY_MS, persist: true },
-  exams: { ttl: DAY_MS, persist: true },
+}
+
+const EMPTY_PROVIDER_SNAPSHOT: ProviderRuntimeSnapshot = {
+  status: "unavailable",
+  schoolId: null,
+  provider: null,
+  error: null,
+  generation: 0,
+}
+
+const EMPTY_SESSION_SNAPSHOT: SessionSnapshot = {
+  activeSchoolId: null,
+  credential: null,
+  username: null,
+  isAuthenticated: false,
+  sessionExpired: false,
+  hasHydrated: true,
+  artifacts: {},
+}
+
+const STATIC_PROVIDER_SOURCE: ObservableSource<ProviderRuntimeSnapshot> = {
+  getSnapshot: () => EMPTY_PROVIDER_SNAPSHOT,
+  subscribe: () => () => {},
+}
+
+const STATIC_SESSION_SOURCE: ObservableSource<SessionSnapshot> = {
+  getSnapshot: () => EMPTY_SESSION_SNAPSHOT,
+  subscribe: () => () => {},
+}
+
+function createStaticQuerySource<T>(): ObservableSource<QuerySnapshot<T>> {
+  const snapshot: QuerySnapshot<T> = {
+    status: "idle",
+    data: undefined,
+    error: null,
+    isLoading: false,
+    isRefreshing: false,
+    isStale: false,
+    updatedAt: null,
+    refresh: async () => undefined,
+  }
+  return {
+    getSnapshot: () => snapshot,
+    subscribe: () => () => {},
+  }
 }
 
 function detectLiveUpdateSupported(isNative: boolean): boolean {
@@ -152,6 +223,27 @@ function detectLiveUpdateSupported(isNative: boolean): boolean {
   return Number(match[1]) >= 16
 }
 
+const SCHEDULE_INJECT = [
+  "ui",
+  "slots",
+  "settings",
+  "router",
+  "navigation",
+  "i18n",
+  "storage",
+  "native",
+  "widgets",
+  "assets",
+] as const
+
+const SCHEDULE_OPTIONAL_INJECT = [
+  "provider",
+  "session",
+  "query",
+  "notifications",
+  "overview",
+] as const
+
 const scheduleManifest: PluginManifest = {
   id: SCHEDULE_PLUGIN_ID,
   name: "日程",
@@ -159,50 +251,21 @@ const scheduleManifest: PluginManifest = {
   apiVersion: PLUGIN_API_VERSION,
   kind: "feature",
   entry: "index.js",
-  description: "课程与考试日程表、本地课表调整、上课提醒与桌面小组件",
+  description: "开放式日程引擎、个人日程与课表编辑、多源聚合、上课提醒与桌面小组件",
+  provides: ["schedule"],
   nativeCapabilities: [
     NOTIFICATIONS_CORE_CAPABILITY,
     REMINDERS_CLASSES_CAPABILITY,
     WIDGETS_GENERIC_CAPABILITY,
     WIDGETS_SCHEDULE_CAPABILITY,
   ],
-  inject: [
-    "ui",
-    "slots",
-    "settings",
-    "router",
-    "navigation",
-    "i18n",
-    "storage",
-    "provider",
-    "session",
-    "query",
-    "notifications",
-    "native",
-    "widgets",
-    "assets",
-  ],
+  inject: [...SCHEDULE_INJECT],
 }
 
 export const schedulePlugin = definePlugin({
   manifest: scheduleManifest,
-  inject: [
-    "ui",
-    "slots",
-    "settings",
-    "router",
-    "navigation",
-    "i18n",
-    "storage",
-    "provider",
-    "session",
-    "query",
-    "notifications",
-    "native",
-    "widgets",
-    "assets",
-  ] as const,
-  optionalInject: ["overview"] as const,
+  inject: SCHEDULE_INJECT,
+  optionalInject: SCHEDULE_OPTIONAL_INJECT,
   apply(ctx) {
     const {
       ui,
@@ -223,8 +286,10 @@ export const schedulePlugin = definePlugin({
     } = ctx
 
     i18n.register(scheduleDictionary)
-    for (const [feature, policy] of Object.entries(SCHEDULE_QUERY_POLICIES)) {
-      query.registerPolicy(feature, policy)
+    if (query) {
+      for (const [feature, policy] of Object.entries(SCHEDULE_QUERY_POLICIES)) {
+        query.registerPolicy(feature, policy)
+      }
     }
 
     const resolveWidgetAssetSrc = (fileName: string): string =>
@@ -232,12 +297,45 @@ export const schedulePlugin = definePlugin({
     const widgetAssistantSrc = resolveWidgetAssetSrc("buro.png")
 
     let disposed = false
+    const registry = new ScheduleRegistry()
+    ctx.set("schedule", registry)
+
     const settingsStore = scheduleSettingsStore.create(storage)
     const patchesStore = schedulePatchesStore.create(storage)
+    const customizationsStore = scheduleCustomizationsStore.create(storage)
     const viewStore = scheduleViewStore.create()
     const minuteClock = createMinuteClockSource()
 
+    // Register personal free-time & single-date custom items as a first-class schedule source.
+    const personalEntriesSource = createObservableSource<readonly ScheduleEntry[]>([])
+    const publishPersonalEntries = (): void => {
+      if (disposed) return
+      const items = customizationsStore.source.getSnapshot().customItems
+      const entries = items
+        .map((item) => customItemToOverlayEntry(item, SCHEDULE_PLUGIN_ID))
+        .filter((entry): entry is ScheduleEntry => entry !== null)
+      personalEntriesSource.set(entries)
+    }
+    const detachPersonalSource = customizationsStore.source.subscribe(publishPersonalEntries)
+    publishPersonalEntries()
+
+    const ownSchedule = registry.createScopedFacade(ctx, scheduleManifest)
+    ownSchedule.registerSource({
+      id: "personal",
+      order: 20,
+      category: "personal",
+      entries: personalEntriesSource,
+    })
+
+    const providerStateSource = provider?.state ?? STATIC_PROVIDER_SOURCE
+    const sessionStateSource = session?.state ?? STATIC_SESSION_SOURCE
+    const staticCoursesSource = createStaticQuerySource<Course[]>()
+    const staticWeekSource = createStaticQuerySource<CurrentWeek>()
+    const staticCalendarSource = createStaticQuerySource<TermCalendar>()
+    const staticPeriodsSource = createStaticQuerySource<ClassPeriod[]>()
+
     const isTimetableEnabled = (): boolean => {
+      if (!provider || !session) return false
       const activeProvider = provider.getSnapshot().provider
       return (
         !disposed &&
@@ -248,81 +346,79 @@ export const schedulePlugin = definePlugin({
     }
 
     const createScheduleSourceForTerm = (semester: string | undefined) =>
-      query.source<Course[], "timetable">({
-        feature: "schedule",
-        slice: "timetable",
-        params: {
-          ...(semester ? { semester } : {}),
-          courseCategory: "all",
-          includeLabSchedule: true,
-        },
-        enabled: isTimetableEnabled,
-        fetcher: (activeProvider) =>
-          requireSlice(activeProvider, "timetable").getSchedule({
-            ...(semester ? { semester } : {}),
-            courseCategory: "all",
-            includeLabSchedule: true,
-          }),
-      })
+      query
+        ? query.source<Course[], "timetable">({
+            feature: "schedule",
+            slice: "timetable",
+            params: {
+              ...(semester ? { semester } : {}),
+              courseCategory: "all",
+              includeLabSchedule: true,
+            },
+            enabled: isTimetableEnabled,
+            fetcher: (activeProvider) =>
+              requireSlice(activeProvider, "timetable").getSchedule({
+                ...(semester ? { semester } : {}),
+                courseCategory: "all",
+                includeLabSchedule: true,
+              }),
+          })
+        : staticCoursesSource
 
     const createCurrentWeekSourceForTerm = (semester: string | undefined) =>
-      query.source<CurrentWeek, "timetable">({
-        feature: "current-week",
-        slice: "timetable",
-        params: semester ? { semester } : undefined,
-        enabled: () =>
-          isTimetableEnabled() &&
-          Boolean(provider.getSnapshot().provider?.slices.timetable?.getCurrentWeek),
-        fetcher: async (activeProvider) => {
-          const timetable = requireSlice(activeProvider, "timetable")
-          if (!timetable.getCurrentWeek) {
-            throw new Error("Current week query is unavailable")
-          }
-          return timetable.getCurrentWeek(semester ? { semester } : undefined)
-        },
-      })
+      query
+        ? query.source<CurrentWeek, "timetable">({
+            feature: "current-week",
+            slice: "timetable",
+            params: semester ? { semester } : undefined,
+            enabled: () =>
+              isTimetableEnabled() &&
+              Boolean(provider?.getSnapshot().provider?.slices.timetable?.getCurrentWeek),
+            fetcher: async (activeProvider) => {
+              const timetable = requireSlice(activeProvider, "timetable")
+              if (!timetable.getCurrentWeek) {
+                throw new Error("Current week query is unavailable")
+              }
+              return timetable.getCurrentWeek(semester ? { semester } : undefined)
+            },
+          })
+        : staticWeekSource
 
     const createTermCalendarSourceForTerm = (semester: string | undefined) =>
-      query.source<TermCalendar, "timetable">({
-        feature: "term-calendar",
-        slice: "timetable",
-        params: semester ? { semester } : undefined,
-        enabled: () =>
-          isTimetableEnabled() &&
-          Boolean(provider.getSnapshot().provider?.slices.timetable?.getTermCalendar),
-        fetcher: async (activeProvider) => {
-          const timetable = requireSlice(activeProvider, "timetable")
-          if (!timetable.getTermCalendar) {
-            throw new Error("Term calendar query is unavailable")
-          }
-          return timetable.getTermCalendar(semester ? { semester } : undefined)
-        },
-      })
+      query
+        ? query.source<TermCalendar, "timetable">({
+            feature: "term-calendar",
+            slice: "timetable",
+            params: semester ? { semester } : undefined,
+            enabled: () =>
+              isTimetableEnabled() &&
+              Boolean(provider?.getSnapshot().provider?.slices.timetable?.getTermCalendar),
+            fetcher: async (activeProvider) => {
+              const timetable = requireSlice(activeProvider, "timetable")
+              if (!timetable.getTermCalendar) {
+                throw new Error("Term calendar query is unavailable")
+              }
+              return timetable.getTermCalendar(semester ? { semester } : undefined)
+            },
+          })
+        : staticCalendarSource
 
-    const periodsSource = query.source<ClassPeriod[], "timetable">({
-      feature: "class-periods",
-      slice: "timetable",
-      enabled: () =>
-        isTimetableEnabled() &&
-        Boolean(provider.getSnapshot().provider?.slices.timetable?.getClassPeriods),
-      fetcher: async (activeProvider) => {
-        const timetable = requireSlice(activeProvider, "timetable")
-        if (!timetable.getClassPeriods) {
-          throw new Error("Class periods query is unavailable")
-        }
-        return timetable.getClassPeriods()
-      },
-    })
-
-    const createExamsSourceForTerm = (semester: string | undefined) =>
-      query.source<Exam[], "exams">({
-        feature: "exams",
-        slice: "exams",
-        params: semester ? { semester } : undefined,
-        enabled: () => isTimetableEnabled() && hasSlice(provider.getSnapshot().provider, "exams"),
-        fetcher: (activeProvider) =>
-          requireSlice(activeProvider, "exams").getExams(semester ? { semester } : undefined),
-      })
+    const periodsSource = query
+      ? query.source<ClassPeriod[], "timetable">({
+          feature: "class-periods",
+          slice: "timetable",
+          enabled: () =>
+            isTimetableEnabled() &&
+            Boolean(provider?.getSnapshot().provider?.slices.timetable?.getClassPeriods),
+          fetcher: async (activeProvider) => {
+            const timetable = requireSlice(activeProvider, "timetable")
+            if (!timetable.getClassPeriods) {
+              throw new Error("Class periods query is unavailable")
+            }
+            return timetable.getClassPeriods()
+          },
+        })
+      : staticPeriodsSource
 
     const defaultScheduleSource = createScheduleSourceForTerm(undefined)
     const defaultCurrentWeekSource = createCurrentWeekSourceForTerm(undefined)
@@ -364,43 +460,39 @@ export const schedulePlugin = definePlugin({
         semester ? createTermCalendarSourceForTerm(semester) : defaultTermCalendarSource,
     })
 
-    const pageExamsSource = createParameterizedQuerySource<
-      ScheduleViewState,
-      string | undefined,
-      Exam[]
-    >({
-      state: viewStore.source,
-      selectKey: (s) => (s.queriedTerm ? s.queriedTerm : undefined),
-      serializeKey: (semester) => semester ?? "",
-      resolveSource: (semester) => createExamsSourceForTerm(semester),
-    })
-
-    const controller = new ClassReminderAndWidgetController({
-      pluginId: SCHEDULE_PLUGIN_ID,
-      settingsStore,
-      patchesStore,
-      provider,
-      session,
-      native,
-      widgets,
-      scheduleSource: defaultScheduleSource,
-      currentWeekSource: defaultCurrentWeekSource,
-      termCalendarSource: defaultTermCalendarSource,
-      periodsSource,
-    })
+    const controller =
+      provider && session
+        ? new ClassReminderAndWidgetController({
+            pluginId: SCHEDULE_PLUGIN_ID,
+            settingsStore,
+            patchesStore,
+            customizationsStore,
+            scheduleStateSource: registry.state,
+            provider,
+            session,
+            native,
+            widgets,
+            scheduleSource: defaultScheduleSource,
+            currentWeekSource: defaultCurrentWeekSource,
+            termCalendarSource: defaultTermCalendarSource,
+            periodsSource,
+          })
+        : null
 
     const patchMutators = createSchedulePatchMutators({
       patchesStore,
-      getProviderSnapshot: () => provider.getSnapshot(),
-      getSessionSnapshot: () => session.getSnapshot(),
+      getProviderSnapshot: () => provider?.getSnapshot() ?? EMPTY_PROVIDER_SNAPSHOT,
+      getSessionSnapshot: () => session?.getSnapshot() ?? EMPTY_SESSION_SNAPSHOT,
     })
 
     const mobileBridge: MobileLessonBridge = {
       hasMobileSupport(): boolean {
+        if (!provider) return false
         const activeProvider = provider.getSnapshot().provider
         return Boolean(getSlice(activeProvider, "timetable")?.mobile)
       },
       async getCurrentLesson(lessonQuery) {
+        if (!provider) throw new Error("Mobile lesson service is unavailable")
         const mobile = requireSlice(provider.getActive(), "timetable").mobile
         if (!mobile) {
           throw new Error("Mobile lesson service is unavailable")
@@ -408,6 +500,7 @@ export const schedulePlugin = definePlugin({
         return mobile.getCurrentLesson(lessonQuery)
       },
       async getSigninContext(activityId, title) {
+        if (!provider) throw new Error("Mobile sign-in service is unavailable")
         const mobile = requireSlice(provider.getActive(), "timetable").mobile
         if (!mobile) {
           throw new Error("Mobile sign-in service is unavailable")
@@ -419,6 +512,7 @@ export const schedulePlugin = definePlugin({
         return { detail, status }
       },
       async signIn(input) {
+        if (!provider) throw new Error("Mobile sign-in service is unavailable")
         const mobile = requireSlice(provider.getActive(), "timetable").mobile
         if (!mobile) {
           throw new Error("Mobile sign-in service is unavailable")
@@ -473,13 +567,15 @@ export const schedulePlugin = definePlugin({
       router.push({ route: "schedule" })
     }
 
-    notifications.registerChannel({
-      id: "schedule",
-      order: 30,
-      slice: "timetable",
-      onDisable: () => controller.handleChannelDisabled(),
-      onEnable: () => controller.handleChannelEnabled(),
-    })
+    if (notifications && controller) {
+      notifications.registerChannel({
+        id: "schedule",
+        order: 30,
+        slice: "timetable",
+        onDisable: () => controller.handleChannelDisabled(),
+        onEnable: () => controller.handleChannelEnabled(),
+      })
+    }
 
     router.registerBackGuard(() => {
       const loc = router.current.getSnapshot()
@@ -503,10 +599,10 @@ export const schedulePlugin = definePlugin({
         route: "schedule",
         title: "日程",
         titleKey: "navTitle",
-        capability: "timetable",
         primary: true,
-        requiresProvider: true,
+        requiresProvider: false,
         dictionary: scheduleDictionary,
+        children: SCHEDULE_PAGE_CHILDREN,
         store: viewStore,
         inject: (): SchedulePageInject => ({
           hooks: {
@@ -514,17 +610,27 @@ export const schedulePlugin = definePlugin({
             settings: settingsStore.source,
             patches: patchesStore.source,
             patchesHydrated: patchesStore.hydrated,
-            provider: provider.state,
-            session: session.state,
+            customizations: customizationsStore.source,
+            customizationsHydrated: customizationsStore.hydrated,
+            scheduleState: registry.state,
+            provider: providerStateSource,
+            session: sessionStateSource,
             schedule: pageScheduleSource,
             currentWeek: pageCurrentWeekSource,
             termCalendar: pageTermCalendarSource,
             periods: periodsSource,
-            exams: pageExamsSource,
             navigation: navigation.state,
           },
           pluginId: SCHEDULE_PLUGIN_ID,
           patchMutators,
+          upsertOverride: (scope, override) =>
+            customizationsStore.actions.upsertOverride(scope, override),
+          removeOverride: (scope, courseKey) =>
+            customizationsStore.actions.removeOverride(scope, courseKey),
+          upsertCustomItem: (item) => customizationsStore.actions.upsertCustomItem(item),
+          removeCustomItem: (id) => customizationsStore.actions.removeCustomItem(id),
+          onSemesterChange: (semester) => registry.setSemester(semester),
+          refreshSources: () => registry.refreshAll(),
           mobileBridge,
           isNative: () => native.isNative,
           assistantSrc: widgetAssistantSrc,
@@ -552,16 +658,18 @@ export const schedulePlugin = definePlugin({
       icon: Calendar,
       group: "main",
       order: 10,
-      capability: "timetable",
       primary: true,
     })
 
     const overviewWidgetInject = (): ScheduleOverviewWidgetInject => ({
       hooks: {
         clockTick: minuteClock.source,
-        provider: provider.state,
-        session: session.state,
+        provider: providerStateSource,
+        session: sessionStateSource,
         patchesHydrated: patchesStore.hydrated,
+        customizations: customizationsStore.source,
+        customizationsHydrated: customizationsStore.hydrated,
+        scheduleState: registry.state,
         schedule: defaultScheduleSource,
         currentWeek: defaultCurrentWeekSource,
         termCalendar: defaultTermCalendarSource,
@@ -625,7 +733,7 @@ export const schedulePlugin = definePlugin({
           store: settingsStore,
           inject: (): ScheduleWidgetsCategoryInject => ({
             hooks: {
-              provider: provider.state,
+              provider: providerStateSource,
               location: router.current,
             },
             pluginId: SCHEDULE_PLUGIN_ID,
@@ -647,7 +755,7 @@ export const schedulePlugin = definePlugin({
           dictionary: scheduleDictionary,
           inject: (): ScheduleStartupOptionInject => ({
             hooks: {
-              provider: provider.state,
+              provider: providerStateSource,
             },
             pluginId: SCHEDULE_PLUGIN_ID,
           }),
@@ -675,31 +783,33 @@ export const schedulePlugin = definePlugin({
       )
     }
 
-    const checkExactAlarmPermission = () => controller.checkExactAlarmPermission()
+    if (controller) {
+      const checkExactAlarmPermission = () => controller.checkExactAlarmPermission()
 
-    slots.inject("settings.notifications.reminders", () =>
-      slots.register(
-        {
-          id: "class-reminder-settings",
-          slot: "settings.notifications.reminders",
-          order: 10,
-          dictionary: scheduleDictionary,
-          store: settingsStore,
-          inject: (): ClassReminderSettingsInject => ({
-            hooks: {
-              provider: provider.state,
-            },
-            pluginId: SCHEDULE_PLUGIN_ID,
-            isNative: () => native.isNative,
-            isLiveUpdateSupported: () => detectLiveUpdateSupported(native.isNative),
-            toggleClassReminder: (enabled) => controller.setClassReminderEnabled(enabled),
-            requestExactAlarmPermission: () => native.requestExactAlarmPermission(),
-            checkExactAlarmPermission,
-          }),
-        },
-        ClassReminderSettings
+      slots.inject("settings.notifications.reminders", () =>
+        slots.register(
+          {
+            id: "class-reminder-settings",
+            slot: "settings.notifications.reminders",
+            order: 10,
+            dictionary: scheduleDictionary,
+            store: settingsStore,
+            inject: (): ClassReminderSettingsInject => ({
+              hooks: {
+                provider: providerStateSource,
+              },
+              pluginId: SCHEDULE_PLUGIN_ID,
+              isNative: () => native.isNative,
+              isLiveUpdateSupported: () => detectLiveUpdateSupported(native.isNative),
+              toggleClassReminder: (enabled) => controller.setClassReminderEnabled(enabled),
+              requestExactAlarmPermission: () => native.requestExactAlarmPermission(),
+              checkExactAlarmPermission,
+            }),
+          },
+          ClassReminderSettings
+        )
       )
-    )
+    }
 
     slots.inject("shell.header.actions", () =>
       slots.register(
@@ -716,8 +826,10 @@ export const schedulePlugin = definePlugin({
               settings: settingsStore.source,
               patches: patchesStore.source,
               patchesHydrated: patchesStore.hydrated,
-              provider: provider.state,
-              session: session.state,
+              customizations: customizationsStore.source,
+              customizationsHydrated: customizationsStore.hydrated,
+              provider: providerStateSource,
+              session: sessionStateSource,
               schedule: pageScheduleSource,
               currentWeek: pageCurrentWeekSource,
               termCalendar: pageTermCalendarSource,
@@ -737,11 +849,14 @@ export const schedulePlugin = definePlugin({
 
     ctx.effect(() => async () => {
       disposed = true
+      detachPersonalSource()
       minuteClock.dispose()
+      registry.dispose()
       try {
-        await controller.dispose()
+        await controller?.dispose()
       } finally {
         viewStore.dispose()
+        customizationsStore.dispose()
         patchesStore.dispose()
         settingsStore.dispose()
       }

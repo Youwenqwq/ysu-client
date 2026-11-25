@@ -103,9 +103,7 @@ describe("schedule grid break rules", () => {
       lunchRow: null,
       dinnerRow: null,
     })
-    expect(
-      computeScheduleGridRows(periods, { lunchAfter: 1, dinnerAfter: 4 })
-    ).toMatchObject({
+    expect(computeScheduleGridRows(periods, { lunchAfter: 1, dinnerAfter: 4 })).toMatchObject({
       lunchRow: 3,
       dinnerRow: 6,
     })
@@ -229,6 +227,51 @@ describe("ScheduleMobile and ScheduleTablet pure-props views", () => {
       expect(html).toContain("英语分级考")
     }
     expect(mobileHtml).toContain("整天已调整")
+    expect(mobileHtml).toContain("课程已调整")
+    expect(mobileHtml).toContain('data-schedule-adjusted="day"')
+    expect(mobileHtml).toContain('data-schedule-adjusted="course"')
     expect(mobileHtml).toContain("调至 2026-08-31")
+
+    // Normal viewing mode hides cancelled/moved trace tombstones while keeping subtle bottom indicators
+    const normalHtml = renderToStaticMarkup(
+      createElement(ScheduleMobile, {
+        courses: occurrences,
+        exams,
+        colorMap,
+        periods,
+        currentWeekday: 1,
+        currentWeek,
+        weekAnchor: currentWeek,
+        selectedWeek: 1,
+        termStartDate: "2026-08-31",
+        nowMinutes: 500,
+        labels,
+        scheduleRules,
+        editor: {
+          enabled: false,
+          editing: false,
+          adjustedDates: new Set(["2026-08-31"]),
+          adjustedCourses: new Set([occurrences[0]!.occurrenceId]),
+          coursePatchIds: new Set(["p1"]),
+          termStartDate: "2026-08-31",
+          traces: [
+            {
+              patchId: "p1",
+              date: "2026-09-03",
+              startSection: 1,
+              endSection: 2,
+              kind: "cleared",
+              name: "体育V",
+              targetDate: "2026-09-03",
+            },
+          ],
+          courses: occurrences,
+        },
+      })
+    )
+    expect(normalHtml).toContain('data-schedule-adjusted="day"')
+    expect(normalHtml).toContain('data-schedule-adjusted="course"')
+    expect(normalHtml).not.toContain("已停课")
+    expect(normalHtml).not.toContain("体育V")
   })
 })

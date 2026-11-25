@@ -1,11 +1,19 @@
 import { Calendar, FileText } from "lucide-react"
+import {
+  formatExamTime,
+  getAcademicClock,
+  getExamEndTime,
+  getExamStartTime,
+} from "@orahako/academic-kit"
 import { hasSlice, requireSlice, type Exam, type ProviderQueryPolicy } from "@orahako/academic-sdk"
 import {
+  createObservableSource,
   definePlugin,
   PLUGIN_API_VERSION,
   WIDGETS_EXAM_CAPABILITY,
   WIDGETS_GENERIC_CAPABILITY,
   type PluginManifest,
+  type ScheduleEntry,
 } from "@orahako/sdk"
 import { examsDictionary, type ExamsDictionary } from "./dictionary"
 import { ExamsHeaderActions, type ExamsHeaderActionsInject } from "./header-actions"
@@ -79,7 +87,7 @@ export const examsPlugin = definePlugin({
     "native",
     "widgets",
   ] as const,
-  optionalInject: ["overview", "assets"] as const,
+  optionalInject: ["overview", "assets", "schedule"] as const,
   apply(ctx) {
     const {
       ui,
@@ -93,6 +101,7 @@ export const examsPlugin = definePlugin({
       notifications,
       overview,
       assets,
+      schedule,
       widgets,
     } = ctx
 
@@ -136,6 +145,66 @@ export const examsPlugin = definePlugin({
     const pageExamsController = createParameterizedExamQueryController((semester) =>
       semester ? buildExamsSource(semester) : defaultExamsSource
     )
+
+    // Publish exams into the open `schedule` service as a pluggable source.
+    const scheduleExamsController = createParameterizedExamQueryController((semester) =>
+      semester ? buildExamsSource(semester) : defaultExamsSource
+    )
+    const examEntriesSource = createObservableSource<readonly ScheduleEntry[]>([])
+    const publishExamEntries = (): void => {
+      if (disposed) return
+      const exams = scheduleExamsController.source.getSnapshot().data ?? []
+      const timeZone = provider.getSnapshot().provider?.slices.timetable?.scheduleRules?.timeZone
+      const entries: ScheduleEntry[] = []
+      for (let i = 0; i < exams.length; i += 1) {
+        const exam = exams[i]!
+        const startDate = getExamStartTime(exam, timeZone)
+        const endDate = getExamEndTime(exam, timeZone)
+        if (!startDate || !endDate) continue
+        const startClock = getAcademicClock(startDate, timeZone)
+        const endClock = getAcademicClock(endDate, timeZone)
+        if (endClock.minutes <= startClock.minutes) continue
+        entries.push({
+          id: `exam:${exam.name}:${startClock.date}:${startClock.minutes}:${i}`,
+          sourceId: "exams",
+          sourcePluginId: EXAMS_PLUGIN_ID,
+          category: "exam",
+          title: exam.name,
+          ...(exam.examName ? { subtitle: exam.examName } : {}),
+          ...(exam.examLocation ? { location: exam.examLocation } : {}),
+          date: startClock.date,
+          weekDay: startClock.weekday,
+          time: { startMinute: startClock.minutes, endMinute: endClock.minutes },
+          remindable: false,
+          metadata: {
+            timeText: formatExamTime(exam),
+            ...(exam.seatNumber ? { seatNumber: exam.seatNumber } : {}),
+          },
+        })
+      }
+      examEntriesSource.set(entries)
+    }
+
+    let detachScheduleExams: (() => void) | null = null
+    let detachScheduleProvider: (() => void) | null = null
+    let unregisterScheduleSource: (() => void) | null = null
+    if (schedule) {
+      detachScheduleExams = scheduleExamsController.source.subscribe(publishExamEntries)
+      detachScheduleProvider = provider.state.subscribe(publishExamEntries)
+      publishExamEntries()
+      unregisterScheduleSource = schedule.registerSource({
+        id: "exams",
+        order: 40,
+        category: "exam",
+        entries: examEntriesSource,
+        setSemester: (semester) => {
+          scheduleExamsController.setTerm(semester)
+        },
+        refresh: async () => {
+          await scheduleExamsController.refresh()
+        },
+      })
+    }
 
     let unregisterChannel: (() => void) | null = null
     let lastNotifyExams = settingsStore.source.getSnapshot().notifyExams
@@ -318,9 +387,14 @@ export const examsPlugin = definePlugin({
 
     ctx.effect(() => () => {
       disposed = true
+      unregisterScheduleSource?.()
+      unregisterScheduleSource = null
+      detachScheduleExams?.()
+      detachScheduleProvider?.()
       detachSettings()
       unregisterChannel?.()
       unregisterChannel = null
+      scheduleExamsController.dispose()
       pageExamsController.dispose()
       viewStore.dispose()
       settingsStore.dispose()

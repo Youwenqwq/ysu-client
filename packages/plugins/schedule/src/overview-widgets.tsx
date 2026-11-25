@@ -6,6 +6,7 @@ import {
   courseStartSection,
   formatMinutesClock,
   isCoursePast,
+  isScheduleEntryActiveOnDate,
   scheduleOccurrence,
 } from "@orahako/academic-kit"
 import {
@@ -22,6 +23,8 @@ import {
 import type {
   DerivedComponentProps,
   ObservableSource,
+  ScheduleEffectiveSnapshot,
+  ScheduleEntry,
   SlotComponent,
   Translator,
 } from "@orahako/sdk"
@@ -40,7 +43,11 @@ import {
 } from "@orahako/ui-primitives"
 import type { ScheduleDictionary } from "./dictionary"
 import { CourseActivityModal, CourseSigninModal, type MobileLessonBridge } from "./modals"
-import { computeEffectiveScheduleSnapshot, type SchedulePatchesStoreInstance } from "./stores"
+import {
+  computeEffectiveScheduleSnapshot,
+  type ScheduleCustomizationsState,
+  type SchedulePatchesStoreInstance,
+} from "./stores"
 
 export const COURSE_PROGRESS_WIDGET_ID = "course-progress"
 export const TODAY_COURSES_WIDGET_ID = "today-courses"
@@ -156,6 +163,9 @@ export interface ScheduleOverviewWidgetInject {
     readonly provider: ObservableSource<ProviderRuntimeSnapshot>
     readonly session: ObservableSource<SessionSnapshot>
     readonly patchesHydrated: ObservableSource<boolean>
+    readonly customizations: ObservableSource<ScheduleCustomizationsState>
+    readonly customizationsHydrated: ObservableSource<boolean>
+    readonly scheduleState: ObservableSource<ScheduleEffectiveSnapshot>
     readonly schedule: ObservableSource<QuerySnapshot<Course[]>>
     readonly currentWeek: ObservableSource<QuerySnapshot<CurrentWeek>>
     readonly termCalendar: ObservableSource<QuerySnapshot<TermCalendar>>
@@ -180,6 +190,9 @@ export const CourseProgressWidget: SlotComponent<CourseProgressWidgetProps> = (p
   const providerSnap = props.useProvider()
   const sessionSnap = props.useSession()
   const patchesHydrated = props.usePatchesHydrated()
+  const customizationsState = props.useCustomizations()
+  const customizationsHydrated = props.useCustomizationsHydrated()
+  const scheduleState = props.useScheduleState()
   const scheduleQuery = props.useSchedule()
   const currentWeekQuery = props.useCurrentWeek()
   const termCalendarQuery = props.useTermCalendar()
@@ -204,9 +217,13 @@ export const CourseProgressWidget: SlotComponent<CourseProgressWidgetProps> = (p
         sessionSnapshot: sessionSnap,
         patchesState,
         patchesHydrated,
+        customizationsState,
+        customizationsHydrated,
       }),
     [
       calendar,
+      customizationsHydrated,
+      customizationsState,
       patchesHydrated,
       patchesState,
       providerSnap,
@@ -238,13 +255,89 @@ export const CourseProgressWidget: SlotComponent<CourseProgressWidgetProps> = (p
     ]
   )
 
+  const todayExtraEntries = useMemo(
+    () =>
+      scheduleState.entries.filter(
+        (entry) =>
+          entry.category !== "exam" &&
+          Boolean(entry.time) &&
+          isScheduleEntryActiveOnDate(
+            entry,
+            overview.date,
+            overview.weekday,
+            overview.liveWeek?.week
+          )
+      ),
+    [overview.date, overview.liveWeek?.week, overview.weekday, scheduleState.entries]
+  )
+
   const { currentCourse, currentRange, nextCourseInfo, nowMinutes } = overview
-  const course = currentCourse ?? nextCourseInfo?.course ?? null
-  const range = currentRange ?? nextCourseInfo?.range ?? null
+  const ongoingEntry =
+    todayExtraEntries.find(
+      (entry) =>
+        entry.time && nowMinutes >= entry.time.startMinute && nowMinutes < entry.time.endMinute
+    ) ?? null
+  const nextEntry =
+    todayExtraEntries
+      .filter((entry) => entry.time && entry.time.startMinute > nowMinutes)
+      .sort((a, b) => (a.time?.startMinute ?? 0) - (b.time?.startMinute ?? 0))[0] ?? null
+
+  const activeItem: {
+    readonly title: string
+    readonly detail: string
+    readonly range: [number, number]
+    readonly ongoing: boolean
+  } | null = (() => {
+    if (currentCourse && currentRange) {
+      return {
+        title: currentCourse.name,
+        detail: [currentCourse.teacher, currentCourse.classroom].filter(Boolean).join(" · "),
+        range: currentRange,
+        ongoing: true,
+      }
+    }
+    if (ongoingEntry?.time) {
+      return {
+        title: ongoingEntry.title,
+        detail: [ongoingEntry.subtitle, ongoingEntry.location].filter(Boolean).join(" · "),
+        range: [ongoingEntry.time.startMinute, ongoingEntry.time.endMinute],
+        ongoing: true,
+      }
+    }
+    if (nextCourseInfo && nextEntry?.time) {
+      if (nextEntry.time.startMinute < nextCourseInfo.range[0]) {
+        return {
+          title: nextEntry.title,
+          detail: [nextEntry.subtitle, nextEntry.location].filter(Boolean).join(" · "),
+          range: [nextEntry.time.startMinute, nextEntry.time.endMinute],
+          ongoing: false,
+        }
+      }
+    }
+    if (nextCourseInfo) {
+      return {
+        title: nextCourseInfo.course.name,
+        detail: [nextCourseInfo.course.teacher, nextCourseInfo.course.classroom]
+          .filter(Boolean)
+          .join(" · "),
+        range: nextCourseInfo.range,
+        ongoing: false,
+      }
+    }
+    if (nextEntry?.time) {
+      return {
+        title: nextEntry.title,
+        detail: [nextEntry.subtitle, nextEntry.location].filter(Boolean).join(" · "),
+        range: [nextEntry.time.startMinute, nextEntry.time.endMinute],
+        ongoing: false,
+      }
+    }
+    return null
+  })()
 
   const queries: readonly OverviewQueryLike[] = [scheduleQuery, currentWeekQuery, periodsQuery]
   const settled = queries.every((q) => q.data !== undefined && q.error === null)
-  if (settled && !course) {
+  if (settled && !activeItem) {
     return null
   }
 
@@ -261,19 +354,24 @@ export const CourseProgressWidget: SlotComponent<CourseProgressWidgetProps> = (p
 
   const noLiveWeek =
     (currentWeekQuery.data !== undefined || termCalendarQuery.data !== undefined) &&
-    overview.liveWeek === null
+    overview.liveWeek === null &&
+    !activeItem
 
   return (
     <Card data-overview-wide="" data-overview-course-progress="">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2">
           <Clock className="size-4 text-primary" />
-          {t(currentCourse ? "overview.ongoingNow" : "overview.nextCourse")}
+          {t(activeItem?.ongoing ? "overview.ongoingNow" : "overview.nextCourse")}
         </CardTitle>
-        {range && (
-          <Badge variant={currentCourse ? "default" : "secondary"}>
-            {t(currentCourse ? "overview.remaining" : "overview.startsIn", {
-              time: formatCountdown(currentCourse ? range[1] - nowMinutes : range[0] - nowMinutes),
+        {activeItem && (
+          <Badge variant={activeItem.ongoing ? "default" : "secondary"}>
+            {t(activeItem.ongoing ? "overview.remaining" : "overview.startsIn", {
+              time: formatCountdown(
+                activeItem.ongoing
+                  ? activeItem.range[1] - nowMinutes
+                  : activeItem.range[0] - nowMinutes
+              ),
             })}
           </Badge>
         )}
@@ -285,33 +383,36 @@ export const CourseProgressWidget: SlotComponent<CourseProgressWidgetProps> = (p
               {t("overview.queryState.unavailableShort")}
             </p>
           )}
-          {course && range && (
+          {activeItem && (
             <div className="flex flex-col gap-2">
               <a
                 href={props.scheduleHref}
                 onClick={(event) => handleSpaClick(event, props.openSchedule)}
                 className="rounded-sm text-lg font-semibold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
               >
-                {course.name}
+                {activeItem.title}
               </a>
-              <p className="text-sm text-muted-foreground">
-                {[course.teacher, course.classroom].filter(Boolean).join(" · ")}
-              </p>
-              {currentCourse && (
+              {activeItem.detail && (
+                <p className="text-sm text-muted-foreground">{activeItem.detail}</p>
+              )}
+              {activeItem.ongoing && (
                 <Progress
                   aria-label={t("overview.ongoingNow")}
                   value={Math.min(
                     100,
                     Math.max(
                       0,
-                      ((nowMinutes - range[0]) / Math.max(1, range[1] - range[0])) * 100
+                      ((nowMinutes - activeItem.range[0]) /
+                        Math.max(1, activeItem.range[1] - activeItem.range[0])) *
+                        100
                     )
                   )}
                   className="h-1.5"
                 />
               )}
               <p className="text-xs text-muted-foreground">
-                {formatMinutesClock(range[0])} - {formatMinutesClock(range[1])}
+                {formatMinutesClock(activeItem.range[0])} -{" "}
+                {formatMinutesClock(activeItem.range[1])}
               </p>
             </div>
           )}
@@ -335,6 +436,9 @@ export const TodayCoursesWidget: SlotComponent<TodayCoursesWidgetProps> = (props
   const providerSnap = props.useProvider()
   const sessionSnap = props.useSession()
   const patchesHydrated = props.usePatchesHydrated()
+  const customizationsState = props.useCustomizations()
+  const customizationsHydrated = props.useCustomizationsHydrated()
+  const scheduleState = props.useScheduleState()
   const scheduleQuery = props.useSchedule()
   const currentWeekQuery = props.useCurrentWeek()
   const termCalendarQuery = props.useTermCalendar()
@@ -366,9 +470,13 @@ export const TodayCoursesWidget: SlotComponent<TodayCoursesWidgetProps> = (props
         sessionSnapshot: sessionSnap,
         patchesState,
         patchesHydrated,
+        customizationsState,
+        customizationsHydrated,
       }),
     [
       calendar,
+      customizationsHydrated,
+      customizationsState,
       patchesHydrated,
       patchesState,
       providerSnap,
@@ -400,13 +508,31 @@ export const TodayCoursesWidget: SlotComponent<TodayCoursesWidgetProps> = (props
     ]
   )
 
+  const todayExtraEntries = useMemo<readonly ScheduleEntry[]>(
+    () =>
+      scheduleState.entries
+        .filter(
+          (entry) =>
+            entry.category !== "exam" &&
+            isScheduleEntryActiveOnDate(
+              entry,
+              overview.date,
+              overview.weekday,
+              overview.liveWeek?.week
+            )
+        )
+        .sort((a, b) => (a.time?.startMinute ?? 0) - (b.time?.startMinute ?? 0)),
+    [overview.date, overview.liveWeek?.week, overview.weekday, scheduleState.entries]
+  )
+
   const noLiveWeek =
     (currentWeekQuery.data !== undefined || termCalendarQuery.data !== undefined) &&
-    overview.liveWeek === null
+    overview.liveWeek === null &&
+    todayExtraEntries.length === 0
 
   const openCourse = (course: Course): void => {
     const occurrence = scheduleOccurrence(course)
-    setActivityCourse(occurrence ? occurrence.source.course : course)
+    setActivityCourse(course)
     setActivityWeek(occurrence ? occurrence.source.week : (overview.liveWeek?.week ?? 1))
     setActivityOpen(true)
   }
@@ -434,7 +560,7 @@ export const TodayCoursesWidget: SlotComponent<TodayCoursesWidgetProps> = (props
               <p className="text-sm text-muted-foreground">
                 {t("overview.queryState.unavailableShort")}
               </p>
-            ) : overview.todayCourses.length === 0 ? (
+            ) : overview.todayCourses.length === 0 && todayExtraEntries.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("overview.noCoursesToday")}</p>
             ) : (
               <div className="flex flex-col gap-3">
@@ -461,7 +587,14 @@ export const TodayCoursesWidget: SlotComponent<TodayCoursesWidgetProps> = (props
                         </span>
                       )}
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate text-sm font-medium">{course.name}</span>
+                        <span className="flex items-center gap-1.5 truncate text-sm font-medium">
+                          {course.deliveryMode === "online" && (
+                            <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                              {t("schedule.onlineTag")}
+                            </Badge>
+                          )}
+                          <span className="truncate">{course.name}</span>
+                        </span>
                         <span className="text-xs text-muted-foreground">
                           {[course.teacher, course.classroom].filter(Boolean).join(" · ")}
                         </span>
@@ -475,6 +608,46 @@ export const TodayCoursesWidget: SlotComponent<TodayCoursesWidgetProps> = (props
                             })}
                       </Badge>
                     </button>
+                  )
+                })}
+                {todayExtraEntries.map((entry) => {
+                  const isCurrent =
+                    Boolean(entry.time) &&
+                    overview.nowMinutes >= entry.time!.startMinute &&
+                    overview.nowMinutes < entry.time!.endMinute
+                  const isPast =
+                    Boolean(entry.time) &&
+                    !isCurrent &&
+                    overview.nowMinutes >= entry.time!.endMinute
+                  return (
+                    <a
+                      key={entry.id}
+                      href={props.scheduleHref}
+                      onClick={(event) => handleSpaClick(event, props.openSchedule)}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring",
+                        isCurrent && "border-primary bg-primary/5",
+                        isPast && "opacity-50"
+                      )}
+                    >
+                      {entry.time && (
+                        <span className="flex w-11 shrink-0 flex-col text-xs leading-tight text-muted-foreground">
+                          <span>{formatMinutesClock(entry.time.startMinute)}</span>
+                          <span>{formatMinutesClock(entry.time.endMinute)}</span>
+                        </span>
+                      )}
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-sm font-medium">{entry.title}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {[entry.subtitle, entry.location].filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                      <Badge variant={isCurrent ? "default" : "secondary"} className="shrink-0">
+                        {isCurrent
+                          ? t("overview.ongoingNow")
+                          : entry.badge || t("schedule.personalTag")}
+                      </Badge>
+                    </a>
                   )
                 })}
               </div>

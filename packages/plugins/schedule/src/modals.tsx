@@ -3,15 +3,21 @@ import { toast } from "sonner"
 import {
   CheckCircle2,
   Clock,
+  EyeOff,
   Fingerprint,
+  Globe,
   Hash,
   MapPin,
+  Pencil,
   QrCode,
   RotateCcw,
   Signpost,
+  StickyNote,
   Timer,
+  Trash2,
   XCircle,
 } from "lucide-react"
+import { scheduleOccurrence } from "@orahako/academic-kit"
 import type {
   Course,
   CurrentLesson,
@@ -22,11 +28,7 @@ import type {
   StudentSignResult,
   StudentSigninStatus,
 } from "@orahako/academic-sdk"
-import {
-  loadNativeCapabilities,
-  type PluginNativeService,
-  type Translator,
-} from "@orahako/sdk"
+import { loadNativeCapabilities, type PluginNativeService, type Translator } from "@orahako/sdk"
 import {
   Badge,
   Button,
@@ -100,7 +102,12 @@ export async function resolveGeolocationCoordinates(
         const lat = position?.coords?.latitude
         const lng = position?.coords?.longitude
         const acc = position?.coords?.accuracy ?? 0
-        if (typeof lat === "number" && Number.isFinite(lat) && typeof lng === "number" && Number.isFinite(lng)) {
+        if (
+          typeof lat === "number" &&
+          Number.isFinite(lat) &&
+          typeof lng === "number" &&
+          Number.isFinite(lng)
+        ) {
           return { latitude: lat, longitude: lng, accuracy: Number.isFinite(acc) ? acc : 0 }
         }
       }
@@ -216,21 +223,46 @@ export function CourseActivityModal({
   open,
   mobileBridge,
   t,
+  extraDetailNode,
   onOpenChange,
   onSigninActivity,
+  onEditCourse,
+  onCancelSingle,
+  onHideCourse,
+  onEditCustomCourse,
+  onDeleteCustomCourse,
 }: {
   readonly course: Course | null
   readonly week: number
   readonly open: boolean
   readonly mobileBridge: MobileLessonBridge
   readonly t: Translator<ScheduleDictionary>
+  readonly extraDetailNode?: ReactNode
   readonly onOpenChange: (open: boolean) => void
   readonly onSigninActivity?: (activityId: string, signinType: number) => void
+  readonly onEditCourse?: (course: Course) => void
+  readonly onCancelSingle?: (course: Course) => void
+  readonly onHideCourse?: (course: Course) => void
+  readonly onEditCustomCourse?: (customItemId: string) => void
+  readonly onDeleteCustomCourse?: (customItemId: string, title: string) => void
 }): ReactNode {
   const [loading, setLoading] = useState(false)
   const [lesson, setLesson] = useState<CurrentLesson | null>(null)
   const [missingCourseInfo, setMissingCourseInfo] = useState(false)
-  const hasMobile = mobileBridge.hasMobileSupport()
+  const [hideChoiceOpen, setHideChoiceOpen] = useState(false)
+  const occurrence = course ? scheduleOccurrence(course) : null
+  const customItemId = occurrence?.customItemId
+  const isCustomCourse = Boolean(customItemId || course?.scheduleId?.startsWith("custom:"))
+  const resolvedCustomId =
+    customItemId ??
+    (course?.scheduleId?.startsWith("custom:")
+      ? course.scheduleId.slice("custom:".length)
+      : undefined)
+  const hasMobile = mobileBridge.hasMobileSupport() && !isCustomCourse
+
+  useEffect(() => {
+    setHideChoiceOpen(false)
+  }, [course, open])
 
   useEffect(() => {
     if (!open || !course) {
@@ -239,7 +271,9 @@ export function CourseActivityModal({
       setLoading(false)
       return
     }
-    if (!mobileBridge.hasMobileSupport()) {
+    const occ = scheduleOccurrence(course)
+    const isCustom = Boolean(occ?.customItemId || course.scheduleId?.startsWith("custom:"))
+    if (!mobileBridge.hasMobileSupport() || isCustom) {
       setLesson(null)
       setMissingCourseInfo(false)
       setLoading(false)
@@ -247,7 +281,7 @@ export function CourseActivityModal({
     }
 
     let cancelled = false
-    const activeCourse = course
+    const activeCourse = occ?.source.course ?? course
     const classType = activeCourse.classType || "1"
     const teachClassId = classType === "1" ? activeCourse.classId : activeCourse.syxzdm
     if (!teachClassId || !activeCourse.scheduleId) {
@@ -263,7 +297,7 @@ export function CourseActivityModal({
         teachClassId,
         teachClassType: classType,
         scheduleId: activeCourse.scheduleId,
-        week,
+        week: occ?.source.week ?? week,
         weekDay: activeCourse.weekDay,
         startNode: activeCourse.startSection,
         endNode: activeCourse.endSection,
@@ -288,6 +322,7 @@ export function CourseActivityModal({
 
   const signinActivities = lesson?.activityList.filter((item) => item.signClazz === "1") ?? []
   const signoutActivities = lesson?.activityList.filter((item) => item.signClazz === "2") ?? []
+  const displayWeeks = occurrence?.source.course.weeks || course?.weeks
 
   return (
     <ResponsiveModal open={open} onOpenChange={onOpenChange}>
@@ -296,6 +331,25 @@ export function CourseActivityModal({
           <ResponsiveModalTitle>{course?.name || t("activity.title")}</ResponsiveModalTitle>
           {course && (
             <div className="flex flex-wrap items-center justify-center gap-1 pt-1">
+              {course.deliveryMode === "online" && (
+                <Badge
+                  variant="outline"
+                  className="h-5 border-sky-500/40 bg-sky-500/15 px-1.5 text-[10px] text-sky-700 dark:text-sky-300"
+                >
+                  <Globe className="mr-0.5 size-3" />
+                  {t("schedule.deliveryOnline")}
+                </Badge>
+              )}
+              {isCustomCourse && (
+                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                  {t("schedule.customTag")}
+                </Badge>
+              )}
+              {occurrence?.overridden && (
+                <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                  {t("scheduleCustom.modifiedBadge")}
+                </Badge>
+              )}
               {course.courseType && (
                 <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
                   {course.courseType}
@@ -338,14 +392,145 @@ export function CourseActivityModal({
                   })}
                 </span>
               </div>
-              {course.weeks && (
+              {displayWeeks && (
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-muted-foreground">{t("schedule.weeks")}</span>
-                  <span>{course.weeks}</span>
+                  <span>{displayWeeks}</span>
+                </div>
+              )}
+              {course.note && (
+                <div className="flex flex-col gap-1 border-t border-border/50 pt-2">
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <StickyNote className="size-3" />
+                    {t("schedule.note")}
+                  </span>
+                  <p className="whitespace-pre-wrap text-foreground">{course.note}</p>
                 </div>
               )}
             </div>
           )}
+
+          {course &&
+            isCustomCourse &&
+            resolvedCustomId &&
+            (onEditCustomCourse || onDeleteCustomCourse) && (
+              <div className="flex flex-wrap items-center gap-2">
+                {onEditCustomCourse && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      onOpenChange(false)
+                      onEditCustomCourse(resolvedCustomId)
+                    }}
+                  >
+                    <Pencil data-icon="inline-start" />
+                    {t("scheduleCustom.edit")}
+                  </Button>
+                )}
+                {onDeleteCustomCourse && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      onOpenChange(false)
+                      onDeleteCustomCourse(resolvedCustomId, course.name)
+                    }}
+                  >
+                    <Trash2 data-icon="inline-start" />
+                    {t("scheduleCustom.delete")}
+                  </Button>
+                )}
+              </div>
+            )}
+
+          {course && !isCustomCourse && (onEditCourse || onHideCourse || onCancelSingle) && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                {onEditCourse && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      onOpenChange(false)
+                      onEditCourse(course)
+                    }}
+                  >
+                    <Pencil data-icon="inline-start" />
+                    {t("scheduleCustom.edit")}
+                  </Button>
+                )}
+                {(onHideCourse || (onCancelSingle && occurrence)) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      if (onCancelSingle && occurrence && onHideCourse) {
+                        setHideChoiceOpen((prev) => !prev)
+                      } else if (onHideCourse) {
+                        onOpenChange(false)
+                        onHideCourse(course)
+                      } else if (onCancelSingle) {
+                        onOpenChange(false)
+                        onCancelSingle(course)
+                      }
+                    }}
+                  >
+                    <EyeOff data-icon="inline-start" />
+                    {t("scheduleCustom.hide")}
+                  </Button>
+                )}
+              </div>
+
+              {hideChoiceOpen && occurrence && (
+                <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {t("scheduleCustom.hideChoiceHint")}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {onCancelSingle && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          onOpenChange(false)
+                          onCancelSingle(course)
+                        }}
+                      >
+                        {t("scheduleCustom.hideOnce")}
+                      </Button>
+                    )}
+                    {onHideCourse && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          onOpenChange(false)
+                          onHideCourse(course)
+                        }}
+                      >
+                        {t("scheduleCustom.hideWhole")}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {extraDetailNode}
 
           {hasMobile && loading && (
             <div className="flex flex-col gap-3">

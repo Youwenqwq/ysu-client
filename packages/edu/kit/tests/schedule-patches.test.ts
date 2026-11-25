@@ -2,7 +2,13 @@ import type { Course } from "@orahako/academic-sdk"
 import { describe, expect, it } from "vitest"
 
 import {
+  applyCourseOverrides,
+  computeOverlayBlocks,
+  courseIdentity,
+  DEFAULT_STANDALONE_PERIODS,
   expandScheduleCourses,
+  formatWeekList,
+  isScheduleEntryActiveOnDate,
   resolveSchedulePatches,
   resolveScheduleTerm,
   scheduleDate,
@@ -10,6 +16,7 @@ import {
   schedulePatchAffectsWeek,
   schedulePatchDependents,
   scheduleWeek,
+  type CourseOverride,
   type ScheduleOccurrence,
   type SchedulePatch,
 } from "../src"
@@ -321,5 +328,123 @@ describe("schedule patches", () => {
       totalWeeks: 20,
     })
     expect(resolveScheduleTerm({ ...calendar, semester: "2026-1" }, null, "2025-1")).toBeNull()
+  })
+
+  it("applies course-level overrides, hides finished courses, preserves edits across upstream sync, and merges custom courses", () => {
+    const mathKey = courseIdentity(raw[0]!)
+    const physicsKey = courseIdentity(raw[1]!)
+    const overrides: CourseOverride[] = [
+      {
+        courseKey: mathKey,
+        originalName: "Math",
+        name: "高等数学（线上）",
+        classroom: "腾讯会议 123-456",
+        deliveryMode: "online",
+        weekList: [1, 3],
+        note: "老师改为线上腾讯会议",
+        updatedAt: "2026-09-01T00:00:00.000Z",
+      },
+      {
+        courseKey: physicsKey,
+        originalName: "Physics",
+        hidden: true,
+        updatedAt: "2026-09-01T00:00:00.000Z",
+      },
+    ]
+
+    const applied = applyCourseOverrides(raw, overrides)
+    expect(applied).toHaveLength(1)
+    expect(applied[0]?.course).toMatchObject({
+      name: "高等数学（线上）",
+      classroom: "腾讯会议 123-456",
+      deliveryMode: "online",
+      weeks: "1, 3",
+      weekList: [1, 3],
+      note: "老师改为线上腾讯会议",
+    })
+    expect(applied[0]?.overridden).toBe(true)
+
+    const customCourse: Course = {
+      name: "自主学习课",
+      classroom: "图书馆",
+      weekDay: 3,
+      startSection: 5,
+      endSection: 6,
+      weekList: [1, 2],
+      weeks: "1-2",
+      scheduleId: "custom:self-study",
+    }
+
+    // Simulate upstream sync changing teacher on raw[0] -> non-overridden field updates while overrides stay intact
+    const upstreamFresh = [{ ...raw[0]!, teacher: "Prof. Li" }, raw[1]!]
+    const resolved = resolveSchedulePatches(upstreamFresh, start, 3, [], {
+      overrides,
+      customCourses: [customCourse],
+    })
+    expect(resolved.courses.filter((c) => c.name === "Physics")).toHaveLength(0)
+    const mathOccs = resolved.courses.filter((c) => c.courseKey === mathKey)
+    expect(mathOccs).toHaveLength(2)
+    expect(mathOccs[0]).toMatchObject({
+      name: "高等数学（线上）",
+      classroom: "腾讯会议 123-456",
+      teacher: "Prof. Li",
+      deliveryMode: "online",
+      note: "老师改为线上腾讯会议",
+      overridden: true,
+    })
+    const customOccs = resolved.courses.filter((c) => c.customItemId === "self-study")
+    expect(customOccs).toHaveLength(2)
+    expect(formatWeekList([1, 2, 3, 5, 7, 8, 9])).toBe("1-3, 5, 7-9")
+  })
+
+  it("maps dated and weekly free-time schedule entries onto grid overlay blocks", () => {
+    const entries = [
+      {
+        id: "exam:1",
+        sourceId: "exams",
+        sourcePluginId: "orahako.exams",
+        category: "exam" as const,
+        title: "期末考试",
+        location: "东区101",
+        date: "2026-09-02",
+        weekDay: 3,
+        time: { startMinute: 9 * 60, endMinute: 11 * 60 },
+      },
+      {
+        id: "personal:club",
+        sourceId: "personal",
+        sourcePluginId: "orahako.schedule",
+        category: "personal" as const,
+        title: "社团例会",
+        location: "活动中心",
+        weekDay: 5,
+        time: { startMinute: 19 * 60 + 30, endMinute: 21 * 60 },
+        remindable: true,
+      },
+    ]
+
+    const week1Blocks = computeOverlayBlocks(entries, DEFAULT_STANDALONE_PERIODS, null, 1, start)
+    expect(week1Blocks).toHaveLength(2)
+    expect(week1Blocks[0]).toMatchObject({
+      day: 3,
+      start: 2,
+      end: 3,
+      timeLabel: "09:00-11:00",
+    })
+    expect(week1Blocks[1]).toMatchObject({
+      day: 5,
+      start: 9,
+      end: 10,
+      timeLabel: "19:30-21:00",
+    })
+
+    // Week 2: dated exam is outside week 2, weekly personal event repeats!
+    const week2Blocks = computeOverlayBlocks(entries, DEFAULT_STANDALONE_PERIODS, null, 2, start)
+    expect(week2Blocks).toHaveLength(1)
+    expect(week2Blocks[0]?.entry.id).toBe("personal:club")
+
+    expect(isScheduleEntryActiveOnDate(entries[0]!, "2026-09-02", 3, 1)).toBe(true)
+    expect(isScheduleEntryActiveOnDate(entries[0]!, "2026-09-03", 4, 1)).toBe(false)
+    expect(isScheduleEntryActiveOnDate(entries[1]!, "2026-09-11", 5, 2)).toBe(true)
   })
 })

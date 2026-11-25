@@ -7,6 +7,7 @@ import type {
   CurrentWeek,
   Exam,
 } from "@orahako/academic-sdk"
+import type { ScheduleEntry } from "@orahako/sdk"
 import {
   Drawer,
   DrawerContent,
@@ -24,6 +25,11 @@ import { CalendarOff, Layers } from "lucide-react"
 import { courseBgClass, type CourseColorMap } from "./course-color"
 import { computeExamBlocks, type ExamBlock } from "./exam-blocks"
 import { formatExamTime } from "./exam-utils"
+import {
+  computeOverlayBlocks,
+  computeWeekIsoDates,
+  type ScheduleOverlayBlock,
+} from "./schedule-entries"
 import { scheduleDate, scheduleOccurrence } from "./schedule-patches"
 import {
   buildSectionTimeMap,
@@ -38,19 +44,24 @@ import {
 import {
   DEFAULT_SCHEDULE_EDITOR_STATE,
   SCHEDULE_DAYS,
+  ScheduleCourseAdjustedIndicator,
+  ScheduleDayAdjustedIndicator,
   ScheduleDayHandle,
   ScheduleDayLabel,
   ScheduleGridTraces,
+  ScheduleOnlineBadge,
   SchedulePatchedLabel,
   computeScheduleGridRows,
   courseHasScheduleTrace,
   type ScheduleEditorState,
+  type ScheduleEmptyCellTarget,
   type ScheduleLabels,
 } from "./schedule-view-shared"
 
 export interface ScheduleMobileProps {
   courses: readonly Course[]
   exams?: readonly Exam[]
+  overlayEntries?: readonly ScheduleEntry[]
   colorMap: CourseColorMap
   periods: readonly ClassPeriod[]
   currentWeekday: number
@@ -67,9 +78,13 @@ export interface ScheduleMobileProps {
   compact?: boolean
   /** Constrain the schedule to the mobile shell and scroll rows within it. */
   fullscreen?: boolean
+  /** Keep the interactive grid visible even when a week has no courses or overlays. */
+  showGridWhenEmpty?: boolean
   onPrevWeek?: () => void
   onNextWeek?: () => void
   onCourseTap?: (course: Course, week: number) => void
+  onEntryTap?: (entry: ScheduleEntry) => void
+  onEmptyCellTap?: (cell: ScheduleEmptyCellTarget) => void
 }
 
 const SWIPE_DISTANCE_RATIO = 0.25
@@ -81,6 +96,7 @@ const CLICK_SUPPRESS_MS = 400
 type OverlapState = { day: number; section: number; courses: Course[] } | null
 
 const NO_EXAMS: readonly Exam[] = []
+const NO_OVERLAY_ENTRIES: readonly ScheduleEntry[] = []
 
 interface GestureState {
   x: number
@@ -93,6 +109,7 @@ interface GestureState {
 export function ScheduleMobile({
   courses,
   exams = NO_EXAMS,
+  overlayEntries = NO_OVERLAY_ENTRIES,
   colorMap,
   periods,
   currentWeekday,
@@ -106,9 +123,12 @@ export function ScheduleMobile({
   scheduleRules,
   compact = false,
   fullscreen = false,
+  showGridWhenEmpty = false,
   onPrevWeek,
   onNextWeek,
   onCourseTap,
+  onEntryTap,
+  onEmptyCellTap,
 }: ScheduleMobileProps) {
   const [overlapDrawer, setOverlapDrawer] = useState<OverlapState>(null)
   const [examDrawer, setExamDrawer] = useState<ExamBlock | null>(null)
@@ -198,6 +218,14 @@ export function ScheduleMobile({
 
   function handleTouchStart(e: React.TouchEvent) {
     if (editor.isDragging?.() || (editor.editing && !editor.enabled)) return
+    if (
+      editor.enabled &&
+      e.target instanceof Element &&
+      e.target.closest("[data-schedule-course], [data-schedule-day]")
+    ) {
+      gestureRef.current = null
+      return
+    }
     if (animatingRef.current) finishSettle()
     const touch = e.touches[0]
     if (!touch) return
@@ -272,9 +300,8 @@ export function ScheduleMobile({
       if (editor.editing && !editor.enabled) return
       if (editor.selectCourse?.(course)) return
       const occurrence = scheduleOccurrence(course)
-      const sourceCourse = occurrence?.source.course ?? course
       const sourceWeek = occurrence?.source.week ?? week
-      onCourseTap?.(sourceCourse, sourceWeek)
+      onCourseTap?.(course, sourceWeek)
     },
     [onCourseTap, editor]
   )
@@ -291,7 +318,7 @@ export function ScheduleMobile({
         ref={viewportRef}
         className={cn(
           "flex min-h-0 flex-1 touch-pan-y flex-col select-none",
-          editor.editing || fullscreen ? "overflow-x-hidden overflow-y-auto" : "overflow-hidden"
+          fullscreen ? "overflow-x-hidden overflow-y-auto" : "overflow-hidden"
         )}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -304,10 +331,7 @@ export function ScheduleMobile({
       >
         <div
           ref={trackRef}
-          className={cn(
-            "flex flex-1 will-change-transform",
-            editor.editing || fullscreen ? "min-h-min" : "min-h-0"
-          )}
+          className={cn("flex flex-1 will-change-transform", fullscreen ? "min-h-min" : "min-h-0")}
           style={{ transform: "translateX(-100%)" }}
           onTransitionEnd={(e) => {
             if (e.target === trackRef.current) finishSettle()
@@ -319,6 +343,7 @@ export function ScheduleMobile({
                 week={week}
                 courses={courses}
                 exams={exams}
+                overlayEntries={overlayEntries}
                 periods={periods}
                 currentWeekday={currentWeekday}
                 currentWeek={currentWeek}
@@ -326,6 +351,7 @@ export function ScheduleMobile({
                 termStartDate={termStartDate}
                 nowMinutes={nowMinutes}
                 compact={compact}
+                showGridWhenEmpty={showGridWhenEmpty}
                 colorMap={colorMap}
                 labels={labels}
                 editor={editor}
@@ -333,6 +359,8 @@ export function ScheduleMobile({
                 onCoursePress={handleCoursePress}
                 onOverlapPress={handleOverlapPress}
                 onExamPress={handleExamPress}
+                onEntryPress={onEntryTap}
+                onEmptyCellPress={onEmptyCellTap}
               />
             </div>
           ))}
@@ -425,6 +453,7 @@ interface WeekGridProps {
   week: number
   courses: readonly Course[]
   exams: readonly Exam[]
+  overlayEntries: readonly ScheduleEntry[]
   periods: readonly ClassPeriod[]
   currentWeekday: number
   currentWeek: CurrentWeek | null
@@ -432,6 +461,7 @@ interface WeekGridProps {
   termStartDate?: string
   nowMinutes: number
   compact: boolean
+  showGridWhenEmpty: boolean
   colorMap: CourseColorMap
   labels: ScheduleLabels
   editor: ScheduleEditorState
@@ -439,12 +469,35 @@ interface WeekGridProps {
   onCoursePress: (course: Course, week: number) => void
   onOverlapPress: (day: number, section: number, courses: Course[]) => void
   onExamPress: (block: ExamBlock) => void
+  onEntryPress?: (entry: ScheduleEntry) => void
+  onEmptyCellPress?: (cell: ScheduleEmptyCellTarget) => void
+}
+
+function overlayBlockClass(block: ScheduleOverlayBlock): string {
+  if (block.entry.category === "exam") {
+    return "bg-amber-500/15 ring-1 ring-inset ring-amber-500/50"
+  }
+  if (block.entry.category === "personal") {
+    return "bg-indigo-500/12 ring-1 ring-inset ring-indigo-500/45"
+  }
+  return "bg-emerald-500/12 ring-1 ring-inset ring-emerald-500/45"
+}
+
+function overlayTagClass(block: ScheduleOverlayBlock): string {
+  if (block.entry.category === "exam") {
+    return "text-amber-600 dark:text-amber-400"
+  }
+  if (block.entry.category === "personal") {
+    return "text-indigo-600 dark:text-indigo-400"
+  }
+  return "text-emerald-600 dark:text-emerald-400"
 }
 
 const WeekGrid = memo(function WeekGrid({
   week,
   courses,
   exams,
+  overlayEntries,
   periods,
   currentWeekday,
   currentWeek,
@@ -452,6 +505,7 @@ const WeekGrid = memo(function WeekGrid({
   termStartDate,
   nowMinutes,
   compact,
+  showGridWhenEmpty,
   colorMap,
   labels,
   editor,
@@ -459,12 +513,18 @@ const WeekGrid = memo(function WeekGrid({
   onCoursePress,
   onOverlapPress,
   onExamPress,
+  onEntryPress,
+  onEmptyCellPress,
 }: WeekGridProps) {
-  const dateForDay = (day: number) =>
-    editor.termStartDate ? scheduleDate(editor.termStartDate, week, day) : undefined
-  const hasTraces = editor.traces.some((trace) =>
-    SCHEDULE_DAYS.some((day) => dateForDay(day) === trace.date)
+  const weekIsoDates = useMemo(
+    () => computeWeekIsoDates(weekAnchor, week, termStartDate ?? editor.termStartDate),
+    [weekAnchor, week, termStartDate, editor.termStartDate]
   )
+  const dateForDay = (day: number) =>
+    editor.termStartDate ? scheduleDate(editor.termStartDate, week, day) : weekIsoDates?.[day - 1]
+  const hasTraces =
+    editor.editing &&
+    editor.traces.some((trace) => SCHEDULE_DAYS.some((day) => dateForDay(day) === trace.date))
 
   const weekCourses = useMemo(
     () => (week >= 1 ? courses.filter((c) => isCourseActiveInWeek(c, week)) : []),
@@ -472,15 +532,12 @@ const WeekGrid = memo(function WeekGrid({
   )
   const examBlocks = useMemo(
     () =>
-      computeExamBlocks(
-        exams,
-        periods,
-        weekAnchor,
-        week,
-        termStartDate,
-        scheduleRules?.timeZone
-      ),
+      computeExamBlocks(exams, periods, weekAnchor, week, termStartDate, scheduleRules?.timeZone),
     [exams, periods, weekAnchor, week, termStartDate, scheduleRules]
+  )
+  const overlayBlocks = useMemo(
+    () => computeOverlayBlocks(overlayEntries, periods, weekAnchor, week, termStartDate),
+    [overlayEntries, periods, weekAnchor, week, termStartDate]
   )
   const weekDates = useMemo(
     () => computeWeekDateLabels(weekAnchor, week, termStartDate),
@@ -520,7 +577,14 @@ const WeekGrid = memo(function WeekGrid({
     return <div className="flex-1" />
   }
 
-  if (weekCourses.length === 0 && examBlocks.length === 0 && !editor.editing && !hasTraces) {
+  if (
+    !showGridWhenEmpty &&
+    weekCourses.length === 0 &&
+    examBlocks.length === 0 &&
+    overlayBlocks.length === 0 &&
+    !editor.editing &&
+    !hasTraces
+  ) {
     return (
       <div className="flex flex-1">
         <Empty>
@@ -562,7 +626,7 @@ const WeekGrid = memo(function WeekGrid({
         <div
           key={d}
           className={cn(
-            "flex flex-col items-center justify-center border-b border-border text-[10px] font-medium",
+            "relative flex flex-col items-center justify-center border-b border-border text-[10px] font-medium",
             compact ? "gap-0 py-0.5" : "gap-0.5 py-1.5",
             idx < 6 && "border-r",
             isCurrentWeek && d === currentWeekday
@@ -570,15 +634,15 @@ const WeekGrid = memo(function WeekGrid({
               : "text-muted-foreground"
           )}
         >
-          <ScheduleDayLabel
+          <ScheduleDayLabel day={d} weekdayShort={labels.weekdayShort} />
+          {weekDates[d - 1] && <span className="text-[9px] opacity-70">{weekDates[d - 1]}</span>}
+          <ScheduleDayHandle week={week} day={d} editor={editor} editorLabels={labels.editor} />
+          <ScheduleDayAdjustedIndicator
             week={week}
             day={d}
-            weekdayShort={labels.weekdayShort}
             editor={editor}
             editorLabels={labels.editor}
           />
-          {weekDates[d - 1] && <span className="text-[9px] opacity-70">{weekDates[d - 1]}</span>}
-          <ScheduleDayHandle week={week} day={d} editor={editor} editorLabels={labels.editor} />
         </div>
       ))}
 
@@ -620,15 +684,28 @@ const WeekGrid = memo(function WeekGrid({
         periods.map((p) => {
           const row = sectionToRow.get(p.section)
           if (!row) return null
+          const cellDate = dateForDay(d)
           return (
             <div
               key={`cell-${d}-${p.section}`}
-              data-schedule-date={dateForDay(d)}
+              data-schedule-date={cellDate}
               data-schedule-section={p.section}
+              onClick={
+                onEmptyCellPress && !editor.editing
+                  ? () =>
+                      onEmptyCellPress({
+                        week,
+                        day: d,
+                        section: p.section,
+                        ...(cellDate ? { date: cellDate } : {}),
+                      })
+                  : undefined
+              }
               className={cn(
                 "border-b border-border",
                 d < 7 && "border-r",
-                isCurrentWeek && d === currentWeekday && "bg-primary/5"
+                isCurrentWeek && d === currentWeekday && "bg-primary/5",
+                onEmptyCellPress && !editor.editing && "cursor-pointer active:bg-accent/40"
               )}
               style={{ gridRow: row, gridColumn: d + 1 }}
             />
@@ -639,27 +716,33 @@ const WeekGrid = memo(function WeekGrid({
       {blocks.map((block, idx) => {
         if (block.courses.length === 1) {
           const c = block.courses[0]!
+          const occurrenceId = editor.enabled ? scheduleOccurrence(c)?.occurrenceId : undefined
+          const isBeingDragged = Boolean(
+            occurrenceId && editor.draggingOccurrenceIds?.has(occurrenceId)
+          )
           return (
             <button
               key={`block-${idx}`}
               type="button"
-              data-schedule-course={
-                editor.enabled ? scheduleOccurrence(c)?.occurrenceId : undefined
-              }
+              draggable={false}
+              data-schedule-course={occurrenceId}
               onClick={(e) => {
                 e.currentTarget.blur()
                 onCoursePress(c, week)
               }}
               className={cn(
-                "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1 text-left transition-opacity active:opacity-60",
+                "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1 text-left transition-[opacity,transform] active:opacity-60",
                 courseBgClass(colorMap, c),
-                courseHasScheduleTrace(c, editor.traces) && "pb-7",
-                isBlockCurrent(block) && "ring-1 ring-primary"
+                editor.editing && courseHasScheduleTrace(c, editor.traces) && "pb-7",
+                isBlockCurrent(block) && "ring-1 ring-primary",
+                occurrenceId &&
+                  "cursor-grab touch-none ring-1 ring-primary/30 active:cursor-grabbing",
+                isBeingDragged && "scale-[0.97] opacity-35 ring-2 ring-primary/60"
               )}
               style={blockStyle(block)}
             >
               <span className="line-clamp-4 text-[10.5px] leading-tight font-medium text-foreground">
-                <SchedulePatchedLabel course={c} editor={editor} editorLabels={labels.editor} />
+                <ScheduleOnlineBadge course={c} label={labels.onlineTag} />
                 {c.name}
               </span>
               {c.classroom && (
@@ -677,6 +760,11 @@ const WeekGrid = memo(function WeekGrid({
                   {c.teacher}
                 </span>
               )}
+              <ScheduleCourseAdjustedIndicator
+                course={c}
+                editor={editor}
+                editorLabels={labels.editor}
+              />
             </button>
           )
         }
@@ -690,7 +778,8 @@ const WeekGrid = memo(function WeekGrid({
             }}
             className={cn(
               "relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60",
-              block.courses.some((course) => courseHasScheduleTrace(course, editor.traces)) &&
+              editor.editing &&
+                block.courses.some((course) => courseHasScheduleTrace(course, editor.traces)) &&
                 "pb-7"
             )}
             style={blockStyle(block)}
@@ -715,22 +804,71 @@ const WeekGrid = memo(function WeekGrid({
             e.currentTarget.blur()
             onExamPress(block)
           }}
-          className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md border border-amber-500/50 bg-amber-500/15 p-1 text-left transition-opacity active:opacity-60"
+          className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md bg-amber-500/15 p-1 text-left ring-1 ring-amber-500/50 transition-opacity ring-inset active:opacity-60"
           style={blockStyle(block)}
         >
-          <span className="line-clamp-1 text-[9px] font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
+          <span className="line-clamp-1 text-[9px] leading-tight font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
             {labels.examTag}
           </span>
-          <span className="line-clamp-3 text-[10.5px] leading-tight font-medium text-foreground">
+          <span className="line-clamp-4 text-[10.5px] leading-tight font-medium text-foreground">
             {block.exam.name}
           </span>
-          {block.exam.examLocation && !compact && (
-            <span className="line-clamp-1 text-[9px] leading-tight text-foreground/70">
+          {block.exam.examLocation && (
+            <span className="line-clamp-2 text-[9px] leading-tight text-foreground/70">
               {block.exam.examLocation}
             </span>
           )}
         </button>
       ))}
+      {overlayBlocks.map((block) => {
+        const tag =
+          block.entry.badge ||
+          (block.entry.category === "exam"
+            ? labels.examTag
+            : block.entry.deliveryMode === "online"
+              ? labels.onlineTag
+              : labels.personalTag)
+        return (
+          <button
+            key={`overlay-${block.entry.id}`}
+            type="button"
+            data-schedule-entry={block.entry.id}
+            onClick={(e) => {
+              e.currentTarget.blur()
+              onEntryPress?.(block.entry)
+            }}
+            className={cn(
+              "relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1 text-left transition-opacity active:opacity-60",
+              overlayBlockClass(block)
+            )}
+            style={blockStyle(block)}
+          >
+            {tag && (
+              <span
+                className={cn(
+                  "line-clamp-1 text-[9px] leading-tight font-semibold tracking-wide",
+                  overlayTagClass(block)
+                )}
+              >
+                {tag}
+              </span>
+            )}
+            <span className="line-clamp-4 text-[10.5px] leading-tight font-medium text-foreground">
+              {block.entry.title}
+            </span>
+            {block.entry.location && (
+              <span className="line-clamp-2 text-[9px] leading-tight text-foreground/70">
+                {block.entry.location}
+              </span>
+            )}
+            {!compact && block.timeLabel && (
+              <span className="line-clamp-1 text-[8.5px] leading-tight text-foreground/60 tabular-nums">
+                {block.timeLabel}
+              </span>
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 })
