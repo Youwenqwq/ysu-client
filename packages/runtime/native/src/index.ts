@@ -10,6 +10,18 @@ import {
 } from "@orahako/sdk"
 
 export { createWidgetService }
+export {
+  attachDeepLinkListener,
+  attachNativeWebViewLifecycle,
+  NATIVE_LIFECYCLE_RUNTIME_PLUGIN_ID,
+  NATIVE_WEBVIEW_CAPABILITY,
+  nativeLifecycleRuntimePlugin,
+  parseDeepLink,
+  type CapacitorAppUrlAdapter,
+  type DeepLinkListenerOptions,
+  type NativeLifecycleConfig,
+  type NativeWebViewLifecycleOptions,
+} from "./lifecycle"
 
 export const NATIVE_FILES_CAPABILITY = "native.files@1"
 export const NOTIFICATIONS_CORE_CAPABILITY = "notifications.core@1"

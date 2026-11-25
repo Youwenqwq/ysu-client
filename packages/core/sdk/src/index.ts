@@ -1,6 +1,7 @@
 export * from "./manifest"
 export * from "./market"
 export * from "./observable"
+export * from "./appearance"
 export * from "./i18n"
 export * from "./store"
 export * from "./slots"

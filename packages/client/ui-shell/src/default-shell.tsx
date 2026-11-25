@@ -34,6 +34,8 @@ import {
   type RegisterBackLayer,
 } from "@orahako/ui-primitives"
 import type {
+  AppearanceColorMode,
+  AppearanceSnapshot,
   DerivedComponentProps,
   ObservableSource,
   PluginLocale,
@@ -88,7 +90,9 @@ export interface DefaultShellInject {
     readonly navRevision: ObservableSource<number>
     readonly backgroundUrl: ObservableSource<string | null>
     readonly preference: ObservableSource<PluginHostPreferenceSnapshot>
+    readonly appearance: ObservableSource<AppearanceSnapshot | null>
   }
+  readonly setColorMode: (colorMode: AppearanceColorMode) => void
   readonly getAppName: (locale: PluginLocale) => string
   readonly getStartupPreference: () => string
   readonly resolveChrome: (
@@ -364,9 +368,11 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
   const navRevision = props.useNavRevision()
   const backgroundUrl = props.useBackgroundUrl()
   const preference = props.usePreference()
+  const sharedAppearance = props.useAppearance()
   const startupPage = preference.startupPage ?? props.getStartupPreference()
 
-  const colorMode: ColorMode = useStore((s) => s.colorMode)
+  const fallbackColorMode: ColorMode = useStore((s) => s.colorMode)
+  const colorMode: ColorMode = sharedAppearance?.colorMode ?? fallbackColorMode
   const backgroundImage = useStore((s) => s.backgroundImage)
   const backgroundStyle = useStore((s) => s.backgroundStyle)
   const overlayOpacity = useStore((s) => s.backgroundOverlayOpacity)
@@ -379,6 +385,7 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
   const [defaultSidebarOpen] = useState<boolean>(readInitialSidebarOpen)
 
   useEffect(() => {
+    if (sharedAppearance !== null) return
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
     const mql = window.matchMedia("(prefers-color-scheme: dark)")
     setSystemDark(mql.matches)
@@ -388,14 +395,16 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
       return () => mql.removeEventListener("change", onChange)
     }
     return undefined
-  }, [])
+  }, [sharedAppearance])
 
-  const isDark = colorMode === "dark" || (colorMode === "system" && systemDark)
+  const isDark =
+    sharedAppearance?.isDark ?? (colorMode === "dark" || (colorMode === "system" && systemDark))
 
   useEffect(() => {
+    if (sharedAppearance !== null) return
     if (typeof document === "undefined" || !document.documentElement?.classList) return
     document.documentElement.classList.toggle("dark", isDark)
-  }, [isDark])
+  }, [isDark, sharedAppearance])
 
   // Keyboard shortcut Ctrl/Cmd+B toggles desktop sidebar
   useEffect(() => {
@@ -608,7 +617,7 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
                 data-shell-theme-toggle=""
                 variant="ghost"
                 size="icon-sm"
-                onClick={() => actions.setColorMode(isDark ? "light" : "dark")}
+                onClick={() => props.setColorMode(isDark ? "light" : "dark")}
                 aria-label={t("shell.toggleTheme")}
               >
                 {isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}

@@ -1,13 +1,21 @@
 import {
+  definePlugin,
   isCurrentNotificationDestination,
   notificationDestination,
+  PLUGIN_API_VERSION,
+  type PluginConfig,
   type PluginLocale,
   type PluginNativeService,
   type PluginNavigationService,
   type PluginRouterService,
 } from "@orahako/sdk"
 
+export const NATIVE_LIFECYCLE_RUNTIME_PLUGIN_ID = "orahako.runtime.native-lifecycle"
 export const NATIVE_WEBVIEW_CAPABILITY = "native.webview@1"
+
+export interface NativeLifecycleConfig extends PluginConfig {
+  readonly deepLinkScheme?: string
+}
 
 export interface CapacitorAppUrlAdapter {
   addListener(
@@ -136,3 +144,50 @@ export function attachNativeWebViewLifecycle(options: NativeWebViewLifecycleOpti
     }
   }
 }
+
+export const nativeLifecycleRuntimePlugin = definePlugin<
+  readonly ["native"],
+  NativeLifecycleConfig,
+  readonly ["router", "navigation", "i18n"]
+>({
+  manifest: {
+    id: NATIVE_LIFECYCLE_RUNTIME_PLUGIN_ID,
+    name: "Native WebView and deep-link lifecycle",
+    version: "1.0.0",
+    apiVersion: PLUGIN_API_VERSION,
+    kind: "runtime",
+    entry: "index.js",
+    inject: ["native"],
+    nativeCapabilities: [NATIVE_WEBVIEW_CAPABILITY],
+  },
+  inject: ["native"] as const,
+  optionalInject: ["router", "navigation", "i18n"] as const,
+  configSchema: {
+    type: "object",
+    properties: {
+      deepLinkScheme: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+  apply(ctx, config: NativeLifecycleConfig = {}) {
+    const scheme = config.deepLinkScheme ?? "orahako"
+    const disposeWebView = attachNativeWebViewLifecycle({
+      native: ctx.native,
+      getLocale: () => ctx.i18n?.getLocale() ?? "zh",
+    })
+    const disposeDeepLinks =
+      ctx.router && ctx.navigation
+        ? attachDeepLinkListener({
+            isNative: () => ctx.native.isNative,
+            scheme,
+            navigation: ctx.navigation,
+            router: ctx.router,
+          })
+        : () => {}
+
+    ctx.effect(() => () => {
+      disposeDeepLinks()
+      disposeWebView()
+    })
+  },
+})

@@ -8,7 +8,13 @@ import {
   type StoreInstance,
 } from "@orahako/sdk"
 import { PluginSlotRegistry } from "@orahako/runtime-slots"
-import { PluginUIRegistry, UI_RUNTIME_PLUGIN_ID, uiRegistryPlugin } from "../src"
+import {
+  APPEARANCE_RUNTIME_PLUGIN_ID,
+  appearanceRuntimePlugin,
+  PluginUIRegistry,
+  UI_RUNTIME_PLUGIN_ID,
+  uiRegistryPlugin,
+} from "../src"
 
 declare module "@orahako/sdk" {
   interface SlotMap {
@@ -300,13 +306,9 @@ describe("@orahako/runtime-ui", () => {
     ).toHaveLength(1)
 
     runtime.stop(alpha.manifest.id)
-    expect(
-      slots.getSnapshot().declarations.some((d) => d.name === "test.ui.shared")
-    ).toBe(true)
+    expect(slots.getSnapshot().declarations.some((d) => d.name === "test.ui.shared")).toBe(true)
     runtime.stop(beta.manifest.id)
-    expect(
-      slots.getSnapshot().declarations.some((d) => d.name === "test.ui.shared")
-    ).toBe(false)
+    expect(slots.getSnapshot().declarations.some((d) => d.name === "test.ui.shared")).toBe(false)
 
     const undeclared = definePlugin({
       manifest: {
@@ -362,5 +364,50 @@ describe("@orahako/runtime-ui", () => {
       "Plugin slot already declared: test.ui.page-child"
     )
     runtime.dispose()
+  })
+
+  it("provides shared appearance colorMode state with persistence and dark toggling", async () => {
+    const runtime = new PluginRuntime()
+    const storageMap = new Map<string, string>()
+    runtime.context.set("storage", {
+      local: {
+        getItem: async (k: string) => storageMap.get(k) ?? null,
+        setItem: async (k: string, v: string) => {
+          storageMap.set(k, v)
+        },
+        removeItem: async (k: string) => {
+          storageMap.delete(k)
+        },
+      },
+      secure: {
+        getItem: async () => null,
+        setItem: async () => {},
+        removeItem: async () => {},
+      },
+    })
+
+    runtime.register(appearanceRuntimePlugin, "builtin")
+    await runtime.startAndWait(APPEARANCE_RUNTIME_PLUGIN_ID)
+
+    const appearance = runtime.context.get("appearance")!
+    expect(appearance).toBeDefined()
+    expect(appearance.getSnapshot().colorMode).toBe("system")
+
+    appearance.setColorMode("dark")
+    expect(appearance.getSnapshot()).toEqual({
+      colorMode: "dark",
+      resolvedColorMode: "dark",
+      isDark: true,
+    })
+
+    appearance.toggleDark()
+    expect(appearance.getSnapshot()).toEqual({
+      colorMode: "light",
+      resolvedColorMode: "light",
+      isDark: false,
+    })
+
+    await vi.waitFor(() => expect(storageMap.get("color-mode")).toBe("light"))
+    await runtime.dispose()
   })
 })

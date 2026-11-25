@@ -1681,6 +1681,10 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     expect(scheduleService.getEffectiveSnapshot().entries).toEqual(
       expect.arrayContaining([expect.objectContaining({ title: "开源社团例会" })])
     )
+    expect(scheduleService.getEffectiveSnapshot().allEntries).toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: "开源社团例会" })])
+    )
+    await expect(scheduleService.refresh()).resolves.toBeUndefined()
 
     // Render SchedulePage standalone: external source & toolbar slot render cleanly!
     const ui = runtime.context.get("ui")!

@@ -14,7 +14,13 @@ import {
 } from "@orahako/sdk"
 import { httpRuntimePlugin } from "@orahako/runtime-http"
 import { i18nRegistryPlugin } from "@orahako/runtime-i18n"
-import { nativeRuntimePlugin } from "@orahako/runtime-native"
+import {
+  attachDeepLinkListener,
+  attachNativeWebViewLifecycle,
+  NATIVE_WEBVIEW_CAPABILITY,
+  nativeRuntimePlugin,
+  parseDeepLink,
+} from "@orahako/runtime-native"
 import { navigationRuntimePlugin, PluginRouter, routerRuntimePlugin } from "@orahako/runtime-router"
 import { settingsRegistryPlugin } from "@orahako/runtime-settings"
 import { OrahakoApp, slotRegistryPlugin } from "@orahako/runtime-slots"
@@ -26,15 +32,11 @@ import { PROFILE_PLUGIN_ID, uiProfilePlugin } from "@orahako/ui-profile"
 import { SETTINGS_PLUGIN_ID, uiSettingsPlugin } from "@orahako/ui-settings"
 import {
   appearanceStore,
-  attachDeepLinkListener,
-  attachNativeWebViewLifecycle,
   BackgroundMediaController,
   buildCardStyleCss,
   computeCardBgOpacity,
   manifest,
-  NATIVE_WEBVIEW_CAPABILITY,
   PAGE_TRANSITION_STYLE,
-  parseDeepLink,
   resolvePageOutletTransitionMode,
   SHELL_PLUGIN_ID,
   uiShellPlugin,

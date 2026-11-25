@@ -172,9 +172,17 @@ The active shell, theme, and startup page are host preferences, not shell-local 
 exposes `packageRuntime.preferenceState` (a `PluginHostPreferenceSnapshot` with optional
 `activeShell` / `activeTheme` / `startupPage`), plus corresponding getters and setters.
 `OrahakoApp` subscribes to that snapshot, so changes made by other plugins apply immediately.
-An unset `startupPage` falls back to `composition.defaults.landing`. Shells and settings must not
-keep duplicate preference stores. When `activeTheme` is unset or empty, no theme is injected;
-there is no fallback to the first registered non-empty theme.
+An unset `startupPage` falls back to `composition.defaults.landing`. Color mode (`light` / `dark` /
+`system`) and `.dark` document synchronization are provided by the shared `appearance` Cordis
+service (`optionalInject: ["appearance"]`), while native WebView safe-area and deep-link listeners
+live in `orahako.runtime.native-lifecycle`, keeping replacement shells pure UI. Shells and settings
+must not keep duplicate preference stores. When `activeTheme` is unset or empty, no theme is
+injected; there is no fallback to the first registered non-empty theme.
+
+Custom shells and `root`-slot applications do not have to render `props.children` for every route:
+they can consume shared domain engines such as `schedule` (`allEntries`, `calendar`, `refresh`) or
+academic runtime services (`provider`, `session`, `query`) to draw bespoke views for selected
+features while selectively falling back to `props.children` for settings or long-tail pages.
 
 ## Stores and dictionaries
 
@@ -223,9 +231,14 @@ permissions, receivers or widget implementations.
 The packer externalizes exactly `PLATFORM_MODULES` from `@orahako/sdk`:
 
 ```ts
-[
-  "react", "react-dom", "react-dom/client", "react/jsx-runtime", "sonner",
-  "@orahako/sdk", "@orahako/ui-primitives",
+;[
+  "react",
+  "react-dom",
+  "react-dom/client",
+  "react/jsx-runtime",
+  "sonner",
+  "@orahako/sdk",
+  "@orahako/ui-primitives",
 ]
 ```
 

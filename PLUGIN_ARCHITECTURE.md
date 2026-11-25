@@ -53,15 +53,17 @@ Activation 只由 `scripts/deploy-website.sh` 的 `APP_DEPLOYMENT=edgeone-pwa` �
 
 通用服务属于 composition 中的普通运行时插件：
 
-| 服务                    | 包                                 | 责任                                   |
-| ----------------------- | ---------------------------------- | -------------------------------------- |
-| `slots` / `ui`          | `runtime/slots`, `runtime/ui`      | Slot、页面、导航、Shell、主题注册      |
-| `router` / `navigation` | `runtime/router`                   | 根查询历史、语义目标解析与导航过滤     |
-| `i18n` / `settings`     | `runtime/i18n`, `runtime/settings` | 翻译、设置分类                         |
-| `storage`               | `runtime/storage`                  | 本地/安全存储与插件命名空间            |
-| `http`                  | `runtime/http`                     | 传输、Cookie 协作、网络活动、waterfall |
-| `native`                | `runtime/native`                   | 版本化宿主能力                         |
-| `assets` / `plugins`    | `runtime/packages`                 | 包内资源和市场安装                     |
+| 服务                          | 包                                 | 责任                                      |
+| ----------------------------- | ---------------------------------- | ----------------------------------------- |
+| `slots` / `ui` / `appearance` | `runtime/slots`, `runtime/ui`      | Slot、页面、导航、Shell、主题与共享深浅色 |
+| `router` / `navigation`       | `runtime/router`                   | 根查询历史、语义目标解析与导航过滤        |
+| `i18n` / `settings`           | `runtime/i18n`, `runtime/settings` | 翻译、设置分类                            |
+| `storage`                     | `runtime/storage`                  | 本地/安全存储与插件命名空间               |
+| `http`                        | `runtime/http`                     | 传输、Cookie 协作、网络活动、waterfall    |
+| `native` / `native-lifecycle` | `runtime/native`                   | 版本化宿主能力、WebView 安全区与深链      |
+| `assets` / `plugins`          | `runtime/packages`                 | 包内资源和市场安装                        |
+
+`schedule` 服务向外暴露合并调课补丁、课程覆写、自定义日程与外部源后的统一 `allEntries`、`calendar` 与 `refresh()`；其余教务数据统一由 `provider`、`session` 与 `query` 底座按身份共享缓存提供，不额外为每个业务 UI 插件包装重复的数据服务。定制 Shell 或 `root` 界面插件可以按需消费这些服务自绘核心界面，并在冷门或系统页面回退渲染 `props.children`。
 
 教务运行时是可选服务：Provider 通过 `ctx.providers.registerProvider(schoolId, factory)` 注册；`SchoolProvider` 以正交 `AcademicSliceMap` 组合认证和业务切片，不恢复单体 Provider。`reset()` / `logout()` 只用于用户显式操作；热替换和宿主退出调用本地 `dispose()`，新实例初始化前等待旧实例释放，旧实例不得再清理共享 Query、凭据或 Native 状态。`SchoolProvider.timeZone` 声明学校时区，`timetable.scheduleRules` 声明作息分界，通用教务算法不固定学校时区。Provider 的能力声明与 `supportedPlugins` 同时决定查询、页面、导航和功能插件是否可用。查询数据 record 可按身份共享，但每个插件的 descriptor、enabled 和订阅生命周期相互隔离；TTL/persist 策略由功能插件通过 `query.registerPolicy` 在自己的作用域注册，不在运行时枚举业务功能。官方组合只内置并默认选择 YSU；初始化向导仅在用户打开“更多学校”时从当前市场的 `provider` 类别发现其他学校，约定插件 ID 为 `<schoolId>.provider`，选择时安装该插件并验证对应 Provider 已注册，不在部署配置中枚举社区学校。学校确认后是固定应用身份，登录、账号和 App 内插件市场不提供切校或 Provider 安装入口；Provider 市场条目只服务于初始化向导。
 

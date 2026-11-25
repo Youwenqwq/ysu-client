@@ -52,7 +52,8 @@ const deployment: CompositionLayer = {
         basePath,
       },
     },
-    { id: "orahako.shell", config: { appName, appNameEn, deepLinkScheme } },
+    { id: "orahako.runtime.native-lifecycle", config: { deepLinkScheme } },
+    { id: "orahako.shell", config: { appName, appNameEn } },
     {
       id: "orahako.profile",
       config: {

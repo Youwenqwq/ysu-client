@@ -31,6 +31,12 @@ import {
   type StoreInstance,
 } from "@orahako/sdk"
 
+export {
+  APPEARANCE_RUNTIME_PLUGIN_ID,
+  AppearanceRegistry,
+  appearanceRuntimePlugin,
+} from "./appearance"
+
 export const UI_RUNTIME_PLUGIN_ID = "orahako.runtime.ui"
 
 const EMPTY_UI_SNAPSHOT: PluginUIServiceSnapshot = {

@@ -2,6 +2,8 @@ import {
   definePlugin,
   PLUGIN_API_VERSION,
   resolveContributionText,
+  type AppearanceColorMode,
+  type AppearanceSnapshot,
   type ObservableSource,
   type PluginHostPreferenceSnapshot,
   type PluginLocale,
@@ -15,13 +17,6 @@ import {
 import "./slots-declare"
 import { AppearanceSettingsSection } from "./appearance-settings"
 import { BackgroundMediaController, isRenderableBackgroundUrl } from "./background-media"
-import {
-  attachDeepLinkListener,
-  attachNativeWebViewLifecycle,
-  NATIVE_WEBVIEW_CAPABILITY,
-  parseDeepLink,
-  type CapacitorAppUrlAdapter,
-} from "./deep-link"
 import { DefaultShell, defaultShellChildren, type ResolvedShellChrome } from "./default-shell"
 import { shellDictionary } from "./dictionary"
 import {
@@ -54,8 +49,6 @@ import {
 
 export {
   appearanceStore,
-  attachDeepLinkListener,
-  attachNativeWebViewLifecycle,
   BackgroundMediaController,
   buildCardStyleCss,
   buildMobileBottomTabs,
@@ -68,9 +61,7 @@ export {
   isRenderableBackgroundUrl,
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
-  NATIVE_WEBVIEW_CAPABILITY,
   PAGE_TRANSITION_STYLE,
-  parseDeepLink,
   resolveActivePageForLocation,
   resolveActiveScopedNavId,
   resolvePageOutletTransitionMode,
@@ -79,7 +70,6 @@ export {
   type AppearanceStoreState,
   type AppNavContribution,
   type BackgroundStyle,
-  type CapacitorAppUrlAdapter,
   type CardStyle,
   type ColorMode,
   type ResolvedShellChrome,
@@ -90,6 +80,7 @@ export {
 
 export const SHELL_PLUGIN_ID = "orahako.shell"
 export const DEFAULT_SHELL_ID = "default"
+const DEFAULT_SHELL_QUALIFIED_ID = `${SHELL_PLUGIN_ID}:${DEFAULT_SHELL_ID}`
 
 const EMPTY_PREFERENCE_SNAPSHOT: PluginHostPreferenceSnapshot = {}
 
@@ -98,10 +89,14 @@ const STATIC_PREFERENCE_SOURCE: ObservableSource<PluginHostPreferenceSnapshot> =
   subscribe: () => () => {},
 }
 
+const STATIC_NULL_APPEARANCE_SOURCE: ObservableSource<AppearanceSnapshot | null> = {
+  getSnapshot: () => null,
+  subscribe: () => () => {},
+}
+
 export interface ShellPluginConfig {
   readonly appName?: string
   readonly appNameEn?: string
-  readonly deepLinkScheme?: string
   readonly [key: string]: unknown
 }
 
@@ -118,7 +113,8 @@ export const manifest: PluginManifest = {
 
 export const uiShellPlugin = definePlugin<
   readonly ["ui", "slots", "router", "navigation", "i18n", "storage", "native", "packageRuntime"],
-  ShellPluginConfig
+  ShellPluginConfig,
+  readonly ["appearance"]
 >({
   manifest,
   inject: [
@@ -131,19 +127,18 @@ export const uiShellPlugin = definePlugin<
     "native",
     "packageRuntime",
   ] as const,
+  optionalInject: ["appearance"] as const,
   configSchema: {
     type: "object",
     properties: {
       appName: { type: "string" },
       appNameEn: { type: "string" },
-      deepLinkScheme: { type: "string" },
     },
     additionalProperties: false,
   },
   apply(ctx, config: ShellPluginConfig = {}) {
     const appNameZh = config.appName ?? "酸橙盒"
     const appNameEn = config.appNameEn ?? "Orahako"
-    const deepLinkScheme = config.deepLinkScheme ?? "orahako"
 
     const store = appearanceStore.create(ctx.storage)
     const media = new BackgroundMediaController({
@@ -159,27 +154,24 @@ export const uiShellPlugin = definePlugin<
     })
     void media.syncToken(lastBackgroundImage)
 
+    const appearanceSource: ObservableSource<AppearanceSnapshot | null> =
+      ctx.appearance?.state ?? STATIC_NULL_APPEARANCE_SOURCE
+
+    const setColorMode = (colorMode: AppearanceColorMode): void => {
+      if (ctx.appearance) {
+        ctx.appearance.setColorMode(colorMode)
+      } else {
+        store.actions.setColorMode(colorMode)
+      }
+    }
+
     const resolveStartupPage = (): string =>
       ctx.packageRuntime.preferenceState?.getSnapshot().startupPage ??
       ctx.packageRuntime.getStartupPage?.() ??
       ctx.packageRuntime.defaultLanding?.() ??
       ""
 
-    const disposeWebViewLifecycle = attachNativeWebViewLifecycle({
-      native: ctx.native,
-      getLocale: () => ctx.i18n.getLocale(),
-    })
-
-    const disposeDeepLinks = attachDeepLinkListener({
-      isNative: () => ctx.native.isNative,
-      scheme: deepLinkScheme,
-      navigation: ctx.navigation,
-      router: ctx.router,
-    })
-
     ctx.effect(() => () => {
-      disposeDeepLinks()
-      disposeWebViewLifecycle()
       unsubscribeStore()
       media.dispose()
       store.dispose()
@@ -365,7 +357,9 @@ export const uiShellPlugin = definePlugin<
             navRevision: ctx.navigation.state,
             backgroundUrl: media.urlSource,
             preference: ctx.packageRuntime.preferenceState ?? STATIC_PREFERENCE_SOURCE,
+            appearance: appearanceSource,
           },
+          setColorMode,
           getAppName,
           getStartupPreference: () =>
             ctx.packageRuntime.preferenceState?.getSnapshot().startupPage ??
@@ -438,7 +432,14 @@ export const uiShellPlugin = definePlugin<
             hooks: {
               ui: ctx.ui.state,
               preference: ctx.packageRuntime.preferenceState ?? STATIC_PREFERENCE_SOURCE,
+              appearance: appearanceSource,
             },
+            setColorMode,
+            getActiveShell: () => ctx.packageRuntime.getActiveShell?.(),
+            getDefaultShell: () => ctx.packageRuntime.defaultShell?.(),
+            setActiveShell: (shellId: string | undefined) =>
+              ctx.packageRuntime.setActiveShell?.(shellId),
+            defaultShellQualifiedId: DEFAULT_SHELL_QUALIFIED_ID,
             getActiveTheme: () => ctx.packageRuntime.getActiveTheme?.() ?? "",
             themeHref: ctx.router.href({ route: "theme" }),
             navigateToTheme: () => {

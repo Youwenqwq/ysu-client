@@ -1,3 +1,4 @@
+import type { PluginAppearanceService } from "./appearance"
 import type { HttpRequest, HttpResponse, PluginHttpService } from "./http"
 import type { PluginI18nService } from "./i18n"
 import type { PluginManifest } from "./manifest"
@@ -115,6 +116,7 @@ export interface OrahakoServiceMap {
   router: PluginRouterService
   navigation: PluginNavigationService
   ui: PluginUIService
+  appearance: PluginAppearanceService
   slots: PluginSlotService
   settings: PluginSettingsService
   i18n: PluginI18nService

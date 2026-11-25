@@ -68,8 +68,29 @@ export interface ScheduleSourceContribution extends ScheduleSourceSpec {
   readonly scopedId: string
 }
 
+export interface SchedulePeriodSlot {
+  readonly section: number
+  readonly startTime: string
+  readonly endTime: string
+  readonly name?: string
+}
+
+export interface ScheduleCalendarContext {
+  readonly currentWeek?: number
+  readonly totalWeeks?: number
+  readonly semester?: string
+  readonly termStartDate?: string
+  readonly timeZone?: string
+  readonly periods: readonly SchedulePeriodSlot[]
+}
+
 export interface ScheduleEffectiveSnapshot {
+  /** Entries contributed by registered schedule sources (overlays, exams, personal, etc.). */
   readonly entries: readonly ScheduleEntry[]
+  /** Complete unified entries including merged base timetable courses and all registered sources. */
+  readonly allEntries: readonly ScheduleEntry[]
+  /** Active academic calendar and class-period clock metadata when available. */
+  readonly calendar?: ScheduleCalendarContext
   readonly sources: readonly ScheduleSourceContribution[]
 }
 
@@ -79,5 +100,6 @@ export interface ScheduleService {
   registerSource(spec: ScheduleSourceSpec): () => void
   getSources(): readonly ScheduleSourceContribution[]
   getEffectiveSnapshot(): ScheduleEffectiveSnapshot
+  refresh(): Promise<void>
   subscribe(listener: () => void): () => void
 }

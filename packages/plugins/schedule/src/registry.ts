@@ -5,6 +5,7 @@ import {
   trackPluginRegistration,
   type ObservableSource,
   type PluginManifest,
+  type ScheduleCalendarContext,
   type ScheduleEffectiveSnapshot,
   type ScheduleEntry,
   type ScheduleService,
@@ -31,9 +32,13 @@ export class ScheduleRegistry implements ScheduleService, ScopedPluginService<Sc
   private readonly sourcesSource = createObservableSource<readonly ScheduleSourceContribution[]>([])
   private readonly stateSource = createObservableSource<ScheduleEffectiveSnapshot>({
     entries: [],
+    allEntries: [],
     sources: [],
   })
   private readonly records = new Map<string, RegisteredSourceRecord>()
+  private baseEntries: readonly ScheduleEntry[] = []
+  private calendarContext: ScheduleCalendarContext | undefined
+  private baseRefresher: (() => Promise<void>) | null = null
   private currentSemester = ""
   private disposed = false
 
@@ -62,6 +67,7 @@ export class ScheduleRegistry implements ScheduleService, ScopedPluginService<Sc
       registerSource: registerScoped,
       getSources: this.getSources,
       getEffectiveSnapshot: this.getEffectiveSnapshot,
+      refresh: this.refresh,
       subscribe: this.subscribe,
     }
   }
@@ -82,6 +88,17 @@ export class ScheduleRegistry implements ScheduleService, ScopedPluginService<Sc
     return this.registerInternal("root", spec)
   }
 
+  setBaseSchedule(entries: readonly ScheduleEntry[], calendar?: ScheduleCalendarContext): void {
+    if (this.disposed) return
+    this.baseEntries = entries
+    this.calendarContext = calendar
+    this.publish()
+  }
+
+  setBaseRefresher(refresher: (() => Promise<void>) | null): void {
+    this.baseRefresher = refresher
+  }
+
   setSemester(semester: string): void {
     this.currentSemester = semester
     for (const record of this.records.values()) {
@@ -89,10 +106,19 @@ export class ScheduleRegistry implements ScheduleService, ScopedPluginService<Sc
     }
   }
 
+  refresh = async (): Promise<void> => {
+    await this.refreshAll()
+  }
+
   async refreshAll(): Promise<void> {
-    const tasks = Array.from(this.records.values())
-      .map((record) => record.contribution.refresh?.())
-      .filter((result): result is Promise<void> => Boolean(result))
+    const tasks: Array<Promise<void>> = []
+    if (this.baseRefresher) {
+      tasks.push(this.baseRefresher())
+    }
+    for (const record of this.records.values()) {
+      const result = record.contribution.refresh?.()
+      if (result) tasks.push(result)
+    }
     await Promise.allSettled(tasks)
   }
 
@@ -103,8 +129,11 @@ export class ScheduleRegistry implements ScheduleService, ScopedPluginService<Sc
       record.unsubscribe()
     }
     this.records.clear()
+    this.baseEntries = []
+    this.calendarContext = undefined
+    this.baseRefresher = null
     this.sourcesSource.set([])
-    this.stateSource.set({ entries: [], sources: [] })
+    this.stateSource.set({ entries: [], allEntries: [], sources: [] })
   }
 
   private registerInternal(pluginId: string, spec: ScheduleSourceSpec): () => void {
@@ -173,7 +202,15 @@ export class ScheduleRegistry implements ScheduleService, ScopedPluginService<Sc
       }
     }
 
+    const allEntries: readonly ScheduleEntry[] =
+      this.baseEntries.length > 0 ? [...this.baseEntries, ...entries] : entries
+
     this.sourcesSource.set(sortedSources)
-    this.stateSource.set({ entries, sources: sortedSources })
+    this.stateSource.set({
+      entries,
+      allEntries,
+      ...(this.calendarContext !== undefined ? { calendar: this.calendarContext } : {}),
+      sources: sortedSources,
+    })
   }
 }

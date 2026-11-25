@@ -20,6 +20,7 @@ import {
   PLUGIN_API_VERSION,
   type ObservableSource,
   type PluginManifest,
+  type ScheduleCalendarContext,
   type ScheduleEntry,
 } from "@orahako/sdk"
 import {
@@ -78,6 +79,7 @@ import {
 } from "./settings"
 import "./slots"
 import {
+  computeEffectiveScheduleSnapshot,
   createSchedulePatchMutators,
   customItemToOverlayEntry,
   scheduleCustomizationsStore,
@@ -209,6 +211,15 @@ function createStaticQuerySource<T>(): ObservableSource<QuerySnapshot<T>> {
     getSnapshot: () => snapshot,
     subscribe: () => () => {},
   }
+}
+
+function parsePeriodClockMinutes(timeStr: string | undefined): number | undefined {
+  if (!timeStr) return undefined
+  const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(timeStr.trim())
+  if (!match) return undefined
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  return hours < 24 && minutes < 60 ? hours * 60 + minutes : undefined
 }
 
 function detectLiveUpdateSupported(isNative: boolean): boolean {
@@ -419,6 +430,128 @@ export const schedulePlugin = definePlugin({
     const defaultScheduleSource = createScheduleSourceForTerm(undefined)
     const defaultCurrentWeekSource = createCurrentWeekSourceForTerm(undefined)
     const defaultTermCalendarSource = createTermCalendarSourceForTerm(undefined)
+
+    // Publish merged effective timetable courses (with overrides, patches, and
+    // custom recurring courses) plus calendar/period metadata onto ScheduleService
+    // so headless consumers & custom shells can read one unified schedule stream.
+    const publishBaseSchedule = (): void => {
+      if (disposed) return
+      const providerSnap = providerStateSource.getSnapshot()
+      const sessionSnap = sessionStateSource.getSnapshot()
+      const rawCourses = defaultScheduleSource.getSnapshot().data
+      const currentWeek = defaultCurrentWeekSource.getSnapshot().data ?? null
+      const calendar = defaultTermCalendarSource.getSnapshot().data
+      const periods = periodsSource.getSnapshot().data ?? []
+      const periodMap = new Map(periods.map((period) => [period.section, period]))
+
+      const effective = computeEffectiveScheduleSnapshot({
+        rawCourses,
+        calendar,
+        currentWeek,
+        providerSnapshot: providerSnap,
+        sessionSnapshot: sessionSnap,
+        patchesState: patchesStore.source.getSnapshot(),
+        patchesHydrated: patchesStore.hydrated.getSnapshot(),
+        customizationsState: customizationsStore.source.getSnapshot(),
+        customizationsHydrated: customizationsStore.hydrated.getSnapshot(),
+      })
+
+      const baseEntries: ScheduleEntry[] = effective.courses.map((course, index) => {
+        const startPeriod = periodMap.get(course.startSection)
+        const endPeriod = periodMap.get(course.endSection)
+        const startMin = startPeriod?.startMinute ?? parsePeriodClockMinutes(startPeriod?.startTime)
+        const endMin = endPeriod?.endMinute ?? parsePeriodClockMinutes(endPeriod?.endTime)
+        return {
+          id:
+            course.occurrenceId ||
+            `course:${course.code || course.name}:${course.date}:${course.startSection}:${course.endSection}:${index}`,
+          ...(course.courseKey ? { seriesId: course.courseKey } : {}),
+          sourceId: "timetable",
+          sourcePluginId: SCHEDULE_PLUGIN_ID,
+          category: "course",
+          title: course.name,
+          ...(course.classroom ? { location: course.classroom } : {}),
+          ...(course.teacher ? { subtitle: course.teacher } : {}),
+          ...(course.deliveryMode ? { deliveryMode: course.deliveryMode } : {}),
+          ...(course.note ? { note: course.note } : {}),
+          ...(course.courseKey ? { colorKey: course.courseKey } : {}),
+          ...(course.date ? { date: course.date } : {}),
+          weekDay: course.weekDay,
+          ...(course.weekList && course.weekList.length > 0 ? { weekList: course.weekList } : {}),
+          sections: {
+            startSection: course.startSection,
+            endSection: course.endSection,
+          },
+          ...(startMin !== undefined && endMin !== undefined && endMin > startMin
+            ? { time: { startMinute: startMin, endMinute: endMin } }
+            : {}),
+          remindable: true,
+          metadata: {
+            ...(course.code ? { courseCode: course.code } : {}),
+            ...(course.credit ? { credit: course.credit } : {}),
+            ...(course.patchIds.length > 0 ? { adjusted: true } : {}),
+            ...(course.overridden ? { overridden: true } : {}),
+            ...(course.customItemId ? { custom: true } : {}),
+          },
+        }
+      })
+
+      const timeZone =
+        providerSnap.provider?.slices.timetable?.scheduleRules?.timeZone ??
+        providerSnap.provider?.timeZone
+      const normalizedPeriods = periods
+        .filter((period) => Boolean(period.startTime && period.endTime))
+        .map((period) => ({
+          section: period.section,
+          startTime: period.startTime!,
+          endTime: period.endTime!,
+          ...(period.name ? { name: period.name } : {}),
+        }))
+      const calendarContext: ScheduleCalendarContext | undefined =
+        currentWeek || calendar || normalizedPeriods.length > 0 || timeZone
+          ? {
+              ...(currentWeek?.week !== undefined ? { currentWeek: currentWeek.week } : {}),
+              ...(effective.totalWeeks > 0
+                ? { totalWeeks: effective.totalWeeks }
+                : calendar?.totalWeeks !== undefined
+                  ? { totalWeeks: calendar.totalWeeks }
+                  : {}),
+              ...(currentWeek?.semester
+                ? { semester: currentWeek.semester }
+                : calendar?.semester
+                  ? { semester: calendar.semester }
+                  : {}),
+              ...(effective.termStartDate ? { termStartDate: effective.termStartDate } : {}),
+              ...(timeZone ? { timeZone } : {}),
+              periods: normalizedPeriods,
+            }
+          : undefined
+
+      registry.setBaseSchedule(baseEntries, calendarContext)
+    }
+
+    registry.setBaseRefresher(async () => {
+      await Promise.allSettled([
+        defaultScheduleSource.getSnapshot().refresh(),
+        defaultCurrentWeekSource.getSnapshot().refresh(),
+        defaultTermCalendarSource.getSnapshot().refresh(),
+        periodsSource.getSnapshot().refresh(),
+      ])
+    })
+
+    const baseSubscriptions = [
+      defaultScheduleSource.subscribe(publishBaseSchedule),
+      defaultCurrentWeekSource.subscribe(publishBaseSchedule),
+      defaultTermCalendarSource.subscribe(publishBaseSchedule),
+      periodsSource.subscribe(publishBaseSchedule),
+      patchesStore.source.subscribe(publishBaseSchedule),
+      patchesStore.hydrated.subscribe(publishBaseSchedule),
+      customizationsStore.source.subscribe(publishBaseSchedule),
+      customizationsStore.hydrated.subscribe(publishBaseSchedule),
+      providerStateSource.subscribe(publishBaseSchedule),
+      sessionStateSource.subscribe(publishBaseSchedule),
+    ]
+    publishBaseSchedule()
 
     const pageScheduleSource = createParameterizedQuerySource<
       ScheduleViewState,
@@ -815,6 +948,7 @@ export const schedulePlugin = definePlugin({
 
     ctx.effect(() => async () => {
       disposed = true
+      for (const unsubscribe of baseSubscriptions) unsubscribe()
       detachPersonalSource()
       minuteClock.dispose()
       registry.dispose()

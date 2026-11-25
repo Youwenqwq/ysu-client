@@ -107,6 +107,10 @@ describe("official composition", () => {
       expect(host.runtime.context.get("providers")?.listProviders()).toEqual(["ysu"])
       expect(host.runtime.get("ysu.provider")?.status).toBe("active")
       expect(host.runtime.get("orahako.meter")?.status).toBe("active")
+      expect(host.runtime.get("orahako.runtime.appearance")?.status).toBe("active")
+      expect(host.runtime.get("orahako.runtime.native-lifecycle")?.status).toBe("active")
+      expect(host.runtime.context.get("appearance")).toBeDefined()
+      expect(host.runtime.context.get("schedule")).toBeDefined()
       expect(host.runtime.get("orahako.activation")).toBeUndefined()
       expect(() => host.disable("ysu.provider")).toThrow("protected by the active composition")
     } finally {

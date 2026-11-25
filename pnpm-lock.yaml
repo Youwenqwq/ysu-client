@@ -935,9 +935,6 @@ importers:
 
   packages/client/ui-shell:
     dependencies:
-      '@capacitor/app':
-        specifier: ^8.1.0
-        version: 8.1.0(@capacitor/core@8.3.4)
       '@capacitor/core':
         specifier: ^8.3.4
         version: 8.3.4
@@ -2723,6 +2720,9 @@ importers:
 
   packages/runtime/native:
     dependencies:
+      '@capacitor/app':
+        specifier: ^8.1.0
+        version: 8.1.0(@capacitor/core@8.3.4)
       '@capacitor/core':
         specifier: ^8.3.4
         version: 8.3.4

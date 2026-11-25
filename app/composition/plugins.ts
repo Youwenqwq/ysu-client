@@ -21,13 +21,17 @@ import authUiPlugin from "@orahako/plugin-ui-auth"
 import ysuProviderPlugin from "@orahako/plugin-ysu-provider"
 import { httpRuntimePlugin } from "@orahako/runtime-http"
 import { i18nRegistryPlugin } from "@orahako/runtime-i18n"
-import { nativeRuntimePlugin, widgetRuntimePlugin } from "@orahako/runtime-native"
+import {
+  nativeLifecycleRuntimePlugin,
+  nativeRuntimePlugin,
+  widgetRuntimePlugin,
+} from "@orahako/runtime-native"
 import { assetsRuntimePlugin, installerRuntimePlugin } from "@orahako/runtime-packages"
 import { navigationRuntimePlugin, routerRuntimePlugin } from "@orahako/runtime-router"
 import { settingsRegistryPlugin } from "@orahako/runtime-settings"
 import { slotRegistryPlugin } from "@orahako/runtime-slots"
 import { storageRuntimePlugin } from "@orahako/runtime-storage"
-import { uiRegistryPlugin } from "@orahako/runtime-ui"
+import { appearanceRuntimePlugin, uiRegistryPlugin } from "@orahako/runtime-ui"
 import type { AnyDefinedPlugin } from "@orahako/sdk"
 import themeDefaultPlugin from "@orahako/theme-default"
 import { activationPlugin } from "@orahako/ui-activation"
@@ -46,11 +50,13 @@ export const platformPlugins = [
   uiRegistryPlugin,
   i18nRegistryPlugin,
   storageRuntimePlugin,
+  appearanceRuntimePlugin,
   routerRuntimePlugin,
   navigationRuntimePlugin,
   settingsRegistryPlugin,
   httpRuntimePlugin,
   nativeRuntimePlugin,
+  nativeLifecycleRuntimePlugin,
   widgetRuntimePlugin,
   assetsRuntimePlugin,
   installerRuntimePlugin,

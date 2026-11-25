@@ -845,14 +845,15 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
       apply(ctx) {
         const sourcesSource = { getSnapshot: () => [], subscribe: () => () => {} }
         const stateSource = {
-          getSnapshot: () => ({ entries: [], sources: [] }),
+          getSnapshot: () => ({ entries: [], allEntries: [], sources: [] }),
           subscribe: () => () => {},
         }
         ctx.set("schedule", {
           sources: sourcesSource,
           state: stateSource,
           getSources: () => [],
-          getEffectiveSnapshot: () => ({ entries: [], sources: [] }),
+          getEffectiveSnapshot: () => ({ entries: [], allEntries: [], sources: [] }),
+          refresh: async () => {},
           subscribe: () => () => {},
           registerSource(spec) {
             const record = { id: spec.id, getEntries: () => spec.entries.getSnapshot() }

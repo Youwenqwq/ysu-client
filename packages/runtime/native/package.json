@@ -8,6 +8,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.3.4",
     "@orahako/sdk": "workspace:*"
   },
