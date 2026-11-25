@@ -132,7 +132,7 @@ export type ValidInject<I> = I extends { readonly hooks: infer H }
   : I
 
 /**
- * Share 4: Plain data & callbacks returned by `inject(ctx)`, with `hooks`
+ * Share 4: Plain data & callbacks returned by `inject()`, with `hooks`
  * observables mapped to `use<Capitalize<Name>>` selector hooks so components
  * never receive raw `ObservableSource` instances.
  */

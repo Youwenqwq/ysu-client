@@ -12,7 +12,8 @@ composition, root-query routing, and runtime boundaries.
 
 The packer reads the root `manifest.json` and uses the first existing entry in
 `src/index.tsx`, `src/index.ts`, `index.tsx`, `index.ts`. It bundles source as ESM
-and packages `dist/` and optional `assets/`:
+and packages the esbuild-generated `dist/` outputs plus optional `assets/`; it does not copy
+arbitrary pre-existing files from `dist/`:
 
 ```text
 manifest.json
@@ -91,22 +92,23 @@ export default definePlugin({
   },
   inject: ["ui"],
   apply(ctx) {
-    ctx.ui.registerPage(
-      { id: "index", route: "example", requiresProvider: false, dictionary },
-      ({ t }) => <h1>{t("title")}</h1>
-    )
+    ctx.ui.registerPage({ id: "index", route: "example", dictionary }, ({ t }) => (
+      <h1>{t("title")}</h1>
+    ))
   },
 })
 ```
 
 The definition's `inject` tuple determines which required services `apply` can access.
-Use `optionalInject: ["provider"]` for services that may be absent; their context properties are
+Use `optionalInject: ["assets"]` for services that may be absent; their context properties are
 optional, and the consumer remounts when such a service appears, is replaced, or is revoked.
 Register resources in `apply`; use `ctx.effect` to attach cleanup for resources
 that are not already scoped by the service. After side-loading, open
-`/?route=example` relative to the app's base path. `requiresProvider: false`
-marks the page as not requiring a Provider; `providerIndependent` keeps the
-plugin running even when a school's allowlist omits it.
+`/?route=example` relative to the app's base path. For a page that declares a `capability`,
+`requiresProvider: false` allows that capability without requiring the active Provider to supply
+the corresponding slice. Pages without a `capability` do not undergo this Provider check, though
+the school's `supportedPlugins` allowlist still applies. `providerIndependent` keeps the plugin
+running even when that allowlist omits it.
 
 ## UI and derived props
 

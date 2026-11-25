@@ -53,14 +53,15 @@ Activation 只由 `scripts/deploy-website.sh` 的 `APP_DEPLOYMENT=edgeone-pwa` �
 
 通用服务属于 composition 中的普通运行时插件：
 
-| 服务 | 包 | 责任 |
-| --- | --- | --- |
-| `slots` / `ui` | `runtime/slots`, `runtime/ui` | Slot、页面、导航、Shell、主题注册 |
-| `router` / `i18n` / `settings` | `runtime/*` | 根查询历史、翻译、设置分类 |
-| `storage` | `runtime/storage` | 本地/安全存储与插件命名空间 |
-| `http` | `runtime/http` | 传输、Cookie 协作、网络活动、waterfall |
-| `native` | `runtime/native` | 版本化宿主能力 |
-| `assets` / `plugins` | `runtime/packages` | 包内资源和市场安装 |
+| 服务                    | 包                                 | 责任                                   |
+| ----------------------- | ---------------------------------- | -------------------------------------- |
+| `slots` / `ui`          | `runtime/slots`, `runtime/ui`      | Slot、页面、导航、Shell、主题注册      |
+| `router` / `navigation` | `runtime/router`                   | 根查询历史、语义目标解析与导航过滤     |
+| `i18n` / `settings`     | `runtime/i18n`, `runtime/settings` | 翻译、设置分类                         |
+| `storage`               | `runtime/storage`                  | 本地/安全存储与插件命名空间            |
+| `http`                  | `runtime/http`                     | 传输、Cookie 协作、网络活动、waterfall |
+| `native`                | `runtime/native`                   | 版本化宿主能力                         |
+| `assets` / `plugins`    | `runtime/packages`                 | 包内资源和市场安装                     |
 
 教务运行时是可选服务：Provider 通过 `ctx.providers.registerProvider(schoolId, factory)` 注册；`SchoolProvider` 以正交 `AcademicSliceMap` 组合认证和业务切片，不恢复单体 Provider。`reset()` / `logout()` 只用于用户显式操作；热替换和宿主退出调用本地 `dispose()`，新实例初始化前等待旧实例释放，旧实例不得再清理共享 Query、凭据或 Native 状态。`SchoolProvider.timeZone` 声明学校时区，`timetable.scheduleRules` 声明作息分界，通用教务算法不固定学校时区。Provider 的能力声明与 `supportedPlugins` 同时决定查询、页面、导航和功能插件是否可用。查询数据 record 可按身份共享，但每个插件的 descriptor、enabled 和订阅生命周期相互隔离；TTL/persist 策略由功能插件通过 `query.registerPolicy` 在自己的作用域注册，不在运行时枚举业务功能。官方组合只内置并默认选择 YSU；初始化向导仅在用户打开“更多学校”时从当前市场的 `provider` 类别发现其他学校，约定插件 ID 为 `<schoolId>.provider`，选择时安装该插件并验证对应 Provider 已注册，不在部署配置中枚举社区学校。学校确认后是固定应用身份，登录、账号和 App 内插件市场不提供切校或 Provider 安装入口；Provider 市场条目只服务于初始化向导。
 
@@ -70,7 +71,7 @@ Activation 只由 `scripts/deploy-website.sh` 的 `APP_DEPLOYMENT=edgeone-pwa` �
 
 宿主偏好中的 Shell、主题与启动页选择共享同一份 Observable 状态，插件管理器、设置页和 `OrahakoApp` 通过它同步切换。主题 CSS 只由宿主按 `activeTheme` 注入；空值表示默认主题。启动页只保存宿主的 `startupPage`，未设置时回退 `composition.defaults.landing`；Shell 和设置 Store 不再维护第二份状态。
 
-页面、Shell、设置和 Slot 组件都用注册点声明 `children`、`store`、`inject`，不得读取 `ctx`、业务 React Context、`useSyncExternalStore` 或直接 `useSWR`。贡献的 `inject` 是无参闭包，只捕获 `apply` 中显式声明的服务，不再接收完整 Cordis `Context`。语义路由与显式 `?plugin=&page=` 都经 `navigation.available()` 使用同一能力和 Provider 门禁。唯一 `ui-renderer` 自动派生：
+页面、Shell、设置和 Slot 组件都用注册点声明 `children`、`store`、`inject`，不得读取 `ctx`、业务 React Context、`useSyncExternalStore` 或直接 `useSWR`。贡献的 `inject` 是无参闭包，只捕获 `apply` 中显式声明的服务，不再接收完整 Cordis `Context`。语义路由经 `navigation.resolve()`，显式 `?plugin=&page=` 经 `navigation.available()`；两者共享同一能力和 Provider 门禁。唯一 `ui-renderer` 自动派生：
 
 1. **Runtime Share**：owner、作用域类型化 `t`、`locale`。
 2. **Child Render Share**：仅当前 `children` 声明授权的 `renderSlot` / `renderSlotChain`。
