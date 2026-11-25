@@ -49,13 +49,13 @@ export const PAGE_TRANSITION_STYLE = `
   }
 }
 [data-shell-page-outlet][data-shell-transition="enter"] {
-  animation: orahako-shell-page-enter 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: orahako-shell-page-enter 500ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 [data-shell-page-outlet][data-shell-transition="glass"] {
-  animation: orahako-shell-page-slide 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: orahako-shell-page-slide 500ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 ${GLASS_FADE_TARGETS} {
-  animation: orahako-shell-page-fade 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: orahako-shell-page-fade 500ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 @media (prefers-reduced-motion: reduce) {
   [data-shell-page-outlet][data-shell-transition],
