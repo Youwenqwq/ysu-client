@@ -2,7 +2,10 @@ import {
   definePlugin,
   isCurrentNotificationDestination,
   notificationDestination,
+  parseDeepLinkRoute,
   PLUGIN_API_VERSION,
+  pluginPageHref,
+  semanticRouteHref,
   type PluginConfig,
   type PluginLocale,
   type PluginNativeService,
@@ -12,6 +15,8 @@ import {
 
 export const NATIVE_LIFECYCLE_RUNTIME_PLUGIN_ID = "orahako.runtime.native-lifecycle"
 export const NATIVE_WEBVIEW_CAPABILITY = "native.webview@1"
+
+const handledLaunchNatives = new WeakSet<PluginNativeService>()
 
 export interface NativeLifecycleConfig extends PluginConfig {
   readonly deepLinkScheme?: string
@@ -36,9 +41,13 @@ export function parseDeepLink(
 export interface DeepLinkListenerOptions {
   readonly isNative: () => boolean
   readonly scheme: string
-  readonly navigation: Pick<PluginNavigationService, "resolve" | "sources">
-  readonly router: Pick<PluginRouterService, "current" | "push">
+  readonly navigation: Pick<PluginNavigationService, "resolve" | "sources"> &
+    Partial<Pick<PluginNavigationService, "state">>
+  readonly router: Pick<PluginRouterService, "current" | "push"> &
+    Partial<Pick<PluginRouterService, "replace" | "href">>
   readonly appAdapter?: CapacitorAppUrlAdapter
+  readonly shouldHandleLaunchUrl?: (url: string) => boolean
+  readonly onLaunchUrlHandled?: (url: string) => void
 }
 
 export function attachDeepLinkListener(options: DeepLinkListenerOptions): () => void {
@@ -49,28 +58,116 @@ export function attachDeepLinkListener(options: DeepLinkListenerOptions): () => 
   let disposed = false
   let receivedWarmUrl = false
   let removeListener: (() => Promise<void>) | undefined
+  let cancelPending: (() => void) | undefined
+
+  const clearPending = (): void => {
+    const cancel = cancelPending
+    cancelPending = undefined
+    cancel?.()
+  }
+
+  const navigateTo = (target: string, preferReplace: boolean): void => {
+    const formatted = options.router.href ? options.router.href(target) : target
+    const current = options.router.current.getSnapshot()
+    if (isCurrentNotificationDestination(current.pathname, current.search, formatted)) {
+      return
+    }
+    if (preferReplace && options.router.replace) {
+      options.router.replace(target)
+    } else {
+      options.router.push(target)
+    }
+  }
 
   const handleUrl = (url: string): boolean => {
     if (disposed) return false
-    const destination = parseDeepLink(url, options.navigation, options.scheme)
-    if (!destination) return false
+    const route = parseDeepLinkRoute(url, options.scheme)
+    if (!route) return false
+
+    clearPending()
+
     const current = options.router.current.getSnapshot()
-    if (!isCurrentNotificationDestination(current.pathname, current.search, destination)) {
-      options.router.push(destination)
+    const isAtBareRoot = !current.route && !current.pluginId
+    const resolved = options.navigation.resolve(route)
+    if (resolved) {
+      navigateTo(pluginPageHref(resolved.pluginId, resolved.pageId), isAtBareRoot)
+      return true
     }
+
+    const navState = options.navigation.state
+    if (!navState) {
+      const fallback = options.navigation.sources().fallbackHref
+      if (fallback) navigateTo(fallback, isAtBareRoot)
+      return true
+    }
+
+    // On cold start, feature plugins and school providers may not have mounted
+    // or initialized yet. Park on `/?route=<route>` so the app shell does not
+    // redirect to the default landing page while we wait for the target route.
+    const parkedOnRoute = isAtBareRoot || current.route === route
+    if (isAtBareRoot) {
+      navigateTo(semanticRouteHref(route), true)
+    }
+
+    const startHref = options.router.current.getSnapshot().href
+    let active = true
+    let unsubNav: (() => void) | undefined
+    let unsubRouter: (() => void) | undefined
+
+    const cleanupPending = (): void => {
+      if (!active) return
+      active = false
+      unsubNav?.()
+      unsubNav = undefined
+      unsubRouter?.()
+      unsubRouter = undefined
+      if (cancelPending === cleanupPending) {
+        cancelPending = undefined
+      }
+    }
+
+    cancelPending = cleanupPending
+
+    const tryResolvePending = (): void => {
+      if (!active || disposed) {
+        cleanupPending()
+        return
+      }
+      const target = options.navigation.resolve(route)
+      if (!target) return
+      cleanupPending()
+      const now = options.router.current.getSnapshot()
+      navigateTo(
+        pluginPageHref(target.pluginId, target.pageId),
+        parkedOnRoute && now.route === route
+      )
+    }
+
+    unsubNav = navState.subscribe(tryResolvePending)
+    unsubRouter = options.router.current.subscribe(() => {
+      if (!active || disposed) return
+      if (options.router.current.getSnapshot().href !== startHref) {
+        cleanupPending()
+      }
+    })
+
+    tryResolvePending()
     return true
   }
 
+  // Capacitor plugin proxies expose `then` as a plugin method. Resolve only a
+  // plain wrapper so Promise assimilation never calls that method and stalls.
   const loadAdapter = options.appAdapter
-    ? Promise.resolve(options.appAdapter)
-    : import("@capacitor/app").then(({ App }) => App)
+    ? Promise.resolve({ app: options.appAdapter })
+    : import("@capacitor/app").then(({ App }) => ({ app: App }))
 
   void loadAdapter
-    .then(async (app) => {
+    .then(async ({ app }) => {
       if (disposed) return
       const handle = await app.addListener("appUrlOpen", ({ url }) => {
         if (handleUrl(url)) {
           receivedWarmUrl = true
+          options.onLaunchUrlHandled?.(url)
         }
       })
       if (disposed) {
@@ -79,8 +176,15 @@ export function attachDeepLinkListener(options: DeepLinkListenerOptions): () => 
       }
       removeListener = () => handle.remove()
       const launch = await app.getLaunchUrl()
-      if (!disposed && !receivedWarmUrl && launch?.url) {
-        handleUrl(launch.url)
+      if (
+        !disposed &&
+        !receivedWarmUrl &&
+        launch?.url &&
+        (options.shouldHandleLaunchUrl?.(launch.url) ?? true)
+      ) {
+        if (handleUrl(launch.url)) {
+          options.onLaunchUrlHandled?.(launch.url)
+        }
       }
     })
     .catch(() => {
@@ -89,6 +193,7 @@ export function attachDeepLinkListener(options: DeepLinkListenerOptions): () => 
 
   return () => {
     disposed = true
+    clearPending()
     const cleanup = removeListener
     removeListener = undefined
     if (cleanup) {
@@ -182,6 +287,10 @@ export const nativeLifecycleRuntimePlugin = definePlugin<
             scheme,
             navigation: ctx.navigation,
             router: ctx.router,
+            shouldHandleLaunchUrl: () => !handledLaunchNatives.has(ctx.native),
+            onLaunchUrlHandled: () => {
+              handledLaunchNatives.add(ctx.native)
+            },
           })
         : () => {}
 

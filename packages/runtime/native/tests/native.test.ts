@@ -9,6 +9,27 @@ const companionMocks = vi.hoisted(() => ({
   addListener: vi.fn(async () => ({ remove: async () => {} })),
 }))
 
+const capacitorAppMocks = vi.hoisted(() => ({
+  addListener: vi.fn(),
+  getLaunchUrl: vi.fn(),
+}))
+
+vi.mock("@capacitor/app", () => ({
+  // Capacitor exposes plugin methods through a Proxy, including a `then`
+  // method that makes the namespace object a permanently pending thenable.
+  App: new Proxy(
+    {},
+    {
+      get: (_target, property) => {
+        if (property === "addListener") return capacitorAppMocks.addListener
+        if (property === "getLaunchUrl") return capacitorAppMocks.getLaunchUrl
+        if (property === "then") return () => {}
+        return undefined
+      },
+    }
+  ),
+}))
+
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
     isNativePlatform: () => companionMocks.isNative,
@@ -24,16 +45,23 @@ vi.mock("@capacitor/core", () => ({
 
 import { PluginRuntime } from "@orahako/kernel"
 import {
+  createObservableSource,
   definePlugin,
+  parseRouteLocation,
   PLUGIN_API_VERSION,
   WIDGETS_GENERIC_CAPABILITY,
   WIDGETS_SCHEDULE_CAPABILITY,
   type NativeCapabilityDescriptor,
   type PluginNativeCapabilityService,
   type PluginNativeService,
+  type PluginNavigationService,
+  type PluginRouterService,
   type PluginWidgetService,
+  type RouteLocation,
+  type RouteTargetInput,
 } from "@orahako/sdk"
 import {
+  attachDeepLinkListener,
   createNativeService,
   NATIVE_FILES_CAPABILITY,
   nativeRuntimePlugin,
@@ -76,6 +104,8 @@ describe("@orahako/runtime-native", () => {
     companionMocks.acquire.mockReset()
     companionMocks.release.mockReset()
     companionMocks.invoke.mockReset()
+    capacitorAppMocks.addListener.mockReset()
+    capacitorAppMocks.getLaunchUrl.mockReset()
   })
 
   afterEach(() => {
@@ -329,5 +359,196 @@ describe("@orahako/runtime-native", () => {
     } finally {
       runtime.dispose()
     }
+  })
+
+  it("defers cold-start deep links until feature pages and provider filters become ready", async () => {
+    const createMemoryRouter = (initialHref: string) => {
+      const history: string[] = [initialHref]
+      const current = createObservableSource<RouteLocation>(parseRouteLocation(initialHref))
+      const toHref = (target: RouteTargetInput): string => {
+        if (typeof target === "string") return target
+        if ("route" in target) return `/?route=${target.route}`
+        return `/?plugin=${target.pluginId}&page=${target.pageId ?? "index"}`
+      }
+      const router: Pick<PluginRouterService, "current" | "push" | "replace" | "href"> & {
+        history: string[]
+      } = {
+        history,
+        current,
+        href: toHref,
+        push: (target) => {
+          const next = toHref(target)
+          history.push(next)
+          current.set(parseRouteLocation(next))
+        },
+        replace: (target) => {
+          const next = toHref(target)
+          history[history.length - 1] = next
+          current.set(parseRouteLocation(next))
+        },
+      }
+      return router
+    }
+
+    const navState = createObservableSource(0)
+    const routes = new Map<string, { pluginId: string; pageId: string }>()
+    const navigation: Pick<PluginNavigationService, "resolve" | "sources" | "state"> = {
+      state: navState,
+      resolve: (id) => {
+        const found = routes.get(id)
+        return found ? { ...found, source: "page" as const } : undefined
+      },
+      sources: () => ({ pages: [], navigation: [], fallbackHref: "/" }),
+    }
+
+    // 1. Cold start via retained appUrlOpen before `orahako.exams` / provider is ready
+    const router = createMemoryRouter("/")
+    const dispose = attachDeepLinkListener({
+      isNative: () => true,
+      scheme: "orahako",
+      navigation,
+      router,
+      appAdapter: {
+        async addListener(_event, listener) {
+          // Simulates Capacitor BridgeActivity onCreate -> onNewIntent retainUntilConsumed=true
+          listener({ url: "orahako://exams" })
+          return { remove: async () => {} }
+        },
+        async getLaunchUrl() {
+          return { url: "orahako://exams" }
+        },
+      },
+    })
+
+    // Immediately parks on `/?route=exams` (replacing bare `/`) so OrahakoApp won't redirect to overview
+    await vi.waitFor(() => expect(router.current.getSnapshot().href).toBe("/?route=exams"))
+    expect(router.history).toEqual(["/?route=exams"])
+
+    // Provider initializes & exams route becomes resolvable -> canonicalizes in place
+    routes.set("exams", { pluginId: "orahako.exams", pageId: "index" })
+    navState.set((n) => n + 1)
+
+    expect(router.current.getSnapshot().href).toBe("/?plugin=orahako.exams&page=index")
+    expect(router.history).toEqual(["/?plugin=orahako.exams&page=index"])
+    dispose()
+
+    // 2. Cold start after landing redirect already moved `/` to overview, before `exams` resolves
+    routes.clear()
+    const warmBootRouter = createMemoryRouter("/?plugin=orahako.overview&page=index")
+    const disposeWarmBoot = attachDeepLinkListener({
+      isNative: () => true,
+      scheme: "orahako",
+      navigation,
+      router: warmBootRouter,
+      appAdapter: {
+        async addListener() {
+          return { remove: async () => {} }
+        },
+        async getLaunchUrl() {
+          return { url: "orahako://exams" }
+        },
+      },
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    // Does not blank the active overview page while waiting
+    expect(warmBootRouter.current.getSnapshot().href).toBe("/?plugin=orahako.overview&page=index")
+
+    routes.set("exams", { pluginId: "orahako.exams", pageId: "index" })
+    navState.set((n) => n + 1)
+    expect(warmBootRouter.current.getSnapshot().href).toBe("/?plugin=orahako.exams&page=index")
+    disposeWarmBoot()
+
+    // 3. Slow provider initialization must not expire the user's deep-link intent
+    vi.useFakeTimers()
+    routes.clear()
+    const slowProviderRouter = createMemoryRouter("/")
+    const disposeSlowProvider = attachDeepLinkListener({
+      isNative: () => true,
+      scheme: "orahako",
+      navigation,
+      router: slowProviderRouter,
+      appAdapter: {
+        async addListener() {
+          return { remove: async () => {} }
+        },
+        async getLaunchUrl() {
+          return { url: "orahako://schedule" }
+        },
+      },
+    })
+
+    try {
+      await vi.advanceTimersByTimeAsync(0)
+      expect(slowProviderRouter.current.getSnapshot().href).toBe("/?route=schedule")
+
+      await vi.advanceTimersByTimeAsync(5_000)
+      routes.set("schedule", { pluginId: "orahako.schedule", pageId: "index" })
+      navState.set((n) => n + 1)
+
+      expect(slowProviderRouter.current.getSnapshot().href).toBe(
+        "/?plugin=orahako.schedule&page=index"
+      )
+    } finally {
+      disposeSlowProvider()
+      vi.useRealTimers()
+    }
+
+    // 4. Auth redirect / manual navigation cancels pending deep link
+    routes.clear()
+    const authRouter = createMemoryRouter("/")
+    const disposeAuth = attachDeepLinkListener({
+      isNative: () => true,
+      scheme: "orahako",
+      navigation,
+      router: authRouter,
+      appAdapter: {
+        async addListener() {
+          return { remove: async () => {} }
+        },
+        async getLaunchUrl() {
+          return { url: "orahako://exams" }
+        },
+      },
+    })
+
+    await vi.waitFor(() => expect(authRouter.current.getSnapshot().href).toBe("/?route=exams"))
+    authRouter.replace({ route: "login" })
+    routes.set("exams", { pluginId: "orahako.exams", pageId: "index" })
+    navState.set((n) => n + 1)
+    expect(authRouter.current.getSnapshot().href).toBe("/?route=login")
+    disposeAuth()
+  })
+
+  it("initializes deep links when the Capacitor App plugin is a thenable Proxy", async () => {
+    const current = createObservableSource<RouteLocation>(parseRouteLocation("/"))
+    const router: Pick<PluginRouterService, "current" | "push"> = {
+      current,
+      push: (target) => {
+        if (typeof target !== "string") throw new Error("Expected a formatted destination")
+        current.set(parseRouteLocation(target))
+      },
+    }
+    capacitorAppMocks.addListener.mockResolvedValue({ remove: async () => {} })
+    capacitorAppMocks.getLaunchUrl.mockResolvedValue({ url: "orahako://exams" })
+
+    const dispose = attachDeepLinkListener({
+      isNative: () => true,
+      scheme: "orahako",
+      navigation: {
+        resolve: (id) =>
+          id === "exams"
+            ? { pluginId: "orahako.exams", pageId: "index", source: "page" }
+            : undefined,
+        sources: () => ({ pages: [], navigation: [], fallbackHref: "/" }),
+      },
+      router,
+    })
+
+    await vi.waitFor(() =>
+      expect(current.getSnapshot().href).toBe("/?plugin=orahako.exams&page=index")
+    )
+    expect(capacitorAppMocks.addListener).toHaveBeenCalledWith("appUrlOpen", expect.any(Function))
+    dispose()
   })
 })

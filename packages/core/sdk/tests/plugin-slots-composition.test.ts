@@ -16,6 +16,7 @@ import {
   formatRouteHref,
   isCurrentNotificationDestination,
   notificationDestination,
+  parseDeepLinkRoute,
   parseRouteLocation,
   PLUGIN_API_VERSION,
   pluginPageHref,
@@ -498,6 +499,13 @@ describe("router, deep-link, crypto & widget helpers", () => {
           : undefined,
       sources: () => ({ pages: [], navigation: [], fallbackHref: "/?route=me" }),
     }
+    expect(parseDeepLinkRoute("orahako://schedule", "orahako")).toBe("schedule")
+    expect(parseDeepLinkRoute("orahako://exams/", "orahako")).toBe("exams")
+    expect(parseDeepLinkRoute("ORAHAKO://exams", "orahako")).toBe("exams")
+    expect(parseDeepLinkRoute("other://schedule", "orahako")).toBeNull()
+    expect(parseDeepLinkRoute("orahako://exams/extra", "orahako")).toBeNull()
+    expect(parseDeepLinkRoute("orahako://exams?foo=1", "orahako")).toBeNull()
+
     const dest = notificationDestination("orahako://schedule", nav, "orahako")
     expect(dest).toBe(pluginPageHref("orahako.schedule", "index"))
     expect(
