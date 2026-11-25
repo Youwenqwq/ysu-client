@@ -35,11 +35,7 @@ import {
   type ShellSidebarGroup,
   type ShellSidebarItem,
 } from "./nav-helpers"
-import {
-  canUsePageViewTransition,
-  PAGE_TRANSITION_STYLE,
-  resolvePageOutletTransitionMode,
-} from "./page-transition"
+import { PAGE_TRANSITION_STYLE, resolvePageOutletTransitionMode } from "./page-transition"
 import { BackgroundPage } from "./pages/background-page"
 import { buildThemePreviewDocument, ThemePage } from "./pages/theme-page"
 import {
@@ -65,7 +61,6 @@ export {
   buildMobileBottomTabs,
   buildSidebarGroups,
   buildThemePreviewDocument,
-  canUsePageViewTransition,
   clampSidebarWidth,
   computeCardBgOpacity,
   DEFAULT_SIDEBAR_WIDTH,

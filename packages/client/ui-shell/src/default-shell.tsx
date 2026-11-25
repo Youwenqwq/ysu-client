@@ -47,11 +47,7 @@ import type {
 import "./slots-declare"
 import type { ShellDictionary } from "./dictionary"
 import type { ShellMobileTab, ShellSidebarGroup, ShellSidebarItem } from "./nav-helpers"
-import {
-  PAGE_TRANSITION_STYLE,
-  resolvePageOutletTransitionMode,
-  usePageViewTransition,
-} from "./page-transition"
+import { PAGE_TRANSITION_STYLE, resolvePageOutletTransitionMode } from "./page-transition"
 import {
   buildCardStyleCss,
   computeCardBgOpacity,
@@ -429,14 +425,9 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
     return props.resolveChrome(location, uiSnapshot, locale)
   }, [locale, location, navRevision, props, startupPage, uiSnapshot])
 
-  const { capturing: isCapturingTransition, useViewTransition } = usePageViewTransition(
-    chrome.routeKey
-  )
-
   const hasBackground = Boolean(backgroundImage || backgroundUrl)
   const outletTransitionMode = resolvePageOutletTransitionMode({
     fullscreen: chrome.fullscreen,
-    useViewTransition,
     hasBackground,
     isGlassCards: cardStyle === "glass",
   })
@@ -645,12 +636,7 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
         <div
           key={chrome.routeKey}
           data-shell-page-outlet=""
-          data-shell-capturing={isCapturingTransition ? "" : undefined}
-          data-shell-transition={
-            isCapturingTransition || outletTransitionMode === "none"
-              ? undefined
-              : outletTransitionMode
-          }
+          data-shell-transition={outletTransitionMode === "none" ? undefined : outletTransitionMode}
           className={cn(
             "flex flex-1 flex-col md:p-8",
             chrome.fullscreen ? "min-h-0 overflow-hidden" : "p-4"

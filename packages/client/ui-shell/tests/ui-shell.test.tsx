@@ -30,7 +30,6 @@ import {
   attachNativeWebViewLifecycle,
   BackgroundMediaController,
   buildCardStyleCss,
-  canUsePageViewTransition,
   computeCardBgOpacity,
   manifest,
   NATIVE_WEBVIEW_CAPABILITY,
@@ -849,32 +848,32 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     host.dispose()
   })
 
-  it("uses View Transitions API when available and keeps glass fallback free of Backdrop Roots", async () => {
+  it("uses pure-CSS enter/glass page transitions with zero capture delay and zero Backdrop Roots above glass cards", async () => {
     // 1. Style and helper invariants
-    expect(PAGE_TRANSITION_STYLE).toContain('data-shell-view-transition="page"')
-    expect(PAGE_TRANSITION_STYLE).toContain("::view-transition-new(root)")
+    expect(PAGE_TRANSITION_STYLE).toContain('data-shell-transition="enter"')
+    expect(PAGE_TRANSITION_STYLE).toContain('data-shell-transition="glass"')
+    expect(PAGE_TRANSITION_STYLE).toContain(".bg-card:not(.bg-card .bg-card)")
+    expect(PAGE_TRANSITION_STYLE).toContain(":has(.bg-card):not(.bg-card):not(.bg-card *)")
     expect(PAGE_TRANSITION_STYLE).not.toMatch(/\bfilter\s*:/)
+    expect(PAGE_TRANSITION_STYLE).not.toContain("view-transition")
 
     expect(
       resolvePageOutletTransitionMode({
         fullscreen: false,
-        useViewTransition: true,
         hasBackground: true,
         isGlassCards: true,
       })
-    ).toBe("slide")
+    ).toBe("glass")
     expect(
       resolvePageOutletTransitionMode({
         fullscreen: false,
-        useViewTransition: false,
         hasBackground: true,
-        isGlassCards: true,
+        isGlassCards: false,
       })
-    ).toBe("slide")
+    ).toBe("enter")
     expect(
       resolvePageOutletTransitionMode({
         fullscreen: false,
-        useViewTransition: false,
         hasBackground: false,
         isGlassCards: true,
       })
@@ -882,61 +881,19 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     expect(
       resolvePageOutletTransitionMode({
         fullscreen: true,
-        useViewTransition: true,
-        hasBackground: false,
-        isGlassCards: false,
+        hasBackground: true,
+        isGlassCards: true,
       })
     ).toBe("none")
 
-    expect(
-      canUsePageViewTransition(
-        { visibilityState: "visible", startViewTransition: vi.fn() as never },
-        { matchMedia: () => ({ matches: false }) }
-      )
-    ).toBe(true)
-    expect(
-      canUsePageViewTransition(
-        { visibilityState: "hidden", startViewTransition: vi.fn() as never },
-        { matchMedia: () => ({ matches: false }) }
-      )
-    ).toBe(false)
-    expect(
-      canUsePageViewTransition(
-        { visibilityState: "visible", startViewTransition: vi.fn() as never },
-        { matchMedia: () => ({ matches: true }) }
-      )
-    ).toBe(false)
-
-    // 2. Mounted shell View Transition lifecycle
+    // 2. Mounted shell switches routes immediately with zero blank capture state
     const dom = mountShellDom()
     activeUnmount = dom.unmount
 
-    const pendingCallbacks: Array<() => void | Promise<void>> = []
-    const finishResolvers: Array<() => void> = []
-    const skipSpies: Array<ReturnType<typeof vi.fn>> = []
-
-    const docWithVt = globalThis.document as unknown as {
-      visibilityState?: string
-      startViewTransition?: (cb: () => void | Promise<void>) => {
-        finished: Promise<void>
-        skipTransition: () => void
-      }
-    }
-    docWithVt.visibilityState = "visible"
-    docWithVt.startViewTransition = vi.fn((cb: () => void | Promise<void>) => {
-      pendingCallbacks.push(cb)
-      const skip = vi.fn()
-      skipSpies.push(skip)
-      const finished = new Promise<void>((resolve) => {
-        finishResolvers.push(resolve)
-      })
-      return { finished, skipTransition: skip }
-    })
-
     const pagesPlugin = definePlugin({
       manifest: {
-        id: "demo.vt",
-        name: "VT Demo",
+        id: "demo.transition",
+        name: "Transition Demo",
         version: "1.0.0",
         apiVersion: PLUGIN_API_VERSION,
         kind: "feature",
@@ -954,8 +911,14 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
           () => <div>PAGE_BETA</div>
         )
         ctx.ui.registerPage(
-          { id: "gamma", route: "gamma", title: "Gamma", requiresProvider: false },
-          () => <div>PAGE_GAMMA</div>
+          {
+            id: "full",
+            route: "full",
+            title: "Full",
+            fullscreen: true,
+            requiresProvider: false,
+          },
+          () => <div>PAGE_FULL</div>
         )
       },
     })
@@ -963,10 +926,10 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     const host = new PluginHost(
       {
         appVersion: "1.0.0",
-        appBuild: "test-vt",
+        appBuild: "test-transition",
         composition: {
           version: 1,
-          id: "test.vt",
+          id: "test.transition",
           defaults: {
             shell: `${SHELL_PLUGIN_ID}:default`,
             landing: "alpha",
@@ -981,7 +944,7 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
             { id: "orahako.runtime.native", protected: true },
             { id: SHELL_PLUGIN_ID, protected: true },
             { id: "orahako.theme.default", protected: true },
-            { id: "demo.vt" },
+            { id: "demo.transition" },
           ],
         },
         plugins: [
@@ -1004,65 +967,27 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
 
     await dom.render(<OrahakoApp host={host} />)
     expect(dom.container.textContent).toContain("PAGE_ALPHA")
-    expect(docWithVt.startViewTransition).not.toHaveBeenCalled()
     expect(
       dom.container.findByAttr("data-shell-page-outlet")?.getAttribute("data-shell-transition")
-    ).toBe("slide")
+    ).toBe("enter")
 
-    // Navigate Alpha -> Beta: outlet hides during old-state capture so the old
-    // page clears immediately (no cross-fade ghosting) and slide waits for reveal.
+    // Navigate Alpha -> Beta: renders Beta immediately on the first commit with `enter` mode.
     await act(async () => {
-      router.push({ pluginId: "demo.vt", pageId: "beta" })
+      router.push({ pluginId: "demo.transition", pageId: "beta" })
     })
-    expect(docWithVt.startViewTransition).toHaveBeenCalledTimes(1)
-    expect(dom.docElement.getAttribute("data-shell-view-transition")).toBe("page")
-    const capturingOutlet = dom.container.findByAttr("data-shell-page-outlet")
-    expect(capturingOutlet?.hasAttribute("data-shell-capturing")).toBe(true)
-    expect(capturingOutlet?.getAttribute("data-shell-transition")).toBeNull()
-
-    // Browser invokes updateCallback -> outlet reveals Beta with upward slide and resolves Promise.
-    let callbackResolved = false
-    await act(async () => {
-      const result = pendingCallbacks.shift()?.()
-      if (result) {
-        void result.then(() => {
-          callbackResolved = true
-        })
-      }
-    })
-    const revealedOutlet = dom.container.findByAttr("data-shell-page-outlet")
+    const betaOutlet = dom.container.findByAttr("data-shell-page-outlet")
     expect(dom.container.textContent).toContain("PAGE_BETA")
-    expect(revealedOutlet?.hasAttribute("data-shell-capturing")).toBe(false)
-    expect(revealedOutlet?.getAttribute("data-shell-transition")).toBe("slide")
-    expect(callbackResolved).toBe(true)
+    expect(betaOutlet?.hasAttribute("data-shell-capturing")).toBe(false)
+    expect(betaOutlet?.getAttribute("data-shell-transition")).toBe("enter")
 
-    // Rapid navigation Beta -> Gamma before Alpha->Beta finishes skips the active transition.
+    // Fullscreen route omits page transition attribute.
     await act(async () => {
-      router.push({ pluginId: "demo.vt", pageId: "gamma" })
+      router.push({ pluginId: "demo.transition", pageId: "full" })
     })
-    expect(skipSpies[0]).toHaveBeenCalledTimes(1)
-    expect(docWithVt.startViewTransition).toHaveBeenCalledTimes(2)
-
-    let gammaCallbackPromise: void | Promise<void> = undefined
-    await act(async () => {
-      gammaCallbackPromise = pendingCallbacks.shift()?.()
-    })
-    await gammaCallbackPromise
-    expect(dom.container.textContent).toContain("PAGE_GAMMA")
-
-    // Finishing the older skipped transition must NOT remove the newer transition's root attribute.
-    await act(async () => {
-      finishResolvers[0]?.()
-      await Promise.resolve()
-    })
-    expect(dom.docElement.getAttribute("data-shell-view-transition")).toBe("page")
-
-    // Finishing the active transition cleans up the root attribute.
-    await act(async () => {
-      finishResolvers[1]?.()
-      await Promise.resolve()
-    })
-    expect(dom.docElement.getAttribute("data-shell-view-transition")).toBeNull()
+    expect(dom.container.textContent).toContain("PAGE_FULL")
+    expect(
+      dom.container.findByAttr("data-shell-page-outlet")?.getAttribute("data-shell-transition")
+    ).toBeNull()
 
     activeUnmount = undefined
     await dom.unmount()
