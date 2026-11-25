@@ -1,6 +1,7 @@
 import { CapacitorUpdater } from "@capgo/capacitor-updater"
 import { toast } from "sonner"
-import { definePlugin, PLUGIN_API_VERSION, type UpdateInfo, type UpdateMirror } from "@orahako/sdk"
+import { definePlugin, PLUGIN_API_VERSION } from "@orahako/sdk"
+import type { UpdateInfo, UpdateMirror } from "./contract"
 import { UpdaterAboutSection, type UpdaterAboutSectionProps } from "./controls"
 import { updaterDictionary, type UpdaterDictionary } from "./dictionary"
 import { UpdaterOverlay, type UpdaterOverlayProps } from "./overlay"
@@ -62,6 +63,16 @@ export {
   type UpdaterRuntimeState,
   type UpdaterRuntimeStore,
 }
+
+export type {
+  PluginUpdateService,
+  UpdateChannel,
+  UpdateCheckOptions,
+  UpdateInfo,
+  UpdateManifest,
+  UpdateManifestEntry,
+  UpdateMirror,
+} from "./contract"
 
 export type UpdaterPluginConfig = {
   readonly releaseBaseUrl?: string

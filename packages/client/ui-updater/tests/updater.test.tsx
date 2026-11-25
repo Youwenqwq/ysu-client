@@ -40,7 +40,6 @@ import {
   PLUGIN_API_VERSION,
   type PluginKeyValueStorage,
   type PluginNativeService,
-  type PluginUpdateService,
 } from "@orahako/sdk"
 import {
   ConfiguredUpdateService,
@@ -48,6 +47,7 @@ import {
   isNewer,
   updaterPlugin,
   updaterRuntimeStore,
+  type PluginUpdateService,
 } from "../src/index"
 
 function memoryStorage(): PluginKeyValueStorage {

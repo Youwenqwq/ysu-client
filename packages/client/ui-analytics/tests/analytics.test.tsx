@@ -36,7 +36,6 @@ import { NamespacedStorageService } from "@orahako/runtime-storage"
 import {
   PLUGIN_API_VERSION,
   validatePluginManifest,
-  type PluginAnalyticsService,
   type PluginKeyValueStorage,
 } from "@orahako/sdk"
 import {
@@ -46,6 +45,7 @@ import {
   AnalyticsSettingsToggle,
   APP_LAUNCH_DEDUPE_KEY,
   ConfiguredAnalyticsService,
+  type PluginAnalyticsService,
 } from "../src/index"
 
 class MemoryKeyValueStorage implements PluginKeyValueStorage {

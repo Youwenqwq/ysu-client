@@ -7,14 +7,16 @@ import {
   onNativeCapabilityEvent,
   type PluginKeyValueStorage,
   type PluginNativeService,
-  type PluginUpdateService,
-  type UpdateChannel,
-  type UpdateCheckOptions,
-  type UpdateInfo,
-  type UpdateManifest,
-  type UpdateManifestEntry,
-  type UpdateMirror,
 } from "@orahako/sdk"
+import type {
+  PluginUpdateService,
+  UpdateChannel,
+  UpdateCheckOptions,
+  UpdateInfo,
+  UpdateManifest,
+  UpdateManifestEntry,
+  UpdateMirror,
+} from "./contract"
 
 const DEFAULT_VERSION_MANIFEST = "version.json"
 const DEFAULT_BUNDLE_ASSET = "dist.zip"

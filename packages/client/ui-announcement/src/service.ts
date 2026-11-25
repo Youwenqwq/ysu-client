@@ -1,10 +1,10 @@
+import type { PluginKeyValueStorage } from "@orahako/sdk"
 import type {
   AnnouncementCheckOptions,
   AnnouncementLevel,
   PluginAnnouncement,
   PluginAnnouncementService,
-  PluginKeyValueStorage,
-} from "@orahako/sdk"
+} from "./contract"
 
 export const DEFAULT_DISMISSED_STORAGE_KEY = "dismissed-id"
 

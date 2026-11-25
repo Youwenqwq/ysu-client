@@ -1,11 +1,7 @@
 import { useCallback, useMemo, type ReactNode } from "react"
 import Markdown from "react-markdown"
-import type {
-  AnnouncementLevel,
-  DerivedComponentProps,
-  SlotComponentOwner,
-  TranslationKeyOf,
-} from "@orahako/sdk"
+import type { DerivedComponentProps, SlotComponentOwner, TranslationKeyOf } from "@orahako/sdk"
+import type { AnnouncementLevel } from "./contract"
 import {
   Badge,
   Button,

@@ -7,14 +7,8 @@ import {
   Settings,
 } from "lucide-react"
 import { useCallback, useState } from "react"
-import type {
-  DerivedComponentProps,
-  ObservableSource,
-  PluginUpdateService,
-  SlotComponent,
-  UpdateChannel,
-  UpdateInfo,
-} from "@orahako/sdk"
+import type { DerivedComponentProps, ObservableSource, SlotComponent } from "@orahako/sdk"
+import type { PluginUpdateService, UpdateChannel, UpdateInfo } from "./contract"
 import {
   blurActiveElement,
   Button,

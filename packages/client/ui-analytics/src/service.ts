@@ -1,9 +1,9 @@
+import type { PluginKeyValueStorage } from "@orahako/sdk"
 import type {
   AnalyticsTrackOptions,
   AnalyticsTrackResult,
   PluginAnalyticsService,
-  PluginKeyValueStorage,
-} from "@orahako/sdk"
+} from "./contract"
 
 export const DEFAULT_DEDUPE_STORAGE_PREFIX = "dedupe"
 

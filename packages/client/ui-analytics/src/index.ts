@@ -1,4 +1,10 @@
 export { analyticsDictionary, type AnalyticsDictionary } from "./dictionary"
+export type {
+  AnalyticsTrackOptions,
+  AnalyticsTrackReason,
+  AnalyticsTrackResult,
+  PluginAnalyticsService,
+} from "./contract"
 export {
   ConfiguredAnalyticsService,
   DEFAULT_DEDUPE_STORAGE_PREFIX,

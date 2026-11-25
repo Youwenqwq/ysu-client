@@ -24,7 +24,6 @@ import { NamespacedStorageService } from "@orahako/runtime-storage"
 import {
   PLUGIN_API_VERSION,
   validatePluginManifest,
-  type PluginAnnouncementService,
   type PluginKeyValueStorage,
 } from "@orahako/sdk"
 import {
@@ -33,6 +32,7 @@ import {
   announcementPlugin,
   ConfiguredAnnouncementService,
   DEFAULT_DISMISSED_STORAGE_KEY,
+  type PluginAnnouncementService,
 } from "../src/index"
 
 class MemoryKeyValueStorage implements PluginKeyValueStorage {

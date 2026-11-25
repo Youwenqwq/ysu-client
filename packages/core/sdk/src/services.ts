@@ -110,95 +110,6 @@ export interface PluginPackageRuntime {
   safeMode?(): boolean
 }
 
-export type AnalyticsTrackReason = "sent" | "disabled" | "duplicate" | "unavailable" | "failed"
-
-export interface AnalyticsTrackOptions {
-  readonly enabled: boolean
-  readonly oncePerDay?: boolean
-  readonly dedupeKey?: string
-}
-
-export interface AnalyticsTrackResult {
-  readonly tracked: boolean
-  readonly reason: AnalyticsTrackReason
-  readonly date: string | null
-}
-
-export interface PluginAnalyticsService {
-  readonly endpoint: string | null
-  track(
-    payload: Readonly<Record<string, unknown>>,
-    options: AnalyticsTrackOptions
-  ): Promise<AnalyticsTrackResult>
-}
-
-export type AnnouncementLevel = "info" | "warning" | "critical"
-
-export interface PluginAnnouncement {
-  readonly id: string
-  readonly title: string
-  readonly content: string
-  readonly level: AnnouncementLevel
-  readonly publishedAt?: string
-  readonly expireAt?: string
-}
-
-export interface AnnouncementCheckOptions {
-  readonly signal?: AbortSignal
-}
-
-export interface PluginAnnouncementService {
-  readonly endpoint: string | null
-  check(options?: AnnouncementCheckOptions): Promise<PluginAnnouncement | null>
-  dismiss(id: string): void
-}
-
-export type UpdateChannel = "stable" | "prerelease"
-
-export interface UpdateMirror {
-  readonly label: string
-  readonly value: string
-}
-
-export interface UpdateManifestEntry {
-  readonly webVersion?: string
-  readonly webDownloadUrl?: string
-  readonly apkVersionCode?: number
-  readonly apkDownloadUrl?: string
-  readonly body?: string
-}
-
-export interface UpdateManifest extends UpdateManifestEntry {
-  readonly channels?: Partial<Record<UpdateChannel, UpdateManifestEntry>>
-}
-
-export interface UpdateInfo {
-  readonly available: boolean
-  readonly version: string
-  readonly downloadUrl: string
-  readonly body: string
-  readonly apkUpdateAvailable: boolean
-  readonly apkDownloadUrl: string
-}
-
-export interface UpdateCheckOptions {
-  readonly automatic?: boolean
-  readonly mirror?: string
-  readonly channel?: UpdateChannel
-}
-
-export interface PluginUpdateService {
-  getMirrors(): readonly UpdateMirror[]
-  checkForUpdate(options?: UpdateCheckOptions): Promise<UpdateInfo>
-  downloadAndApply(info: UpdateInfo, onProgress?: (percent: number) => void): Promise<void>
-  applyAndRestart(): Promise<void>
-  resetToBuiltin(): Promise<void>
-  openApkDownload(url: string): void
-  downloadApkInApp(info: UpdateInfo, onProgress?: (percent: number) => void): Promise<void>
-  installDownloadedApk(): Promise<void>
-  clearApkCache(): Promise<void>
-}
-
 export interface OrahakoServiceMap {
   router: PluginRouterService
   navigation: PluginNavigationService
@@ -214,9 +125,6 @@ export interface OrahakoServiceMap {
   plugins: PluginInstallerService
   packageRuntime: PluginPackageRuntime
   pluginManager: PluginManagerService
-  analytics: PluginAnalyticsService
-  announcement: PluginAnnouncementService
-  updater: PluginUpdateService
 }
 
 declare module "@cordisjs/core" {

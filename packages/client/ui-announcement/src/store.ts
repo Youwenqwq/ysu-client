@@ -1,4 +1,5 @@
-import { defineStore, type PluginAnnouncement } from "@orahako/sdk"
+import { defineStore } from "@orahako/sdk"
+import type { PluginAnnouncement } from "./contract"
 
 export interface AnnouncementModalState {
   readonly announcement: PluginAnnouncement | null

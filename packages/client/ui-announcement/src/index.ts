@@ -1,4 +1,10 @@
 export { announcementDictionary, type AnnouncementDictionary } from "./dictionary"
+export type {
+  AnnouncementCheckOptions,
+  AnnouncementLevel,
+  PluginAnnouncement,
+  PluginAnnouncementService,
+} from "./contract"
 export {
   ConfiguredAnnouncementService,
   DEFAULT_DISMISSED_STORAGE_KEY,

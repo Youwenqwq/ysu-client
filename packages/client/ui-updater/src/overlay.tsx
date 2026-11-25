@@ -1,7 +1,8 @@
 import { RefreshCw } from "lucide-react"
 import { useCallback, useMemo, useState, type ReactNode } from "react"
 import Markdown from "react-markdown"
-import type { DerivedComponentProps, PluginUpdateService, SlotComponent } from "@orahako/sdk"
+import type { DerivedComponentProps, SlotComponent } from "@orahako/sdk"
+import type { PluginUpdateService } from "./contract"
 import {
   Button,
   Dialog,

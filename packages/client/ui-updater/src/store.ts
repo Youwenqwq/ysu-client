@@ -1,4 +1,5 @@
-import { defineStore, type UpdateChannel, type UpdateInfo } from "@orahako/sdk"
+import { defineStore } from "@orahako/sdk"
+import type { UpdateChannel, UpdateInfo } from "./contract"
 
 export interface UpdaterPreferencesState {
   readonly mirror: string
