@@ -467,7 +467,11 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
       computeExamDayDiff({ name: "操作系统", startAt: "2026-12-21T09:00:00" }, now, "Asia/Shanghai")
     ).toBe(1)
     expect(
-      computeExamDayDiff({ name: "计算机网络", startAt: "2026-12-25T09:00:00" }, now, "Asia/Shanghai")
+      computeExamDayDiff(
+        { name: "计算机网络", startAt: "2026-12-25T09:00:00" },
+        now,
+        "Asia/Shanghai"
+      )
     ).toBe(5)
     expect(computeExamDayDiff({ name: "待定考试" }, now, "Asia/Shanghai")).toBeNull()
   })

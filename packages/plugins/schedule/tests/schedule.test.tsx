@@ -62,10 +62,7 @@ import {
   type MobileLessonBridge,
 } from "../src/modals"
 import { scheduleDictionary } from "../src/dictionary"
-import {
-  ScheduleAdjustmentDialog,
-  ScheduleAdjustmentsDialog,
-} from "../src/editor-dialogs"
+import { ScheduleAdjustmentDialog, ScheduleAdjustmentsDialog } from "../src/editor-dialogs"
 import { WidgetDiscovery } from "../src/widget-discovery"
 import {
   computeEffectiveScheduleSnapshot,
@@ -1104,10 +1101,16 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     const widgetsCategory = settings.getSnapshot().find((c) => c.id === "widgets")!
     expect(widgetsCategory).toBeDefined()
     expect(widgetsCategory.order).toBe(40)
-    expect(slots.select("settings.startupOptions").some((s) => s.pluginId === SCHEDULE_PLUGIN_ID)).toBe(true)
-    expect(slots.select("settings.widgets").some((s) => s.pluginId === SCHEDULE_PLUGIN_ID)).toBe(true)
     expect(
-      slots.select("settings.notifications.reminders").some((s) => s.pluginId === SCHEDULE_PLUGIN_ID)
+      slots.select("settings.startupOptions").some((s) => s.pluginId === SCHEDULE_PLUGIN_ID)
+    ).toBe(true)
+    expect(slots.select("settings.widgets").some((s) => s.pluginId === SCHEDULE_PLUGIN_ID)).toBe(
+      true
+    )
+    expect(
+      slots
+        .select("settings.notifications.reminders")
+        .some((s) => s.pluginId === SCHEDULE_PLUGIN_ID)
     ).toBe(true)
     expect(
       slots.select("shell.header.actions").some((s) => s.pluginId === SCHEDULE_PLUGIN_ID)

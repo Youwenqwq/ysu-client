@@ -552,9 +552,7 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     expect(artifacts.jwxtSession).toBeUndefined()
     await vi.waitFor(() => {
       expect(
-        [...env.secureBackend.map.values()].some((value) =>
-          value.includes(rememberedPassword)
-        )
+        [...env.secureBackend.map.values()].some((value) => value.includes(rememberedPassword))
       ).toBe(true)
     })
 
@@ -567,14 +565,10 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     expect(artifacts[REMEMBERED_PASSWORD_ARTIFACT]).toBe(nextRememberedPassword)
     await vi.waitFor(() => {
       expect(
-        [...env.secureBackend.map.values()].some((value) =>
-          value.includes(nextRememberedPassword)
-        )
+        [...env.secureBackend.map.values()].some((value) => value.includes(nextRememberedPassword))
       ).toBe(true)
       expect(
-        [...env.secureBackend.map.values()].some((value) =>
-          value.includes(rememberedPassword)
-        )
+        [...env.secureBackend.map.values()].some((value) => value.includes(rememberedPassword))
       ).toBe(false)
     })
 
@@ -587,9 +581,7 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     expect(artifacts[REMEMBERED_PASSWORD_ARTIFACT]).toBeUndefined()
     await vi.waitFor(() => {
       expect(
-        [...env.secureBackend.map.values()].some((value) =>
-          value.includes(nextRememberedPassword)
-        )
+        [...env.secureBackend.map.values()].some((value) => value.includes(nextRememberedPassword))
       ).toBe(false)
     })
 
@@ -599,9 +591,7 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     )
     await vi.waitFor(() => {
       expect(
-        [...env.secureBackend.map.values()].some((value) =>
-          value.includes(nextRememberedPassword)
-        )
+        [...env.secureBackend.map.values()].some((value) => value.includes(nextRememberedPassword))
       ).toBe(true)
     })
 
@@ -615,9 +605,7 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     expect(artifacts[REMEMBERED_PASSWORD_ARTIFACT]).toBeUndefined()
     await vi.waitFor(() => {
       expect(
-        [...env.secureBackend.map.values()].some((value) =>
-          value.includes(nextRememberedPassword)
-        )
+        [...env.secureBackend.map.values()].some((value) => value.includes(nextRememberedPassword))
       ).toBe(false)
     })
     env.runtime.dispose()
@@ -652,9 +640,7 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
       const reloginPromise = account.relogin()
       await started.promise
       providerRuntime.selectSchool("other")
-      await vi.waitFor(() =>
-        expect(providerRuntime.getSnapshot().provider?.id).toBe("other")
-      )
+      await vi.waitFor(() => expect(providerRuntime.getSnapshot().provider?.id).toBe("other"))
 
       gate.resolve(success)
       await reloginPromise

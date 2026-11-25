@@ -319,9 +319,7 @@ export const schedulePlugin = definePlugin({
         feature: "exams",
         slice: "exams",
         params: semester ? { semester } : undefined,
-        enabled: () =>
-          isTimetableEnabled() &&
-          hasSlice(provider.getSnapshot().provider, "exams"),
+        enabled: () => isTimetableEnabled() && hasSlice(provider.getSnapshot().provider, "exams"),
         fetcher: (activeProvider) =>
           requireSlice(activeProvider, "exams").getExams(semester ? { semester } : undefined),
       })
