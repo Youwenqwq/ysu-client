@@ -64,7 +64,7 @@ describe("MeterClient 17wanxiao protocol contract", () => {
       expect(outer.method).toBe("getbindroom")
       const inner: Record<string, unknown> = JSON.parse(String(outer.param))
       expect(inner.cmd).toBe("getbindroom")
-      expect(inner.account).toBe("202411040369")
+      expect(inner.account).toBe("20260001")
       expect(inner.timestamp).toBe(ts)
 
       return encryptedResponse({
@@ -72,18 +72,18 @@ describe("MeterClient 17wanxiao protocol contract", () => {
         result_: "true",
         body: JSON.stringify({
           result: "0",
-          roomfullname: "燕山大学西校区_四组团B座_5层_526房间",
-          roomverify: "104-9--36-526",
-          account_num: "104936526",
+          roomfullname: "测试校区_一组团A座_1层_101房间",
+          roomverify: "rv-101",
+          account_num: "20260001",
         }),
       })
     })
 
-    const room = await new MeterClient("202411040369", http).getRoom()
+    const room = await new MeterClient("20260001", http).getRoom()
     expect(room).toEqual({
-      roomFullName: "燕山大学西校区_四组团B座_5层_526房间",
-      roomverify: "104-9--36-526",
-      accountNum: "104936526",
+      roomFullName: "测试校区_一组团A座_1层_101房间",
+      roomverify: "rv-101",
+      accountNum: "20260001",
     })
   })
 
@@ -137,7 +137,7 @@ describe("MeterClient 17wanxiao protocol contract", () => {
       )
       const inner: Record<string, unknown> = JSON.parse(String(outer.param))
       expect(inner.cmd).toBe("gettimeusedetail")
-      expect(inner.account).toBe("202411040369")
+      expect(inner.account).toBe("20260001")
       expect(inner.businesstype).toBe("0")
       return encryptedResponse({
         code_: 0,
@@ -145,8 +145,8 @@ describe("MeterClient 17wanxiao protocol contract", () => {
         body: JSON.stringify({ result: "0", dayuselist: [{ date: "2026-08-15", use: "0.01" }] }),
       })
     })
-    const daily = await new MeterClient("202411040369", http).getDailyUse(
-      "104-9--36-526",
+    const daily = await new MeterClient("20260001", http).getDailyUse(
+      "rv-101",
       "2026-08-15",
       "2026-08-22"
     )
@@ -212,7 +212,7 @@ describe("MeterClient 17wanxiao protocol contract", () => {
       })
     })
 
-    const data = await fetchMeterData("202411040369", http)
+    const data = await fetchMeterData("20260001", http)
     expect(data.room.roomverify).toBe("rv-302")
     expect(data.overview?.meters[0]).toMatchObject({
       deviceName: "空调表",

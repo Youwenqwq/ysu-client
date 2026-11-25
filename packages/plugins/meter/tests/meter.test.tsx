@@ -293,7 +293,7 @@ function makeEncryptedHttp(
           body: JSON.stringify({
             result: "0",
             roomfullname: first.roomName,
-            roomnum: "526",
+            roomnum: "101",
             modlist: [
               {
                 devicename: "空调电表",
@@ -401,7 +401,7 @@ describe("@orahako/plugin-meter", () => {
     runtime.context.set(
       "http",
       makeEncryptedHttp({
-        "202411040369": { roomName: "西校区_四组团B座_526房间", remaining: 68.5 },
+        "20260001": { roomName: "测试校区_一组团A座_101房间", remaining: 68.5 },
       })
     )
 
@@ -505,7 +505,7 @@ describe("@orahako/plugin-meter", () => {
       })
     )
     const http = makeEncryptedHttp({
-      "202411040369": { roomName: "西校区_四组团B座_526房间", remaining: 68.5 },
+      "20260001": { roomName: "测试校区_一组团A座_101房间", remaining: 68.5 },
     })
     const send = vi.spyOn(http, "send")
     runtime.context.set("http", http)
@@ -574,12 +574,12 @@ describe("@orahako/plugin-meter", () => {
     expect(typeof queryAccount).toBe("function")
     await act(async () => {
       if (typeof queryAccount === "function") {
-        await queryAccount("202411040369")
+        await queryAccount("20260001")
       }
     })
 
     await vi.waitFor(() => {
-      expect(dom.container.textContent).toContain("西校区_四组团B座_526房间")
+      expect(dom.container.textContent).toContain("测试校区_一组团A座_101房间")
       expect(dom.container.textContent).toContain("68.5")
       expect(dom.container.textContent).toContain("第一路:一般送电")
       expect(dom.container.textContent).toContain("自助购电")
@@ -623,7 +623,7 @@ describe("@orahako/plugin-meter", () => {
     // Verify room history persisted into namespaced local storage
     await vi.waitFor(() => {
       expect(localMem.map.get("orahako-plugin:orahako.meter:meter-rooms")).toContain(
-        "西校区_四组团B座_526房间"
+        "测试校区_一组团A座_101房间"
       )
     })
 
