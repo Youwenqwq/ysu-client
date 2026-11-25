@@ -139,6 +139,9 @@
       "@orahako/plugin-exams": [
         "./packages/plugins/exams/src/index.ts"
       ],
+      "@orahako/plugin-free-rooms": [
+        "./packages/plugins/free-rooms/src/index.ts"
+      ],
       "@orahako/plugin-grades": [
         "./packages/plugins/grades/src/index.ts"
       ],

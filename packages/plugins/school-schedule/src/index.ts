@@ -17,6 +17,7 @@ import {
 } from "@orahako/academic-sdk"
 import { createMinuteClockSource, createParameterizedQuerySource } from "@orahako/academic-kit"
 import {
+  createObservableSource,
   definePlugin,
   PLUGIN_API_VERSION,
   type PluginManifest,
@@ -24,25 +25,22 @@ import {
 } from "@orahako/sdk"
 import { schoolScheduleDictionary, type SchoolScheduleDictionary } from "./dictionary"
 import {
-  SchoolScheduleHeaderActions,
-  type SchoolScheduleHeaderActionsInject,
-} from "./header-actions"
-import {
   SchoolSchedulePage,
-  type FreeRoomContext,
   type SchoolSchedulePageInject,
   type SchoolSchedulePageProps,
 } from "./page"
 import {
   FILTER_ALL,
   schoolScheduleFilterStore,
+  schoolSchedulePrefsStore,
   type SchoolScheduleFilterState,
   type SchoolScheduleFilterStoreInstance,
+  type SchoolSchedulePrefsState,
+  type SchoolSchedulePrefsStoreInstance,
   type SchoolScheduleTab,
   type SelectedClassroom,
   type SelectedSchoolClass,
 } from "./store"
-import "./slots"
 
 export const SCHOOL_SCHEDULE_PLUGIN_ID = "orahako.school-schedule"
 
@@ -65,17 +63,27 @@ const SCHOOL_SCHEDULE_QUERY_POLICIES: Readonly<Record<string, ProviderQueryPolic
 }
 
 export type {
-  FreeRoomContext,
   SchoolScheduleDictionary,
   SchoolScheduleFilterState,
   SchoolScheduleFilterStoreInstance,
-  SchoolScheduleHeaderActionsInject,
   SchoolSchedulePageInject,
   SchoolSchedulePageProps,
+  SchoolSchedulePrefsState,
+  SchoolSchedulePrefsStoreInstance,
   SchoolScheduleTab,
   SelectedClassroom,
   SelectedSchoolClass,
 }
+
+const SCHOOL_SCHEDULE_INJECT = [
+  "ui",
+  "router",
+  "i18n",
+  "storage",
+  "provider",
+  "session",
+  "query",
+] as const
 
 const schoolScheduleManifest: PluginManifest = {
   id: SCHOOL_SCHEDULE_PLUGIN_ID,
@@ -84,23 +92,42 @@ const schoolScheduleManifest: PluginManifest = {
   apiVersion: PLUGIN_API_VERSION,
   kind: "feature",
   entry: "index.js",
-  description: "查询行政班与教室的课表",
-  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"],
+  description: "查询行政班与教室的完整周课表",
+  inject: [...SCHOOL_SCHEDULE_INJECT],
 }
 
 export const schoolSchedulePlugin = definePlugin({
   manifest: schoolScheduleManifest,
-  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"] as const,
+  inject: SCHOOL_SCHEDULE_INJECT,
   apply(ctx) {
-    const { ui, slots, router, i18n, provider, session, query } = ctx
+    const { ui, router, i18n, storage, provider, session, query } = ctx
     i18n.register(schoolScheduleDictionary)
     for (const [feature, policy] of Object.entries(SCHOOL_SCHEDULE_QUERY_POLICIES)) {
       query.registerPolicy(feature, policy)
     }
 
     let disposed = false
+    const prefsStore = schoolSchedulePrefsStore.create(storage)
     const filterStore = schoolScheduleFilterStore.create()
     const minuteClock = createMinuteClockSource()
+
+    // Combined state snapshot for parameterized query sources that depend on both prefs & view state.
+    const combinedState = createObservableSource<{
+      readonly prefs: SchoolSchedulePrefsState
+      readonly filter: SchoolScheduleFilterState
+    }>({
+      prefs: prefsStore.source.getSnapshot(),
+      filter: filterStore.source.getSnapshot(),
+    })
+    const syncCombined = () => {
+      if (disposed) return
+      combinedState.set({
+        prefs: prefsStore.source.getSnapshot(),
+        filter: filterStore.source.getSnapshot(),
+      })
+    }
+    const unsubPrefs = prefsStore.source.subscribe(syncCombined)
+    const unsubFilter = filterStore.source.subscribe(syncCombined)
 
     const isSchoolScheduleEnabled = (): boolean =>
       !disposed &&
@@ -173,11 +200,11 @@ export const schoolSchedulePlugin = definePlugin({
     })
 
     const majorsSource = createParameterizedQuerySource<
-      SchoolScheduleFilterState,
+      SchoolSchedulePrefsState,
       string | undefined,
       MajorInfo[]
     >({
-      state: filterStore.source,
+      state: prefsStore.source,
       selectKey: (state) => (state.department === FILTER_ALL ? undefined : state.department),
       serializeKey: (department) => department ?? "",
       resolveSource: (department) =>
@@ -193,22 +220,22 @@ export const schoolSchedulePlugin = definePlugin({
     })
 
     const classesSource = createParameterizedQuerySource<
-      SchoolScheduleFilterState,
+      { readonly prefs: SchoolSchedulePrefsState; readonly filter: SchoolScheduleFilterState },
       SchoolClassQueryOptions | null,
       SchoolClassInfo[]
     >({
-      state: filterStore.source,
-      selectKey: (state) => {
-        if (state.selectedClass !== null) return null
+      state: combinedState,
+      selectKey: ({ prefs, filter }) => {
+        if (filter.selectedClass !== null) return null
         const hasFilter =
-          state.grade !== FILTER_ALL ||
-          state.department !== FILTER_ALL ||
-          state.major !== FILTER_ALL
+          prefs.grade !== FILTER_ALL ||
+          prefs.department !== FILTER_ALL ||
+          prefs.major !== FILTER_ALL
         if (!hasFilter) return null
         return {
-          ...(state.grade !== FILTER_ALL ? { grade: state.grade } : {}),
-          ...(state.department !== FILTER_ALL ? { department: state.department } : {}),
-          ...(state.major !== FILTER_ALL ? { major: state.major } : {}),
+          ...(prefs.grade !== FILTER_ALL ? { grade: prefs.grade } : {}),
+          ...(prefs.department !== FILTER_ALL ? { department: prefs.department } : {}),
+          ...(prefs.major !== FILTER_ALL ? { major: prefs.major } : {}),
         }
       },
       serializeKey: (filter) => JSON.stringify(filter),
@@ -257,11 +284,11 @@ export const schoolSchedulePlugin = definePlugin({
     })
 
     const buildingsSource = createParameterizedQuerySource<
-      SchoolScheduleFilterState,
+      SchoolSchedulePrefsState,
       string | undefined,
       CodeItem[]
     >({
-      state: filterStore.source,
+      state: prefsStore.source,
       selectKey: (state) => (state.campus === FILTER_ALL ? undefined : state.campus),
       serializeKey: (campus) => campus ?? "",
       resolveSource: (campus) =>
@@ -277,22 +304,22 @@ export const schoolSchedulePlugin = definePlugin({
     })
 
     const roomsSource = createParameterizedQuerySource<
-      SchoolScheduleFilterState,
+      { readonly prefs: SchoolSchedulePrefsState; readonly filter: SchoolScheduleFilterState },
       ClassroomQueryOptions | null,
       ClassroomInfo[]
     >({
-      state: filterStore.source,
-      selectKey: (state) => {
-        if (state.selectedRoom !== null) return null
+      state: combinedState,
+      selectKey: ({ prefs, filter }) => {
+        if (filter.selectedRoom !== null) return null
         const hasFilter =
-          state.searchedRoomName !== "" ||
-          state.campus !== FILTER_ALL ||
-          state.building !== FILTER_ALL
+          filter.searchedRoomName !== "" ||
+          prefs.campus !== FILTER_ALL ||
+          prefs.building !== FILTER_ALL
         if (!hasFilter) return null
         return {
-          ...(state.searchedRoomName !== "" ? { name: state.searchedRoomName } : {}),
-          ...(state.campus !== FILTER_ALL ? { campus: state.campus } : {}),
-          ...(state.building !== FILTER_ALL ? { building: state.building } : {}),
+          ...(filter.searchedRoomName !== "" ? { name: filter.searchedRoomName } : {}),
+          ...(prefs.campus !== FILTER_ALL ? { campus: prefs.campus } : {}),
+          ...(prefs.building !== FILTER_ALL ? { building: prefs.building } : {}),
         }
       },
       serializeKey: (filter) => JSON.stringify(filter),
@@ -335,37 +362,16 @@ export const schoolSchedulePlugin = definePlugin({
     const isOwnPage = (location: RouteLocation) =>
       location.route === "school-schedule" || location.pluginId === SCHOOL_SCHEDULE_PLUGIN_ID
 
-    // Keep the route hint from overriding a tab choice on repeated location emissions.
-    let hadRoomTabHint = false
-    const syncRouteTab = (location: RouteLocation) => {
-      const hasRoomTabHint = isOwnPage(location) && location.params.tab === "room"
-      const enteredRoomTab = hasRoomTabHint && !hadRoomTabHint
-      hadRoomTabHint = hasRoomTabHint
-      if (enteredRoomTab) filterStore.actions.setTab("room")
-    }
-
-    const changeTab = (tab: SchoolScheduleTab) => {
-      if (filterStore.source.getSnapshot().tab === tab) return
-      filterStore.actions.setTab(tab)
-      const location = router.current.getSnapshot()
-      if (!isOwnPage(location) || location.params.tab === undefined) return
-      const search = new URLSearchParams(location.search)
-      search.delete("tab")
-      router.replace(`?${search.toString()}`)
-    }
-    const syncCurrentRouteTab = () => syncRouteTab(router.current.getSnapshot())
-    const unsubscribeRouteTab = router.current.subscribe(syncCurrentRouteTab)
-    syncCurrentRouteTab()
-
     router.registerBackGuard(() => {
       const location = router.current.getSnapshot()
       if (!isOwnPage(location)) return true
+      const tab = prefsStore.source.getSnapshot().tab
       const state = filterStore.source.getSnapshot()
-      if (state.tab === "class" && state.selectedClass !== null) {
+      if (tab === "class" && state.selectedClass !== null) {
         filterStore.actions.selectClass(null)
         return false
       }
-      if (state.tab === "room" && state.selectedRoom !== null) {
+      if (tab === "room" && state.selectedRoom !== null) {
         filterStore.actions.selectRoom(null)
         return false
       }
@@ -383,11 +389,18 @@ export const schoolSchedulePlugin = definePlugin({
         dictionary: schoolScheduleDictionary,
         store: filterStore,
         inject: (): SchoolSchedulePageInject => ({
-          onTabChange: changeTab,
+          setTab: (tab) => prefsStore.actions.setTab(tab),
+          setGrade: (grade) => prefsStore.actions.setGrade(grade),
+          setDepartment: (department) => prefsStore.actions.setDepartment(department),
+          setMajor: (major) => prefsStore.actions.setMajor(major),
+          setCampus: (campus) => prefsStore.actions.setCampus(campus),
+          setBuilding: (building) => prefsStore.actions.setBuilding(building),
+          toggleFavoriteClass: (cls) => prefsStore.actions.toggleFavoriteClass(cls),
+          toggleFavoriteRoom: (room) => prefsStore.actions.toggleFavoriteRoom(room),
           hooks: {
-            location: router.current,
             clockTick: minuteClock.source,
             provider: provider.state,
+            prefs: prefsStore.source,
             currentWeek: currentWeekSource,
             termCalendar: termCalendarSource,
             periods: periodsSource,
@@ -406,46 +419,24 @@ export const schoolSchedulePlugin = definePlugin({
       SchoolSchedulePage
     )
 
-    slots.inject("shell.header.actions", () =>
-      slots.register(
-        {
-          id: "school-schedule-header-actions",
-          slot: "shell.header.actions",
-          order: 10,
-          dictionary: schoolScheduleDictionary,
-          store: filterStore,
-          inject: (): SchoolScheduleHeaderActionsInject => ({
-            hooks: {
-              location: router.current,
-              gradeYears: gradeYearsSource,
-              departments: departmentsSource,
-              majors: majorsSource,
-              campuses: campusesSource,
-              buildings: buildingsSource,
-            },
-            pluginId: SCHOOL_SCHEDULE_PLUGIN_ID,
-          }),
-        },
-        SchoolScheduleHeaderActions
-      )
-    )
-
     ui.registerNavigation({
       id: "school-schedule",
       title: "全校课表",
       titleKey: "title",
       page: "index",
       icon: CalendarDays,
-      group: "platform",
-      order: 40,
+      group: "academic",
+      order: 45,
       capability: "schoolSchedule",
     })
 
     ctx.effect(() => () => {
       disposed = true
-      unsubscribeRouteTab()
+      unsubPrefs()
+      unsubFilter()
       minuteClock.dispose()
       filterStore.dispose()
+      prefsStore.dispose()
     })
   },
 })

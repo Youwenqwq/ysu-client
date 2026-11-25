@@ -423,9 +423,9 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
     expect(validated.kind).toBe("feature")
     expect(validated.inject).toEqual([
       "ui",
-      "slots",
       "router",
       "i18n",
+      "storage",
       "provider",
       "session",
       "query",
@@ -614,10 +614,13 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
       .pages.find((p) => p.pluginId === SCHOOL_SCHEDULE_PLUGIN_ID && p.id === "index")!
     const navEntry = ui
       .getSnapshot()
-      .navigation.find((n) => n.pluginId === SCHOOL_SCHEDULE_PLUGIN_ID && n.id === "school-schedule")!
+      .navigation.find(
+        (n) => n.pluginId === SCHOOL_SCHEDULE_PLUGIN_ID && n.id === "school-schedule"
+      )!
     expect(pageEntry.route).toBe("school-schedule")
     expect(pageEntry.capability).toBe("schoolSchedule")
-    expect(navEntry.group).toBe("platform")
+    expect(navEntry.group).toBe("academic")
+    expect(navEntry.order).toBe(45)
     expect(navEntry.capability).toBe("schoolSchedule")
     expect(query.policy("school-classrooms")).toEqual({ ttl: LONG_TTL_MS, persist: true })
     expect(query.policy("school-class-schedule")).toEqual({ ttl: LONG_TTL_MS, persist: true })
@@ -636,37 +639,27 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
       />
     )
 
-    const headerEntry = slots
-      .select("shell.header.actions")
-      .find((entry) => entry.pluginId === SCHOOL_SCHEDULE_PLUGIN_ID)!
+    // No hidden mobile header drawer button; filters render inline directly on the page
     expect(
-      renderToStaticMarkup(<ContributionOutlet entry={headerEntry} slots={slots} i18n={i18n} />)
-    ).toContain("data-school-schedule-header-actions")
-
-    await act(async () => {
-      router.push({ route: "student-info" })
-    })
-    expect(
-      renderToStaticMarkup(<ContributionOutlet entry={headerEntry} slots={slots} i18n={i18n} />)
-    ).toBe("")
-    await act(async () => {
-      router.back()
-    })
-    expect(router.current.getSnapshot().route).toBe("school-schedule")
+      slots
+        .select("shell.header.actions")
+        .find((entry) => entry.pluginId === SCHOOL_SCHEDULE_PLUGIN_ID)
+    ).toBeUndefined()
 
     // Before selecting any filter, full class/room lists are NOT queried!
-    expect(dom.container.textContent).toContain("选择筛选条件后查询")
+    expect(dom.container.textContent).toContain("选择年级或院系后浏览班级课表")
     expect(getSchoolClasses).not.toHaveBeenCalled()
     expect(getSchoolClassrooms).not.toHaveBeenCalled()
 
     const store = pageEntry.store as SchoolScheduleFilterStoreInstance
+    const injected = pageEntry.inject!(runtime.context) as SchoolSchedulePageInject
 
     // Selecting department resets major and fetches filtered classes
     await act(async () => {
-      store.actions.setMajor("old-major")
-      store.actions.setDepartment("ise")
+      injected.setMajor("old-major")
+      injected.setDepartment("ise")
     })
-    expect(store.source.getSnapshot().major).toBe(FILTER_ALL)
+    expect(injected.hooks.prefs.getSnapshot().major).toBe(FILTER_ALL)
 
     await vi.waitFor(() => {
       expect(getSchoolClasses).toHaveBeenCalledWith({ department: "ise" })
@@ -674,6 +667,22 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
       expect(dom.container.textContent).toContain("32 人")
       expect(dom.container.textContent).toContain("未排课")
     })
+
+    // Local keyword filtering narrows classes without extra network requests
+    await act(async () => {
+      store.actions.setClassKeyword("2401")
+    })
+    expect(dom.container.textContent).toContain("计算机2401-all-ise")
+    expect(dom.container.textContent).not.toContain("未排课")
+    await act(async () => {
+      store.actions.setClassKeyword("")
+    })
+
+    // Starring a class persists in favorites and renders quick-access strip
+    await act(async () => {
+      injected.toggleFavoriteClass({ classId: "cls-cs-2401", className: "计算机2401" })
+    })
+    expect(dom.container.textContent).toContain("收藏的班级")
 
     // Selecting a class loads its timetable view
     await act(async () => {
@@ -696,38 +705,9 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
     expect(store.source.getSnapshot().selectedClass).toBeNull()
     expect(router.current.getSnapshot().href).toBe(hrefBeforeBack)
 
-    // Navigating with free-room context deep link switches to room tab and shows context banner
+    // Switch to room tab, switch locale to English, and search classrooms
     await act(async () => {
-      router.push({
-        route: "school-schedule",
-        params: { tab: "room", week: 3, day: 2, section: 5 },
-      })
-    })
-
-    await vi.waitFor(() => {
-      expect(store.source.getSnapshot().tab).toBe("room")
-      expect(dom.container.textContent).toContain("正在查找第3周 · 星期二第5节 的空教室")
-    })
-
-    const { onTabChange } = pageEntry.inject!(runtime.context) as SchoolSchedulePageInject
-    await act(async () => {
-      onTabChange("class")
-    })
-    expect(store.source.getSnapshot().tab).toBe("class")
-    expect(router.current.getSnapshot().params).toEqual({ week: "3", day: "2", section: "5" })
-
-    await act(async () => {
-      router.replace(router.current.getSnapshot().href)
-    })
-    expect(store.source.getSnapshot().tab).toBe("class")
-
-    await act(async () => {
-      router.push({ route: "school-schedule", params: { tab: "room", week: 3, day: 2, section: 5 } })
-    })
-    expect(store.source.getSnapshot().tab).toBe("room")
-
-    // Switch locale to English and search classrooms
-    await act(async () => {
+      injected.setTab("room")
       i18n.setLocale("en")
       store.actions.setRoomNameInput("301")
       store.actions.submitRoomSearch()
@@ -735,9 +715,6 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
 
     await vi.waitFor(() => {
       expect(getSchoolClassrooms).toHaveBeenCalledWith({ name: "301" })
-      expect(dom.container.textContent).toContain(
-        "Finding free rooms · week 3, Tuesday, section 5"
-      )
       expect(dom.container.textContent).toContain("搜索教室-301")
       expect(dom.container.textContent).toContain("120 seats")
     })

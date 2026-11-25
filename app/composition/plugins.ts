@@ -5,6 +5,7 @@ import ecardPlugin from "@orahako/plugin-ecard"
 import epayPlugin from "@orahako/plugin-epay"
 import evaluationPlugin from "@orahako/plugin-evaluation"
 import examsPlugin from "@orahako/plugin-exams"
+import freeRoomsPlugin from "@orahako/plugin-free-rooms"
 import gradesPlugin from "@orahako/plugin-grades"
 import laborPlugin from "@orahako/plugin-labor"
 import makeupExamsPlugin from "@orahako/plugin-makeup-exams"
@@ -73,6 +74,7 @@ export const officialPlugins = [
   notificationsPlugin,
   overviewPlugin,
   schedulePlugin,
+  freeRoomsPlugin,
   schoolSchedulePlugin,
   gradesPlugin,
   examsPlugin,

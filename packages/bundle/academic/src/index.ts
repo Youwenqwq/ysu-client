@@ -22,6 +22,7 @@ export const academicBundle = defineBundle({
     { id: "orahako.notifications", protected: true },
     { id: "orahako.overview" },
     { id: "orahako.schedule" },
+    { id: "orahako.free-rooms" },
     { id: "orahako.school-schedule" },
     { id: "orahako.grades" },
     { id: "orahako.exams" },

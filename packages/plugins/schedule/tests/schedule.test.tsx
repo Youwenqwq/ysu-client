@@ -561,7 +561,6 @@ describe("@orahako/plugin-schedule export discipline & manifest", () => {
       "slots",
       "settings",
       "router",
-      "navigation",
       "i18n",
       "storage",
       "native",
@@ -1076,7 +1075,6 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     const providerRuntime = runtime.context.get("provider")!
     const notifications = runtime.context.get("notifications")!
     const overview = runtime.context.get("overview")!
-    const navigation = runtime.context.get("navigation")!
     const query = runtime.context.get("query")!
 
     slots.declare({ name: "settings.startupOptions", kind: "list" })
@@ -1195,44 +1193,10 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     })
     unregisterExamSource()
 
-    // Without a registered school-schedule route, both entries stay hidden
+    // Schedule stays decoupled from school-schedule and free-rooms plugins
     await dom.render(<ContributionOutlet entry={schedulePage} slots={slots} i18n={i18n} />)
     expect(dom.container.textContent).not.toContain("全校课表")
     expect(dom.container.textContent).not.toContain("查空教室")
-
-    // Registering the route makes the entries visible, disposing hides them again
-    const stubRoutePlugin = definePlugin({
-      manifest: {
-        id: "test.school-schedule-route",
-        name: "School schedule route stub",
-        version: "1.0.0",
-        apiVersion: PLUGIN_API_VERSION,
-        kind: "feature",
-        entry: "index.js",
-        inject: ["ui"],
-      },
-      inject: ["ui"] as const,
-      apply(stubCtx) {
-        stubCtx.ui.registerPage(
-          {
-            id: "index",
-            route: "school-schedule",
-            title: "全校课表",
-          },
-          () => null
-        )
-      },
-    })
-    runtime.register(stubRoutePlugin, "builtin")
-    await runtime.startAndWait(stubRoutePlugin.manifest.id)
-    await vi.waitFor(() => expect(navigation.resolve("school-schedule")).toBeDefined())
-    await dom.render(<ContributionOutlet entry={schedulePage} slots={slots} i18n={i18n} />)
-    await vi.waitFor(() => {
-      expect(dom.container.textContent).toContain("全校课表")
-      expect(dom.container.textContent).toContain("查空教室")
-    })
-    runtime.stop(stubRoutePlugin.manifest.id)
-    await vi.waitFor(() => expect(navigation.resolve("school-schedule")).toBeUndefined())
 
     const viewStore = schedulePage.store as ScheduleViewStoreInstance
     await act(async () => {

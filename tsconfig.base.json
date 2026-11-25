@@ -51,6 +51,7 @@
       "@orahako/plugin-epay": ["./packages/plugins/epay/src/index.ts"],
       "@orahako/plugin-evaluation": ["./packages/plugins/evaluation/src/index.ts"],
       "@orahako/plugin-exams": ["./packages/plugins/exams/src/index.ts"],
+      "@orahako/plugin-free-rooms": ["./packages/plugins/free-rooms/src/index.ts"],
       "@orahako/plugin-grades": ["./packages/plugins/grades/src/index.ts"],
       "@orahako/plugin-labor": ["./packages/plugins/labor/src/index.ts"],
       "@orahako/plugin-makeup-exams": ["./packages/plugins/makeup-exams/src/index.ts"],

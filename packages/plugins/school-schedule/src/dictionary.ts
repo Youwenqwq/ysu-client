@@ -4,7 +4,7 @@ import { defineDictionary, type Translator } from "@orahako/sdk"
 export const schoolScheduleDictionary = defineDictionary({
   zh: {
     title: "全校课表",
-    description: "查询行政班与教室的课表",
+    description: "查询行政班与教室的完整周课表",
     classTab: "班级课表",
     roomTab: "教室课表",
     grade: "年级",
@@ -13,21 +13,24 @@ export const schoolScheduleDictionary = defineDictionary({
     campus: "校区",
     building: "教学楼",
     all: "全部",
-    searchClass: "查询班级",
-    searchRoom: "查询教室",
-    roomNamePlaceholder: "教室名称关键字...",
-    noClasses: "未找到班级",
-    noRooms: "未找到教室",
-    noCourses: "该学期暂无课程",
+    searchRoom: "查询",
+    classKeywordPlaceholder: "按班级名筛选，如 计科24…",
+    roomNamePlaceholder: "输入教室号直接搜，如 C201…",
+    noClasses: "未找到符合条件的班级",
+    noRooms: "未找到符合条件的教室",
+    noCourses: "该学期暂无排课",
     backToList: "返回列表",
     studentCount: "{count} 人",
-    seats: "座位 {count}",
+    seats: "{count} 座",
     sections: "第 {start}-{end} 节",
-    selectHint: "选择筛选条件后查询",
+    selectClassHint: "选择年级或院系后浏览班级课表",
+    selectRoomHint: "选择校区、教学楼或输入教室号查询课表",
     unscheduled: "未排课",
-    singleSection: "第{section}节",
-    freeRoomEntry: "查空教室",
-    freeRoomContext: "正在查找第{week}周 · {weekday}第{section}节 的空教室",
+    favoritesClasses: "收藏的班级",
+    favoritesRooms: "收藏的教室",
+    favoriteAdd: "收藏",
+    favoriteRemove: "取消收藏",
+    resultCount: "共 {count} 项",
     closeDialog: "关闭",
     weekdayNames: {
       "1": "星期一",
@@ -52,7 +55,7 @@ export const schoolScheduleDictionary = defineDictionary({
       currentWeekBadge: "当前第 {week} 周",
       weekPrev: "上一周",
       weekNext: "下一周",
-      noData: "暂无日程数据",
+      noData: "本周暂无课程",
       overlapCourses: "{count} 个课程",
       overlapDialogTitle: "{weekday} 第{section}节",
       weeks: "周次",
@@ -71,7 +74,7 @@ export const schoolScheduleDictionary = defineDictionary({
   },
   en: {
     title: "School Schedules",
-    description: "Query schedules of administrative classes and classrooms",
+    description: "Browse weekly schedules for classes and classrooms",
     classTab: "Classes",
     roomTab: "Classrooms",
     grade: "Grade",
@@ -80,21 +83,24 @@ export const schoolScheduleDictionary = defineDictionary({
     campus: "Campus",
     building: "Building",
     all: "All",
-    searchClass: "Search classes",
-    searchRoom: "Search rooms",
-    roomNamePlaceholder: "Room name keyword...",
-    noClasses: "No classes found",
-    noRooms: "No rooms found",
-    noCourses: "No courses this term",
+    searchRoom: "Search",
+    classKeywordPlaceholder: "Filter class name…",
+    roomNamePlaceholder: "Room keyword, e.g. C201…",
+    noClasses: "No matching classes found",
+    noRooms: "No matching classrooms found",
+    noCourses: "No scheduled courses this term",
     backToList: "Back to list",
     studentCount: "{count} students",
     seats: "{count} seats",
     sections: "Sections {start}-{end}",
-    selectHint: "Pick filters and search",
+    selectClassHint: "Choose a grade or department to browse classes",
+    selectRoomHint: "Choose a campus/building or enter a room name",
     unscheduled: "Not scheduled",
-    singleSection: "Section {section}",
-    freeRoomEntry: "Find free rooms",
-    freeRoomContext: "Finding free rooms · week {week}, {weekday}, section {section}",
+    favoritesClasses: "Starred classes",
+    favoritesRooms: "Starred classrooms",
+    favoriteAdd: "Star",
+    favoriteRemove: "Unstar",
+    resultCount: "{count} results",
     closeDialog: "Close",
     weekdayNames: {
       "1": "Monday",
@@ -119,7 +125,7 @@ export const schoolScheduleDictionary = defineDictionary({
       currentWeekBadge: "Current Week {week}",
       weekPrev: "Previous week",
       weekNext: "Next week",
-      noData: "No schedule data",
+      noData: "No classes this week",
       overlapCourses: "{count} courses",
       overlapDialogTitle: "{weekday} Section {section}",
       weeks: "Weeks",
@@ -139,27 +145,6 @@ export const schoolScheduleDictionary = defineDictionary({
 })
 
 export type SchoolScheduleDictionary = typeof schoolScheduleDictionary
-
-export function weekdayName(t: Translator<SchoolScheduleDictionary>, day: number): string {
-  switch (day) {
-    case 1:
-      return t("weekdayNames.1")
-    case 2:
-      return t("weekdayNames.2")
-    case 3:
-      return t("weekdayNames.3")
-    case 4:
-      return t("weekdayNames.4")
-    case 5:
-      return t("weekdayNames.5")
-    case 6:
-      return t("weekdayNames.6")
-    case 7:
-      return t("weekdayNames.7")
-    default:
-      return String(day)
-  }
-}
 
 export function buildSchoolScheduleLabels(t: Translator<SchoolScheduleDictionary>): ScheduleLabels {
   return {
@@ -185,9 +170,8 @@ export function buildSchoolScheduleLabels(t: Translator<SchoolScheduleDictionary
     lunchBreak: t("schedule.lunchBreak"),
     dinnerBreak: t("schedule.dinnerBreak"),
     overlap: t("schedule.overlap"),
-    overlapDialogTitle: ({ weekday, section }) =>
-      t("schedule.overlapDialogTitle", { weekday, section }),
-    overlapCourses: ({ count }) => t("schedule.overlapCourses", { count }),
+    overlapDialogTitle: (params) => t("schedule.overlapDialogTitle", params),
+    overlapCourses: (params) => t("schedule.overlapCourses", params),
     weeks: t("schedule.weeks"),
     sections: t("schedule.sections"),
     examTag: t("schedule.examTag"),

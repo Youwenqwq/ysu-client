@@ -42,6 +42,7 @@
     "@orahako/plugin-epay": "workspace:*",
     "@orahako/plugin-evaluation": "workspace:*",
     "@orahako/plugin-exams": "workspace:*",
+    "@orahako/plugin-free-rooms": "workspace:*",
     "@orahako/plugin-grades": "workspace:*",
     "@orahako/plugin-labor": "workspace:*",
     "@orahako/plugin-makeup-exams": "workspace:*",

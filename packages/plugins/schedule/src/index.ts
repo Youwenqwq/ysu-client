@@ -55,7 +55,6 @@ import {
   SCHEDULE_PAGE_CHILDREN,
   ScheduleHeaderActions,
   SchedulePage,
-  type FreeRoomTargetParams,
   type ScheduleHeaderActionsInject,
   type ScheduleHeaderActionsProps,
   type SchedulePageInject,
@@ -121,7 +120,6 @@ export type {
   CustomScheduleRecurrence,
   CustomScheduleTimeMode,
   EffectiveScheduleSnapshot,
-  FreeRoomTargetParams,
   GeolocationCoordinatesSnapshot,
   MobileLessonBridge,
   PendingPatchUndo,
@@ -228,7 +226,6 @@ const SCHEDULE_INJECT = [
   "slots",
   "settings",
   "router",
-  "navigation",
   "i18n",
   "storage",
   "native",
@@ -272,7 +269,6 @@ export const schedulePlugin = definePlugin({
       slots,
       settings,
       router,
-      navigation,
       i18n,
       storage,
       provider,
@@ -542,27 +538,6 @@ export const schedulePlugin = definePlugin({
       })
     }
 
-    const isSchoolScheduleRouteAvailable = (): boolean =>
-      navigation.resolve("school-schedule") !== undefined
-
-    const openSchoolSchedule = (): void => {
-      if (!isSchoolScheduleRouteAvailable()) return
-      router.push({ route: "school-schedule" })
-    }
-
-    const openFreeRooms = (params: FreeRoomTargetParams): void => {
-      if (!isSchoolScheduleRouteAvailable()) return
-      router.push({
-        route: "school-schedule",
-        params: {
-          tab: "room",
-          week: params.week,
-          ...(params.day !== undefined ? { day: params.day } : {}),
-          ...(params.section !== undefined ? { section: params.section } : {}),
-        },
-      })
-    }
-
     const openScheduleRoute = (): void => {
       router.push({ route: "schedule" })
     }
@@ -619,7 +594,6 @@ export const schedulePlugin = definePlugin({
             currentWeek: pageCurrentWeekSource,
             termCalendar: pageTermCalendarSource,
             periods: periodsSource,
-            navigation: navigation.state,
           },
           pluginId: SCHEDULE_PLUGIN_ID,
           patchMutators,
@@ -634,7 +608,6 @@ export const schedulePlugin = definePlugin({
           mobileBridge,
           isNative: () => native.isNative,
           assistantSrc: widgetAssistantSrc,
-          canOpenSchoolSchedule: isSchoolScheduleRouteAvailable,
           setCompactMode: (compact) => settingsStore.actions.setCompactMode(compact),
           setWidgetAssistantHidden: (hidden) =>
             settingsStore.actions.setWidgetAssistantHidden(hidden),
@@ -643,8 +616,6 @@ export const schedulePlugin = definePlugin({
           requestPinScheduleWidget: () => widgets.requestPin("schedule"),
           widgetsSettingsHref,
           openWidgetsSettings,
-          openSchoolSchedule,
-          openFreeRooms,
         }),
       },
       SchedulePage
@@ -833,14 +804,9 @@ export const schedulePlugin = definePlugin({
               schedule: pageScheduleSource,
               currentWeek: pageCurrentWeekSource,
               termCalendar: pageTermCalendarSource,
-              periods: periodsSource,
-              navigation: navigation.state,
             },
             pluginId: SCHEDULE_PLUGIN_ID,
             setCompactMode: (compact) => settingsStore.actions.setCompactMode(compact),
-            canOpenSchoolSchedule: isSchoolScheduleRouteAvailable,
-            openSchoolSchedule,
-            openFreeRooms,
           }),
         },
         ScheduleHeaderActions
