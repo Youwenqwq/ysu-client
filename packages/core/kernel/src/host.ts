@@ -57,12 +57,14 @@ export function createPluginHostPreferences(
   let memoryActiveShell: string | undefined
   let memoryActiveTheme: string | undefined
   let memoryStartupPage: string | undefined
-  // A failed write must not leave reads on the stale persisted value: the
-  // in-memory snapshot is authoritative for this host once persistence fails.
-  let memoryOnly = false
+  // Read localStorage once on creation and keep the in-memory snapshot
+  // authoritative afterwards: avoids repeated synchronous JSON.parse during
+  // plugin boot loops and never forks reads from writes if setItem fails.
+  let loadedFromStorage = false
 
   const read = (): StoredHostPreferences => {
-    if (!memoryOnly) {
+    if (!loadedFromStorage) {
+      loadedFromStorage = true
       try {
         if (typeof localStorage !== "undefined") {
           const raw = localStorage.getItem(storageKey)
@@ -89,18 +91,11 @@ export function createPluginHostPreferences(
               memoryActiveShell = activeShell
               memoryActiveTheme = activeTheme
               memoryStartupPage = startupPage
-              return {
-                disabledPluginIds: disabled,
-                ...(activeShell !== undefined ? { activeShell } : {}),
-                ...(activeTheme !== undefined ? { activeTheme } : {}),
-                ...(startupPage !== undefined ? { startupPage } : {}),
-              }
             }
           }
         }
       } catch {
         // Fall back to in-memory state when localStorage is unavailable.
-        memoryOnly = true
       }
     }
     return {
@@ -112,6 +107,7 @@ export function createPluginHostPreferences(
   }
 
   const write = (next: StoredHostPreferences): void => {
+    loadedFromStorage = true
     memoryDisabled = new Set(next.disabledPluginIds)
     memoryActiveShell = next.activeShell
     memoryActiveTheme = next.activeTheme
@@ -121,9 +117,7 @@ export function createPluginHostPreferences(
         localStorage.setItem(storageKey, JSON.stringify(next))
       }
     } catch {
-      // Writes may fail (quota/security) while getItem still returns the stale
-      // snapshot. Keep memory authoritative so reads never fork from writes.
-      memoryOnly = true
+      // Writes may fail (quota/security); the in-memory snapshot stays authoritative.
     }
   }
 
@@ -708,25 +702,27 @@ export class PluginHost {
     this.recovery = beginPluginBoot(this.appBuild)
     const enabledIds: string[] = []
 
-    for (const entry of this.composition.plugins) {
-      const plugin = this.compositionPlugins.get(entry.id)
-      if (!plugin) throw new Error(`Composition module is not available: ${entry.id}`)
-      if (!this.runtime.get(entry.id)) {
-        const schema =
-          "configSchema" in plugin && plugin.configSchema !== undefined
-            ? plugin.configSchema
-            : plugin.manifest.configSchema
-        this.runtime.register(
-          plugin.manifest,
-          toRuntimeExecutable(plugin),
-          "builtin",
-          validatePluginConfig({ id: plugin.manifest.id, configSchema: schema }, entry.config)
-        )
+    this.runtime.batch(() => {
+      for (const entry of this.composition.plugins) {
+        const plugin = this.compositionPlugins.get(entry.id)
+        if (!plugin) throw new Error(`Composition module is not available: ${entry.id}`)
+        if (!this.runtime.get(entry.id)) {
+          const schema =
+            "configSchema" in plugin && plugin.configSchema !== undefined
+              ? plugin.configSchema
+              : plugin.manifest.configSchema
+          this.runtime.register(
+            plugin.manifest,
+            toRuntimeExecutable(plugin),
+            "builtin",
+            validatePluginConfig({ id: plugin.manifest.id, configSchema: schema }, entry.config)
+          )
+        }
+        const disabled = entry.disabled || this.preferences.isPluginDisabled(plugin.manifest.id)
+        if (disabled) this.runtime.stop(plugin.manifest.id)
+        else enabledIds.push(entry.id)
       }
-      const disabled = entry.disabled || this.preferences.isPluginDisabled(plugin.manifest.id)
-      if (disabled) this.runtime.stop(plugin.manifest.id)
-      else enabledIds.push(entry.id)
-    }
+    })
 
     await this.mountGroup(enabledIds)
     if (this.recovery.safeMode) {

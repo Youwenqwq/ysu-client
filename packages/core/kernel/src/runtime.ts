@@ -226,6 +226,8 @@ export class PluginRuntime {
   private readonly cleanupEpoch = new WeakMap<Set<Promise<void>>, number>()
   private disposed = false
   private disposal?: Promise<void>
+  private publishBatchDepth = 0
+  private publishDirty = false
 
   constructor() {
     this.state = {
@@ -989,7 +991,25 @@ export class PluginRuntime {
     }
   }
 
+  /** Coalesce synchronous state snapshot publications inside a bulk mutation. */
+  batch<T>(fn: () => T): T {
+    this.publishBatchDepth += 1
+    try {
+      return fn()
+    } finally {
+      this.publishBatchDepth -= 1
+      if (this.publishBatchDepth === 0 && this.publishDirty) {
+        this.publishDirty = false
+        this.publish()
+      }
+    }
+  }
+
   private publish(): void {
+    if (this.publishBatchDepth > 0) {
+      this.publishDirty = true
+      return
+    }
     const next = Array.from(this.plugins.values(), toState).sort((a, b) =>
       a.manifest.name.localeCompare(b.manifest.name)
     )

@@ -35,6 +35,11 @@ import {
   type ShellSidebarGroup,
   type ShellSidebarItem,
 } from "./nav-helpers"
+import {
+  canUsePageViewTransition,
+  PAGE_TRANSITION_STYLE,
+  resolveFallbackPageTransitionMode,
+} from "./page-transition"
 import { BackgroundPage } from "./pages/background-page"
 import { buildThemePreviewDocument, ThemePage } from "./pages/theme-page"
 import {
@@ -60,6 +65,7 @@ export {
   buildMobileBottomTabs,
   buildSidebarGroups,
   buildThemePreviewDocument,
+  canUsePageViewTransition,
   clampSidebarWidth,
   computeCardBgOpacity,
   DEFAULT_SIDEBAR_WIDTH,
@@ -68,9 +74,11 @@ export {
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
   NATIVE_WEBVIEW_CAPABILITY,
+  PAGE_TRANSITION_STYLE,
   parseDeepLink,
   resolveActivePageForLocation,
   resolveActiveScopedNavId,
+  resolveFallbackPageTransitionMode,
   shellDictionary,
   ThemePage,
   type AppearanceStoreState,

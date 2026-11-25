@@ -48,6 +48,11 @@ import "./slots-declare"
 import type { ShellDictionary } from "./dictionary"
 import type { ShellMobileTab, ShellSidebarGroup, ShellSidebarItem } from "./nav-helpers"
 import {
+  PAGE_TRANSITION_STYLE,
+  resolveFallbackPageTransitionMode,
+  usePageViewTransition,
+} from "./page-transition"
+import {
   buildCardStyleCss,
   computeCardBgOpacity,
   DEFAULT_SIDEBAR_WIDTH,
@@ -259,7 +264,6 @@ function BackgroundLayer({
           backgroundImage: `url(${backgroundUrl})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
-          backgroundAttachment: "fixed",
         }}
       >
         <div className="absolute inset-0" style={overlayStyle} />
@@ -406,14 +410,28 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [])
 
-  const chrome = useMemo(() => {
+  const resolvedChrome = useMemo(() => {
     // Navigation filters and the startup preference live outside uiSnapshot.
     void navRevision
     void startupPage
     return props.resolveChrome(location, uiSnapshot, locale)
   }, [locale, location, navRevision, props, startupPage, uiSnapshot])
 
+  const { snapshot: pageSnapshot, useViewTransition } = usePageViewTransition({
+    routeKey: resolvedChrome.routeKey,
+    chrome: resolvedChrome,
+    children: props.children,
+  })
+  const chrome = pageSnapshot.chrome
+  const pageChildren = pageSnapshot.children
+
   const hasBackground = Boolean(backgroundImage || backgroundUrl)
+  const fallbackTransitionMode = resolveFallbackPageTransitionMode({
+    fullscreen: chrome.fullscreen,
+    useViewTransition,
+    hasBackground,
+    isGlassCards: cardStyle === "glass",
+  })
   const showMobileThemeToggle = Boolean(
     chrome.activePage?.primary &&
     chrome.accountItems.some(
@@ -625,14 +643,15 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
         <div
           key={chrome.routeKey}
           data-shell-page-outlet=""
+          data-shell-transition={
+            fallbackTransitionMode === "none" ? undefined : fallbackTransitionMode
+          }
           className={cn(
             "flex flex-1 flex-col md:p-8",
-            chrome.fullscreen
-              ? "min-h-0 overflow-hidden"
-              : "animate-in p-4 duration-500 fade-in slide-in-from-bottom-2"
+            chrome.fullscreen ? "min-h-0 overflow-hidden" : "p-4"
           )}
         >
-          {props.children}
+          {pageChildren}
         </div>
       </main>
 
@@ -649,6 +668,7 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
   return (
     <BackLayerProvider registerBackHandler={props.registerBackHandler}>
       <TooltipProvider>
+        <style data-shell-page-transition="">{PAGE_TRANSITION_STYLE}</style>
         <BackgroundLayer
           backgroundUrl={backgroundUrl}
           hasBackground={hasBackground}

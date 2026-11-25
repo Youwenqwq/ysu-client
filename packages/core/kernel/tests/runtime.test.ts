@@ -694,4 +694,26 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
     expect(cleanupById.has(manifest.id)).toBe(false)
     await runtime.dispose()
   })
+
+  it("coalesces state notifications inside runtime.batch()", async () => {
+    const runtime = new PluginRuntime()
+    const listener = vi.fn()
+    const unsubscribe = runtime.subscribe(listener)
+
+    runtime.batch(() => {
+      runtime.register(makeManifest("example.batch-a"), () => {}, "builtin")
+      runtime.register(makeManifest("example.batch-b"), () => {}, "builtin")
+      runtime.register(makeManifest("example.batch-c"), () => {}, "builtin")
+    })
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(runtime.getSnapshot().map((item) => item.manifest.id)).toEqual([
+      "example.batch-a",
+      "example.batch-b",
+      "example.batch-c",
+    ])
+
+    unsubscribe()
+    await runtime.dispose()
+  })
 })
