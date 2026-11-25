@@ -1,6 +1,7 @@
 import {
   definePlugin,
   PLUGIN_API_VERSION,
+  resolveContributionText,
   type ObservableSource,
   type PluginHostPreferenceSnapshot,
   type PluginLocale,
@@ -29,7 +30,6 @@ import {
   isPagePrimary,
   resolveActivePageForLocation,
   resolveActiveScopedNavId,
-  resolveEntryText,
   type AppNavContribution,
   type ShellMobileTab,
   type ShellSidebarGroup,
@@ -230,13 +230,14 @@ export const uiShellPlugin = definePlugin<
       )
 
       const pageTitle = activePage
-        ? resolveEntryText(
-            activePage.dictionary,
-            activePage.titleKey,
-            activePage.title ?? activePage.id,
+        ? resolveContributionText({
+            dictionary: activePage.dictionary,
+            key: activePage.titleKey,
+            literal: activePage.title ?? activePage.id,
             locale,
-            (key, loc) => ctx.i18n.t(key, undefined, loc)
-          )
+            pluginId: activePage.pluginId,
+            i18n: ctx.i18n,
+          })
         : getAppName(locale)
 
       const showBack = activePage
@@ -254,7 +255,7 @@ export const uiShellPlugin = definePlugin<
         activePage,
         locale,
         groupLabel: groupLabelFor,
-        translateShared: (key, loc) => ctx.i18n.t(key, undefined, loc),
+        i18n: ctx.i18n,
         formatHref: (rawHref) => ctx.router.href(rawHref),
         pushTarget: (pluginId, pageId, params) => {
           ctx.router.push({
@@ -271,7 +272,7 @@ export const uiShellPlugin = definePlugin<
         activePage,
         locationParams: location.params,
         locale,
-        translateShared: (key, loc) => ctx.i18n.t(key, undefined, loc),
+        i18n: ctx.i18n,
         formatHref: (rawHref) => ctx.router.href(rawHref),
         replaceTarget: (pluginId, pageId, params) => {
           ctx.router.replace({

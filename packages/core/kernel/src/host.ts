@@ -57,41 +57,51 @@ export function createPluginHostPreferences(
   let memoryActiveShell: string | undefined
   let memoryActiveTheme: string | undefined
   let memoryStartupPage: string | undefined
+  // A failed write must not leave reads on the stale persisted value: the
+  // in-memory snapshot is authoritative for this host once persistence fails.
+  let memoryOnly = false
 
   const read = (): StoredHostPreferences => {
-    try {
-      if (typeof localStorage !== "undefined") {
-        const raw = localStorage.getItem(storageKey)
-        if (raw) {
-          const parsed: unknown = JSON.parse(raw)
-          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-            const disabled =
-              "disabledPluginIds" in parsed && Array.isArray(parsed.disabledPluginIds)
-                ? parsed.disabledPluginIds.filter((x): x is string => typeof x === "string")
-                : []
-            const activeShell =
-              "activeShell" in parsed && typeof parsed.activeShell === "string"
-                ? parsed.activeShell
-                : undefined
-            const activeTheme =
-              "activeTheme" in parsed && typeof parsed.activeTheme === "string"
-                ? parsed.activeTheme
-                : undefined
-            const startupPage =
-              "startupPage" in parsed && typeof parsed.startupPage === "string"
-                ? parsed.startupPage
-                : undefined
-            return {
-              disabledPluginIds: disabled,
-              ...(activeShell !== undefined ? { activeShell } : {}),
-              ...(activeTheme !== undefined ? { activeTheme } : {}),
-              ...(startupPage !== undefined ? { startupPage } : {}),
+    if (!memoryOnly) {
+      try {
+        if (typeof localStorage !== "undefined") {
+          const raw = localStorage.getItem(storageKey)
+          if (raw) {
+            const parsed: unknown = JSON.parse(raw)
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+              const disabled =
+                "disabledPluginIds" in parsed && Array.isArray(parsed.disabledPluginIds)
+                  ? parsed.disabledPluginIds.filter((x): x is string => typeof x === "string")
+                  : []
+              const activeShell =
+                "activeShell" in parsed && typeof parsed.activeShell === "string"
+                  ? parsed.activeShell
+                  : undefined
+              const activeTheme =
+                "activeTheme" in parsed && typeof parsed.activeTheme === "string"
+                  ? parsed.activeTheme
+                  : undefined
+              const startupPage =
+                "startupPage" in parsed && typeof parsed.startupPage === "string"
+                  ? parsed.startupPage
+                  : undefined
+              memoryDisabled = new Set(disabled)
+              memoryActiveShell = activeShell
+              memoryActiveTheme = activeTheme
+              memoryStartupPage = startupPage
+              return {
+                disabledPluginIds: disabled,
+                ...(activeShell !== undefined ? { activeShell } : {}),
+                ...(activeTheme !== undefined ? { activeTheme } : {}),
+                ...(startupPage !== undefined ? { startupPage } : {}),
+              }
             }
           }
         }
+      } catch {
+        // Fall back to in-memory state when localStorage is unavailable.
+        memoryOnly = true
       }
-    } catch {
-      // Fall back to in-memory state when localStorage is unavailable.
     }
     return {
       disabledPluginIds: Array.from(memoryDisabled),
@@ -111,7 +121,9 @@ export function createPluginHostPreferences(
         localStorage.setItem(storageKey, JSON.stringify(next))
       }
     } catch {
-      // In-memory state remains authoritative for this host instance.
+      // Writes may fail (quota/security) while getItem still returns the stale
+      // snapshot. Keep memory authoritative so reads never fork from writes.
+      memoryOnly = true
     }
   }
 
@@ -411,8 +423,9 @@ export class PluginHost {
       if (page.pluginId === id && page.route !== undefined) registeredRoutes.add(page.route)
     }
     if (this.runtime.get(id)?.source === "external") {
-      this.runtime.stop(id)
-      this.runtime.unregister(id)
+      // Await the plugin's async disposers before revoking its module/asset
+      // blob URLs; running cleanup must not observe a revoked entry module.
+      await this.runtime.unregisterAndWait(id)
     }
     this.external.get(id)?.dispose()
     this.external.delete(id)
@@ -434,6 +447,9 @@ export class PluginHost {
   }
 
   suspend(id: string): void {
+    if (this.composition.plugins.some((entry) => entry.id === id && entry.protected)) {
+      throw new Error(`Plugin is protected by the active composition: ${id}`)
+    }
     this.runtime.stop(id)
     this.removeStyles(id)
   }
@@ -453,7 +469,7 @@ export class PluginHost {
       await this.load(id, false, false)
     }
     markPluginStarted(id)
-    await this.runtime.startAndWait(id)
+    await this.runtime.startAndWait(id, this.pluginStartTimeoutMs)
     this.applyStyles(id)
     this.loadErrors.delete(id)
     this.preferences.setPluginDisabled(id, false)
@@ -618,7 +634,7 @@ export class PluginHost {
     wasDisabled: boolean
   ): Promise<void> {
     this.preferences.setPluginDisabled(id, wasDisabled)
-    if (this.runtime.get(id)?.source === "external") this.runtime.unregister(id)
+    if (this.runtime.get(id)?.source === "external") await this.runtime.unregisterAndWait(id)
     this.external.get(id)?.dispose()
     this.external.delete(id)
     this.removeStyles(id)

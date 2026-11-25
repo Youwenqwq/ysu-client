@@ -1,4 +1,13 @@
 import { describe, expect, it, vi } from "vitest"
+
+vi.mock("sonner", () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+    info: vi.fn(),
+  },
+}))
+
 import {
   BUILT_IN_ACADEMIC_SLICES,
   getEnabledSlices,
@@ -80,6 +89,47 @@ function jsonResponse(url: string, payload: unknown, status = 200) {
   })
 }
 
+/** Simulates a first-factor CAS login that lands on the interactive re-auth page. */
+function createMfaCasFetch(): JarFetch {
+  const cerBase = YSU_CONFIG.cas.cerBaseUrl
+  const casLoginUrl = `${cerBase}/authserver/login`
+
+  return async (jar, req) => {
+    if (req.url === `${cerBase}/authserver/index.do` && req.method === "GET") {
+      const cookies = await jar.getCookieString(req.url)
+      if (cookies.includes("CASTGC=TGT-mfa")) {
+        return textResponse(req.url, "", 302, {
+          location: `${cerBase}/personalInfo/index.html`,
+        })
+      }
+      return textResponse(req.url, "", 302, {
+        location: `${cerBase}/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true`,
+      })
+    }
+    if (req.url.startsWith(`${casLoginUrl}?service=`) && req.method === "GET") {
+      return textResponse(casLoginUrl, LOGIN_PAGE_HTML, 200, {
+        "content-type": "text/html",
+      })
+    }
+    if (req.url.includes("checkNeedCaptcha.htl")) {
+      return jsonResponse(req.url, { isNeed: false })
+    }
+    if (req.url.startsWith(casLoginUrl) && req.method === "POST") {
+      return textResponse(req.url, "", 302, {
+        location: `${cerBase}/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true`,
+      })
+    }
+    if (req.url.includes("reAuthLoginView.do")) {
+      return textResponse(req.url, "<html>reAuth</html>", 200, { "content-type": "text/html" })
+    }
+    if (req.url.includes("reAuthSubmit.do") && req.method === "POST") {
+      await jar.setCookie("CASTGC=TGT-mfa; Domain=cer.ysu.edu.cn; Path=/authserver", req.url)
+      return jsonResponse(req.url, { code: "reAuth_success" })
+    }
+    return emptyResponse(req.url)
+  }
+}
+
 /** Simulates a successful first-factor CAS login plus the status probe that verifies it. */
 function createDirectCasFetch(tgc = "TGT-direct"): JarFetch {
   const cerBase = YSU_CONFIG.cas.cerBaseUrl
@@ -124,6 +174,8 @@ describe("YSU SchoolProvider API v1 contract & grade scale", () => {
 
     expect(provider.id).toBe("ysu")
     expect(provider.name).toBe("燕山大学")
+    expect(provider.timeZone).toBe(YSU_CONFIG.timeZone)
+    expect(YSU_CONFIG.timeZone).toBe("Asia/Shanghai")
     expect(Object.getPrototypeOf(provider)).toBe(Object.prototype)
 
     for (const sliceKey of BUILT_IN_ACADEMIC_SLICES) {
@@ -885,11 +937,19 @@ describe("YSU SchoolProvider lifecycle, concurrency, relogin, and session expiry
 
     expect(secureStore.has(YSU_SECURE_KEY_CAS_TGC)).toBe(false)
     expect(authChecks).toBe(0)
+    expect(ctx.query.clearPersistent).toHaveBeenCalledWith({
+      providerId: "ysu",
+      username: "20230001",
+    })
 
     // Subsequent initialize runs fresh in the new generation
     await provider.initialize()
     await provider.logout()
     expect(ctx.session.getSnapshot().isAuthenticated).toBe(false)
+    expect(ctx.query.clearPersistent).toHaveBeenLastCalledWith({
+      providerId: "ysu",
+      username: "20230001",
+    })
   })
 
   it("relogins with credentials written after a login and keeps them", async () => {
@@ -1029,7 +1089,6 @@ describe("YSU SchoolProvider lifecycle, concurrency, relogin, and session expiry
   })
 
   it("completes relogin() via SMS MFA when CAS redirects to reAuthPage", async () => {
-    const casLoginUrl = `${YSU_CONFIG.cas.cerBaseUrl}/authserver/login`
     const mfaShow = vi.fn(async () => ({
       type: "code" as const,
       method: "sms",
@@ -1050,45 +1109,7 @@ describe("YSU SchoolProvider lifecycle, concurrency, relogin, and session expiry
         },
       },
       mfaShow,
-      fetchWithJar: async (jar, req) => {
-        if (
-          req.url === `${YSU_CONFIG.cas.cerBaseUrl}/authserver/index.do` &&
-          req.method === "GET"
-        ) {
-          const cookies = await jar.getCookieString(req.url)
-          if (cookies.includes("CASTGC=TGT-mfa")) {
-            return textResponse(req.url, "", 302, {
-              location: "https://cer.ysu.edu.cn/personalInfo/index.html",
-            })
-          }
-          return textResponse(req.url, "", 302, {
-            location:
-              "https://cer.ysu.edu.cn/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true",
-          })
-        }
-        if (req.url.startsWith(`${casLoginUrl}?service=`) && req.method === "GET") {
-          return textResponse(casLoginUrl, LOGIN_PAGE_HTML, 200, {
-            "content-type": "text/html",
-          })
-        }
-        if (req.url.includes("checkNeedCaptcha.htl")) {
-          return jsonResponse(req.url, { isNeed: false })
-        }
-        if (req.url.startsWith(casLoginUrl) && req.method === "POST") {
-          return textResponse(req.url, "", 302, {
-            location:
-              "https://cer.ysu.edu.cn/authserver/reAuthCheck/reAuthLoginView.do?isMultifactor=true",
-          })
-        }
-        if (req.url.includes("reAuthLoginView.do")) {
-          return textResponse(req.url, "<html>reAuth</html>", 200, { "content-type": "text/html" })
-        }
-        if (req.url.includes("reAuthSubmit.do") && req.method === "POST") {
-          await jar.setCookie("CASTGC=TGT-mfa; Domain=cer.ysu.edu.cn; Path=/authserver", req.url)
-          return jsonResponse(req.url, { code: "reAuth_success" })
-        }
-        return emptyResponse(req.url)
-      },
+      fetchWithJar: createMfaCasFetch(),
     })
 
     const provider = createYsuSchoolProvider({
@@ -1105,6 +1126,88 @@ describe("YSU SchoolProvider lifecycle, concurrency, relogin, and session expiry
     expect(mfaShow).toHaveBeenCalledOnce()
     expect(state.isAuthenticated).toBe(true)
     expect(state.sessionExpired).toBe(false)
+  })
+
+  it("does not write the shared session when relogin resolves after provider disposal", async () => {
+    const started = Promise.withResolvers<void>()
+    const gate = Promise.withResolvers<void>()
+    const direct = createDirectCasFetch("TGT-stale")
+    const fetchWithJar: JarFetch = async (jar, request) => {
+      if (
+        request.url.startsWith(`${YSU_CONFIG.cas.cerBaseUrl}/authserver/login`) &&
+        request.method === "POST"
+      ) {
+        started.resolve()
+        await gate.promise
+      }
+      return direct(jar, request)
+    }
+
+    const { ctx, state } = createTestContext({
+      initialState: {
+        activeSchoolId: "ysu",
+        username: "20230001",
+        credential: makeStoredCasJson(),
+        isAuthenticated: true,
+        sessionExpired: true,
+        artifacts: {
+          "remembered-username": "20230001",
+          "remembered-password": "secret-password",
+        },
+      },
+      fetchWithJar,
+    })
+
+    const provider = createYsuSchoolProvider({
+      session: ctx.session,
+      http: ctx.http,
+      storage: ctx.storage,
+      native: ctx.native,
+      i18n: ctx.i18n,
+      query: ctx.query,
+      mfa: ctx.mfa,
+    })
+
+    const credentialBefore = state.credential
+    const artifactsBefore = { ...state.artifacts }
+    const relogin = provider.relogin()
+    await started.promise
+    await provider.dispose()
+    gate.resolve()
+
+    await expect(relogin).resolves.toBe(false)
+    expect(state.credential).toBe(credentialBefore)
+    expect(state.artifacts).toEqual(artifactsBefore)
+  })
+
+  it("fails interactive MFA relogin explicitly when no MFA UI is injected", async () => {
+    const { ctx, state } = createTestContext({
+      initialState: {
+        activeSchoolId: "ysu",
+        username: "20230001",
+        credential: makeStoredCasJson(),
+        isAuthenticated: true,
+        sessionExpired: true,
+        artifacts: {
+          "remembered-username": "20230001",
+          "remembered-password": "secret-password",
+        },
+      },
+      fetchWithJar: createMfaCasFetch(),
+    })
+
+    const provider = createYsuSchoolProvider({
+      session: ctx.session,
+      http: ctx.http,
+      storage: ctx.storage,
+      native: ctx.native,
+      i18n: ctx.i18n,
+      query: ctx.query,
+    })
+
+    await expect(provider.relogin()).resolves.toBe(false)
+    expect(state.isAuthenticated).toBe(true)
+    expect(state.credential).toBe(makeStoredCasJson())
   })
 
   it("rejects unsupported MFA methods on auth.submitMfaCode with FEATURE_NOT_SUPPORTED", async () => {

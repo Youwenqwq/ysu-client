@@ -138,6 +138,7 @@ export const ysuPluginTranslations: PluginTranslations = {
     },
     autoLogin: {
       captchaRequired: "当前登录需要图形验证码，请手动重新登录",
+      mfaUnavailable: "当前登录需要二次验证，但未配置验证界面，请手动重新登录",
     },
     networkActivity: {
       ysu: {
@@ -183,6 +184,7 @@ export const ysuPluginTranslations: PluginTranslations = {
     },
     autoLogin: {
       captchaRequired: "Captcha is required, please sign in manually",
+      mfaUnavailable: "Two-factor verification is required but no verification UI is available",
     },
     networkActivity: {
       ysu: {

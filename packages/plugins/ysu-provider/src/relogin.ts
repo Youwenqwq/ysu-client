@@ -55,7 +55,8 @@ export function createRelogin(
   ctx: YSUContext,
   cas: CASProtocol,
   auth: CasAuthApi,
-  lifecycle: YSUSessionLifecycle
+  lifecycle: YSUSessionLifecycle,
+  lifecycleGeneration?: () => number
 ): ReloginApi {
   const { withAuthTransition } = ctx.transition
   let inflightAutoLogin: Promise<boolean> | null = null
@@ -64,42 +65,62 @@ export function createRelogin(
     if (inflightAutoLogin) return inflightAutoLogin
 
     const attempt = (async () => {
+      const generation = lifecycleGeneration?.()
+      // A retired or hot-replaced provider must never write the shared session.
+      const isActive = (): boolean =>
+        lifecycleGeneration === undefined || lifecycleGeneration() === generation
       const remembered = loadRememberedCredentials(ctx)
       if (!remembered) return false
 
       return withAuthTransition(async () => {
         try {
+          if (!isActive()) return false
           lifecycle.resetDerivedSessions()
           await auth.prepareLogin()
+          if (!isActive()) return false
           if (await auth.checkCaptchaNeeded(remembered.username)) {
+            if (!isActive()) return false
             toast.error(text(ctx.i18n, "autoLogin.captchaRequired"))
             return false
           }
+          if (!isActive()) return false
 
           const step1 = await cas.loginStep1(remembered.username, remembered.password)
+          if (!isActive()) return false
 
           if (step1.authenticated) {
             const credential = await CASCredential.fromJar(cas.getJar(), ctx.urls.casCookieDomain)
+            if (!isActive()) return false
             saveReloginCredential(ctx, auth, remembered, credential.toJSON())
+            if (!isActive()) return false
             await lifecycle.initializeSession()
             return true
           }
 
           if (step1.needsMfa) {
+            if (!isActive()) return false
+            if (!ctx.mfa) {
+              toast.error(text(ctx.i18n, "autoLogin.mfaUnavailable"))
+              return false
+            }
             try {
               const result = await ctx.mfa.show({
                 username: remembered.username,
                 methods: getYSUMfaMethods(),
               })
+              if (!isActive()) return false
               if (result.type === "wechat") {
                 if (!(await auth.isAuthenticated())) return false
+                if (!isActive()) return false
                 const credential = await CASCredential.fromJar(
                   cas.getJar(),
                   ctx.urls.casCookieDomain
                 )
+                if (!isActive()) return false
                 if (credential.cookies.length > 0) {
                   saveReloginCredential(ctx, auth, remembered, credential.toJSON())
                 }
+                if (!isActive()) return false
                 await lifecycle.initializeSession()
                 return true
               }
@@ -114,7 +135,9 @@ export function createRelogin(
                 },
                 result.code
               )
+              if (!isActive()) return false
               saveReloginCredential(ctx, auth, remembered, credential.toJSON())
+              if (!isActive()) return false
               await lifecycle.initializeSession()
               return true
             } catch {

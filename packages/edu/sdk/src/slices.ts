@@ -261,6 +261,8 @@ export const BUILT_IN_ACADEMIC_SLICES = [
 export interface SchoolProvider {
   readonly id: string
   readonly name: string
+  /** IANA school wall-clock timezone used by academic date/time presentations. */
+  readonly timeZone: string
   readonly supportedPlugins?: readonly string[]
   readonly slices: Partial<AcademicSliceMap>
   readonly diagnostics?: ProviderDiagnostics

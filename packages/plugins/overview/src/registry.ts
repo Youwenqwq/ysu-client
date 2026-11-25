@@ -7,14 +7,12 @@ import type {
 import {
   createObservableSource,
   PLUGIN_SERVICE_SCOPE,
-  resolveDictionaryMessage,
+  resolveContributionText,
   resolvePluginSlots,
   resolvePluginStorage,
   trackPluginRegistration,
   type ChildrenSpec,
-  type DefinedDictionary,
   type DerivedComponentProps,
-  type DictionaryMessages,
   type ObservableSource,
   type PluginI18nService,
   type PluginLocale,
@@ -41,45 +39,21 @@ function isStoreDefinition(
   )
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function isDefinedDictionary(value: unknown): value is DefinedDictionary {
-  return isPlainRecord(value) && isPlainRecord(value.zh) && isPlainRecord(value.en)
-}
-
-function isDictionaryMessages(value: unknown): value is DictionaryMessages {
-  return isPlainRecord(value)
-}
-
 export function resolveOverviewWidgetText(
   widget: OverviewWidgetContribution,
   kind: "title" | "description",
   locale: PluginLocale,
   i18nRegistry?: Pick<PluginI18nService, "translate">
 ): string {
-  const key = kind === "title" ? widget.titleKey : widget.descriptionKey
-  const literal = kind === "title" ? widget.title : widget.description
-
-  if (key) {
-    if (isDefinedDictionary(widget.dictionary)) {
-      const primary = locale === "en" ? widget.dictionary.en : widget.dictionary.zh
-      const fallback = locale === "en" ? widget.dictionary.zh : widget.dictionary.en
-      const resolved =
-        resolveDictionaryMessage(primary, key) ?? resolveDictionaryMessage(fallback, key)
-      if (resolved !== undefined) return resolved
-    } else if (isDictionaryMessages(widget.dictionary)) {
-      const resolved = resolveDictionaryMessage(widget.dictionary, key)
-      if (resolved !== undefined) return resolved
-    }
-    if (i18nRegistry) {
-      const translated = i18nRegistry.translate(widget.pluginId, key, locale)
-      if (translated !== key) return translated
-    }
-  }
-
-  return literal ?? key ?? widget.id
+  return resolveContributionText({
+    dictionary: widget.dictionary,
+    key: kind === "title" ? widget.titleKey : widget.descriptionKey,
+    literal: kind === "title" ? widget.title : widget.description,
+    fallback: widget.id,
+    locale,
+    pluginId: widget.pluginId,
+    i18n: i18nRegistry,
+  })
 }
 
 export function overviewWidgetSlotKey(pluginId: string, widgetId: string): string {

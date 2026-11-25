@@ -9,7 +9,6 @@ import {
   type StudentInfo,
 } from "@orahako/academic-sdk"
 import {
-  createObservableSource,
   definePlugin,
   isCapacitor,
   PLUGIN_API_VERSION,
@@ -26,7 +25,7 @@ import {
   StudentProfileHeader,
 } from "./components"
 import { authUiDictionary } from "./dictionary"
-import { LoginPage, type AuthSchoolChoice, type LoginPageInject } from "./login-page"
+import { LoginPage, type LoginPageInject } from "./login-page"
 import "./slots"
 import {
   createLoginRateLimiter,
@@ -52,7 +51,6 @@ const LONG_TTL_MS = 1000 * 60 * 60 * 24 * 7
 const DEFAULT_CAPACITOR_RETRY_DELAY_MS = 800
 
 export interface AuthUiPluginConfig extends PluginConfig {
-  readonly schools?: readonly AuthSchoolChoice[]
   readonly defaultLanding?: string
   readonly capacitorRetryDelayMs?: number
   readonly canRemember?: boolean
@@ -77,7 +75,6 @@ export {
   SessionExpiredBanner,
   StaleIndicator,
   StudentProfileHeader,
-  type AuthSchoolChoice,
   type LoginRateLimitState,
   type RateLimitResult,
   type RememberedCredentialEntry,
@@ -143,19 +140,6 @@ export const authUiPlugin = definePlugin({
         defaultLanding: { type: "string", minLength: 1 },
         capacitorRetryDelayMs: { type: "number", minimum: 0 },
         canRemember: { type: "boolean" },
-        schools: {
-          type: "array",
-          items: {
-            type: "object",
-            required: ["id", "name"],
-            properties: {
-              id: { type: "string", minLength: 1 },
-              name: { type: "string", minLength: 1 },
-              nameEn: { type: "string", minLength: 1 },
-            },
-            additionalProperties: false,
-          },
-        },
       },
       additionalProperties: false,
     },
@@ -192,7 +176,6 @@ export const authUiPlugin = definePlugin({
     query.registerPolicy("student-info", { ttl: LONG_TTL_MS, persist: true })
     const rateLimiter = createLoginRateLimiter(storage)
     const rememberStore = rememberedCredentialsStore.create(storage)
-    const providersRevision = createObservableSource(0)
     const retryDelayMs = config.capacitorRetryDelayMs ?? DEFAULT_CAPACITOR_RETRY_DELAY_MS
 
     const applyRememberedCredential = (
@@ -216,38 +199,17 @@ export const authUiPlugin = definePlugin({
 
     const detachProviders = providers.subscribe(() => {
       if (disposed) return
-      providersRevision.set(providersRevision.getSnapshot() + 1)
       ensureProviderInitialized()
     })
 
-    const listSchools = (): readonly AuthSchoolChoice[] => {
-      const configured = config.schools ?? []
-      const byId = new Map<string, AuthSchoolChoice>()
-      for (const item of configured) {
-        byId.set(item.id, item)
-      }
-      const activeProvider = provider.getSnapshot().provider
-      for (const id of providers.listProviders()) {
-        if (!byId.has(id)) {
-          byId.set(id, {
-            id,
-            name: activeProvider?.id === id ? activeProvider.name : id,
-          })
-        }
-      }
-      return Array.from(byId.values())
-    }
-
-    const selectSchoolSafe = (schoolId: string): SchoolProvider | null => {
-      if (!schoolId) return null
-      if (!providers.hasProvider(schoolId)) {
-        session.activateSchool(schoolId)
-        return null
-      }
+    const prepareProvider = async (): Promise<SchoolProvider | null> => {
+      if (disposed) return null
+      const sessionSnap = session.getSnapshot()
+      const schoolId = sessionSnap.activeSchoolId ?? provider.getSnapshot().schoolId
+      if (schoolId && !providers.hasProvider(schoolId)) return null
+      if (!schoolId && providers.listProviders().length === 0) return null
       try {
-        const selected = provider.selectSchool(schoolId)
-        void provider.initialize().catch(() => {})
-        return selected
+        return disposed ? null : await provider.initialize()
       } catch {
         return null
       }
@@ -363,8 +325,18 @@ export const authUiPlugin = definePlugin({
       }
       rateLimiter.recordLoginAttempt()
 
+      const before = provider.getSnapshot()
+      const generation = before.generation
+      const target = before.provider
+      const isCurrent = (): boolean => {
+        if (disposed) return false
+        const current = provider.getSnapshot()
+        return current.generation === generation && current.provider === target
+      }
+
       try {
         const success = await provider.relogin()
+        if (!isCurrent()) return
         if (success) {
           toast.success(t("login.loginSuccess"))
           return
@@ -372,6 +344,7 @@ export const authUiPlugin = definePlugin({
       } catch {
         // Fall through to clean logout & redirect when quick relogin cannot recover session.
       }
+      if (!isCurrent()) return
       await provider.logout()
       router.replace({ route: "login" })
     }
@@ -385,17 +358,6 @@ export const authUiPlugin = definePlugin({
       }
       toast.success(t("session.logoutSuccess"))
       router.replace({ route: "login" })
-    }
-
-    const performSwitchSchool = (nextSchoolId?: string): void => {
-      if (nextSchoolId) {
-        selectSchoolSafe(nextSchoolId)
-        if (!session.getSnapshot().isAuthenticated) {
-          router.push({ route: "login" })
-        }
-        return
-      }
-      router.push({ route: "login" })
     }
 
     ctx.on("provider/ready", (snapshot) => {
@@ -457,12 +419,10 @@ export const authUiPlugin = definePlugin({
           hooks: {
             session: session.state,
             provider: provider.state,
-            providersRevision,
             rememberHydrated: rememberStore.hydrated,
           },
           canRemember: config.canRemember ?? isCapacitor(),
-          listSchools,
-          selectSchool: selectSchoolSafe,
+          prepareProvider,
           setCredential: (input, remembered) => {
             checkedReadyGeneration = -1
             session.setCredential(input)
@@ -554,12 +514,9 @@ export const authUiPlugin = definePlugin({
           inject: () => ({
             hooks: {
               session: session.state,
-              providersRevision,
             },
             showLogoutConfirm: true,
-            listSchools,
             relogin: performRelogin,
-            switchSchool: performSwitchSchool,
             logout: performLogout,
             openLogin: () => {
               router.push({ route: "login" })
@@ -580,12 +537,9 @@ export const authUiPlugin = definePlugin({
           inject: () => ({
             hooks: {
               session: session.state,
-              providersRevision,
             },
             showLogoutConfirm: true,
-            listSchools,
             relogin: performRelogin,
-            switchSchool: performSwitchSchool,
             logout: performLogout,
             openLogin: () => {
               router.push({ route: "login" })

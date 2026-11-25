@@ -14,6 +14,7 @@ function makeProvider(id: string, name = id): SchoolProvider {
   return defineSchoolProvider({
     id,
     name,
+    timeZone: "Asia/Shanghai",
     slices: {},
     initialize: async () => {},
     reset: async () => {},

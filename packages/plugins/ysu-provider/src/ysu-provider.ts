@@ -267,13 +267,15 @@ export interface YsuSchoolProvider extends SchoolProvider {
 }
 
 export function createYsuSchoolProvider(source: YSUContextSource): YsuSchoolProvider {
-  const runtime = createYSUProviderRuntime(source)
+  let lifecycleGeneration = 0
+  const runtime = createYSUProviderRuntime(source, {
+    lifecycleGeneration: () => lifecycleGeneration,
+  })
   const config = runtime.ctx.config
   const hasLabSchedule = config.features.hasLabSchedule
   const hasMobile = config.features.hasMobile
   const hasMfa = config.features.hasMfa
 
-  let lifecycleGeneration = 0
   let initialized = false
   let pendingInit: { readonly generation: number; readonly promise: Promise<void> } | null = null
 
@@ -1092,6 +1094,7 @@ export function createYsuSchoolProvider(source: YSUContextSource): YsuSchoolProv
   return defineSchoolProvider({
     id: config.id,
     name: config.name,
+    timeZone: config.timeZone,
     slices,
     diagnostics: runtime.diagnostics,
     async warmup(): Promise<void> {

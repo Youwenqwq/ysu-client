@@ -30,10 +30,15 @@ function Page() {
   return null
 }
 
-function createFakeBrowserWindow(initialHref = "/") {
+function createFakeBrowserWindow(
+  initialHref = "/",
+  options: { readonly deferPopState?: boolean } = {}
+) {
   let currentPath = "/"
   let currentSearch = ""
   let currentState: unknown = undefined
+  let backCalls = 0
+  let deferredPopState: { href: string; state: unknown } | null = null
   const listeners = new Set<(event: PopStateEvent) => void>()
   const stack: Array<{ href: string; state: unknown }> = [{ href: initialHref, state: undefined }]
   let idx = 0
@@ -73,9 +78,14 @@ function createFakeBrowserWindow(initialHref = "/") {
         syncFromHref(nextHref)
       },
       back() {
+        backCalls += 1
         if (idx > 0) {
           idx -= 1
           const item = stack[idx]!
+          if (options.deferPopState) {
+            deferredPopState = item
+            return
+          }
           currentState = item.state
           syncFromHref(item.href)
           for (const listener of listeners) {
@@ -95,6 +105,18 @@ function createFakeBrowserWindow(initialHref = "/") {
   return {
     window: win,
     listenerCount: () => listeners.size,
+    backCallCount: () => backCalls,
+    hasDeferredPopState: () => deferredPopState !== null,
+    flushPopState: () => {
+      if (!deferredPopState) return
+      const item = deferredPopState
+      deferredPopState = null
+      currentState = item.state
+      syncFromHref(item.href)
+      for (const listener of listeners) {
+        listener({ state: item.state } as PopStateEvent)
+      }
+    },
     triggerPopState: (href: string, state?: unknown) => {
       currentState = state
       syncFromHref(href)
@@ -286,6 +308,100 @@ describe("PluginRouter & routerRuntimePlugin", () => {
     await vi.waitFor(() => expect(router.current.getSnapshot().route).toBe("home"))
     expect(guard).toHaveBeenCalledTimes(1)
     router.dispose()
+  })
+
+  it("keeps sync-guard back single-flight until the asynchronous popstate arrives", () => {
+    const browser = createFakeBrowserWindow("/?route=home", { deferPopState: true })
+    const router = new PluginRouter({ window: browser.window })
+    router.push("detail")
+
+    const guard = vi.fn(() => true)
+    router.registerBackGuard(guard)
+
+    router.back()
+    router.back()
+    router.back()
+    expect(guard).toHaveBeenCalledTimes(1)
+    expect(browser.backCallCount()).toBe(1)
+    expect(browser.hasDeferredPopState()).toBe(true)
+    expect(router.current.getSnapshot().route).toBe("home")
+
+    browser.flushPopState()
+    expect(router.current.getSnapshot().route).toBe("home")
+    expect(browser.window.history.state).toMatchObject({
+      orahakoIndex: 0,
+      currentHref: "/?route=home",
+    })
+
+    // The lock was released by the popstate handler, so a later back runs again.
+    router.push("grades")
+    router.back()
+    expect(guard).toHaveBeenCalledTimes(2)
+    expect(browser.backCallCount()).toBe(2)
+    router.dispose()
+  })
+
+  it("keeps async-guard back single-flight across guard resolution and popstate", async () => {
+    const browser = createFakeBrowserWindow("/?route=home", { deferPopState: true })
+    const router = new PluginRouter({ window: browser.window })
+    router.push("detail")
+
+    const guardGate = Promise.withResolvers<boolean>()
+    const guard = vi.fn(() => guardGate.promise)
+    router.registerBackGuard(guard)
+
+    router.back()
+    router.back()
+    expect(guard).toHaveBeenCalledTimes(1)
+    expect(browser.backCallCount()).toBe(0)
+
+    guardGate.resolve(true)
+    await vi.waitFor(() => {
+      expect(browser.backCallCount()).toBe(1)
+      expect(router.current.getSnapshot().route).toBe("home")
+    })
+    expect(browser.hasDeferredPopState()).toBe(true)
+
+    // Guard already resolved, but the browser traversal is still in flight.
+    router.back()
+    router.back()
+    expect(guard).toHaveBeenCalledTimes(1)
+    expect(browser.backCallCount()).toBe(1)
+
+    browser.flushPopState()
+    router.push("editor")
+    router.back()
+    await vi.waitFor(() => {
+      expect(guard).toHaveBeenCalledTimes(2)
+      expect(browser.backCallCount()).toBe(2)
+    })
+    router.dispose()
+  })
+
+  it("releases the back lock when the browser never emits the matching popstate", () => {
+    vi.useFakeTimers()
+    try {
+      const browser = createFakeBrowserWindow("/?route=home", { deferPopState: true })
+      const router = new PluginRouter({ window: browser.window })
+      router.push("detail")
+
+      const guard = vi.fn(() => true)
+      router.registerBackGuard(guard)
+
+      router.back()
+      router.back()
+      expect(guard).toHaveBeenCalledTimes(1)
+      expect(browser.backCallCount()).toBe(1)
+
+      vi.advanceTimersByTime(1_500)
+      router.push("grades")
+      router.back()
+      expect(guard).toHaveBeenCalledTimes(2)
+      expect(browser.backCallCount()).toBe(2)
+      router.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("treats rejected async back guards as vetoes and releases the in-flight lock", async () => {

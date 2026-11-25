@@ -110,6 +110,7 @@ describe("SchoolProvider & AcademicSliceMap helpers", () => {
   const provider: SchoolProvider = defineSchoolProvider({
     id: "ysu",
     name: "燕山大学",
+    timeZone: "Asia/Shanghai",
     supportedPlugins: ["orahako.schedule", "orahako.grades"],
     slices: {
       auth: {

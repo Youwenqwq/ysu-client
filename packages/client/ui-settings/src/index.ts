@@ -1,6 +1,7 @@
 import {
   definePlugin,
   PLUGIN_API_VERSION,
+  resolveContributionText,
   type ObservableSource,
   type PluginHostPreferenceSnapshot,
   type PluginLocale,
@@ -19,7 +20,6 @@ import {
   settingsStore,
   type SettingsStoreState,
 } from "./store"
-import { resolveContributionText } from "./translate-helper"
 
 export {
   applyCustomUserAgentHeader,
@@ -70,25 +70,27 @@ export const uiSettingsPlugin = definePlugin({
     )
 
     const resolveCategoryTitle = (category: PluginSettingsCategory, locale: PluginLocale): string =>
-      resolveContributionText(
-        category.dictionary,
-        category.titleKey,
-        category.title ?? category.id,
+      resolveContributionText({
+        dictionary: category.dictionary,
+        key: category.titleKey,
+        literal: category.title ?? category.id,
         locale,
-        ctx.i18n
-      )
+        pluginId: category.pluginId,
+        i18n: ctx.i18n,
+      })
 
     const resolveCategoryDescription = (
       category: PluginSettingsCategory,
       locale: PluginLocale
     ): string =>
-      resolveContributionText(
-        category.dictionary,
-        category.descriptionKey,
-        category.description,
+      resolveContributionText({
+        dictionary: category.dictionary,
+        key: category.descriptionKey,
+        literal: category.description,
         locale,
-        ctx.i18n
-      )
+        pluginId: category.pluginId,
+        i18n: ctx.i18n,
+      })
 
     ctx.ui.registerPage(
       {

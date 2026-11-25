@@ -292,9 +292,10 @@ describe("ysu.provider manifest & plugin lifecycle", () => {
       required: true,
       entry: "index.js",
       description: "燕山大学 CAS / 教务 / 移动端 / 缴费平台 Provider",
-      inject: ["i18n", "storage", "providers", "http", "session", "query", "native", "mfa"],
+      inject: ["i18n", "storage", "providers", "http", "session", "query", "native"],
     })
     expect(manifest.apiVersion).toBe(1)
+    expect(ysuProviderPlugin.optionalInject).toEqual(["mfa"])
 
     const env = createTestRuntimeEnvironment()
     await startAllBuiltins(env.kernel)

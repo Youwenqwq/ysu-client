@@ -11,10 +11,14 @@ import {
   sessionRuntimePlugin,
   SHORT_TTL_MS,
 } from "@orahako/academic-runtime"
-import { defineSchoolProvider, type SchoolProvider } from "@orahako/academic-sdk"
+import {
+  defineSchoolProvider,
+  type OverviewWidgetContribution,
+  type SchoolProvider,
+} from "@orahako/academic-sdk"
 import { PluginRuntime } from "@orahako/kernel"
 import { StatelessHttpService } from "@orahako/runtime-http"
-import { i18nRegistryPlugin } from "@orahako/runtime-i18n"
+import { i18nRegistryPlugin, PluginI18nRegistry } from "@orahako/runtime-i18n"
 import { navigationRuntimePlugin, routerRuntimePlugin } from "@orahako/runtime-router"
 import { settingsRegistryPlugin, type PluginSettingsRegistry } from "@orahako/runtime-settings"
 import {
@@ -37,6 +41,7 @@ import {
   OVERVIEW_PROFILE_WIDGET_ID,
   OVERVIEW_WEEK_SUMMARY_WIDGET_ID,
   overviewPlugin,
+  resolveOverviewWidgetText,
 } from "../src"
 
 class MiniDomNode {
@@ -245,6 +250,7 @@ describe("@orahako/plugin-overview ownership, single store instantiation & keyed
     const fullProvider: SchoolProvider = defineSchoolProvider({
       id: "full-school",
       name: "全功能大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         studentProfile: {
           getStudentInfo: async () => ({
@@ -284,6 +290,7 @@ describe("@orahako/plugin-overview ownership, single store instantiation & keyed
     const restrictedProvider: SchoolProvider = defineSchoolProvider({
       id: "restricted-school",
       name: "受限大学",
+      timeZone: "Asia/Shanghai",
       supportedPlugins: [OVERVIEW_PLUGIN_ID], // excludes feature.card-plugin
       slices: {
         timetable: {
@@ -549,5 +556,55 @@ describe("@orahako/plugin-overview ownership, single store instantiation & keyed
     expect(rootQuery.policy("current-week")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
     expect(rootQuery.policy("term-calendar")).toEqual({ ttl: DEFAULT_TTL_MS, persist: false })
     runtime.dispose()
+  })
+
+  it("resolves dictionary-free widget labels from the contributing plugin's i18n namespace", () => {
+    const runtime = new PluginRuntime()
+    const registry = new PluginI18nRegistry({ defaultLocale: "zh" })
+    runtime.context.set("i18n", registry)
+
+    const contributor = definePlugin({
+      manifest: {
+        id: "feature.dictionary-free",
+        name: "Dictionary-free",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+        inject: ["i18n"],
+      },
+      inject: ["i18n"] as const,
+      apply(ctx) {
+        ctx.i18n.register({
+          zh: { widgetTitle: "无字典标题" },
+          en: { widgetTitle: "Dictionary-free title" },
+        })
+      },
+    })
+
+    try {
+      runtime.register(contributor, "builtin")
+      runtime.start(contributor.manifest.id)
+
+      const widget = {
+        id: "dictionary-free",
+        pluginId: contributor.manifest.id,
+        titleKey: "widgetTitle",
+        icon: () => null,
+        region: "content",
+        defaultVisible: true,
+        component: () => null,
+      } as unknown as OverviewWidgetContribution
+
+      expect(resolveOverviewWidgetText(widget, "title", "en", registry)).toBe(
+        "Dictionary-free title"
+      )
+      expect(resolveOverviewWidgetText(widget, "title", "zh", registry)).toBe("无字典标题")
+      // Without i18n or literal text the key survives; no other plugin's label leaks in.
+      expect(resolveOverviewWidgetText(widget, "title", "en")).toBe("widgetTitle")
+    } finally {
+      runtime.stop(contributor.manifest.id)
+      runtime.dispose()
+    }
   })
 })

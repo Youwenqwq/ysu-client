@@ -4,6 +4,7 @@ import {
   createTranslator,
   defineDictionary,
   defineStore,
+  resolveContributionText,
   type PluginKeyValueStorage,
   type PluginLocale,
   type PluginStorageService,
@@ -240,5 +241,81 @@ describe("defineDictionary & typed Translator", () => {
       })
     }
     expect(dict.zh.title).toBe("课程表")
+  })
+})
+
+describe("resolveContributionText", () => {
+  it("resolves the contributing plugin's namespace when no dictionary is present", () => {
+    const translations: Record<string, Record<string, string>> = {
+      "feature.card": { title: "Card Balance", desc: "Live balance" },
+      "orahako.overview": { title: "Overview" },
+    }
+    const translate = vi.fn((pluginId: string, key: string) => translations[pluginId]?.[key] ?? key)
+
+    expect(
+      resolveContributionText({
+        key: "title",
+        literal: "校园卡余额",
+        fallback: "balance-card",
+        locale: "en",
+        pluginId: "feature.card",
+        i18n: { translate },
+      })
+    ).toBe("Card Balance")
+
+    // The consumer's own namespace must never be used for the contribution.
+    expect(translate).toHaveBeenCalledWith("feature.card", "title", "en")
+    expect(translate).not.toHaveBeenCalledWith(
+      "orahako.overview",
+      expect.anything(),
+      expect.anything()
+    )
+  })
+
+  it("prefers the dictionary, then literal text, the key and the final fallback", () => {
+    const dictionary = defineDictionary({
+      zh: { title: "课程表" },
+      en: { title: "Schedule" },
+    })
+    const translate = vi.fn((_pluginId: string, key: string) => key)
+
+    expect(
+      resolveContributionText({
+        dictionary,
+        key: "title",
+        literal: "课表",
+        locale: "en",
+        pluginId: "feature.schedule",
+      })
+    ).toBe("Schedule")
+
+    expect(
+      resolveContributionText({
+        key: "missing",
+        literal: "课表",
+        locale: "zh",
+        pluginId: "feature.schedule",
+        i18n: { translate },
+      })
+    ).toBe("课表")
+
+    expect(
+      resolveContributionText({
+        key: "missing",
+        fallback: "widget-id",
+        locale: "zh",
+        pluginId: "feature.schedule",
+        i18n: { translate },
+      })
+    ).toBe("missing")
+
+    expect(
+      resolveContributionText({
+        fallback: "widget-id",
+        locale: "zh",
+        pluginId: "feature.schedule",
+        i18n: { translate },
+      })
+    ).toBe("widget-id")
   })
 })

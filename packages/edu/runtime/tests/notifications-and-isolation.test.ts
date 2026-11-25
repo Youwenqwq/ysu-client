@@ -327,6 +327,7 @@ describe("academicRuntimePlugins bundle & non-academic composition isolation", (
           defineSchoolProvider({
             id: "ysu",
             name: "燕山大学",
+            timeZone: "Asia/Shanghai",
             slices: {
               studentProfile: {
                 getStudentInfo: async () => ({

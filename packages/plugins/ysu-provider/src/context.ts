@@ -108,7 +108,7 @@ export interface YSUContext {
   readonly native: PluginNativeService
   readonly i18n: PluginI18nService
   readonly query: QueryService
-  readonly mfa: MfaService
+  readonly mfa?: MfaService
   readonly transition: AuthTransitionQueue
   readonly appVersion: string
 }
@@ -120,7 +120,7 @@ export interface YSUContextSource {
   readonly native: PluginNativeService
   readonly i18n: PluginI18nService
   readonly query: QueryService
-  readonly mfa: MfaService
+  readonly mfa?: MfaService
   readonly config?: YSUConfig
   readonly transition?: AuthTransitionQueue
   readonly appVersion?: string

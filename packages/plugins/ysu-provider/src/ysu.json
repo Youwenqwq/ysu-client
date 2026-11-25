@@ -2,6 +2,7 @@
   "id": "ysu",
   "name": "燕山大学",
   "nameEn": "Yanshan University",
+  "timeZone": "Asia/Shanghai",
   "cas": {
     "cerBaseUrl": "https://cer.ysu.edu.cn",
     "aesChars": "ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678",

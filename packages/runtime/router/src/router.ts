@@ -23,6 +23,7 @@ export const ROUTER_RUNTIME_PLUGIN_ID = "orahako.runtime.router"
 const HISTORY_INDEX_KEY = "orahakoIndex"
 const HISTORY_KEY_KEY = "orahakoKey"
 const HISTORY_HREF_KEY = "currentHref"
+const POPSTATE_FALLBACK_MS = 1_000
 
 export interface RouterRuntimeConfig {
   readonly basePath?: string
@@ -151,6 +152,9 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
   private readonly backFallbacks: RouterBackFallback[] = []
   private index = 0
   private backInFlight = false
+  private popStatePending = false
+  private popStateToken = 0
+  private popStateWatchdog: ReturnType<typeof setTimeout> | null = null
   private disposed = false
   private hardwareListener?: HardwareBackListenerHandle
   private readonly handlePopState: (event: PopStateEvent) => void
@@ -177,27 +181,39 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
 
     this.handlePopState = (event: PopStateEvent) => {
       if (this.disposed || !this.browserWindow) return
-      const href =
-        `${this.browserWindow.location.pathname || "/"}${this.browserWindow.location.search}`
-      const nextLocation = parseRouteLocation(href)
-      const stored = readHistoryState(event.state ?? this.browserWindow.history.state)
-      if (stored && stored.href === nextLocation.href) {
-        this.entries.set(stored.index, { key: stored.key, href: stored.href })
-        this.index = stored.index
-      } else {
-        const matchedIndex = this.findEntryIndex(nextLocation.href)
-        if (matchedIndex !== undefined) {
-          this.index = matchedIndex
-          this.entries.set(matchedIndex, {
-            key: this.entries.get(matchedIndex)!.key,
-            href: nextLocation.href,
-          })
+      const hadPendingBack = this.popStatePending
+      try {
+        const href =
+          `${this.browserWindow.location.pathname || "/"}${this.browserWindow.location.search}`
+        const nextLocation = parseRouteLocation(href)
+        const stored = readHistoryState(event.state ?? this.browserWindow.history.state)
+        if (stored && stored.href === nextLocation.href) {
+          this.entries.set(stored.index, { key: stored.key, href: stored.href })
+          this.index = stored.index
         } else {
-          this.resetStack(nextLocation.href)
+          const matchedIndex = this.findEntryIndex(nextLocation.href)
+          if (matchedIndex !== undefined) {
+            this.index = matchedIndex
+            this.entries.set(matchedIndex, {
+              key: this.entries.get(matchedIndex)!.key,
+              href: nextLocation.href,
+            })
+          } else {
+            this.resetStack(nextLocation.href)
+          }
+        }
+        this.browserWindow.history.replaceState(this.createHistoryState(), "", nextLocation.href)
+        this.currentSource.set(nextLocation)
+      } finally {
+        // A browser history traversal is only complete once its popstate handler
+        // runs. Keep `backInFlight` until that happens, then release it so a
+        // missed event can never lock the router permanently.
+        if (hadPendingBack) {
+          this.popStatePending = false
+          this.clearPopStateWatchdog()
+          this.backInFlight = false
         }
       }
-      this.browserWindow.history.replaceState(this.createHistoryState(), "", nextLocation.href)
-      this.currentSource.set(nextLocation)
     }
 
     if (this.browserWindow) {
@@ -327,14 +343,18 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
       .reverse()
       .sort((left, right) => right.priority - left.priority)
     this.backInFlight = true
+    let awaitPopState = false
     try {
       const allowed = await this.evaluateBackGuards(snapshot)
       if (this.disposed || !allowed) return true
-      if (this.performHistoryBack()) return true
-      await onExit?.()
-      return false
+      if (!this.performHistoryBack()) {
+        await onExit?.()
+        return false
+      }
+      awaitPopState = this.popStatePending
+      return true
     } finally {
-      this.backInFlight = false
+      if (!awaitPopState || this.disposed) this.backInFlight = false
     }
   }
 
@@ -342,6 +362,8 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     if (this.disposed) return
     this.disposed = true
     this.backInFlight = false
+    this.popStatePending = false
+    this.clearPopStateWatchdog()
     this.backGuards.length = 0
     this.backFallbacks.length = 0
     if (this.browserWindow) {
@@ -394,10 +416,40 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     return true
   }
 
+  private schedulePopStateWatchdog(): void {
+    this.clearPopStateWatchdog()
+    const token = ++this.popStateToken
+    const timer = setTimeout(() => {
+      if (this.popStateWatchdog === timer) this.popStateWatchdog = null
+      if (this.popStateToken !== token || !this.popStatePending) return
+      // A browser that never dispatches the matching popstate must not wedge
+      // back navigation forever; release the single-flight lock defensively.
+      this.popStatePending = false
+      this.backInFlight = false
+    }, POPSTATE_FALLBACK_MS)
+    this.popStateWatchdog = timer
+    if (typeof timer === "object" && timer !== null && "unref" in timer) {
+      const unref = timer.unref
+      if (typeof unref === "function") unref.call(timer)
+    }
+  }
+
+  private clearPopStateWatchdog(): void {
+    if (this.popStateWatchdog === null) return
+    clearTimeout(this.popStateWatchdog)
+    this.popStateWatchdog = null
+    this.popStateToken += 1
+  }
+
   private finishBack(allowed: boolean): void {
-    this.backInFlight = false
-    if (this.disposed || !allowed) return
-    this.performHistoryBack()
+    if (this.disposed || !allowed) {
+      this.backInFlight = false
+      return
+    }
+    const navigated = this.performHistoryBack()
+    if (!navigated || !this.popStatePending) {
+      this.backInFlight = false
+    }
   }
 
   private nextKey(): string {
@@ -441,9 +493,19 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
       const from = this.index
       const target = this.entries.get(from - 1)
       if (this.browserWindow) {
-        this.browserWindow.history.back()
-        // A synchronous popstate may already have adopted the destination.
-        if (this.index === from && target) {
+        this.popStatePending = true
+        this.schedulePopStateWatchdog()
+        try {
+          this.browserWindow.history.back()
+        } catch {
+          this.popStatePending = false
+          this.clearPopStateWatchdog()
+          return false
+        }
+        // A synchronous popstate may already have adopted the destination and
+        // released the pending lock; otherwise update optimistically while the
+        // asynchronous popstate reconciles the state.
+        if (this.popStatePending && this.index === from && target) {
           this.index = from - 1
           this.currentSource.set(parseRouteLocation(target.href))
         }

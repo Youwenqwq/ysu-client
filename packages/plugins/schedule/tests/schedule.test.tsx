@@ -659,6 +659,7 @@ describe("scheduleSettingsStore & schedulePatchesStore validation and persistenc
       provider: defineSchoolProvider({
         id: "ysu",
         name: "YSU",
+        timeZone: "Asia/Shanghai",
         slices: {},
         async initialize() {},
         async reset() {},
@@ -766,6 +767,22 @@ describe("scheduleSettingsStore & schedulePatchesStore validation and persistenc
 })
 
 describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
+  it("does not schedule a reminder whose trigger time has already passed", () => {
+    const now = new Date("2026-09-07T00:30:00Z") // 08:30 Asia/Shanghai, during the 08:00 class
+    expect(
+      computeClassAlarms(
+        [sampleCourses[0]!],
+        sampleWeek,
+        samplePeriods,
+        1,
+        sampleCalendar,
+        15,
+        now,
+        "Asia/Shanghai"
+      )
+    ).toEqual([])
+  })
+
   it("computes Shanghai-timezone alarms, merges conflicting courses, and handles geolocation lookup", async () => {
     const now = new Date("2026-09-06T17:00:00Z") // 2026-09-07 01:00 Asia/Shanghai (Monday)
     const conflicting: Course[] = [
@@ -944,6 +961,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     const schoolProvider: SchoolProvider = defineSchoolProvider({
       id: "ysu",
       name: "燕山大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         timetable: {
           getSchedule: async () => sampleCourses,

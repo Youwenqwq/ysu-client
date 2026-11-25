@@ -46,6 +46,7 @@ import {
 } from "@orahako/sdk"
 import * as examsPublic from "../src"
 import { EXAMS_PLUGIN_ID, examsPlugin } from "../src"
+import { UpcomingExamsWidget } from "../src/overview-widget"
 import type { ExamsSettingsStoreInstance } from "../src/store"
 import { computeExamDayDiff } from "../src/widget-sync"
 
@@ -471,6 +472,57 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
     expect(computeExamDayDiff({ name: "待定考试" }, now, "Asia/Shanghai")).toBeNull()
   })
 
+  it("derives exam countdowns from the provider time zone, not the timetable slice", () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-12-20T02:00:00Z"))
+
+    const exam: Exam = {
+      name: "编译原理",
+      startAt: "2026-12-21T00:30:00",
+      endAt: "2026-12-21T02:30:00",
+    }
+    const examsSnap = {
+      status: "success",
+      data: [exam],
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isStale: false,
+      updatedAt: null,
+      refresh: async () => undefined,
+    }
+    const providerSnap = {
+      status: "ready",
+      schoolId: "exam-school",
+      provider: {
+        id: "exam-school",
+        name: "测试大学",
+        timeZone: "Asia/Shanghai",
+        slices: {
+          timetable: {
+            scheduleRules: { timeZone: "UTC", lunchAfter: 4, dinnerAfter: 8 },
+          },
+        },
+      },
+      error: null,
+      generation: 1,
+    }
+
+    const render = UpcomingExamsWidget as unknown as (props: unknown) => ReactNode
+    const html = renderToStaticMarkup(
+      render({
+        t: (key: string) => (key === "widgets.upcomingExams.examTomorrow" ? "明天" : key),
+        useExams: () => examsSnap,
+        useProvider: () => providerSnap,
+        openExams: () => {},
+      })
+    )
+
+    expect(html).toContain("明天")
+    expect(html).not.toContain("今天")
+    vi.useRealTimers()
+  })
+
   it("syncs exam widget snapshots on query success, pins home-screen widgets, and clears widgets on channel disable & plugin dispose", async () => {
     const dom = mountInteractiveDom()
     activeUnmount = dom.unmount
@@ -532,6 +584,7 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
     const examSchool: SchoolProvider = defineSchoolProvider({
       id: "exam-school",
       name: "测试大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         exams: {
           getExams,

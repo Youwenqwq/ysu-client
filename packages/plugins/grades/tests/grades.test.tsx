@@ -650,6 +650,7 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
     const customFivePointSchool: SchoolProvider = defineSchoolProvider({
       id: "five-point-uni",
       name: "五分制大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         grades: {
           gpaScale: {
@@ -1071,6 +1072,7 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
     const provider: SchoolProvider = defineSchoolProvider({
       id: "optional-overview-uni",
       name: "Optional Overview University",
+      timeZone: "Asia/Shanghai",
       slices: {
         grades: {
           getGrades: async () => [],

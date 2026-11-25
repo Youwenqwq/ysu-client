@@ -283,6 +283,24 @@ describe("@orahako/ui-plugin-manager", () => {
       updatedAt: "2026-11-18T00:00:00Z",
       plugins: [
         {
+          id: "campus.provider",
+          name: "Campus Provider",
+          summary: "Initialization-only school provider",
+          author: "orahako",
+          categories: ["provider"],
+          versions: [
+            {
+              version: "1.0.0",
+              apiVersion: 1,
+              platforms: ["web", "android"],
+              zipUrl: "v1/campus-provider.zip",
+              sha256: "c".repeat(64),
+              size: 100,
+              publishedAt: "2026-11-18T00:00:00Z",
+            },
+          ],
+        },
+        {
           id: "community.toy",
           name: "Community Toy",
           summary: "Fun campus toy",
@@ -555,6 +573,7 @@ describe("@orahako/ui-plugin-manager", () => {
       expect(text).not.toContain("v9.0.0") // v2 release filtered out!
       expect(text).toContain("更新全部（1）")
       expect(text).toContain("Mint Theme")
+      expect(text).not.toContain("Campus Provider")
       expect(fetchMock).toHaveBeenCalledWith("https://market.example.com/custom.json", {
         cache: "no-store",
       })

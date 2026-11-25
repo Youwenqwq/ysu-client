@@ -148,9 +148,12 @@ export const notificationsPlugin = definePlugin({
       )
     )
 
-    ctx.effect(() => () => {
-      void controller.dispose()
-      store.dispose()
+    ctx.effect(() => async () => {
+      try {
+        await controller.dispose()
+      } finally {
+        store.dispose()
+      }
     })
   },
 })

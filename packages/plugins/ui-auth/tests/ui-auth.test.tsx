@@ -243,6 +243,7 @@ function setupAuthRuntime(options?: {
   checkAuthStatus?: () => Promise<AuthStatus>
   warmup?: () => Promise<void>
   reloginResult?: boolean
+  relogin?: () => Promise<boolean>
   canRemember?: boolean
 }) {
   const localBackend = createMemoryStorage()
@@ -270,6 +271,7 @@ function setupAuthRuntime(options?: {
   const mockSchoolProvider: SchoolProvider = defineSchoolProvider({
     id: "demo",
     name: "示例大学",
+    timeZone: "Asia/Shanghai",
     warmup,
     async initialize() {},
     async reset() {},
@@ -279,6 +281,7 @@ function setupAuthRuntime(options?: {
     },
     async dispose() {},
     async relogin() {
+      if (options?.relogin) return options.relogin()
       return options?.reloginResult ?? true
     },
     slices: {
@@ -305,6 +308,24 @@ function setupAuthRuntime(options?: {
     },
   })
 
+  const otherLogoutSpy = vi.fn(async () => {})
+  const otherSchoolProvider: SchoolProvider = defineSchoolProvider({
+    id: "other",
+    name: "第二大学",
+    timeZone: "Asia/Shanghai",
+    async initialize() {},
+    async reset() {},
+    async logout() {
+      await otherLogoutSpy()
+      runtime.context.get("session")?.clearCredential("other")
+    },
+    async dispose() {},
+    async relogin() {
+      return false
+    },
+    slices: {},
+  })
+
   const schoolPlugin = definePlugin({
     manifest: {
       id: "demo.provider",
@@ -318,6 +339,7 @@ function setupAuthRuntime(options?: {
     inject: ["providers"] as const,
     apply(ctx) {
       ctx.providers.registerProvider("demo", () => mockSchoolProvider)
+      ctx.providers.registerProvider("other", () => otherSchoolProvider)
     },
   })
 
@@ -382,10 +404,6 @@ function setupAuthRuntime(options?: {
   runtime.register(authUiPlugin, "builtin", {
     capacitorRetryDelayMs: 5,
     canRemember: options?.canRemember ?? true,
-    schools: [
-      { id: "demo", name: "示例大学", nameEn: "Demo University" },
-      { id: "other", name: "第二大学", nameEn: "Second University" },
-    ],
   })
   runtime.start(AUTH_UI_PLUGIN_ID)
   expect(runtime.context.get("query")!.policy("student-info")).toEqual({
@@ -605,6 +623,49 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     env.runtime.dispose()
   })
 
+  it.each([true, false])(
+    "does not log out the replacement provider when quick relogin finishes after a hot switch (success=%s)",
+    async (success) => {
+      const started = Promise.withResolvers<void>()
+      const gate = Promise.withResolvers<boolean>()
+      const env = setupAuthRuntime({
+        initialHref: "/?route=settings",
+        relogin: () => {
+          started.resolve()
+          return gate.promise
+        },
+      })
+      const slots = env.runtime.context.get("slots") as PluginSlotRegistry
+      const session = env.runtime.context.get("session")!
+      const providerRuntime = env.runtime.context.get("provider")!
+
+      slots.declare({ name: "settings.account", kind: "list" })
+      await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
+      session.setCredential({
+        schoolId: "demo",
+        credential: "valid-tgc",
+        username: "20260001",
+      })
+      const [entry] = slots.select("settings.account")
+      const account = entry!.inject!(env.runtime.context) as AccountActionsInject
+
+      const reloginPromise = account.relogin()
+      await started.promise
+      providerRuntime.selectSchool("other")
+      await vi.waitFor(() =>
+        expect(providerRuntime.getSnapshot().provider?.id).toBe("other")
+      )
+
+      gate.resolve(success)
+      await reloginPromise
+
+      expect(env.logoutSpy).not.toHaveBeenCalled()
+      expect(providerRuntime.getSnapshot().provider?.id).toBe("other")
+
+      env.runtime.dispose()
+    }
+  )
+
   it("invalidates query and calls warmup when checkAuthStatus succeeds on provider/ready", async () => {
     const warmup = vi.fn(async () => {})
     const checkAuthStatus = vi.fn(async () => ({ authenticated: true }))
@@ -776,7 +837,7 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
         session.setCredential({ schoolId: "demo", credential: "valid-tgc", username: "20260001" })
       })
 
-      expectAccountRows(["重新登录", "切换学校", "退出登录"])
+      expectAccountRows(["重新登录", "退出登录"])
     }
   )
 
@@ -805,6 +866,7 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
       <ContributionOutlet entry={loginPage} slots={slots} i18n={i18n} />
     )
     expect(loginHtml).toContain("酸橙盒")
+    expect(loginHtml).not.toContain("切换学校")
     expect(loginHtml).toContain("记住密码")
     expect(loginHtml).toContain("orahako-login-password")
     expect(loginHtml).toContain(`type="${"pass"}word"`)

@@ -51,7 +51,15 @@ export interface YSUProviderRuntime {
   readonly relogin: ReloginApi
 }
 
-export function createYSUProviderRuntime(source: YSUContextSource): YSUProviderRuntime {
+export interface YSUProviderRuntimeOptions {
+  /** Provider lifecycle generation used to fence in-flight relogin continuations. */
+  readonly lifecycleGeneration?: () => number
+}
+
+export function createYSUProviderRuntime(
+  source: YSUContextSource,
+  options: YSUProviderRuntimeOptions = {}
+): YSUProviderRuntime {
   const ctx = createYSUContext(source)
 
   const cas = createCAS(ctx)
@@ -101,6 +109,6 @@ export function createYSUProviderRuntime(source: YSUContextSource): YSUProviderR
     mobileAdapter: new YSUMobileAdapter(mobile, auth.mapCASSessionError),
     fetchEcardBalance: createEcardAccess(ctx, ecard, auth.mapCASSessionError),
     fetchEpayPayments: createEpayAccess(ctx, epay, auth.mapCASSessionError),
-    relogin: createRelogin(ctx, cas, auth, lifecycle),
+    relogin: createRelogin(ctx, cas, auth, lifecycle, options.lifecycleGeneration),
   }
 }

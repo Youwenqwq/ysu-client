@@ -141,7 +141,10 @@ export function createSessionLifecycle(
       } finally {
         resetDerivedSessions()
         if (isActive()) {
-          ctx.query.clearPersistent()
+          ctx.query.clearPersistent({
+            providerId: ctx.config.id,
+            username: ctx.session.getSnapshot().username,
+          })
           ctx.query.invalidate()
           await stopNativeIntegrations(ctx)
           await ctx.storage.secure.removeItem(YSU_SECURE_KEY_CAS_TGC).catch(() => {})

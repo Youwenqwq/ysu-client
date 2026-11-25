@@ -11,6 +11,7 @@ import {
   type ProviderRuntimeService,
   type ProviderRuntimeSnapshot,
   type ProviderQueryPolicy,
+  type QueryDescriptor,
   type QuerySnapshot,
   type SchoolProvider,
   type SessionService,
@@ -55,6 +56,7 @@ function makeProvider(id: string, slices: Partial<AcademicSliceMap> = {}): Schoo
   return defineSchoolProvider({
     id,
     name: id,
+    timeZone: "Asia/Shanghai",
     slices,
     initialize: async () => {},
     reset: async () => {},
@@ -171,6 +173,20 @@ function createQueryTestRig(options?: {
     sessionService,
     getListenerCounts: () => ({ providerListeners, sessionListeners }),
   }
+}
+
+interface QueryTestInternals {
+  readonly records: Map<string, unknown>
+  readonly handles: Map<string, unknown>
+  sourceForConsumer<U>(
+    id: string,
+    descriptor: QueryDescriptor<U>
+  ): ObservableSource<QuerySnapshot<U>>
+}
+
+// Test-only window into the private caches, used to assert bounded retention.
+function queryInternals(query: QueryRuntimeService): QueryTestInternals {
+  return query as unknown as QueryTestInternals
 }
 
 const SAMPLE_GRADE: Grade = {
@@ -1017,6 +1033,267 @@ describe("QueryRuntimeService & queryRuntimePlugin", () => {
     expect(rig.getListenerCounts().providerListeners).toBe(0)
 
     runtime.dispose()
+    rig.query.dispose()
+  })
+
+  it("evicts stale records for provider generations and accounts while shared handles stay coherent", async () => {
+    const getGrades = vi.fn(async (): Promise<Grade[]> => [SAMPLE_GRADE])
+    const ysu = makeProvider("ysu", { grades: { getGrades } })
+    const rig = createQueryTestRig({ provider: ysu, username: "alice" })
+    await rig.query.hydrated
+
+    const descriptor = {
+      feature: "grades",
+      slice: "grades" as const,
+      params: { view: "identity" },
+      fetcher: (provider: SchoolProvider) => requireSlice(provider, "grades").getGrades(),
+    }
+    const internals = queryInternals(rig.query)
+    const sourceA = internals.sourceForConsumer<Grade[]>("ext.a", descriptor)
+    const sourceB = internals.sourceForConsumer<Grade[]>("ext.b", descriptor)
+    const stopA = sourceA.subscribe(() => {})
+    const stopB = sourceB.subscribe(() => {})
+
+    await vi.waitFor(() => {
+      expect(sourceA.getSnapshot().status).toBe("success")
+      expect(sourceB.getSnapshot().status).toBe("success")
+    })
+    expect(getGrades).toHaveBeenCalledTimes(1)
+    const generationOneKeys = [...internals.records.keys()]
+    expect(generationOneKeys).toHaveLength(1)
+
+    rig.providerState.set((prev) => ({ ...prev, generation: 2 }))
+    await vi.waitFor(() => {
+      expect(getGrades).toHaveBeenCalledTimes(2)
+      expect(sourceA.getSnapshot().status).toBe("success")
+      expect(sourceB.getSnapshot().status).toBe("success")
+    })
+    const generationTwoKeys = [...internals.records.keys()]
+    expect(generationTwoKeys).toHaveLength(1)
+    expect(generationTwoKeys).not.toEqual(generationOneKeys)
+    expect(generationTwoKeys[0]).toContain("ysu:2")
+
+    rig.sessionState.set((prev) => ({
+      ...prev,
+      username: "bob",
+      credential: "bob-cred",
+      isAuthenticated: true,
+      sessionExpired: false,
+    }))
+    await vi.waitFor(() => {
+      expect(getGrades).toHaveBeenCalledTimes(3)
+      expect(sourceA.getSnapshot().status).toBe("success")
+      expect(sourceB.getSnapshot().status).toBe("success")
+    })
+    const bobKeys = [...internals.records.keys()]
+    expect(bobKeys).toHaveLength(1)
+    expect(bobKeys[0]).toContain("|bob|")
+    expect([...internals.handles.keys()]).toHaveLength(2)
+
+    stopA()
+    stopB()
+    rig.query.dispose()
+  })
+
+  it("bounds inactive handles and records across account and parameter rebinds", async () => {
+    const fetchA = vi.fn(async (): Promise<Grade[]> => [SAMPLE_GRADE])
+    const fetchB = vi.fn(async (): Promise<Grade[]> => [SAMPLE_GRADE])
+    const ysu = makeProvider("ysu", {
+      grades: { getGrades: async () => [SAMPLE_GRADE] },
+    })
+    const rig = createQueryTestRig({ provider: ysu, username: "alice" })
+    await rig.query.hydrated
+    const internals = queryInternals(rig.query)
+
+    const sourceAlice = rig.query.source({
+      feature: "grades",
+      slice: "grades",
+      params: { view: "alice" },
+      fetcher: fetchA,
+    })
+    const stopAlice = sourceAlice.subscribe(() => {})
+    await vi.waitFor(() => expect(sourceAlice.getSnapshot().status).toBe("success"))
+    stopAlice()
+    expect(internals.handles.size).toBe(1)
+    expect(internals.records.size).toBe(1)
+
+    // No upstream subscription remains; the next source call must evict the
+    // Alice record instead of keeping both identities alive.
+    rig.sessionState.set((prev) => ({
+      ...prev,
+      username: "bob",
+      credential: "bob-cred",
+      isAuthenticated: true,
+      sessionExpired: false,
+    }))
+    const sourceBob = rig.query.source({
+      feature: "grades",
+      slice: "grades",
+      params: { view: "alice" },
+      fetcher: fetchB,
+    })
+    expect(internals.handles.size).toBe(1)
+    expect(internals.records.size).toBe(1)
+    expect([...internals.records.keys()][0]).toContain("|bob|")
+    const stopBob = sourceBob.subscribe(() => {})
+    await vi.waitFor(() => expect(sourceBob.getSnapshot().status).toBe("success"))
+    expect(fetchB).toHaveBeenCalledTimes(1)
+    stopBob()
+
+    // Switching params repeatedly keeps a single inactive handle/record pair.
+    for (const view of ["one", "two", "three"]) {
+      rig.query.source({
+        feature: "grades",
+        slice: "grades",
+        params: { view },
+        fetcher: fetchB,
+      })
+      expect(internals.handles.size).toBe(1)
+      expect(internals.records.size).toBe(1)
+    }
+    expect([...internals.records.keys()][0]).toContain('"view":"three"')
+
+    rig.query.dispose()
+  })
+
+  it("clears persistent data by provider and username across generations but keeps other identities", async () => {
+    const ysu = makeProvider("ysu", {
+      grades: { getGrades: async () => [SAMPLE_GRADE] },
+    })
+    const rig = createQueryTestRig({ provider: ysu, username: "alice" })
+    await rig.query.hydrated
+
+    const aliceGenerationOne = rig.query.cacheKey({
+      providerId: "ysu",
+      providerScope: "ysu:1",
+      username: "alice",
+      feature: "grades",
+    })
+    const aliceGenerationTwo = rig.query.cacheKey({
+      providerId: "ysu",
+      providerScope: "ysu:2",
+      username: "alice",
+      feature: "grades",
+    })
+    const bobGenerationOne = rig.query.cacheKey({
+      providerId: "ysu",
+      providerScope: "ysu:1",
+      username: "bob",
+      feature: "grades",
+    })
+    const otherSchoolAlice = rig.query.cacheKey({
+      providerId: "other",
+      providerScope: "other:1",
+      username: "alice",
+      feature: "grades",
+    })
+    const sample = { data: [SAMPLE_GRADE], updatedAt: Date.now() }
+    rig.query.writePersistent(aliceGenerationOne, sample)
+    rig.query.writePersistent(aliceGenerationTwo, sample)
+    rig.query.writePersistent(bobGenerationOne, sample)
+    rig.query.writePersistent(otherSchoolAlice, sample)
+    await vi.waitFor(() => expect(rig.localMap.size).toBe(1))
+
+    rig.query.clearPersistent({ providerId: "ysu", username: "alice" })
+    expect(rig.query.readPersistent(aliceGenerationOne)).toBeNull()
+    expect(rig.query.readPersistent(aliceGenerationTwo)).toBeNull()
+    expect(rig.query.readPersistent(bobGenerationOne)).not.toBeNull()
+    expect(rig.query.readPersistent(otherSchoolAlice)).not.toBeNull()
+
+    const storedEntries = () => {
+      const raw = [...rig.localMap.values()][0]
+      return raw ? (JSON.parse(raw) as { entries: Record<string, unknown> }).entries : {}
+    }
+    await vi.waitFor(() => {
+      const entries = storedEntries()
+      expect(entries).not.toHaveProperty(aliceGenerationOne)
+      expect(entries).not.toHaveProperty(aliceGenerationTwo)
+      expect(entries).toHaveProperty(bobGenerationOne)
+      expect(entries).toHaveProperty(otherSchoolAlice)
+    })
+
+    rig.query.clearPersistent({ providerId: "other" })
+    expect(rig.query.readPersistent(otherSchoolAlice)).toBeNull()
+    await vi.waitFor(() => expect(storedEntries()).not.toHaveProperty(otherSchoolAlice))
+
+    rig.query.clearPersistent()
+    expect(rig.query.readPersistent(bobGenerationOne)).toBeNull()
+    await vi.waitFor(() => expect(rig.localMap.size).toBe(0))
+    rig.query.dispose()
+  })
+
+  it("keeps dirty persistent writes in sync when an identity clear runs before hydration", async () => {
+    const { storage, localMap } = createTrackedStorage()
+    const ysu = makeProvider("ysu", {
+      grades: { getGrades: async () => [SAMPLE_GRADE] },
+    })
+    const rig = createQueryTestRig({ provider: ysu, storage, username: "alice" })
+    const aliceKey = rig.query.cacheKey({
+      providerId: "ysu",
+      providerScope: "ysu:1",
+      username: "alice",
+      feature: "grades",
+    })
+    const bobKey = rig.query.cacheKey({
+      providerId: "ysu",
+      providerScope: "ysu:1",
+      username: "bob",
+      feature: "grades",
+    })
+    const sample = { data: [SAMPLE_GRADE], updatedAt: Date.now() }
+    rig.query.writePersistent(aliceKey, sample)
+    rig.query.writePersistent(bobKey, sample)
+    rig.query.clearPersistent({ providerId: "ysu", username: "alice" })
+
+    await rig.query.hydrated
+    expect(rig.query.readPersistent(aliceKey)).toBeNull()
+    expect(rig.query.readPersistent(bobKey)).not.toBeNull()
+
+    await vi.waitFor(() => {
+      const raw = [...localMap.values()][0]
+      const entries = raw ? (JSON.parse(raw) as { entries: Record<string, unknown> }).entries : {}
+      expect(entries).not.toHaveProperty(aliceKey)
+      expect(entries).toHaveProperty(bobKey)
+    })
+    rig.query.dispose()
+  })
+
+  it("persists writes made after a full clear while hydration is still in flight", async () => {
+    const { storage, localMap } = createTrackedStorage()
+    const ysu = makeProvider("ysu", {
+      grades: { getGrades: async () => [SAMPLE_GRADE] },
+    })
+    const firstRig = createQueryTestRig({ provider: ysu, storage, username: "alice" })
+    const oldKey = firstRig.query.cacheKey({
+      providerId: "ysu",
+      providerScope: "ysu:1",
+      username: "alice",
+      feature: "old-feature",
+    })
+    await firstRig.query.hydrated
+    firstRig.query.writePersistent(oldKey, { data: "old", updatedAt: Date.now() })
+    await vi.waitFor(() => expect(localMap.size).toBe(1))
+    firstRig.query.dispose()
+
+    const rig = createQueryTestRig({ provider: ysu, storage, username: "alice" })
+    const newKey = rig.query.cacheKey({
+      providerId: "ysu",
+      providerScope: "ysu:1",
+      username: "alice",
+      feature: "new-feature",
+    })
+    rig.query.clearPersistent()
+    rig.query.writePersistent(newKey, { data: "new", updatedAt: Date.now() })
+    await rig.query.hydrated
+    expect(rig.query.readPersistent(oldKey)).toBeNull()
+    expect(rig.query.readPersistent(newKey)).toEqual({ data: "new", updatedAt: expect.any(Number) })
+
+    await vi.waitFor(() => {
+      const raw = [...localMap.values()][0]
+      const entries = raw ? (JSON.parse(raw) as { entries: Record<string, unknown> }).entries : {}
+      expect(entries).not.toHaveProperty(oldKey)
+      expect(entries).toHaveProperty(newKey)
+    })
     rig.query.dispose()
   })
 })

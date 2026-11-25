@@ -5,7 +5,6 @@ export const authUiDictionary = defineDictionary({
     pageTitle: "登录",
     login: {
       title: "酸橙盒",
-      schoolLabel: "学校",
       usernameLabel: "学号",
       usernamePlaceholder: "请输入学号",
       passwordLabel: "密码",
@@ -36,8 +35,6 @@ export const authUiDictionary = defineDictionary({
       logoutConfirm: "确定要退出登录吗？",
       cancel: "取消",
       logoutSuccess: "已退出登录",
-      switchSchool: "切换学校",
-      switchSchoolDesc: "选择其他已安装的学校服务或重新登录",
       signIn: "去登录",
       notSignedIn: "未登录",
       notSignedInDesc: "登录后可查看学籍与教务数据",
@@ -57,7 +54,6 @@ export const authUiDictionary = defineDictionary({
     pageTitle: "Login",
     login: {
       title: "Orahako",
-      schoolLabel: "School",
       usernameLabel: "Student ID",
       usernamePlaceholder: "Enter student ID",
       passwordLabel: "Password",
@@ -89,8 +85,6 @@ export const authUiDictionary = defineDictionary({
       logoutConfirm: "Are you sure you want to log out?",
       cancel: "Cancel",
       logoutSuccess: "Logged out",
-      switchSchool: "Switch School",
-      switchSchoolDesc: "Choose another registered school provider or sign in again",
       signIn: "Sign in",
       notSignedIn: "Not signed in",
       notSignedInDesc: "Sign in to access your student record and academic services",

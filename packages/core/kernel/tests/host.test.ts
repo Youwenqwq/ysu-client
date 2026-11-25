@@ -1,5 +1,6 @@
 import { zipSync } from "fflate"
 import { afterEach, describe, expect, it, vi } from "vitest"
+import "./test-contract"
 import * as SdkNamespace from "@orahako/sdk"
 import {
   definePlugin,
@@ -53,18 +54,18 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
 
     const consumerPlugin = definePlugin({
       manifest: makeManifest("app.consumer"),
-      inject: ["analytics"],
+      inject: ["kernelTelemetry"],
       apply(ctx) {
-        order.push(`consumer:${ctx.analytics.endpoint}`)
+        order.push(`consumer:${ctx.kernelTelemetry.endpoint}`)
       },
     })
 
     const providerPlugin = definePlugin({
-      manifest: makeManifest("app.analytics", { kind: "runtime", provides: ["analytics"] }),
+      manifest: makeManifest("app.analytics", { kind: "runtime", provides: ["kernelTelemetry"] }),
       apply: async (ctx) => {
         await Promise.resolve()
         order.push("provider:ready")
-        ctx.set("analytics", {
+        ctx.set("kernelTelemetry", {
           endpoint: "https://telemetry.example",
           track: async () => ({ tracked: true, reason: "sent", date: null }),
         })
@@ -99,6 +100,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
     expect(order).toEqual(["provider:ready", "consumer:https://telemetry.example"])
 
     expect(() => host.disable("app.analytics")).toThrow("protected by the active composition")
+    expect(() => host.suspend("app.analytics")).toThrow("protected by the active composition")
     host.dispose()
   })
 
@@ -151,8 +153,8 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
             size: 100,
             publishedAt: "2026-11-18T00:00:00Z",
             requires: id === "ext.consumer" ? { "ext.base": "^1.0.0" } : undefined,
-            inject: id === "ext.consumer" ? ["analytics"] : undefined,
-            provides: id === "ext.service" ? ["analytics"] : undefined,
+            inject: id === "ext.consumer" ? ["kernelTelemetry"] : undefined,
+            provides: id === "ext.service" ? ["kernelTelemetry"] : undefined,
           },
         ],
       })),
@@ -174,13 +176,13 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
       installedOrder.push(expected.id)
       const manifest = makeManifest(expected.id, {
         version: expected.version,
-        provides: expected.id === "ext.service" ? ["analytics"] : undefined,
+        provides: expected.id === "ext.service" ? ["kernelTelemetry"] : undefined,
       })
       host.runtime.register(
         manifest,
         (ctx) => {
           if (expected.id === "ext.service") {
-            ctx.set("analytics", {
+            ctx.set("kernelTelemetry", {
               endpoint: null,
               track: async () => ({ tracked: false, reason: "disabled", date: null }),
             })
@@ -597,10 +599,10 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
   it("bounds async composition startup and ignores late apply side effects", async () => {
     const { promise: gate, resolve: release } = Promise.withResolvers<void>()
     const slowPlugin = definePlugin({
-      manifest: makeManifest("app.slow", { kind: "runtime", provides: ["analytics"] }),
+      manifest: makeManifest("app.slow", { kind: "runtime", provides: ["kernelTelemetry"] }),
       apply: async (ctx) => {
         await gate
-        ctx.set("analytics", {
+        ctx.set("kernelTelemetry", {
           endpoint: null,
           track: async () => ({ tracked: false, reason: "disabled", date: null }),
         })
@@ -632,7 +634,7 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
 
     release()
     await host.runtime.flush()
-    expect(host.runtime.context.get("analytics")).toBeUndefined()
+    expect(host.runtime.context.get("kernelTelemetry")).toBeUndefined()
     expect(host.runtime.get("app.slow")?.status).toBe("failed")
     host.dispose()
   })
@@ -733,6 +735,34 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
       startupPage: "overview",
     })
     unsubscribe()
+  })
+
+  it("keeps in-memory preferences authoritative when setItem fails but getItem returns stale data", () => {
+    const stale = {
+      disabledPluginIds: ["ext.stale"],
+      activeTheme: "app.theme:light",
+    }
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) =>
+        key === "test-preferences-lossy" ? JSON.stringify(stale) : null,
+      setItem: () => {
+        throw new Error("quota exceeded")
+      },
+      removeItem: () => {},
+    })
+
+    const preferences = createPluginHostPreferences("test-preferences-lossy")
+    expect(preferences.isPluginDisabled("ext.stale")).toBe(true)
+    expect(preferences.getActiveTheme()).toBe("app.theme:light")
+
+    preferences.setPluginDisabled("ext.new", true)
+    preferences.setActiveTheme("app.theme:dark")
+
+    // getItem still reports the old JSON, but reads must observe the writes.
+    expect(preferences.isPluginDisabled("ext.stale")).toBe(true)
+    expect(preferences.isPluginDisabled("ext.new")).toBe(true)
+    expect(preferences.getActiveTheme()).toBe("app.theme:dark")
+    expect(preferences.state.getSnapshot()).toEqual({ activeTheme: "app.theme:dark" })
   })
 
   it("exposes the preference source through packageRuntime", () => {
@@ -944,5 +974,122 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
     expect(host.preferences.getStartupPage()).toBeUndefined()
     expect(host.preferences.getActiveShell()).toBe("app.shell:default")
     await host.dispose()
+  })
+
+  it("waits for plugin cleanup before revoking external module URLs on uninstall", async () => {
+    const events: string[] = []
+    const cleanupStarted = Promise.withResolvers<void>()
+    const cleanupGate = Promise.withResolvers<void>()
+    const hostGlobal = globalThis as unknown as {
+      __kernelUninstallCleanup?: () => Promise<void>
+    }
+    hostGlobal.__kernelUninstallCleanup = async () => {
+      events.push("cleanup:start")
+      cleanupStarted.resolve()
+      await cleanupGate.promise
+      events.push("cleanup:end")
+    }
+
+    const pluginCode = [
+      "export default {",
+      "  apply(ctx) {",
+      "    ctx.effect(() => async () => { await globalThis.__kernelUninstallCleanup() })",
+      "  },",
+      "}",
+    ].join("\n")
+    let urlCounter = 0
+    vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      void blob
+      return `data:text/javascript;base64,${btoa(pluginCode)}#uninstall-${++urlCounter}`
+    })
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation((url) => {
+      events.push(`revoke:${url}`)
+    })
+
+    const encoder = new TextEncoder()
+    const zipBytes = zipSync({
+      "manifest.json": encoder.encode(
+        JSON.stringify({
+          id: "ext.uninstall-cleanup",
+          name: "Uninstall cleanup",
+          version: "1.0.0",
+          apiVersion: 1,
+          kind: "feature",
+          entry: "index.js",
+        })
+      ),
+      "index.js": encoder.encode(pluginCode),
+    })
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b-uninstall-cleanup",
+        composition: { id: "test.uninstall-cleanup", version: 1, defaults: {}, plugins: [] },
+        plugins: [],
+      },
+      {
+        platformModules: {},
+        packages: new PluginPackageStore({ backend: createMemoryPackageBackend() }),
+      }
+    )
+    await host.install(zipBytes)
+    expect(events).toEqual([])
+
+    let uninstalled = false
+    const uninstall = host.uninstall("ext.uninstall-cleanup").then(() => {
+      uninstalled = true
+    })
+    await cleanupStarted.promise
+    expect(events).toEqual(["cleanup:start"])
+    expect(uninstalled).toBe(false)
+
+    cleanupGate.resolve()
+    await uninstall
+    expect(events.slice(0, 2)).toEqual(["cleanup:start", "cleanup:end"])
+    expect(events[2]?.startsWith("revoke:")).toBe(true)
+    delete hostGlobal.__kernelUninstallCleanup
+    await host.dispose()
+  })
+
+  it("uses pluginStartTimeoutMs for enable and bounds disposal for a never-settling apply", async () => {
+    const gate = Promise.withResolvers<void>()
+    const hanging = definePlugin({
+      manifest: makeManifest("app.enable-timeout"),
+      apply: async () => {
+        await gate.promise
+      },
+    })
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b-enable-timeout",
+        composition: {
+          id: "test.enable-timeout",
+          version: 1,
+          defaults: {},
+          plugins: [{ id: hanging.manifest.id }],
+        },
+        plugins: [hanging],
+      },
+      {
+        platformModules: {},
+        packages: new PluginPackageStore({ backend: createMemoryPackageBackend() }),
+        pluginStartTimeoutMs: 10,
+      }
+    )
+    await host.bootstrap()
+    expect(host.loadErrors.get(hanging.manifest.id)).toContain("startup timed out")
+
+    // enable must honour the host's configured startup bound instead of the
+    // runtime's 10s default.
+    await expect(host.enable(hanging.manifest.id)).rejects.toThrow(
+      "Plugin startup timed out"
+    )
+    expect(host.runtime.get(hanging.manifest.id)?.status).toBe("failed")
+
+    // The abandoned apply must not keep host disposal waiting forever.
+    await host.dispose()
+    expect(host.runtime.get(hanging.manifest.id)).toBeUndefined()
+    gate.resolve()
   })
 })

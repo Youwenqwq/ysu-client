@@ -4,7 +4,6 @@ import {
   BatteryCharging,
   Bell,
   Check,
-  ChevronLeft,
   Download,
   GraduationCap,
 } from "lucide-react"
@@ -58,9 +57,7 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
   const completed = useStore((state) => state.completed)
   const storedSchoolId = useStore((state) => state.selectedSchoolId)
 
-  const [step, setStep] = useState<"school" | "permissions">(() =>
-    schools.length > 0 ? "school" : "permissions"
-  )
+  const [step, setStep] = useState<"school" | "permissions">("school")
   const [selectedSchoolId, setSelectedSchoolId] = useState(
     () => storedSchoolId ?? schools[0]?.id ?? ""
   )
@@ -71,10 +68,13 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
 
   if (!storeHydrated || !session.hasHydrated || completed) return null
 
+  // A persisted school choice means the user already confirmed it; never unlock it again.
+  const schoolLocked = storedSchoolId !== null
+  const showSchoolStep = !schoolLocked && step === "school"
   const activeSchoolId = selectedSchoolId || schools[0]?.id || ""
   const native = props.isNative()
-  const totalSteps = schools.length > 0 ? 2 : 1
-  const currentStepNumber = schools.length > 0 ? (step === "school" ? 1 : 2) : 1
+  const totalSteps = 2
+  const currentStepNumber = showSchoolStep ? 1 : 2
 
   async function selectSchoolAndContinue() {
     const school = schools.find((item) => item.id === activeSchoolId) ?? schools[0]
@@ -156,7 +156,7 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
           </span>
         </div>
 
-        {step === "school" && schools.length > 0 ? (
+        {showSchoolStep ? (
           <section>
             <h1 className="mb-6 text-2xl font-semibold tracking-tight">{t("chooseSchool")}</h1>
             <div className="space-y-3">
@@ -206,7 +206,17 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
               </p>
             )}
             <Button
-              className="mt-6 w-full"
+              variant="outline"
+              className="mt-4 w-full"
+              disabled={installing || schoolsLoading}
+              onClick={() => retrySchoolDiscovery()}
+            >
+              {schoolsLoading ? <Spinner data-icon="inline-start" /> : null}
+              {t("moreSchools")}
+            </Button>
+            <p className="mt-4 text-sm text-muted-foreground">{t("schoolLocked")}</p>
+            <Button
+              className="mt-2 w-full"
               disabled={installing || !activeSchoolId}
               onClick={() => void selectSchoolAndContinue()}
             >
@@ -214,7 +224,7 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
               {!installing && activeSchoolId && !props.hasProvider(activeSchoolId) ? (
                 <Download data-icon="inline-start" />
               ) : null}
-              {installing ? t("installing") : t("continue")}
+              {installing ? t("installing") : t("confirm")}
             </Button>
           </section>
         ) : (
@@ -252,12 +262,6 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
               </div>
             )}
             <div className="mt-6 flex gap-3">
-              {schools.length > 0 && (
-                <Button variant="ghost" onClick={() => setStep("school")}>
-                  <ChevronLeft data-icon="inline-start" />
-                  {t("back")}
-                </Button>
-              )}
               <Button variant="ghost" onClick={finish}>
                 {t("skip")}
               </Button>

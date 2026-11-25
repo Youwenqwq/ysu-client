@@ -69,10 +69,7 @@ describe("official composition", () => {
       appVersion: officialCompositionSource.appVersion,
       repoUrl: "https://github.com/Youwenqwq/orahako",
     })
-    expect(configs.get("orahako.auth-ui")).toMatchObject({
-      defaultLanding: "overview",
-      schools: [{ id: "ysu", name: "燕山大学", nameEn: "Yanshan University" }],
-    })
+    expect(configs.get("orahako.auth-ui")).toEqual({ defaultLanding: "overview" })
     expect(configs.get("orahako.onboarding")).toMatchObject({
       marketUrl: composition.market?.indexUrl,
       schools: [{ id: "ysu", builtin: true }],

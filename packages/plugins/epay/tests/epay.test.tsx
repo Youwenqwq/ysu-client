@@ -312,6 +312,7 @@ describe("@orahako/plugin-epay", () => {
     const epaySchool: SchoolProvider = defineSchoolProvider({
       id: "epay-school",
       name: "缴费大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         epay: {
           fetchPayments,
@@ -330,6 +331,7 @@ describe("@orahako/plugin-epay", () => {
     const plainSchool: SchoolProvider = defineSchoolProvider({
       id: "plain-school",
       name: "无缴费大学",
+      timeZone: "Asia/Shanghai",
       slices: {},
       async initialize() {},
       async reset() {},

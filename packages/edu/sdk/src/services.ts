@@ -137,7 +137,15 @@ export interface QueryService {
   cacheKey(identity: ProviderQueryIdentity & { username: string }): string
   readPersistent<T>(key: string): PersistentQueryValue<T> | null
   writePersistent<T>(key: string, value: PersistentQueryValue<T>): void
-  clearPersistent(): void
+  /**
+   * Clear persistent query data. Without an identity filter every entry is
+   * removed; provided fields are matched with AND semantics and clear every
+   * provider generation for the matching provider/user.
+   */
+  clearPersistent(identity?: {
+    readonly providerId?: string
+    readonly username?: string | null
+  }): void
 }
 
 export type PollingFlagMapping =

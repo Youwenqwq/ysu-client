@@ -74,6 +74,7 @@ describe("runEpayAutoCheck (scoped epaySettingsStore)", () => {
     testProvider = defineSchoolProvider({
       id: "ysu",
       name: "燕山大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         epay: {
           fetchPayments,

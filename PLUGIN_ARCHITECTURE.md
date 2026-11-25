@@ -62,7 +62,7 @@ Activation 只由 `scripts/deploy-website.sh` 的 `APP_DEPLOYMENT=edgeone-pwa` �
 | `native` | `runtime/native` | 版本化宿主能力 |
 | `assets` / `plugins` | `runtime/packages` | 包内资源和市场安装 |
 
-教务运行时是可选服务：Provider 通过 `ctx.providers.registerProvider(schoolId, factory)` 注册；`SchoolProvider` 以正交 `AcademicSliceMap` 组合认证和业务切片，不恢复单体 Provider。`reset()` / `logout()` 只用于用户显式操作；学校切换、热替换和宿主退出调用本地 `dispose()`，新实例初始化前等待旧实例释放，旧实例不得再清理共享 Query、凭据或 Native 状态。`timetable.scheduleRules` 声明学校时区与作息分界，通用教务算法不固定学校时区。Provider 的能力声明与 `supportedPlugins` 同时决定查询、页面、导航和功能插件是否可用。查询数据 record 可按身份共享，但每个插件的 descriptor、enabled 和订阅生命周期相互隔离；TTL/persist 策略由功能插件通过 `query.registerPolicy` 在自己的作用域注册，不在运行时枚举业务功能。官方组合只内置 YSU 学校元数据；初始化向导会从当前市场的 `provider` 类别发现其他学校，约定插件 ID 为 `<schoolId>.provider`，选择时安装该插件并验证对应 Provider 已注册，不在部署配置中枚举社区学校。
+教务运行时是可选服务：Provider 通过 `ctx.providers.registerProvider(schoolId, factory)` 注册；`SchoolProvider` 以正交 `AcademicSliceMap` 组合认证和业务切片，不恢复单体 Provider。`reset()` / `logout()` 只用于用户显式操作；热替换和宿主退出调用本地 `dispose()`，新实例初始化前等待旧实例释放，旧实例不得再清理共享 Query、凭据或 Native 状态。`SchoolProvider.timeZone` 声明学校时区，`timetable.scheduleRules` 声明作息分界，通用教务算法不固定学校时区。Provider 的能力声明与 `supportedPlugins` 同时决定查询、页面、导航和功能插件是否可用。查询数据 record 可按身份共享，但每个插件的 descriptor、enabled 和订阅生命周期相互隔离；TTL/persist 策略由功能插件通过 `query.registerPolicy` 在自己的作用域注册，不在运行时枚举业务功能。官方组合只内置并默认选择 YSU；初始化向导仅在用户打开“更多学校”时从当前市场的 `provider` 类别发现其他学校，约定插件 ID 为 `<schoolId>.provider`，选择时安装该插件并验证对应 Provider 已注册，不在部署配置中枚举社区学校。学校确认后是固定应用身份，登录、账号和 App 内插件市场不提供切校或 Provider 安装入口；Provider 市场条目只服务于初始化向导。
 
 ## Slot、UI 与四份派生 Props
 

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
+import "./test-contract"
 import {
   Context,
   definePlugin,
@@ -196,7 +197,7 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
     let receivedConfig: unknown
 
     const configurable = definePlugin({
-      manifest: makeManifest("example.configurable", { kind: "runtime", provides: ["analytics"] }),
+      manifest: makeManifest("example.configurable", { kind: "runtime", provides: ["kernelTelemetry"] }),
       configSchema: {
         type: "object",
         properties: {
@@ -207,7 +208,7 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
       apply: async (ctx, config) => {
         await Promise.resolve()
         receivedConfig = config
-        ctx.set("analytics", {
+        ctx.set("kernelTelemetry", {
           endpoint: String(config.endpoint),
           track: async () => ({ tracked: false, reason: "disabled" as const, date: null }),
         })
@@ -222,11 +223,11 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
     // Missing declared `provides` fails startup
     const brokenProvider = makeManifest("example.broken-provider", {
       kind: "runtime",
-      provides: ["updater"],
+      provides: ["kernelTelemetry"],
     })
     runtime.register(brokenProvider, () => {}, "builtin")
     await expect(runtime.startAndWait(brokenProvider.id)).rejects.toThrow(
-      "did not provide declared service: updater"
+      "did not provide declared service: kernelTelemetry"
     )
     expect(runtime.get(brokenProvider.id)?.status).toBe("failed")
     runtime.dispose()
@@ -442,6 +443,145 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
     expect(runtime.get(manifest.id)?.status).toBe("active")
     runtime.dispose()
   })
+
+  it("waits for an async disposer before Cordis auto-restart applies the next generation", async () => {
+    const runtime = new PluginRuntime()
+    const releaseCleanup = Promise.withResolvers<void>()
+    const cleanupStarted = Promise.withResolvers<void>()
+    const applied: number[] = []
+    let starts = 0
+    let finished = 0
+    const manifest = makeManifest("example.auto-restart-cleanup", { inject: ["ui"] })
+
+    const releaseFirst = runtime.context.set("ui", new LabelledRootService("first"))
+    runtime.register(
+      manifest,
+      (ctx: Context) => {
+        starts += 1
+        const generation = starts
+        applied.push(generation)
+        ctx.effect(() => async () => {
+          if (generation !== 1) return
+          cleanupStarted.resolve()
+          await releaseCleanup.promise
+          finished += 1
+        })
+      },
+      "builtin"
+    )
+    await runtime.startAndWait(manifest.id)
+    expect(starts).toBe(1)
+
+    // A required-service replacement disposes and restarts the Cordis scope.
+    releaseFirst()
+    const releaseSecond = runtime.context.set("ui", new LabelledRootService("second"))
+    await cleanupStarted.promise
+    await Promise.resolve()
+    expect(applied).toEqual([1])
+    expect(finished).toBe(0)
+    expect(starts).toBe(1)
+    expect(runtime.get(manifest.id)?.status).toBe("starting")
+
+    // A second replacement while the first cleanup is still pending supersedes
+    // the queued attempt; only the newest attempt may eventually apply.
+    releaseSecond()
+    runtime.context.set("ui", new LabelledRootService("third"))
+    await Promise.resolve()
+    expect(starts).toBe(1)
+
+    releaseCleanup.resolve()
+    await runtime.flush()
+    expect(finished).toBe(1)
+    expect(starts).toBe(2)
+    expect(applied).toEqual([1, 2])
+    expect(runtime.get(manifest.id)?.status).toBe("active")
+    await runtime.dispose()
+  })
+
+  it("abandons an apply that never settles so runtime disposal stays bounded", async () => {
+    vi.useFakeTimers()
+    const runtime = new PluginRuntime()
+    const never = Promise.withResolvers<void>()
+    const manifest = makeManifest("example.never-settles")
+
+    runtime.register(manifest, async () => {
+      await never.promise
+    }, "builtin")
+    const pending = runtime.startAndWait(manifest.id, 5_000)
+    const assertion = expect(pending).rejects.toThrow("Plugin startup timed out")
+    await vi.advanceTimersByTimeAsync(5_000)
+    await assertion
+    expect(runtime.get(manifest.id)?.status).toBe("failed")
+    // Introspection: the abandoned apply is no longer tracked as awaited work.
+    const internals = runtime as unknown as { applyAbandons: Set<unknown> }
+    expect(internals.applyAbandons.size).toBe(0)
+
+    let settled = false
+    const disposal = runtime.dispose().then(() => {
+      settled = true
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    await Promise.resolve()
+    expect(settled).toBe(true)
+    await disposal
+    expect(runtime.get(manifest.id)).toBeUndefined()
+
+    // A late resolution must not revive the abandoned apply.
+    never.resolve()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(settled).toBe(true)
+    vi.useRealTimers()
+  })
+
+  it("waits for async disposers in stopAndWait and unregisterAndWait", async () => {
+    const runtime = new PluginRuntime()
+    const firstCleanup = Promise.withResolvers<void>()
+    const secondCleanup = Promise.withResolvers<void>()
+    const manifest = makeManifest("example.single-cleanup")
+    let cleanupGeneration = 0
+    let finished = 0
+
+    runtime.register(
+      manifest,
+      (ctx: Context) => {
+        cleanupGeneration += 1
+        const generation = cleanupGeneration
+        ctx.effect(() => async () => {
+          if (generation === 1) await firstCleanup.promise
+          if (generation === 2) await secondCleanup.promise
+          finished += 1
+        })
+      },
+      "builtin"
+    )
+    await runtime.startAndWait(manifest.id)
+
+    let stopped = false
+    const stopping = runtime.stopAndWait(manifest.id).then(() => {
+      stopped = true
+    })
+    await Promise.resolve()
+    expect(stopped).toBe(false)
+    expect(finished).toBe(0)
+    firstCleanup.resolve()
+    await stopping
+    expect(finished).toBe(1)
+
+    await runtime.startAndWait(manifest.id)
+    let unregistered = false
+    const unregistering = runtime.unregisterAndWait(manifest.id).then(() => {
+      unregistered = true
+    })
+    await Promise.resolve()
+    expect(unregistered).toBe(false)
+    expect(finished).toBe(1)
+    secondCleanup.resolve()
+    await unregistering
+    expect(finished).toBe(2)
+    expect(runtime.get(manifest.id)).toBeUndefined()
+    await runtime.dispose()
+  })
+
 
   it("does not restart optional consumers while disposing", async () => {
     const runtime = new PluginRuntime()

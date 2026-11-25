@@ -726,13 +726,16 @@ export const schedulePlugin = definePlugin({
       )
     )
 
-    ctx.effect(() => () => {
+    ctx.effect(() => async () => {
       disposed = true
       minuteClock.dispose()
-      void controller.dispose()
-      viewStore.dispose()
-      patchesStore.dispose()
-      settingsStore.dispose()
+      try {
+        await controller.dispose()
+      } finally {
+        viewStore.dispose()
+        patchesStore.dispose()
+        settingsStore.dispose()
+      }
     })
   },
 })

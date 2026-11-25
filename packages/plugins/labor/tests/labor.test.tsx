@@ -295,6 +295,7 @@ describe("@orahako/plugin-labor", () => {
     const school: SchoolProvider = defineSchoolProvider({
       id: "labor-school",
       name: "劳动大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         labor: {
           getLaborSummary,

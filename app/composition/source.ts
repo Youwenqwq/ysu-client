@@ -69,7 +69,7 @@ const deployment: CompositionLayer = {
     },
     {
       id: "orahako.auth-ui",
-      config: { schools, defaultLanding: academicBundle.defaults.landing },
+      config: { defaultLanding: academicBundle.defaults.landing },
     },
     {
       id: "orahako.onboarding",

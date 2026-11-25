@@ -3,9 +3,7 @@ import {
   definePlugin,
   PLUGIN_API_VERSION,
   pluginPageHref,
-  resolveDictionaryMessage,
-  type DefinedDictionary,
-  type DictionaryMessages,
+  resolveContributionText,
   type PluginAppNavigationDefinition,
   type PluginLocale,
   type PluginManifest,
@@ -68,42 +66,6 @@ export const manifest: PluginManifest = {
 type AppNavigationEntry = PluginNavigationContribution & PluginAppNavigationDefinition
 
 const KNOWN_GROUP_ORDER = ["main", "academic", "platform", "fees", "extras", "plugins"]
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function isDictionaryMessages(value: unknown): value is DictionaryMessages {
-  return isPlainRecord(value)
-}
-
-function isDefinedDictionary(value: unknown): value is DefinedDictionary {
-  return isPlainRecord(value) && isDictionaryMessages(value.zh) && isDictionaryMessages(value.en)
-}
-
-function resolveDictText(
-  dictionary: unknown,
-  key: string | undefined,
-  fallback: string | undefined,
-  locale: PluginLocale,
-  translateShared: (k: string, loc: PluginLocale) => string
-): string {
-  if (key) {
-    if (isDefinedDictionary(dictionary)) {
-      const primary = locale === "en" ? dictionary.en : dictionary.zh
-      const secondary = locale === "en" ? dictionary.zh : dictionary.en
-      const resolved =
-        resolveDictionaryMessage(primary, key) ?? resolveDictionaryMessage(secondary, key)
-      if (resolved !== undefined) return resolved
-    } else if (isDictionaryMessages(dictionary)) {
-      const resolved = resolveDictionaryMessage(dictionary, key)
-      if (resolved !== undefined) return resolved
-    }
-    const shared = translateShared(key, locale)
-    if (shared !== key) return shared
-  }
-  return fallback ?? key ?? ""
-}
 
 export const uiProfilePlugin = definePlugin<
   readonly ["ui", "slots", "router", "navigation", "i18n", "storage", "native"],
@@ -210,13 +172,14 @@ export const uiProfilePlugin = definePlugin<
             return {
               id: `${item.pluginId}:${item.id}`,
               href: ctx.router.href(rawHref),
-              label: resolveDictText(
-                targetPage?.dictionary,
-                item.titleKey,
-                item.title ?? targetPage?.title ?? item.id,
+              label: resolveContributionText({
+                dictionary: targetPage?.dictionary,
+                key: item.titleKey,
+                literal: item.title ?? targetPage?.title ?? item.id,
                 locale,
-                (key, loc) => ctx.i18n.t(key, undefined, loc)
-              ),
+                pluginId: item.pluginId,
+                i18n: ctx.i18n,
+              }),
               icon: item.icon,
               onNavigate: () => {
                 ctx.router.push({

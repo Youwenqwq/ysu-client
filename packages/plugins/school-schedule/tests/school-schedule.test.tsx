@@ -494,6 +494,7 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
     const schoolProvider: SchoolProvider = defineSchoolProvider({
       id: "ysu",
       name: "燕山大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         timetable: {
           getSchedule: async () => [],

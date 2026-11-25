@@ -33,6 +33,7 @@ import {
   NOTIFICATIONS_PLUGIN_ID,
   notificationSettingsStore,
   notificationsPlugin,
+  type NotificationSettingsStoreInstance,
 } from "../src"
 
 function createMemoryStorage(): PluginKeyValueStorage {
@@ -127,6 +128,7 @@ function createHarness(options?: { isNative?: boolean }) {
     defineSchoolProvider({
       id,
       name: `School-${id}`,
+      timeZone: "Asia/Shanghai",
       ...(supportedPlugins ? { supportedPlugins } : {}),
       slices: {
         ecard: {
@@ -215,6 +217,7 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
     const provider = defineSchoolProvider({
       id: "campus-a",
       name: "Campus A",
+      timeZone: "Asia/Shanghai",
       slices: {
         ecard: { fetchBalance: async () => ({ ready: true, balance: null }) },
       },
@@ -349,7 +352,7 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
     expect(category).toBeDefined()
     expect(slots.select("debug.panels")).toHaveLength(1)
 
-    const store = category.store as ReturnType<typeof notificationSettingsStore.create>
+    const store = category.store as NotificationSettingsStoreInstance
     await vi.waitFor(() => expect(store.hydrated.getSnapshot()).toBe(true))
 
     // Enable polling + coalesce rapid mutations

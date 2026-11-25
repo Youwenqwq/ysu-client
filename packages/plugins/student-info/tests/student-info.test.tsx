@@ -242,6 +242,7 @@ describe("@orahako/plugin-student-info", () => {
     const schoolProvider: SchoolProvider = defineSchoolProvider({
       id: "demo-school",
       name: "示例大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         studentProfile: {
           getStudentInfo: getStudentInfoSpy,

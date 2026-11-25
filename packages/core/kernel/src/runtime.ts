@@ -76,6 +76,21 @@ interface PluginContextBinding {
   attempt: number
 }
 
+/**
+ * An in-flight apply that a startup timeout or stop may explicitly abandon.
+ * The underlying promise is never treated as settled: the runtime stops
+ * awaiting it so `flush`/`dispose` stay bounded, and the task itself ignores
+ * late resolution or rejection through the `abandoned` flag.
+ */
+interface ApplyAbandon {
+  readonly plugin: RegisteredPlugin
+  readonly generation: number
+  readonly signal: Promise<void>
+  abandoned: boolean
+  abandon(): void
+  release(): void
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -204,6 +219,8 @@ export class PluginRuntime {
   private readonly contexts = new WeakMap<Context, PluginContextBinding>()
   private readonly pendingMounts = new Set<Promise<void>>()
   private readonly pendingCleanupRecycling = new Set<Promise<void>>()
+  /** Explicitly abandoned apply promises; never awaited by flush/dispose. */
+  private readonly applyAbandons = new Set<ApplyAbandon>()
   private readonly cleanupById = new Map<string, Set<Promise<void>>>()
   /** Registration epoch per cleanup set, so delayed recycling never drops a new owner. */
   private readonly cleanupEpoch = new WeakMap<Set<Promise<void>>, number>()
@@ -318,6 +335,9 @@ export class PluginRuntime {
       const current = this.plugins.get(resolvedManifest.id)
       if (!current || !current.mounted) return
       const generation = current.generation
+      // Cordis restarts a consumer on required-service replacement without
+      // touching our mount generation; every invocation still owns a distinct
+      // attempt so a superseded delayed apply cannot run twice.
       current.attempt += 1
       const attempt = current.attempt
       if (current.status === "failed") {
@@ -326,99 +346,7 @@ export class PluginRuntime {
         current.status = "starting"
         current.error = undefined
       }
-      let scoped = ctx
-      const scopedServices: Array<{
-        name: string
-        service: { [PLUGIN_SERVICE_SCOPE](c: Context, m: PluginManifest): unknown }
-      }> = []
-
-      for (const [name] of Object.entries(current.inject)) {
-        const service: unknown = ctx.get(name)
-        if (service == null || !isScopedPluginService(service)) continue
-        scoped = scoped.isolate(name)
-        scopedServices.push({ name, service })
-      }
-
-      const provided = new Set<string>()
-      const pluginCtx = trackProvidedServices(scoped, provided, (promise) =>
-        this.trackPluginCleanup(current, promise)
-      )
-
-      // Facades observe the exact final context passed to apply; service writes
-      // themselves stay outside `provides` tracking because they are dependencies.
-      for (const { name, service } of scopedServices) {
-        scoped.set(name, service[PLUGIN_SERVICE_SCOPE](pluginCtx, current.manifest))
-      }
-
-      this.contexts.set(ctx, { plugin: current, generation, attempt })
-      this.contexts.set(scoped, { plugin: current, generation, attempt })
-      this.contexts.set(pluginCtx, { plugin: current, generation, attempt })
-
-      let result: void | Promise<void>
-      try {
-        result = invokeExecutable(current.executable, pluginCtx, resolvedConfig)
-      } catch (error) {
-        current.status = "failed"
-        current.error = errorMessage(error)
-        this.invalidateDependents(current.manifest.id)
-        this.publish()
-        throw error
-      }
-
-      if (isPromiseLike(result)) {
-        current.pendingCount += 1
-        current.status = "starting"
-        current.error = undefined
-        this.publish()
-        ctx.scope.ensure(async () => {
-          try {
-            await result
-            if (
-              current.generation !== generation ||
-              current.attempt !== attempt ||
-              !current.mounted
-            ) {
-              return
-            }
-            this.assertProvides(current, provided)
-          } catch (error) {
-            if (
-              current.generation !== generation ||
-              current.attempt !== attempt ||
-              !current.mounted
-            ) {
-              // A service replacement already started a newer attempt; do not
-              // let the stale rejection cancel the revived Cordis scope.
-              return
-            }
-            current.status = "failed"
-            current.error = errorMessage(error)
-            this.invalidateDependents(current.manifest.id)
-            throw error
-          } finally {
-            if (current.generation === generation) {
-              current.pendingCount = Math.max(0, current.pendingCount - 1)
-            }
-            if (current.generation === generation && current.attempt === attempt) {
-              this.syncPluginStatus(current)
-            }
-            this.publish()
-          }
-        })
-      } else {
-        try {
-          this.assertProvides(current, provided)
-        } catch (error) {
-          current.status = "failed"
-          current.error = errorMessage(error)
-          this.invalidateDependents(current.manifest.id)
-          this.publish()
-          throw error
-        }
-        current.status = "active"
-        current.error = undefined
-        this.publish()
-      }
+      this.scheduleApply(ctx, current, generation, attempt, resolvedConfig)
     }
     cordisPlugin.inject = inject
 
@@ -448,35 +376,257 @@ export class PluginRuntime {
     }
   }
 
+  /**
+   * A required-service replacement makes Cordis dispose the old scope and
+   * immediately invoke the plugin again. Its async disposers are only tracked
+   * after they start, so the new generation must explicitly wait for them
+   * before apply runs. Only after that wait is a real apply attempt started.
+   */
+  private scheduleApply(
+    ctx: Context,
+    plugin: RegisteredPlugin,
+    generation: number,
+    attempt: number,
+    resolvedConfig: PluginConfig
+  ): void {
+    if (plugin.generation !== generation || !plugin.mounted || plugin.attempt !== attempt) return
+    if (plugin.cleanup.size === 0) {
+      this.applyAttempt(ctx, plugin, generation, attempt, resolvedConfig)
+      return
+    }
+
+    plugin.status = "starting"
+    plugin.error = undefined
+    plugin.pendingCount += 1
+    this.publish()
+    const abandon = this.createApplyAbandon(plugin, generation)
+    const task = (async () => {
+      try {
+        await Promise.race([this.waitForCleanup(plugin), abandon.signal])
+        if (abandon.abandoned) return
+        if (
+          plugin.generation !== generation ||
+          !plugin.mounted ||
+          plugin.attempt !== attempt
+        ) {
+          return
+        }
+        this.applyAttempt(ctx, plugin, generation, attempt, resolvedConfig)
+      } catch (error) {
+        // `applyAttempt` records its own synchronous failures; reaching here
+        // means the cleanup wait itself failed.
+        if (abandon.abandoned) return
+        plugin.status = "failed"
+        plugin.error = errorMessage(error)
+        this.invalidateDependents(plugin.manifest.id)
+        throw error
+      } finally {
+        abandon.release()
+        if (plugin.generation === generation) {
+          plugin.pendingCount = Math.max(0, plugin.pendingCount - 1)
+        }
+        this.publish()
+      }
+    })()
+    ctx.scope.ensure(() => task)
+  }
+
+  private applyAttempt(
+    ctx: Context,
+    current: RegisteredPlugin,
+    generation: number,
+    attempt: number,
+    resolvedConfig: PluginConfig
+  ): void {
+    if (
+      current.generation !== generation ||
+      !current.mounted ||
+      current.attempt !== attempt
+    ) {
+      return
+    }
+    let scoped = ctx
+    const scopedServices: Array<{
+      name: string
+      service: { [PLUGIN_SERVICE_SCOPE](c: Context, m: PluginManifest): unknown }
+    }> = []
+
+    for (const [name] of Object.entries(current.inject)) {
+      const service: unknown = ctx.get(name)
+      if (service == null || !isScopedPluginService(service)) continue
+      scoped = scoped.isolate(name)
+      scopedServices.push({ name, service })
+    }
+
+    const provided = new Set<string>()
+    const pluginCtx = trackProvidedServices(scoped, provided, (promise) =>
+      this.trackPluginCleanup(current, promise)
+    )
+
+    // Facades observe the exact final context passed to apply; service writes
+    // themselves stay outside `provides` tracking because they are dependencies.
+    for (const { name, service } of scopedServices) {
+      scoped.set(name, service[PLUGIN_SERVICE_SCOPE](pluginCtx, current.manifest))
+    }
+
+    this.contexts.set(ctx, { plugin: current, generation, attempt })
+    this.contexts.set(scoped, { plugin: current, generation, attempt })
+    this.contexts.set(pluginCtx, { plugin: current, generation, attempt })
+
+    let result: void | Promise<void>
+    try {
+      result = invokeExecutable(current.executable, pluginCtx, resolvedConfig)
+    } catch (error) {
+      current.status = "failed"
+      current.error = errorMessage(error)
+      this.invalidateDependents(current.manifest.id)
+      this.publish()
+      throw error
+    }
+
+    if (isPromiseLike(result)) {
+      current.pendingCount += 1
+      current.status = "starting"
+      current.error = undefined
+      this.publish()
+      const abandon = this.createApplyAbandon(current, generation)
+      const task = (async () => {
+        try {
+          await Promise.race([result, abandon.signal])
+          if (abandon.abandoned) return
+          if (
+            current.generation !== generation ||
+            current.attempt !== attempt ||
+            !current.mounted
+          ) {
+            return
+          }
+          this.assertProvides(current, provided)
+        } catch (error) {
+          if (
+            abandon.abandoned ||
+            current.generation !== generation ||
+            current.attempt !== attempt ||
+            !current.mounted
+          ) {
+            // A service replacement or an explicit abandonment already moved
+            // on; do not let the stale rejection cancel the revived scope.
+            return
+          }
+          current.status = "failed"
+          current.error = errorMessage(error)
+          this.invalidateDependents(current.manifest.id)
+          throw error
+        } finally {
+          abandon.release()
+          if (current.generation === generation) {
+            current.pendingCount = Math.max(0, current.pendingCount - 1)
+          }
+          if (current.generation === generation && current.attempt === attempt) {
+            this.syncPluginStatus(current)
+          }
+          this.publish()
+        }
+      })()
+      ctx.scope.ensure(() => task)
+    } else {
+      try {
+        this.assertProvides(current, provided)
+      } catch (error) {
+        current.status = "failed"
+        current.error = errorMessage(error)
+        this.invalidateDependents(current.manifest.id)
+        this.publish()
+        throw error
+      }
+      current.status = "active"
+      current.error = undefined
+      this.publish()
+    }
+  }
+
+  private createApplyAbandon(
+    plugin: RegisteredPlugin,
+    generation: number
+  ): ApplyAbandon {
+    const { promise, resolve } = Promise.withResolvers<void>()
+    const handle: ApplyAbandon = {
+      plugin,
+      generation,
+      signal: promise,
+      abandoned: false,
+      abandon() {
+        if (this.abandoned) return
+        this.abandoned = true
+        resolve()
+      },
+      release: () => {
+        this.applyAbandons.delete(handle)
+      },
+    }
+    this.applyAbandons.add(handle)
+    return handle
+  }
+
+  private abandonApplies(plugin: RegisteredPlugin, generation?: number): void {
+    for (const handle of this.applyAbandons) {
+      if (handle.plugin !== plugin) continue
+      if (generation !== undefined && handle.generation !== generation) continue
+      handle.abandon()
+    }
+  }
+
+  private releaseCleanupBucket(id: string, cleanup: Set<Promise<void>>): void {
+    if (this.cleanupById.get(id) !== cleanup) return
+    if (cleanup.size === 0) {
+      this.cleanupById.delete(id)
+      return
+    }
+    const epoch = this.cleanupEpoch.get(cleanup)
+    const pending = Array.from(cleanup)
+    const recycling = (async () => {
+      await Promise.allSettled(pending)
+      // A re-registration bumps the epoch and owns the same cleanup set;
+      // leave its pending cleanup registered for the new plugin instance.
+      if (this.cleanupById.get(id) === cleanup && this.cleanupEpoch.get(cleanup) === epoch) {
+        this.cleanupById.delete(id)
+      }
+    })()
+    this.pendingCleanupRecycling.add(recycling)
+    void recycling.then(
+      () => this.pendingCleanupRecycling.delete(recycling),
+      () => this.pendingCleanupRecycling.delete(recycling)
+    )
+  }
+
   unregister(id: string): void {
     const plugin = this.plugins.get(id)
     if (!plugin) return
     this.stop(id)
     this.context.registry.delete(plugin.cordisPlugin)
     this.plugins.delete(id)
-    const cleanup = plugin.cleanup
-    if (this.cleanupById.get(id) === cleanup) {
-      if (cleanup.size === 0) {
-        this.cleanupById.delete(id)
-      } else {
-        const epoch = this.cleanupEpoch.get(cleanup)
-        const pending = Array.from(cleanup)
-        const recycling = (async () => {
-          await Promise.allSettled(pending)
-          // A re-registration bumps the epoch and owns the same cleanup set;
-          // leave its pending cleanup registered for the new plugin instance.
-          if (this.cleanupById.get(id) === cleanup && this.cleanupEpoch.get(cleanup) === epoch) {
-            this.cleanupById.delete(id)
-          }
-        })()
-        this.pendingCleanupRecycling.add(recycling)
-        void recycling.then(
-          () => this.pendingCleanupRecycling.delete(recycling),
-          () => this.pendingCleanupRecycling.delete(recycling)
-        )
-      }
-    }
+    this.releaseCleanupBucket(id, plugin.cleanup)
     this.publish()
+  }
+
+  async unregisterAndWait(id: string): Promise<void> {
+    const plugin = this.plugins.get(id)
+    if (!plugin) return
+    this.stop(id)
+    await this.waitForCleanup(plugin)
+    // A concurrent re-registration owns the id now; never delete it.
+    if (this.plugins.get(id) !== plugin) return
+    this.context.registry.delete(plugin.cordisPlugin)
+    this.plugins.delete(id)
+    this.releaseCleanupBucket(id, plugin.cleanup)
+    this.publish()
+  }
+
+  async stopAndWait(id: string, cascade = true): Promise<void> {
+    this.stop(id, cascade)
+    const plugin = this.plugins.get(id)
+    if (!plugin) return
+    await this.waitForCleanup(plugin)
   }
 
   start(id: string): void {
@@ -534,8 +684,13 @@ export class PluginRuntime {
       // the new generation run native setup before the old one finished
       // releasing it; the sync start/stop API stays available.
       plugin.status = "starting"
-      const mount: Promise<void> = this.waitForCleanup(plugin)
+      const abandon = this.createApplyAbandon(plugin, generation)
+      const mount: Promise<void> = Promise.race([
+        this.waitForCleanup(plugin),
+        abandon.signal,
+      ])
         .then(() => {
+          if (abandon.abandoned) return
           if (plugin.generation !== generation || !plugin.mounted) return
           try {
             plugin.scope = this.context.plugin(plugin.cordisPlugin, resolvedConfig)
@@ -546,6 +701,7 @@ export class PluginRuntime {
           this.publish()
         })
         .finally(() => {
+          abandon.release()
           this.pendingMounts.delete(mount)
         })
       this.pendingMounts.add(mount)
@@ -566,6 +722,7 @@ export class PluginRuntime {
   private resetFailedStart(plugin: RegisteredPlugin, error: unknown): void {
     plugin.mounted = false
     plugin.pendingCount = 0
+    this.abandonApplies(plugin)
     const scope = plugin.scope
     plugin.scope = undefined
     scope?.dispose()
@@ -610,6 +767,10 @@ export class PluginRuntime {
       plugin.generation += 1
       plugin.mounted = false
       plugin.pendingCount = 0
+      // An apply that never settles cannot be cancelled. Explicitly abandon
+      // its tracked task so runtime/host disposal does not wait forever; late
+      // resolution and rejection stay ignored by the generation/attempt guards.
+      this.abandonApplies(plugin, generation)
       plugin.scope?.dispose()
       this.context.registry.delete(plugin.cordisPlugin)
       plugin.scope = undefined
@@ -724,6 +885,7 @@ export class PluginRuntime {
     plugin.pendingCount = 0
     plugin.status = "disabled"
     plugin.error = undefined
+    this.abandonApplies(plugin)
     const scope = plugin.scope
     plugin.scope = undefined
     if (cascade) {
@@ -759,9 +921,12 @@ export class PluginRuntime {
   dispose(): Promise<void> {
     if (this.disposal) return this.disposal
     this.disposed = true
-    for (const id of Array.from(this.plugins.keys())) this.unregister(id)
     this.disposal = (async () => {
       try {
+        // Start every stop synchronously, then await all cleanup so one slow
+        // disposer cannot prevent the remaining plugins from being torn down.
+        const removals = Array.from(this.plugins.keys(), (id) => this.unregisterAndWait(id))
+        await Promise.allSettled(removals)
         await this.flush()
       } finally {
         await this.context.stop()

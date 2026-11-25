@@ -171,8 +171,6 @@ export const onboardingPlugin = definePlugin({
       }
     }
 
-    void discoverSchools()
-
     const activateSchoolChoice = async (school: OnboardingSchoolChoice): Promise<void> => {
       const builtinReady = school.builtin === true && providers.hasProvider(school.id)
 

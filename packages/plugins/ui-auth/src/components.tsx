@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowLeftRight, ChevronRight, CloudOff, LogIn, LogOut, TriangleAlert } from "lucide-react"
+import { ChevronRight, CloudOff, LogIn, LogOut, TriangleAlert } from "lucide-react"
 import type {
   ProviderRuntimeSnapshot,
   QueryActivitySnapshot,
@@ -31,7 +31,6 @@ import {
   TooltipTrigger,
 } from "@orahako/ui-primitives"
 import type { AuthUiDictionary } from "./dictionary"
-import type { AuthSchoolChoice } from "./login-page"
 
 export function RefreshIndicator({
   count,
@@ -269,12 +268,9 @@ export const StudentProfileHeader: SlotComponent<StudentProfileHeaderProps> = (p
 export interface AccountActionsInject {
   readonly hooks: {
     readonly session: ObservableSource<SessionSnapshot>
-    readonly providersRevision: ObservableSource<number>
   }
   readonly showLogoutConfirm: boolean
-  readonly listSchools: () => readonly AuthSchoolChoice[]
   readonly relogin: () => Promise<void>
-  readonly switchSchool: (schoolId?: string) => void
   readonly logout: () => Promise<void>
   readonly openLogin: () => void
 }
@@ -289,14 +285,9 @@ export type AccountActionsProps = DerivedComponentProps<
 
 export const AccountActions: SlotComponent<AccountActionsProps> = (props) => {
   const session = props.useSession()
-  const providersRevision = props.useProvidersRevision()
-  void providersRevision
 
   const [reloginBusy, setReloginBusy] = useState(false)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
-  const [schoolDialogOpen, setSchoolDialogOpen] = useState(false)
-
-  const schools = props.listSchools()
 
   if (!session.isAuthenticated) {
     return (
@@ -327,14 +318,6 @@ export const AccountActions: SlotComponent<AccountActionsProps> = (props) => {
     await props.logout()
   }
 
-  function handleSwitchClick() {
-    if (schools.length > 1) {
-      setSchoolDialogOpen(true)
-      return
-    }
-    props.switchSchool()
-  }
-
   return (
     <>
       <button
@@ -352,16 +335,6 @@ export const AccountActions: SlotComponent<AccountActionsProps> = (props) => {
 
       <button
         type="button"
-        onClick={handleSwitchClick}
-        className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
-      >
-        <ArrowLeftRight className="size-5 shrink-0 text-muted-foreground" />
-        <span className="flex-1 text-left text-sm">{props.t("session.switchSchool")}</span>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-      </button>
-
-      <button
-        type="button"
         onClick={() => {
           if (props.showLogoutConfirm) {
             setLogoutDialogOpen(true)
@@ -374,31 +347,6 @@ export const AccountActions: SlotComponent<AccountActionsProps> = (props) => {
         <LogOut className="size-5 shrink-0" />
         <span className="flex-1 text-left text-sm">{props.t("session.logout")}</span>
       </button>
-
-      <Dialog open={schoolDialogOpen} onOpenChange={setSchoolDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{props.t("session.switchSchool")}</DialogTitle>
-            <DialogDescription>{props.t("session.switchSchoolDesc")}</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-2">
-            {schools.map((school) => (
-              <Button
-                key={school.id}
-                variant={school.id === session.activeSchoolId ? "secondary" : "outline"}
-                className="justify-between"
-                onClick={() => {
-                  setSchoolDialogOpen(false)
-                  props.switchSchool(school.id)
-                }}
-              >
-                <span>{props.locale === "en" && school.nameEn ? school.nameEn : school.name}</span>
-                <span className="font-mono text-xs text-muted-foreground">{school.id}</span>
-              </Button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
         <DialogContent>

@@ -734,6 +734,7 @@ describe("@orahako/ui-mfa", () => {
     const fakeProvider: SchoolProvider = {
       id: "ysu",
       name: "YSU",
+      timeZone: "Asia/Shanghai",
       slices: {
         auth: {
           prepareLogin: async () => {},

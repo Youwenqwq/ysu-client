@@ -50,7 +50,7 @@ export const ExamsPage: SlotComponent<ExamsPageProps> = (props) => {
   const examsQuery = props.useExams()
   const providerSnap = props.useProvider()
   const queriedTerm = props.useQueriedTerm()
-  const timeZone = providerSnap.provider?.slices.timetable?.scheduleRules?.timeZone
+  const timeZone = providerSnap.provider?.timeZone
 
   const [term, setTerm] = useState(queriedTerm)
   useEffect(() => {

@@ -263,6 +263,7 @@ describe("@orahako/plugin-ecard", () => {
     const cardSchool: SchoolProvider = defineSchoolProvider({
       id: "card-school",
       name: "校园卡大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         ecard: {
           fetchBalance,
@@ -280,6 +281,7 @@ describe("@orahako/plugin-ecard", () => {
     const noCardSchool: SchoolProvider = defineSchoolProvider({
       id: "no-card-school",
       name: "无卡大学",
+      timeZone: "Asia/Shanghai",
       slices: {},
       async initialize() {},
       async reset() {},

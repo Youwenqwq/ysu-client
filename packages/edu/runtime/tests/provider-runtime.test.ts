@@ -34,6 +34,7 @@ function makeProvider(id: string, name = id): ControllableProvider {
   const base = defineSchoolProvider({
     id,
     name,
+    timeZone: "Asia/Shanghai",
     slices: {},
     initialize,
     reset,

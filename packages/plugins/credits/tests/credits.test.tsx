@@ -388,6 +388,7 @@ describe("@orahako/plugin-credits", () => {
     const school: SchoolProvider = defineSchoolProvider({
       id: "credits-school",
       name: "双创大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         credits: {
           getCreditSummary,

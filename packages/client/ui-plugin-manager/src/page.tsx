@@ -344,8 +344,10 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
     showSystemPlugins ? rows : rows.filter((row) => pluginCategory(row) !== "system")
   )
   const compatibleMarketPlugins =
-    market?.index.plugins.filter((plugin) =>
-      Boolean(selectCompatibleRelease(plugin, appVersion, platform, nativeCapabilities))
+    market?.index.plugins.filter(
+      (plugin) =>
+        pluginCategory(plugin) !== "provider" &&
+        Boolean(selectCompatibleRelease(plugin, appVersion, platform, nativeCapabilities))
     ) ?? []
   const marketGroups = groupByPluginCategory(compatibleMarketPlugins)
 

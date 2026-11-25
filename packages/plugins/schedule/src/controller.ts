@@ -113,7 +113,12 @@ export function computeClassAlarms(
           : undefined
       const alarmTime = dayStart + (startMinutes - remindMinutes) * 60_000
       const expiresAt = endAt ?? dayStart + startMinutes * 60_000
-      if (!Number.isFinite(alarmTime) || expiresAt <= now.getTime()) continue
+      if (
+        !Number.isFinite(alarmTime) ||
+        alarmTime <= now.getTime() ||
+        expiresAt <= now.getTime()
+      )
+        continue
 
       const alarmId = `${date}|${startSection}`
       const existing = alarms.find((alarm) => alarm.alarmId === alarmId)

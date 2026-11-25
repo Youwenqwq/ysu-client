@@ -42,6 +42,7 @@ function makeProvider(
   return defineSchoolProvider({
     id,
     name: id,
+    timeZone: "Asia/Shanghai",
     ...(supportedPlugins !== undefined ? { supportedPlugins } : {}),
     slices,
     initialize: async () => {},

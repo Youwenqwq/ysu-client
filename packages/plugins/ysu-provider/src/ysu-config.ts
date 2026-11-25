@@ -11,6 +11,8 @@ export interface YSUConfig {
   readonly id: string
   readonly name: string
   readonly nameEn: string
+  /** School wall-clock timezone used by academic date/time presentations. */
+  readonly timeZone: string
   readonly cas: {
     readonly cerBaseUrl: string
     readonly aesChars: string
@@ -48,7 +50,7 @@ export interface YSUConfig {
 export const YSU_CONFIG: YSUConfig = rawConfig
 /** YSU wall-clock timezone and the break rows its class-period table expects. */
 export const YSU_SCHEDULE_RULES: AcademicScheduleRules = {
-  timeZone: "Asia/Shanghai",
+  timeZone: YSU_CONFIG.timeZone,
   lunchAfter: 4,
   dinnerAfter: 8,
 }

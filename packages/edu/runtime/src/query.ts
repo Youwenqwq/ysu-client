@@ -119,6 +119,35 @@ export function providerCacheKey(
   ])
 }
 
+interface PersistentClearIdentity {
+  readonly providerId?: string
+  readonly username?: string | null
+}
+
+function cacheKeyMatchesIdentity(key: string, identity: PersistentClearIdentity): boolean {
+  const segments = key.split("|", 5)
+  if (segments[0] !== "provider" || segments.length < 4) return false
+  if (identity.providerId !== undefined && segments[1] !== hashKeyPart(identity.providerId)) {
+    return false
+  }
+  if (identity.username !== undefined) {
+    if (identity.username === null) return false
+    if (segments[3] !== hashKeyPart(identity.username)) return false
+  }
+  return true
+}
+
+function parsePersistentCacheEntries(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (isPlainRecord(parsed) && isPlainRecord(parsed.entries)) return parsed.entries
+    return isPlainRecord(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 function matchesIdentity(
   keyTuple: readonly unknown[],
   identity: Partial<ProviderQueryIdentity> | undefined
@@ -169,6 +198,7 @@ interface ResolvedIdentity {
   readonly providerId: string
   readonly providerScope: string
   readonly username: string | null
+  readonly descriptorKey: string
   readonly paramsKey: string
   readonly sliceKey: string
   readonly recordKey: string
@@ -260,6 +290,8 @@ interface AnyDescriptor {
 }
 
 class QuerySourceHandle {
+  readonly consumerId: string
+  readonly descriptorKey: string
   readonly handleKey: string
   readonly source: ObservableSource<QuerySnapshot<unknown>>
   descriptor: AnyDescriptor
@@ -275,12 +307,15 @@ class QuerySourceHandle {
 
   constructor(
     service: QueryRuntimeService,
-    handleKey: string,
+    consumerId: string,
+    descriptorKey: string,
     descriptor: AnyDescriptor,
     initialRecord: QueryIdentityRecord
   ) {
     this.service = service
-    this.handleKey = handleKey
+    this.consumerId = consumerId
+    this.descriptorKey = descriptorKey
+    this.handleKey = `${consumerId}|${descriptorKey}`
     this.descriptor = descriptor
     this.boundRecord = initialRecord
     this.lastEvaluatedEnabled = evaluateEnabled(descriptor.enabled)
@@ -342,7 +377,9 @@ class QuerySourceHandle {
     if (this.listeners.size === 0 && this.boundRecord.inFlight === null) {
       const latestRecord = this.service.resolveRecordForDescriptor(this.descriptor, this.boundRecord)
       if (latestRecord !== this.boundRecord) {
+        const previousRecord = this.boundRecord
         this.boundRecord = latestRecord
+        this.service.releaseRecord(previousRecord)
       }
       this.service.syncPassiveRecord(this.boundRecord, this.descriptor)
     }
@@ -355,8 +392,10 @@ class QuerySourceHandle {
     this.listeners.add(listener)
 
     if (wasIdle) {
+      const previousRecord = this.boundRecord
       const targetRecord = this.service.resolveRecordForDescriptor(this.descriptor)
       this.boundRecord = targetRecord
+      if (previousRecord !== targetRecord) this.service.releaseRecord(previousRecord)
       this.boundRecord.holderCount += 1
       this.detachRecord = this.boundRecord.addListener(() => {
         this.refreshCachedSnapshot(true)
@@ -421,11 +460,14 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
 
   private readonly memoryCache = new Map<string, PersistentQueryValue<unknown>>()
   private readonly dirtyKeys = new Set<string>()
+  private readonly hydrationClearFilters: PersistentClearIdentity[] = []
+  private persistenceQueue: Promise<void> = Promise.resolve()
   private clearEpoch = 0
   private hasHydrated = false
 
   private readonly records = new Map<string, QueryIdentityRecord>()
   private readonly handles = new Map<string, QuerySourceHandle>()
+  private readonly latestHandleKeys = new Map<string, string>()
   private readonly activeHandles = new Set<QuerySourceHandle>()
   private activeRefreshCount = 0
 
@@ -466,6 +508,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     this.teardownUpstreamSubscriptions()
     this.activeHandles.clear()
     this.handles.clear()
+    this.latestHandleKeys.clear()
     this.records.clear()
     this.activitySource.set({ refreshingCount: 0, staleCount: 0 })
   }
@@ -550,12 +593,51 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     this.flushPersistentCache()
   }
 
-  clearPersistent = (): void => {
-    this.clearEpoch += 1
-    this.memoryCache.clear()
-    this.dirtyKeys.clear()
-    void this.storage.local.removeItem(PERSISTENT_CACHE_STORAGE_KEY).catch(() => {
-      // Storage removal errors are non-fatal for in-memory query state.
+  clearPersistent = (identity?: PersistentClearIdentity): void => {
+    if (!identity) {
+      this.clearEpoch += 1
+      this.memoryCache.clear()
+      this.dirtyKeys.clear()
+      this.hydrationClearFilters.length = 0
+      this.enqueuePersistence(async () => {
+        try {
+          await this.storage.local.removeItem(PERSISTENT_CACHE_STORAGE_KEY)
+        } catch {
+          // Storage removal errors are non-fatal for in-memory query state.
+        }
+      })
+      return
+    }
+
+    const filter: PersistentClearIdentity = { ...identity }
+    for (const key of Array.from(this.memoryCache.keys())) {
+      if (cacheKeyMatchesIdentity(key, filter)) this.memoryCache.delete(key)
+    }
+    for (const key of Array.from(this.dirtyKeys)) {
+      if (cacheKeyMatchesIdentity(key, filter)) this.dirtyKeys.delete(key)
+    }
+    if (!this.hasHydrated) this.hydrationClearFilters.push(filter)
+
+    this.enqueuePersistence(async () => {
+      try {
+        const stored = parsePersistentCacheEntries(
+          await this.storage.local.getItem(PERSISTENT_CACHE_STORAGE_KEY)
+        )
+        if (!stored) return
+        let changed = false
+        for (const key of Object.keys(stored)) {
+          if (!cacheKeyMatchesIdentity(key, filter)) continue
+          delete stored[key]
+          changed = true
+        }
+        if (!changed) return
+        await this.storage.local.setItem(
+          PERSISTENT_CACHE_STORAGE_KEY,
+          JSON.stringify({ version: 1, entries: stored })
+        )
+      } catch {
+        // Storage cleanup errors are non-fatal for in-memory query state.
+      }
     })
   }
 
@@ -586,7 +668,10 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
       fetcher: (provider) => descriptor.fetcher(provider),
     }
     const resolved = this.resolveIdentity(anyDesc)
-    const handleKey = `${consumerId}|${resolved.recordKey}`
+    const handleKey = `${consumerId}|${resolved.descriptorKey}`
+    this.evictStaleState()
+    this.pruneConsumerHandles(consumerId, handleKey)
+    this.latestHandleKeys.set(consumerId, handleKey)
     const existing = this.handles.get(handleKey)
     if (existing) {
       existing.updateDescriptor(anyDesc)
@@ -595,7 +680,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     const record = anyDesc.releaseOnInactive
       ? new QueryIdentityRecord(resolved, anyDesc.feature, anyDesc.slice)
       : this.getOrCreateRecord(resolved, anyDesc)
-    const handle = new QuerySourceHandle(this, handleKey, anyDesc, record)
+    const handle = new QuerySourceHandle(this, consumerId, resolved.descriptorKey, anyDesc, record)
     if (!anyDesc.releaseOnInactive) this.handles.set(handleKey, handle)
     return handle.source as ObservableSource<QuerySnapshot<T>>
   }
@@ -675,7 +760,13 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
   deactivateHandle(handle: QuerySourceHandle): void {
     this.activeHandles.delete(handle)
     this.syncUpstreamSubscriptions()
-    if (handle.descriptor.releaseOnInactive) this.releaseHandle(handle)
+    if (handle.descriptor.releaseOnInactive) {
+      this.releaseHandle(handle)
+    } else if (this.latestHandleKeys.get(handle.consumerId) !== handle.handleKey) {
+      // The consumer has since bound a different descriptor (for example new
+      // params). Drop its superseded inactive handle instead of retaining it.
+      this.releaseHandle(handle)
+    }
     this.recomputeActivity()
   }
 
@@ -684,11 +775,42 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     this.releaseRecord(handle.currentRecord)
   }
 
-  private releaseRecord(record: QueryIdentityRecord): void {
+  /** @internal Drop a record only when no subscriber or manual refresh still uses it. */
+  releaseRecord(record: QueryIdentityRecord): void {
     if (record.holderCount !== 0 || record.manualRefreshCount !== 0) return
     if (this.records.get(record.recordKey) === record) this.records.delete(record.recordKey)
     record.fetchEpoch += 1
     record.inFlight = null
+  }
+
+  private pruneConsumerHandles(consumerId: string, keepHandleKey: string): void {
+    for (const [handleKey, handle] of Array.from(this.handles)) {
+      if (handleKey === keepHandleKey) continue
+      if (handle.consumerId !== consumerId) continue
+      if (handle.holderCount > 0) continue
+      this.handles.delete(handleKey)
+      this.releaseRecord(handle.currentRecord)
+    }
+  }
+
+  private evictStaleState(): void {
+    for (const [handleKey, handle] of Array.from(this.handles)) {
+      if (handle.holderCount > 0) continue
+      if (this.isRecordMatchingCurrentEnv(handle.currentRecord)) continue
+      this.handles.delete(handleKey)
+      this.releaseRecord(handle.currentRecord)
+    }
+    this.evictUnreferencedRecords()
+  }
+
+  private evictUnreferencedRecords(): void {
+    const referenced = new Set<QueryIdentityRecord>()
+    for (const handle of this.handles.values()) referenced.add(handle.currentRecord)
+    for (const handle of this.activeHandles) referenced.add(handle.currentRecord)
+    for (const record of Array.from(this.records.values())) {
+      if (referenced.has(record)) continue
+      this.releaseRecord(record)
+    }
   }
 
   private hasEnabledActiveHandle(record: QueryIdentityRecord): boolean {
@@ -728,7 +850,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     const targetRecord = this.resolveRecordForDescriptor(handle.descriptor, previousRecord)
     if (targetRecord !== previousRecord) {
       handle.rebindRecord(targetRecord)
-      if (handle.descriptor.releaseOnInactive) this.releaseRecord(previousRecord)
+      this.releaseRecord(previousRecord)
     }
     if (!evaluateEnabled(handle.descriptor.enabled)) {
       this.deactivateRecord(targetRecord)
@@ -753,7 +875,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     const targetRecord = this.resolveRecordForDescriptor(handle.descriptor, previousRecord)
     if (targetRecord !== previousRecord) {
       handle.rebindRecord(targetRecord)
-      if (handle.descriptor.releaseOnInactive) this.releaseRecord(previousRecord)
+      this.releaseRecord(previousRecord)
     }
     const providerSnap = this.provider.getSnapshot()
     const activeProvider = providerSnap.provider
@@ -1139,6 +1261,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     for (const handle of Array.from(this.activeHandles)) {
       this.reconcileHandle(handle, forceRefresh)
     }
+    this.evictStaleState()
     this.recomputeActivity()
   }
 
@@ -1252,7 +1375,8 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     const username = sessionSnap.username ?? null
     const paramsKey = stableStringify(descriptor.params ?? null)
     const sliceKey = descriptor.slice ?? ""
-    const recordKey = `${providerId}|${providerScope}|${username ?? ""}|${descriptor.feature}|${paramsKey}|${sliceKey}${descriptor.releaseOnInactive ? "|transient" : ""}`
+    const descriptorKey = `${descriptor.feature}|${paramsKey}|${sliceKey}${descriptor.releaseOnInactive ? "|transient" : ""}`
+    const recordKey = `${providerId}|${providerScope}|${username ?? ""}|${descriptorKey}`
     const persistentKey = username
       ? providerCacheKey(providerId, providerScope, username, descriptor.feature, descriptor.params)
       : null
@@ -1268,6 +1392,7 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
       providerId,
       providerScope,
       username,
+      descriptorKey,
       paramsKey,
       sliceKey,
       recordKey,
@@ -1299,36 +1424,31 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     if (this.disposed) return
 
     if (epoch === this.clearEpoch && raw) {
-      try {
-        const parsed: unknown = JSON.parse(raw)
-        const entriesRecord =
-          isPlainRecord(parsed) && isPlainRecord(parsed.entries)
-            ? parsed.entries
-            : isPlainRecord(parsed)
-              ? parsed
-              : null
-
-        if (entriesRecord) {
-          for (const [cacheKey, rawEntry] of Object.entries(entriesRecord)) {
-            if (this.dirtyKeys.has(cacheKey)) continue
-            if (isPersistentQueryValue(rawEntry)) {
-              this.memoryCache.set(cacheKey, {
-                data: rawEntry.data,
-                updatedAt: rawEntry.updatedAt,
-              })
-            }
+      const entriesRecord = parsePersistentCacheEntries(raw)
+      if (entriesRecord) {
+        for (const [cacheKey, rawEntry] of Object.entries(entriesRecord)) {
+          if (this.dirtyKeys.has(cacheKey)) continue
+          if (
+            this.hydrationClearFilters.some((filter) => cacheKeyMatchesIdentity(cacheKey, filter))
+          ) {
+            continue
+          }
+          if (isPersistentQueryValue(rawEntry)) {
+            this.memoryCache.set(cacheKey, {
+              data: rawEntry.data,
+              updatedAt: rawEntry.updatedAt,
+            })
           }
         }
-      } catch {
-        // Ignore malformed persistent cache data.
       }
     }
 
     const hadDirtyWrites = this.dirtyKeys.size > 0
     this.dirtyKeys.clear()
+    this.hydrationClearFilters.length = 0
     this.hasHydrated = true
 
-    if (hadDirtyWrites && epoch === this.clearEpoch) {
+    if (hadDirtyWrites) {
       this.flushPersistentCache()
     }
 
@@ -1337,14 +1457,23 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
     }
   }
 
+  private enqueuePersistence(task: () => Promise<void>): void {
+    this.persistenceQueue = this.persistenceQueue.then(task).catch(() => {})
+  }
+
   private flushPersistentCache(): void {
-    const entries: Record<string, PersistentQueryValue<unknown>> = {}
-    for (const [key, value] of this.memoryCache.entries()) {
-      entries[key] = value
-    }
-    const payload = JSON.stringify({ version: 1, entries })
-    void this.storage.local.setItem(PERSISTENT_CACHE_STORAGE_KEY, payload).catch(() => {
-      // Storage quota errors must never crash active queries.
+    this.enqueuePersistence(async () => {
+      if (this.disposed) return
+      const entries: Record<string, PersistentQueryValue<unknown>> = {}
+      for (const [key, value] of this.memoryCache.entries()) {
+        entries[key] = value
+      }
+      const payload = JSON.stringify({ version: 1, entries })
+      try {
+        await this.storage.local.setItem(PERSISTENT_CACHE_STORAGE_KEY, payload)
+      } catch {
+        // Storage quota errors must never crash active queries.
+      }
     })
   }
 }

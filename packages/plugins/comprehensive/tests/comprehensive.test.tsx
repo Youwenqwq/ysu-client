@@ -309,6 +309,7 @@ describe("@orahako/plugin-comprehensive", () => {
     const schoolProvider: SchoolProvider = defineSchoolProvider({
       id: "demo-school",
       name: "示例大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         comprehensive: {
           getComprehensiveTerms: async (): Promise<ComprehensiveTerm[]> => [

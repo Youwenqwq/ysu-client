@@ -96,6 +96,61 @@ export function createTranslator<D extends DefinedDictionary>(
 export type PluginDictionary = Record<string, unknown>
 export type PluginTranslations = Partial<Record<PluginLocale, PluginDictionary>>
 
+export interface ContributionTextInput {
+  /** Optional dictionary contributed alongside the text. */
+  readonly dictionary?: unknown
+  /** Dot-path key resolved against the dictionary, then plugin translations. */
+  readonly key?: string | undefined
+  /** Literal text contributed alongside the key. */
+  readonly literal?: string | undefined
+  /** Last-resort text when neither the key nor a literal exists (e.g. a widget id). */
+  readonly fallback?: string | undefined
+  readonly locale: PluginLocale
+  /** Owner of the contribution, never the plugin rendering the label. */
+  readonly pluginId: string
+  readonly i18n?: Pick<PluginI18nService, "translate"> | undefined
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isDictionaryMessages(value: unknown): value is DictionaryMessages {
+  return isPlainRecord(value)
+}
+
+function isDefinedDictionary(value: unknown): value is DefinedDictionary {
+  return isPlainRecord(value) && isDictionaryMessages(value.zh) && isDictionaryMessages(value.en)
+}
+
+/**
+ * Resolves text contributed by a plugin (page, navigation, settings or widget
+ * labels) in precedence order: contribution dictionary, translations
+ * registered under the contributing plugin's own namespace, literal text, the
+ * key, then `fallback`. Consumers pass the contribution's `pluginId`, so the
+ * contributor's translations resolve even when it contributes no dictionary.
+ */
+export function resolveContributionText(input: ContributionTextInput): string {
+  const { dictionary, key, literal, fallback, locale, pluginId, i18n } = input
+  if (key) {
+    if (isDefinedDictionary(dictionary)) {
+      const primary = locale === "en" ? dictionary.en : dictionary.zh
+      const secondary = locale === "en" ? dictionary.zh : dictionary.en
+      const resolved =
+        resolveDictionaryMessage(primary, key) ?? resolveDictionaryMessage(secondary, key)
+      if (resolved !== undefined) return resolved
+    } else if (isDictionaryMessages(dictionary)) {
+      const resolved = resolveDictionaryMessage(dictionary, key)
+      if (resolved !== undefined) return resolved
+    }
+    if (i18n) {
+      const translated = i18n.translate(pluginId, key, locale)
+      if (translated !== key) return translated
+    }
+  }
+  return literal ?? key ?? fallback ?? ""
+}
+
 export interface PluginI18nService {
   readonly locale: ObservableSource<PluginLocale>
   register(translations: PluginTranslations): () => void

@@ -14,7 +14,6 @@ const YSU_PROVIDER_INJECT = [
   "session",
   "query",
   "native",
-  "mfa",
 ] as const
 
 export const manifest: PluginManifest = {
@@ -32,6 +31,7 @@ export const manifest: PluginManifest = {
 export const ysuProviderPlugin = definePlugin({
   manifest,
   inject: YSU_PROVIDER_INJECT,
+  optionalInject: ["mfa"] as const,
   apply(ctx) {
     ctx.i18n.register(ysuPluginTranslations)
 

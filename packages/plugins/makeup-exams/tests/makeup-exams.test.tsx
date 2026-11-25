@@ -521,6 +521,7 @@ describe("@orahako/plugin-makeup-exams export discipline, signup & navigation", 
     const makeupSchool: SchoolProvider = defineSchoolProvider({
       id: "makeup-school",
       name: "补考测试大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         makeupExams: {
           getMakeupExamBatches: async () => [

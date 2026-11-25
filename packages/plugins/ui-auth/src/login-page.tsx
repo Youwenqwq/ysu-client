@@ -23,11 +23,6 @@ import {
   FieldGroup,
   FieldLabel,
   Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Spinner,
 } from "@orahako/ui-primitives"
 import type { AuthUiDictionary } from "./dictionary"
@@ -38,22 +33,15 @@ import {
   type RememberedCredentialsStoreInstance,
 } from "./stores"
 
-export interface AuthSchoolChoice {
-  readonly id: string
-  readonly name: string
-  readonly nameEn?: string
-}
-
 export interface LoginPageInject {
   readonly hooks: {
     readonly session: ObservableSource<SessionSnapshot>
     readonly provider: ObservableSource<ProviderRuntimeSnapshot>
-    readonly providersRevision: ObservableSource<number>
     readonly rememberHydrated: ObservableSource<boolean>
   }
   readonly canRemember: boolean
-  readonly listSchools: () => readonly AuthSchoolChoice[]
-  readonly selectSchool: (schoolId: string) => SchoolProvider | null
+  /** Resolve the already-selected school provider; login never changes schools. */
+  readonly prepareProvider: () => Promise<SchoolProvider | null>
   readonly setCredential: (
     input: CredentialInput,
     remembered: RememberedCredentialEntry | null
@@ -85,17 +73,13 @@ function isCaptchaError(error: unknown): boolean {
 }
 
 export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
-  const { t, locale, useStore } = props
+  const { t, useStore } = props
   const session = props.useSession()
   const providerSnap = props.useProvider()
-  const providersRevision = props.useProvidersRevision()
   const rememberHydrated = props.useRememberHydrated()
-  void providersRevision
 
-  const schools = props.listSchools()
-  const initialSchoolId = session.activeSchoolId ?? providerSnap.schoolId ?? schools[0]?.id ?? ""
+  const activeSchoolId = session.activeSchoolId ?? providerSnap.schoolId ?? ""
 
-  const [selectedSchool, setSelectedSchool] = useState(initialSchoolId)
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [remember, setRemember] = useState(false)
@@ -106,23 +90,17 @@ export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
   const [countdown, setCountdown] = useState(0)
 
   const rememberedForSchool = useStore((state) =>
-    selectedSchool ? state.bySchool[selectedSchool] : undefined
+    activeSchoolId ? state.bySchool[activeSchoolId] : undefined
   )
 
   useEffect(() => {
-    if (!selectedSchool && initialSchoolId) {
-      setSelectedSchool(initialSchoolId)
-    }
-  }, [initialSchoolId, selectedSchool])
-
-  useEffect(() => {
-    if (!props.canRemember || !rememberHydrated || !selectedSchool) return
+    if (!props.canRemember || !rememberHydrated || !activeSchoolId) return
     if (rememberedForSchool) {
       setUsername(rememberedForSchool.username)
       setPassword(rememberedForSchool.password)
       setRemember(true)
     }
-  }, [props.canRemember, rememberHydrated, rememberedForSchool, selectedSchool])
+  }, [props.canRemember, rememberHydrated, rememberedForSchool, activeSchoolId])
 
   useEffect(() => {
     if (countdown <= 0) return
@@ -138,19 +116,9 @@ export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
     return () => clearInterval(timer)
   }, [countdown])
 
-  function resolveActiveProvider(targetSchool: string): SchoolProvider | null {
-    if (providerSnap.provider && providerSnap.schoolId === targetSchool) {
-      return providerSnap.provider
-    }
-    return props.selectSchool(targetSchool)
-  }
-
-  function handleSchoolChange(nextSchoolId: string) {
-    setSelectedSchool(nextSchoolId)
-    setNeedsCaptcha(false)
-    setCaptcha("")
-    setCaptchaUrl(null)
-    props.selectSchool(nextSchoolId)
+  async function resolveActiveProvider(): Promise<SchoolProvider | null> {
+    if (providerSnap.provider) return providerSnap.provider
+    return props.prepareProvider()
   }
 
   function rememberedEntry(user: string, pass: string): RememberedCredentialEntry | null {
@@ -165,16 +133,16 @@ export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
   }
 
   async function handleCheckCaptcha() {
-    if (!username || !selectedSchool) return
-    const activeProvider = resolveActiveProvider(selectedSchool)
+    if (!username || !activeSchoolId) return
+    const activeProvider = await resolveActiveProvider()
     const auth = getSlice(activeProvider, "auth")
-    if (!auth) return
+    if (!activeProvider || !auth) return
     try {
       await auth.resetLoginSession()
       await auth.prepareLogin()
       const captchaNeeded = (await auth.checkCaptchaNeeded?.(username)) ?? false
       if (captchaNeeded) {
-        refreshCaptchaDisplay(activeProvider!)
+        refreshCaptchaDisplay(activeProvider)
       } else {
         setNeedsCaptcha(false)
         setCaptcha("")
@@ -186,8 +154,7 @@ export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
   }
 
   async function doLogin(skipRateLimitCheck: boolean) {
-    const schoolToUse = selectedSchool || initialSchoolId
-    const activeProvider = schoolToUse ? resolveActiveProvider(schoolToUse) : null
+    const activeProvider = activeSchoolId ? await resolveActiveProvider() : null
     const auth = getSlice(activeProvider, "auth")
     if (!activeProvider || !auth) {
       toast.error(t("login.errorProviderUnavailable"))
@@ -328,22 +295,6 @@ export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
         <CardHeader>
           <CardTitle>{t("login.title")}</CardTitle>
           <CardDescription>{t("login.usernamePlaceholder")}</CardDescription>
-          {schools.length > 1 && (
-            <div className="pt-2">
-              <Select value={selectedSchool} onValueChange={handleSchoolChange}>
-                <SelectTrigger className="w-full" size="sm" aria-label={t("login.schoolLabel")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {schools.map((school) => (
-                    <SelectItem key={school.id} value={school.id}>
-                      {locale === "en" && school.nameEn ? school.nameEn : school.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={(event) => void handleSubmit(event)}>

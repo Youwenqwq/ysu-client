@@ -381,6 +381,7 @@ describe("@orahako/plugin-training-plan", () => {
     const schoolProvider: SchoolProvider = defineSchoolProvider({
       id: "demo-school",
       name: "示例大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         trainingPlan: {
           getTrainingPlan: async () => [
@@ -587,6 +588,7 @@ describe("@orahako/plugin-training-plan", () => {
     const minimalProvider: SchoolProvider = defineSchoolProvider({
       id: "minimal-school",
       name: "精简大学",
+      timeZone: "Asia/Shanghai",
       slices: {
         trainingPlan: {
           getTrainingPlan: async () => [

@@ -49,7 +49,7 @@ export const UpcomingExamsWidget: SlotComponent<UpcomingExamsWidgetProps> = (pro
   const examsQuery = props.useExams()
   const providerSnap = props.useProvider()
   const now = new Date()
-  const timeZone = providerSnap.provider?.slices.timetable?.scheduleRules?.timeZone
+  const timeZone = providerSnap.provider?.timeZone
 
   const upcomingExams = (examsQuery.data ?? [])
     .filter((exam) => !isExamCompleted(exam, now, timeZone))

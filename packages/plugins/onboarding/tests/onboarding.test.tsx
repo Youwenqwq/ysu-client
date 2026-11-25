@@ -196,8 +196,8 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-function createMemoryStorage(): PluginKeyValueStorage {
-  const map = new Map<string, string>()
+function createMemoryStorage(seed?: Readonly<Record<string, string>>): PluginKeyValueStorage {
+  const map = new Map(Object.entries(seed ?? {}))
   return {
     getItem: async (key) => map.get(key) ?? null,
     setItem: async (key, value) => {
@@ -207,6 +207,45 @@ function createMemoryStorage(): PluginKeyValueStorage {
       map.delete(key)
     },
   }
+}
+
+function getReactProps(node: MiniDomNode): Record<string, unknown> {
+  for (const key of Object.keys(node)) {
+    if (key.startsWith("__reactProps$")) {
+      const value: unknown = Reflect.get(node, key)
+      if (typeof value === "object" && value !== null) return value as Record<string, unknown>
+    }
+  }
+  return {}
+}
+
+function findAll(
+  root: MiniDomNode,
+  predicate: (node: MiniDomNode) => boolean
+): MiniDomNode[] {
+  const matches: MiniDomNode[] = []
+  const visit = (node: MiniDomNode) => {
+    if (predicate(node)) matches.push(node)
+    for (const child of node.childNodes) visit(child)
+  }
+  visit(root)
+  return matches
+}
+
+function findButton(root: MiniDomNode, text: string): MiniDomNode {
+  const button = findAll(
+    root,
+    (node) => node.tagName === "BUTTON" && node.textContent.includes(text)
+  )[0]
+  if (!button) throw new Error(`Button not found: ${text}`)
+  return button
+}
+
+async function clickButton(root: MiniDomNode, text: string): Promise<void> {
+  await act(async () => {
+    const onClick = getReactProps(findButton(root, text)).onClick
+    if (typeof onClick === "function") onClick({ preventDefault() {} })
+  })
 }
 
 const YSU_SCHOOL: OnboardingSchoolChoice = {
@@ -276,9 +315,10 @@ function createOnboardingEnv(options: {
   index?: MarketplaceIndex
   fetch?: () => Promise<Response>
   registerOnlineProviders?: readonly string[]
+  persisted?: Readonly<Record<string, string>>
 }) {
   const dom = mountMiniDom()
-  const localBackend = createMemoryStorage()
+  const localBackend = createMemoryStorage(options.persisted)
   const secureBackend = createMemoryStorage()
   const runtime = new PluginRuntime()
 
@@ -303,6 +343,7 @@ function createOnboardingEnv(options: {
           defineSchoolProvider({
             id: schoolId,
             name: schoolId,
+            timeZone: "Asia/Shanghai",
             slices: {},
             async initialize() {},
             async reset() {},
@@ -377,6 +418,7 @@ function createOnboardingEnv(options: {
         defineSchoolProvider({
           id: "ysu",
           name: "燕山大学",
+          timeZone: "Asia/Shanghai",
           slices: {},
           async initialize() {},
           async reset() {},
@@ -447,7 +489,7 @@ function createOnboardingEnv(options: {
 }
 
 describe("@orahako/plugin-onboarding", () => {
-  it("merges market provider plugins with configured schools and renders them through derived hooks", async () => {
+  it("starts offline with the first configured school and loads more schools only on demand", async () => {
     const marketDeferred = Promise.withResolvers<Response>()
     const env = createOnboardingEnv({ fetch: () => marketDeferred.promise })
     activeUnmount = env.cleanup
@@ -463,7 +505,13 @@ describe("@orahako/plugin-onboarding", () => {
 
     expect(env.dom.container.textContent).toContain("初次设置")
     expect(env.dom.container.textContent).toContain("燕山大学")
+    expect(env.dom.container.textContent).toContain("更多学校")
     expect(env.dom.container.textContent).not.toContain(ZMU_NAME)
+    expect(env.fetchMock).not.toHaveBeenCalled()
+    expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(false)
+
+    await clickButton(env.dom.container, "更多学校")
+    await vi.waitFor(() => expect(env.fetchMock).toHaveBeenCalledTimes(1))
     expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(true)
 
     await act(async () => {
@@ -500,13 +548,19 @@ describe("@orahako/plugin-onboarding", () => {
     const env = createOnboardingEnv({ fetch: fetchMock })
     activeUnmount = env.cleanup
 
+    const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
+    await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
+    expect(env.fetchMock).not.toHaveBeenCalled()
+
+    await clickButton(env.dom.container, "更多学校")
     await vi.waitFor(() => {
       expect(env.injected.hooks.schoolsError.getSnapshot()).toBe("market offline")
       expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(false)
     })
     expect(env.injected.hooks.schools.getSnapshot()).toEqual([YSU_SCHOOL])
+    expect(env.dom.container.textContent).toContain("无法获取在线学校列表")
 
-    env.injected.retrySchoolDiscovery()
+    await clickButton(env.dom.container, "重试")
 
     await vi.waitFor(() => {
       expect(env.injected.hooks.schools.getSnapshot()).toHaveLength(2)
@@ -516,7 +570,7 @@ describe("@orahako/plugin-onboarding", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it("installs the matching provider plugin on online selection and verifies registration", async () => {
+  it("installs the matching provider plugin when an online school is confirmed", async () => {
     const env = createOnboardingEnv({
       index: marketIndex([
         providerPlugin("zmu.provider", ZMU_NAME),
@@ -526,27 +580,32 @@ describe("@orahako/plugin-onboarding", () => {
     })
     activeUnmount = env.cleanup
 
+    const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
+    await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
+
+    await clickButton(env.dom.container, "更多学校")
     await vi.waitFor(() =>
       expect(env.injected.hooks.schools.getSnapshot()).toHaveLength(3)
     )
     const schools = env.injected.hooks.schools.getSnapshot()
     const zmu = schools.find((school) => school.id === "zmu")!
-    const ghost = schools.find((school) => school.id === "ghost")!
-    const ysu = schools.find((school) => school.id === "ysu")!
+    expect(schools.find((school) => school.id === "ghost")).toBeDefined()
 
-    await env.injected.activateSchoolChoice(zmu)
+    await clickButton(env.dom.container, ZMU_NAME)
+    await clickButton(env.dom.container, "确认并继续")
 
-    expect(env.applyPluginBundle).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => {
+      expect(env.applyPluginBundle).toHaveBeenCalledTimes(1)
+      expect(env.runtime.context.get("provider")?.getSnapshot().schoolId).toBe("zmu")
+    })
     expect(env.applyPluginBundle.mock.calls[0]?.[0]).toEqual(["zmu.provider"])
-    expect(env.runtime.context.get("provider")?.getSnapshot().schoolId).toBe("zmu")
+    expect(env.storeInstance.source.getSnapshot().selectedSchoolId).toBe(zmu.id)
 
+    // The onboarding activation contract still rejects an unregistered market provider.
+    const ghost = schools.find((school) => school.id === "ghost")!
     await expect(env.injected.activateSchoolChoice(ghost)).rejects.toThrow(
       "School provider is not registered: ghost"
     )
-
-    await env.injected.activateSchoolChoice(ysu)
-    expect(env.applyPluginBundle).toHaveBeenCalledTimes(2)
-    expect(env.runtime.context.get("provider")?.getSnapshot().schoolId).toBe("ysu")
   })
 
   it("ignores market discovery results that arrive after the plugin scope is disposed", async () => {
@@ -554,6 +613,11 @@ describe("@orahako/plugin-onboarding", () => {
     const env = createOnboardingEnv({ fetch: () => marketDeferred.promise })
     activeUnmount = env.cleanup
 
+    const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
+    await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
+    expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(false)
+
+    await clickButton(env.dom.container, "更多学校")
     expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(true)
 
     env.disposeRuntime()
@@ -569,13 +633,10 @@ describe("@orahako/plugin-onboarding", () => {
     expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(true)
   })
 
-  it("completes builtin YSU onboarding, requests native permissions, and persists completion", async () => {
+  it("confirms the default YSU school, locks it, requests permissions, and persists completion", async () => {
     const env = createOnboardingEnv({})
     activeUnmount = env.cleanup
 
-    await vi.waitFor(() =>
-      expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(false)
-    )
     await vi.waitFor(() => expect(env.storeInstance.hydrated.getSnapshot()).toBe(true))
     await vi.waitFor(() =>
       expect(env.runtime.context.get("session")?.getSnapshot().hasHydrated).toBe(true)
@@ -585,14 +646,19 @@ describe("@orahako/plugin-onboarding", () => {
     await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
     expect(env.dom.container.textContent).toContain("初次设置")
     expect(env.dom.container.textContent).toContain("选择学校")
+    expect(env.fetchMock).not.toHaveBeenCalled()
 
-    await env.injected.activateSchoolChoice(YSU_SCHOOL)
-    expect(env.runtime.context.get("provider")?.getSnapshot().schoolId).toBe("ysu")
+    await clickButton(env.dom.container, "确认并继续")
+    await vi.waitFor(() =>
+      expect(env.runtime.context.get("provider")?.getSnapshot().schoolId).toBe("ysu")
+    )
     expect(env.applyPluginBundle).not.toHaveBeenCalled()
+    expect(env.storeInstance.source.getSnapshot().selectedSchoolId).toBe("ysu")
 
-    await act(async () => {
-      env.storeInstance.actions.selectSchool("ysu")
-    })
+    expect(env.dom.container.textContent).toContain("权限")
+    expect(env.dom.container.textContent).not.toContain("选择学校")
+    expect(env.dom.container.textContent).not.toContain("更多学校")
+    expect(env.dom.container.textContent).not.toContain("返回")
 
     await expect(env.injected.requestNotificationPermission()).resolves.toBe(true)
     await expect(env.injected.requestExactAlarmPermission()).resolves.toBe(true)
@@ -609,5 +675,33 @@ describe("@orahako/plugin-onboarding", () => {
       )
       expect(persisted).toContain('"completed":true')
     })
+  })
+
+  it("restores a confirmed-but-incomplete school from persistence without offering reselection", async () => {
+    const storageKey = formatPluginStorageKey(ONBOARDING_PLUGIN_ID, "onboarding")
+    const env = createOnboardingEnv({
+      persisted: {
+        [storageKey]: JSON.stringify({
+          version: 1,
+          state: { completed: false, selectedSchoolId: "ysu" },
+        }),
+      },
+    })
+    activeUnmount = env.cleanup
+
+    await vi.waitFor(() => expect(env.storeInstance.hydrated.getSnapshot()).toBe(true))
+    await vi.waitFor(() =>
+      expect(env.runtime.context.get("session")?.getSnapshot().hasHydrated).toBe(true)
+    )
+    expect(env.storeInstance.source.getSnapshot().selectedSchoolId).toBe("ysu")
+
+    const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
+    await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
+
+    expect(env.dom.container.textContent).toContain("权限")
+    expect(env.dom.container.textContent).not.toContain("选择学校")
+    expect(env.dom.container.textContent).not.toContain("更多学校")
+    expect(env.dom.container.textContent).not.toContain("确认并继续")
+    expect(env.fetchMock).not.toHaveBeenCalled()
   })
 })

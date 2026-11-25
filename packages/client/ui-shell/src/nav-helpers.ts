@@ -1,11 +1,10 @@
 import {
   isAppNavigation,
   pluginPageHref,
-  resolveDictionaryMessage,
-  type DefinedDictionary,
-  type DictionaryMessages,
+  resolveContributionText,
   type PluginAppNavigationDefinition,
   type PluginIcon,
+  type PluginI18nService,
   type PluginLocale,
   type PluginNavigationContribution,
   type PluginNavigationScope,
@@ -47,42 +46,6 @@ export interface ShellMobileTab {
 }
 
 const KNOWN_GROUP_ORDER = ["main", "academic", "platform", "fees", "extras", "plugins", "account"]
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function isDictionaryMessages(value: unknown): value is DictionaryMessages {
-  return isPlainRecord(value)
-}
-
-function isDefinedDictionary(value: unknown): value is DefinedDictionary {
-  return isPlainRecord(value) && isDictionaryMessages(value.zh) && isDictionaryMessages(value.en)
-}
-
-export function resolveEntryText(
-  dictionary: unknown,
-  key: string | undefined,
-  fallback: string | undefined,
-  locale: PluginLocale,
-  translateShared: (k: string, loc: PluginLocale) => string
-): string {
-  if (key) {
-    if (isDefinedDictionary(dictionary)) {
-      const primary = locale === "en" ? dictionary.en : dictionary.zh
-      const secondary = locale === "en" ? dictionary.zh : dictionary.en
-      const resolved =
-        resolveDictionaryMessage(primary, key) ?? resolveDictionaryMessage(secondary, key)
-      if (resolved !== undefined) return resolved
-    } else if (isDictionaryMessages(dictionary)) {
-      const resolved = resolveDictionaryMessage(dictionary, key)
-      if (resolved !== undefined) return resolved
-    }
-    const shared = translateShared(key, locale)
-    if (shared !== key) return shared
-  }
-  return fallback ?? key ?? ""
-}
 
 function navParamsMatch(
   paramsSpec: Readonly<Record<string, string | number>> | undefined,
@@ -162,7 +125,7 @@ export function buildSidebarGroups(options: {
   readonly activePage: PluginPageContribution | undefined
   readonly locale: PluginLocale
   readonly groupLabel: (group: string) => string
-  readonly translateShared: (key: string, locale: PluginLocale) => string
+  readonly i18n: Pick<PluginI18nService, "translate">
   readonly formatHref: (rawHref: string) => string
   readonly pushTarget: (
     pluginId: string,
@@ -203,13 +166,14 @@ export function buildSidebarGroups(options: {
       id: `${item.pluginId}:${item.id}`,
       pluginId: item.pluginId,
       pageId: item.page,
-      title: resolveEntryText(
-        targetPage?.dictionary,
-        item.titleKey,
-        item.title ?? targetPage?.title ?? item.id,
-        options.locale,
-        options.translateShared
-      ),
+      title: resolveContributionText({
+        dictionary: targetPage?.dictionary,
+        key: item.titleKey,
+        literal: item.title ?? targetPage?.title ?? item.id,
+        locale: options.locale,
+        pluginId: item.pluginId,
+        i18n: options.i18n,
+      }),
       href: options.formatHref(rawHref),
       icon: item.icon,
       isActive: active,
@@ -243,7 +207,7 @@ export function buildMobileBottomTabs(options: {
   readonly activePage: PluginPageContribution | undefined
   readonly locationParams: RouteParams
   readonly locale: PluginLocale
-  readonly translateShared: (key: string, locale: PluginLocale) => string
+  readonly i18n: Pick<PluginI18nService, "translate">
   readonly formatHref: (rawHref: string) => string
   readonly replaceTarget: (
     pluginId: string,
@@ -276,13 +240,14 @@ export function buildMobileBottomTabs(options: {
         id: item.id,
         pluginId: item.pluginId,
         href: options.formatHref(rawHref),
-        label: resolveEntryText(
-          targetPage?.dictionary,
-          item.titleKey,
-          item.title ?? targetPage?.title ?? item.id,
-          options.locale,
-          options.translateShared
-        ),
+        label: resolveContributionText({
+          dictionary: targetPage?.dictionary,
+          key: item.titleKey,
+          literal: item.title ?? targetPage?.title ?? item.id,
+          locale: options.locale,
+          pluginId: item.pluginId,
+          i18n: options.i18n,
+        }),
         icon: item.icon,
         ...(item.badge !== undefined ? { badge: item.badge } : {}),
         isActive: item.id === activeNavId,
@@ -306,13 +271,14 @@ export function buildMobileBottomTabs(options: {
       id: item.id,
       pluginId: item.pluginId,
       href: options.formatHref(rawHref),
-      label: resolveEntryText(
-        targetPage?.dictionary,
-        item.titleKey,
-        item.title ?? targetPage?.title ?? item.id,
-        options.locale,
-        options.translateShared
-      ),
+      label: resolveContributionText({
+        dictionary: targetPage?.dictionary,
+        key: item.titleKey,
+        literal: item.title ?? targetPage?.title ?? item.id,
+        locale: options.locale,
+        pluginId: item.pluginId,
+        i18n: options.i18n,
+      }),
       icon: item.icon,
       ...(item.badge !== undefined ? { badge: item.badge } : {}),
       isActive,
