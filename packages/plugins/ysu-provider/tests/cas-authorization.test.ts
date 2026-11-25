@@ -56,6 +56,14 @@ describe("CAS service authorization boundaries & isAuthenticated verification", 
     await expect(cas.authorize(service)).rejects.toBeInstanceOf(NotAuthenticatedError)
   })
 
+  it("accepts HTTP 304 Not Modified on static target service pages like jwmobile/index", async () => {
+    const mobileIndex = "https://jwxt.ysu.edu.cn/jwmobile/index"
+    fetchWithJar.mockResolvedValue(response(mobileIndex, 304))
+    await expect(
+      cas.authorize("https://jwxt.ysu.edu.cn/jwmobile/auth/index")
+    ).resolves.toBeDefined()
+  })
+
   it("keeps service outages distinct from expired credentials", async () => {
     fetchWithJar.mockResolvedValue(response(service, 502))
     await expect(cas.authorize(service)).rejects.toBeInstanceOf(CASProtocolError)

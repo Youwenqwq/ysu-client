@@ -731,7 +731,14 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     // The responsive header mounts each slot contribution exactly once across breakpoints.
     expect(dom.container.toHtml().match(/ACTIVITY_DOT/g)).toHaveLength(1)
     expect(dom.container.toHtml().match(/HEADER_ACTION/g)).toHaveLength(1)
-    expect(dom.container.findByAttr("data-shell-header")).toBeDefined()
+    const shellHeader = dom.container.findByAttr("data-shell-header")
+    expect(shellHeader).toBeDefined()
+    expect(shellHeader?.getAttribute("class")).toContain("md:pt-4 md:pb-4")
+    expect(shellHeader?.getAttribute("class")).not.toContain("md:pt-0")
+    // Profile's `me` nav item sets `sidebar: false` so desktop sidebar doesn't duplicate SidebarProfileFooter.
+    const sidebarContent = dom.container.findByAttr("data-slot", "sidebar-content")
+    expect(sidebarContent?.textContent).not.toContain("我的")
+    expect(dom.container.findByAttr("data-sidebar-profile-footer")).toBeDefined()
     expect(dom.container.textContent).toContain("COMMUNITY_OVERLAY")
     // Plugin-scoped mobile bottom nav shows both `社区广场` and `讨论组` tabs while `community.forum` is active!
     expect(dom.container.textContent).toContain("讨论组")

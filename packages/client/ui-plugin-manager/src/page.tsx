@@ -181,11 +181,15 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
   const [market, setMarket] = useState<PluginMarketResult | undefined>(() =>
     marketUrl ? loadCachedPluginMarket(marketUrl) : undefined
   )
+  // Only show the offline fallback notice when a network request actually failed
+  // and fell back to cache — never simply because initial state hydrated from cache.
+  const [marketOffline, setMarketOffline] = useState(false)
   const [marketError, setMarketError] = useState<string | undefined>()
   const [busy, setBusy] = useState<string | undefined>()
   const [checking, setChecking] = useState(false)
   const [selectedShell, setSelectedShell] = useState<string | undefined>(() => getActiveShell())
   const checkingRef = useRef(false)
+  const initialFetchUrlRef = useRef<string | undefined>(undefined)
 
   const platform = getPlatform()
   const appVersion = getAppVersion()
@@ -208,8 +212,10 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
       }
       const resolved = await loadPluginMarket(marketUrl)
       setMarket(resolved)
+      setMarketOffline(resolved.stale)
       if (!resolved.stale) actions.setLastUpdateCheck(Date.now())
     } catch (error) {
+      setMarketOffline(false)
       setMarketError(error instanceof Error ? error.message : String(error))
     } finally {
       checkingRef.current = false
@@ -219,6 +225,7 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
 
   useEffect(() => {
     setMarket(marketUrl ? loadCachedPluginMarket(marketUrl) : undefined)
+    setMarketOffline(false)
     setMarketError(undefined)
   }, [marketUrl])
 
@@ -226,7 +233,12 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
     void refreshPackages().catch((error) => {
       toast.error(error instanceof Error ? error.message : String(error))
     })
-    if (marketUrl && autoCheckUpdates && Date.now() - lastUpdateCheck >= AUTO_CHECK_INTERVAL_MS) {
+    if (!marketUrl) return
+    const needsInitialFetch =
+      initialFetchUrlRef.current !== marketUrl && !loadCachedPluginMarket(marketUrl)
+    const autoCheckDue = autoCheckUpdates && Date.now() - lastUpdateCheck >= AUTO_CHECK_INTERVAL_MS
+    if (needsInitialFetch || autoCheckDue) {
+      initialFetchUrlRef.current = marketUrl
       void refreshMarket()
     }
   }, [autoCheckUpdates, lastUpdateCheck, marketUrl, refreshMarket, refreshPackages])
@@ -277,6 +289,7 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
       if (!marketUrl) throw new Error("The active composition does not provide a plugin market")
       const resolved = market ?? (await loadPluginMarket(marketUrl))
       setMarket(resolved)
+      if (!market) setMarketOffline(resolved.stale)
       await applyPluginBundle(bundle.pluginIds, resolved.index, marketUrl)
       toast.success(t("bundleEnabled", { name: bundle.name }))
     })
@@ -606,8 +619,7 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
             {shells.map((shell) => {
               const id = `${shell.pluginId}:${shell.id}`
               const selected =
-                activeShellId !== undefined &&
-                (activeShellId === id || activeShellId === shell.id)
+                activeShellId !== undefined && (activeShellId === id || activeShellId === shell.id)
               return (
                 <Button
                   key={id}
@@ -638,7 +650,7 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
               <RefreshCw className={checking ? "animate-spin" : undefined} />
             </Button>
           </div>
-          {market?.stale && <p className="text-xs text-amber-600">{t("staleMarket")}</p>}
+          {marketOffline && <p className="text-xs text-amber-600">{t("staleMarket")}</p>}
           {marketError && <p className="text-sm text-destructive">{marketError}</p>}
           {!market && !marketError && <Skeleton className="h-28 w-full" />}
           {market && compatibleMarketPlugins.length === 0 && (

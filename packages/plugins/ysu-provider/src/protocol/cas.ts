@@ -1244,7 +1244,7 @@ export function createCAS(ctx: YSUContext): CASProtocol {
     if (resp.status >= 400 && resp.status !== 401 && resp.status !== 403) {
       throw new CASProtocolError(`CAS authorization returned HTTP ${resp.status}`)
     }
-    if (!resp.url || resp.status < 200 || resp.status >= 300) {
+    if (!resp.url || ((resp.status < 200 || resp.status >= 300) && resp.status !== 304)) {
       throw new NotAuthenticatedError("CAS authorization did not complete")
     }
     const finalUrl = new URL(resp.url)

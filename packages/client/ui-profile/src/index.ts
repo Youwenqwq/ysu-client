@@ -207,6 +207,7 @@ export const uiProfilePlugin = definePlugin<
       group: "account",
       order: 900,
       primary: true,
+      sidebar: false,
     })
 
     ctx.ui.registerPage(

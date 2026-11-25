@@ -29,8 +29,8 @@ export const EpayNotificationSettings: SlotComponent<EpayNotificationSettingsPro
   }
 
   return (
-    <div data-epay-reminder-settings="">
-      <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
+    <div data-epay-reminder-settings="" className="group/epay-reminder">
+      <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground group-first/epay-reminder:border-t-0 group-first/epay-reminder:pt-1">
         {t("settings.epayReminderTitle")}
       </h3>
 

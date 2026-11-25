@@ -301,6 +301,7 @@ describe("httpRuntimePlugin waterfall pipeline, proxy & native transports, and f
 
       const [firstUrl, firstInit] = fetchMock.mock.calls[0]!
       expect(String(firstUrl)).toBe("/custom/proxy")
+      expect(firstInit?.cache).toBe("no-store")
       const firstHeaders = new Headers(firstInit?.headers)
       expect(firstHeaders.get("x-proxy-target")).toBe("https://jwxt.ysu.edu.cn/jwapp/test")
       expect(firstHeaders.get("x-proxy-manual-redirect")).toBe("1")

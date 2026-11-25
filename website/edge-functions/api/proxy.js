@@ -101,9 +101,11 @@ const SKIP_REQUEST_HEADERS = new Set([
   'x-proxy-origin',
   'x-proxy-target',
   'x-activation', // 激活凭证仅用于代理鉴权，不透传上游
+  'if-modified-since', // 代理响应禁止条件缓存，避免静态目标（如 jwmobile/index）返回 304
+  'if-none-match',
 ]);
 
-// 不透传给客户端的上游响应头（body 已由运行时解压，编码/长度头必须丢弃）
+// 不透传给客户端的上游响应头（body 已由运行时解压，编码/长度/缓存校验头必须丢弃）
 const SKIP_RESPONSE_HEADERS = new Set([
   'set-cookie', // 走 x-proxy-set-cookie
   'content-encoding',
@@ -112,6 +114,11 @@ const SKIP_RESPONSE_HEADERS = new Set([
   'connection',
   'keep-alive',
   'proxy-authenticate',
+  'cache-control',
+  'expires',
+  'pragma',
+  'etag',
+  'last-modified',
 ]);
 
 const HEADER_VALUE_MAX = 3500; // 边缘函数头部 value 上限 4095B，留余量分片
@@ -186,7 +193,7 @@ function preflightResponse(origin) {
       ...corsHeaders(origin),
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers':
-        'Content-Type, X-Requested-With, X-Proxy-Cookie, X-Proxy-Ua, X-Proxy-Referer, X-Proxy-Origin, X-Proxy-Target, X-Activation',
+        'Content-Type, X-Requested-With, X-Proxy-Cookie, X-Proxy-Ua, X-Proxy-Referer, X-Proxy-Origin, X-Proxy-Target, X-Proxy-Manual-Redirect, X-Activation',
       'Access-Control-Max-Age': '86400',
     },
   });
@@ -318,6 +325,7 @@ export async function onRequest({ request, env }) {
   }
 
   headers.set('x-proxy-status', String(upstream.status));
+  headers.set('Cache-Control', 'no-store');
   if (origin) {
     headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Access-Control-Expose-Headers', '*');

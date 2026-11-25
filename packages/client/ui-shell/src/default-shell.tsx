@@ -77,6 +77,7 @@ export interface ResolvedShellChrome {
   readonly activePage: PluginPageContribution | undefined
   readonly pageTitle: string
   readonly showBack: boolean
+  readonly showMobileThemeToggle: boolean
   readonly fullscreen: boolean
   readonly routeKey: string
   readonly mainGroups: readonly ShellSidebarGroup[]
@@ -428,13 +429,7 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
     hasBackground,
     isGlassCards: cardStyle === "glass",
   })
-  const showMobileThemeToggle = Boolean(
-    chrome.activePage?.primary &&
-    chrome.accountItems.some(
-      (item) =>
-        item.pluginId === chrome.activePage?.pluginId && item.pageId === chrome.activePage?.id
-    )
-  )
+  const showMobileThemeToggle = chrome.showMobileThemeToggle
   const appName = props.getAppName(locale)
   const bannerNode = renderSlot("shell.banner")
   const activityNode = renderSlot("shell.activity")
@@ -558,7 +553,7 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
             "h-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))]",
             "pt-[var(--safe-area-inset-top,env(safe-area-inset-top,0px))] backdrop-blur",
             "md:relative md:inset-auto md:z-auto md:h-auto md:border-b md:bg-transparent",
-            "md:px-6 md:py-4 md:pt-0 md:backdrop-blur-none",
+            "md:px-6 md:pt-4 md:pb-4 md:backdrop-blur-none",
             hasBackground
               ? cn(
                   "bg-background/60 supports-[backdrop-filter]:bg-background/40",

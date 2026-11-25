@@ -136,8 +136,9 @@ export function buildSidebarGroups(options: {
   readonly mainGroups: readonly ShellSidebarGroup[]
   readonly accountItems: readonly ShellSidebarItem[]
 } {
+  const sidebarAppNav = options.appNav.filter((item) => item.sidebar !== false)
   const grouped = new Map<string, AppNavContribution[]>()
-  for (const item of options.appNav) {
+  for (const item of sidebarAppNav) {
     const list = grouped.get(item.group)
     if (list) list.push(item)
     else grouped.set(item.group, [item])

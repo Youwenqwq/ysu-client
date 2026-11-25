@@ -610,31 +610,33 @@ export const schedulePlugin = definePlugin({
       TodayCoursesWidget
     )
 
-    settings.registerCategory(
-      {
-        id: "widgets",
-        order: 40,
-        title: "小组件",
-        titleKey: "settings.widgetsCategoryTitle",
-        description: "添加与管理桌面小组件",
-        descriptionKey: "settings.widgetsCategoryDesc",
-        icon: LayoutGrid,
-        dictionary: scheduleDictionary,
-        children: SCHEDULE_WIDGETS_CATEGORY_CHILDREN,
-        store: settingsStore,
-        inject: (): ScheduleWidgetsCategoryInject => ({
-          hooks: {
-            provider: provider.state,
-            location: router.current,
-          },
-          pluginId: SCHEDULE_PLUGIN_ID,
-          isNative: () => native.isNative,
-          previewSrc: resolveWidgetAssetSrc("schedule.png"),
-          requestPinWidget: (widgetId) => widgets.requestPin(widgetId),
-        }),
-      },
-      ScheduleWidgetsCategoryPanel
-    )
+    if (native.isNative) {
+      settings.registerCategory(
+        {
+          id: "widgets",
+          order: 40,
+          title: "小组件",
+          titleKey: "settings.widgetsCategoryTitle",
+          description: "添加与管理桌面小组件",
+          descriptionKey: "settings.widgetsCategoryDesc",
+          icon: LayoutGrid,
+          dictionary: scheduleDictionary,
+          children: SCHEDULE_WIDGETS_CATEGORY_CHILDREN,
+          store: settingsStore,
+          inject: (): ScheduleWidgetsCategoryInject => ({
+            hooks: {
+              provider: provider.state,
+              location: router.current,
+            },
+            pluginId: SCHEDULE_PLUGIN_ID,
+            isNative: () => native.isNative,
+            previewSrc: resolveWidgetAssetSrc("schedule.png"),
+            requestPinWidget: (widgetId) => widgets.requestPin(widgetId),
+          }),
+        },
+        ScheduleWidgetsCategoryPanel
+      )
+    }
 
     slots.inject("settings.startupOptions", () =>
       slots.register(
@@ -654,22 +656,24 @@ export const schedulePlugin = definePlugin({
       )
     )
 
-    slots.inject("settings.widgets", () =>
-      slots.register(
-        {
-          id: "widget-assistant",
-          slot: "settings.widgets",
-          order: 10,
-          dictionary: scheduleDictionary,
-          store: settingsStore,
-          inject: (): ScheduleWidgetAssistantSettingsInject => ({
-            isNative: () => native.isNative,
-            assistantSrc: widgetAssistantSrc,
-          }),
-        },
-        ScheduleWidgetAssistantSettings
+    if (native.isNative) {
+      slots.inject("settings.widgets", () =>
+        slots.register(
+          {
+            id: "widget-assistant",
+            slot: "settings.widgets",
+            order: 10,
+            dictionary: scheduleDictionary,
+            store: settingsStore,
+            inject: (): ScheduleWidgetAssistantSettingsInject => ({
+              isNative: () => native.isNative,
+              assistantSrc: widgetAssistantSrc,
+            }),
+          },
+          ScheduleWidgetAssistantSettings
+        )
       )
-    )
+    }
 
     const checkExactAlarmPermission = () => controller.checkExactAlarmPermission()
 

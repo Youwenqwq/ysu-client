@@ -703,4 +703,98 @@ describe("@orahako/ui-plugin-manager", () => {
       host.dispose()
     }
   })
+
+  it("does not display the offline fallback warning for a valid cached market until a refresh fails", async () => {
+    const indexUrl = "https://market.example.com/cached.json"
+    const cachedIndex: MarketplaceIndex = {
+      schemaVersion: 1,
+      updatedAt: "2026-11-26T00:00:00Z",
+      plugins: [],
+      bundles: [],
+    }
+    const storageMap = new Map<string, string>([
+      [`orahako-plugin-market-cache:${encodeURIComponent(indexUrl)}`, JSON.stringify(cachedIndex)],
+    ])
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storageMap.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        storageMap.set(key, value)
+      },
+      removeItem: (key: string) => {
+        storageMap.delete(key)
+      },
+    })
+    const fetchMock = vi.fn(async () => new Response("offline", { status: 503 }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b1",
+        composition: {
+          id: "test.pm.cached",
+          version: 1,
+          defaults: {},
+          market: { indexUrl },
+          plugins: [
+            { id: slotRegistryPlugin.manifest.id, protected: true },
+            { id: uiRegistryPlugin.manifest.id, protected: true },
+            { id: routerRuntimePlugin.manifest.id, protected: true },
+            { id: i18nRegistryPlugin.manifest.id, protected: true },
+            { id: storageRuntimePlugin.manifest.id, protected: true },
+            { id: pluginManagerPlugin.manifest.id, protected: true },
+          ],
+        },
+        plugins: [
+          slotRegistryPlugin,
+          uiRegistryPlugin,
+          routerRuntimePlugin,
+          i18nRegistryPlugin,
+          storageRuntimePlugin,
+          pluginManagerPlugin,
+        ],
+      },
+      {
+        platformModules: { "@orahako/sdk": SdkNamespace },
+        packages: new PluginPackageStore({ backend: createMemoryPackageBackend() }),
+      }
+    )
+
+    try {
+      await host.bootstrap()
+      const pageEntry = host.ui?.findPage("orahako.plugin-manager", "plugins")
+      const preferences = pageEntry!.store as PluginManagerPreferencesStoreInstance
+      preferences.actions.setMarketEnabled(true)
+      preferences.actions.setLastUpdateCheck(Date.now())
+
+      const dom = mountDom()
+      await dom.render(
+        <ContributionOutlet entry={pageEntry!} slots={host.slots} i18n={host.i18n} />
+      )
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      })
+
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(dom.container.textContent).not.toContain("网络不可用，正在显示上次缓存的市场索引。")
+
+      // Manual refresh failing falls back to cache and now shows the offline notice.
+      const refresh = dom.container.findAll(
+        (node) => node.attributes.get("aria-label") === "刷新市场"
+      )[0]
+      await act(async () => {
+        const onClick = findReactProps(refresh!).onClick as (() => void) | undefined
+        onClick?.()
+      })
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      })
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(dom.container.textContent).toContain("网络不可用，正在显示上次缓存的市场索引。")
+
+      await dom.unmount()
+    } finally {
+      host.dispose()
+    }
+  })
 })

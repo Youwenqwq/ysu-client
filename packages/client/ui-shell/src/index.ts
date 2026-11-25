@@ -276,10 +276,21 @@ export const uiShellPlugin = definePlugin<
         },
       })
 
+      const showMobileThemeToggle = Boolean(
+        activePage?.primary &&
+        appNav.some(
+          (item) =>
+            item.group === "account" &&
+            item.pluginId === activePage.pluginId &&
+            item.page === activePage.id
+        )
+      )
+
       return {
         activePage,
         pageTitle,
         showBack,
+        showMobileThemeToggle,
         fullscreen,
         routeKey,
         mainGroups,

@@ -124,6 +124,7 @@ async function proxyHttpSend(req: HttpRequest, proxyPath: string): Promise<HttpR
     method: req.method,
     headers,
     body: req.body,
+    cache: "no-store",
     redirect: "follow",
     signal: req.signal ? AbortSignal.any([timeoutSignal, req.signal]) : timeoutSignal,
   })

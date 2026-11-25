@@ -272,8 +272,14 @@ export class SimpleCookieJar implements CookieJar {
   }
 
   async removeCookie(domain: string, path: string, key: string): Promise<void> {
+    const normalizedTarget = normalizeDomain(domain)
     this.cookies = this.cookies.filter(
-      (cookie) => !(cookie.domain === domain && cookie.path === path && cookie.name === key)
+      (cookie) =>
+        !(
+          normalizeDomain(cookie.domain) === normalizedTarget &&
+          cookie.path === path &&
+          cookie.name === key
+        )
     )
   }
 
@@ -415,10 +421,7 @@ function matchScopedCookieEntries(
   return matchCookieEntries(entries, url, (cookie, host) => domainMatches(cookie.domain, host))
 }
 
-export function isRequestScopedCookie(
-  req: Pick<HttpRequest, "cookies">,
-  cookie: string
-): boolean {
+export function isRequestScopedCookie(req: Pick<HttpRequest, "cookies">, cookie: string): boolean {
   const equals = cookie.indexOf("=")
   const name = (equals === -1 ? cookie : cookie.slice(0, equals)).trim()
   return req.cookies?.some((entry) => entry.name === name) ?? false

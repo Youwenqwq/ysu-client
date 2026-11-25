@@ -77,6 +77,12 @@ export interface PluginAppNavigationDefinition extends PluginNavigationBase {
   readonly scope?: "app"
   readonly group: PluginNavigationGroup
   readonly primary?: boolean
+  /**
+   * Whether this item appears in desktop sidebar navigation. Defaults to true.
+   * Set to false when a dedicated `shell.sidebar.footer` entry already represents
+   * the same destination on desktop while keeping mobile primary tab navigation.
+   */
+  readonly sidebar?: boolean
 }
 
 export interface PluginScopedNavigationDefinition extends PluginNavigationBase {
