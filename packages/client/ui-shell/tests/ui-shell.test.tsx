@@ -738,7 +738,7 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
       host.preferences.setActiveTheme("community.forum:sakura")
     })
     expect(dom.container.toHtml()).toContain('data-plugin-theme="community.forum:sakura"')
-    expect(dom.container.toHtml()).toContain('--primary: oklch(0.7 0.2 350)')
+    expect(dom.container.toHtml()).toContain("--primary: oklch(0.7 0.2 350)")
     expect(dom.container.toHtml()).not.toContain("data-shell-theme=")
     await act(async () => {
       host.preferences.setActiveTheme("")

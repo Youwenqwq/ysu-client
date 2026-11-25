@@ -110,29 +110,11 @@ export const manifest: PluginManifest = {
   kind: "shell",
   entry: "index.js",
   required: true,
-  inject: [
-    "ui",
-    "slots",
-    "router",
-    "navigation",
-    "i18n",
-    "storage",
-    "native",
-    "packageRuntime",
-  ],
+  inject: ["ui", "slots", "router", "navigation", "i18n", "storage", "native", "packageRuntime"],
 }
 
 export const uiShellPlugin = definePlugin<
-  readonly [
-    "ui",
-    "slots",
-    "router",
-    "navigation",
-    "i18n",
-    "storage",
-    "native",
-    "packageRuntime",
-  ],
+  readonly ["ui", "slots", "router", "navigation", "i18n", "storage", "native", "packageRuntime"],
   ShellPluginConfig
 >({
   manifest,
