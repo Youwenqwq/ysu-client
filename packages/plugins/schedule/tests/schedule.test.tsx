@@ -869,7 +869,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     const runtime = new PluginRuntime()
     runtime.context.set("storage", new NamespacedStorageService({ local, secure }))
     runtime.context.set("http", new StatelessHttpService())
-    runtime.context.set("assets", { url: (path) => `/widgets/${path}` })
+    runtime.context.set("assets", { url: (path) => `/${path}` })
 
     let permissionGranted = true
     let exactAlarmGranted = true
@@ -1078,7 +1078,6 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     const query = runtime.context.get("query")!
 
     slots.declare({ name: "settings.startupOptions", kind: "list" })
-    slots.declare({ name: "settings.widgets", kind: "list" })
     slots.declare({ name: "shell.header.actions", kind: "list" })
 
     await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
@@ -1292,18 +1291,22 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     const widgetsHtml = renderToStaticMarkup(
       <ContributionOutlet entry={widgetsCategory} slots={slots} i18n={i18n} />
     )
-    expect(widgetsHtml).toContain("今日课表")
-    expect(widgetsHtml).toContain("明日课表")
+    expect(widgetsHtml).toContain("添加小组件")
+    expect(widgetsHtml).toContain("日程页小组件助手")
+    expect(widgetsHtml).toContain("/widgets/buro.png")
+    expect(widgetsHtml).not.toContain("data-widget-pin-card")
 
-    const assistantSlotEntry = slots
-      .select("settings.widgets")
-      .find((s) => s.pluginId === SCHEDULE_PLUGIN_ID && s.id === "widget-assistant")!
-    expect(assistantSlotEntry).toBeDefined()
-    const assistantSettingsHtml = renderToStaticMarkup(
-      <ContributionOutlet entry={assistantSlotEntry} slots={slots} i18n={i18n} />
+    await act(async () => {
+      router.push({ route: "settings-category", params: { category: "widgets", expand: "add" } })
+    })
+    const expandedWidgetsHtml = renderToStaticMarkup(
+      <ContributionOutlet entry={widgetsCategory} slots={slots} i18n={i18n} />
     )
-    expect(assistantSettingsHtml).toContain("日程页小组件助手")
-    expect(assistantSettingsHtml).toContain("/widgets/buro.png")
+    expect(expandedWidgetsHtml).toContain("今日课表")
+    expect(expandedWidgetsHtml).toContain("明日课表")
+    expect(expandedWidgetsHtml.match(/src="\/widgets\/schedule\.png"/g)).toHaveLength(2)
+    expect(expandedWidgetsHtml).toContain("日程页小组件助手")
+    expect(expandedWidgetsHtml).toContain("手动添加")
 
     const reminderSlotEntry = slots
       .select("settings.notifications.reminders")

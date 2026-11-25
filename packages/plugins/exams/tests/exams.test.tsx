@@ -658,7 +658,7 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
     const pinSpy = vi.spyOn(widgets, "requestPin").mockResolvedValue(true)
 
     slots.declare({ name: "settings.notifications.content", kind: "list" })
-    slots.declare({ name: "settings.widgets", kind: "list" })
+    slots.declare({ name: "settings.widgets.add", kind: "list" })
 
     await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
     session.setCredential({
@@ -693,7 +693,7 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
       order: 60,
     })
 
-    const widgetPinEntries = slots.select("settings.widgets")
+    const widgetPinEntries = slots.select("settings.widgets.add")
     expect(widgetPinEntries.map((e) => e.id)).toEqual(["exam", "exam-compact"])
 
     // Render widget pin card and verify standard <img> + requestPin("exam")
@@ -815,7 +815,7 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
     expect(clearSpy).toHaveBeenCalledWith("exam")
     expect(clearSpy).toHaveBeenCalledWith("exam-compact")
     expect(notifications.getSnapshot()).toEqual([])
-    expect(slots.select("settings.widgets")).toEqual([])
+    expect(slots.select("settings.widgets.add")).toEqual([])
     expect(slots.select("settings.notifications.content")).toEqual([])
     expect(ui.getSnapshot().pages.filter((p) => p.pluginId === EXAMS_PLUGIN_ID)).toEqual([])
 

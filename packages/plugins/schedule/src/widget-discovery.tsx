@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react"
 import { createPortal } from "react-dom"
+import { AnimatePresence, motion } from "motion/react"
 import { toast } from "sonner"
 import type { Translator } from "@orahako/sdk"
 import { cn, useIsMobile } from "@orahako/ui-primitives"
@@ -440,66 +441,82 @@ export function WidgetDiscovery({
       style={rootStyle}
       className="fixed right-4 bottom-4 z-40 md:right-6 md:bottom-6"
     >
-      {open && (
-        <div
-          ref={bubbleRef}
-          id="widget-discovery-bubble"
-          role="dialog"
-          aria-label={t("desktopWidgets.title")}
-          style={{
-            left: bubbleLayout?.left ?? 16,
-            top: bubbleLayout?.top ?? (placement === "bottom" ? 16 : undefined),
-            bottom: bubbleLayout?.bottom ?? (placement === "top" ? 88 : undefined),
-            width: bubbleLayout?.width ?? 320,
-          }}
-          className="fixed animate-in max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-popover p-4 text-popover-foreground shadow-xl duration-200 fade-in zoom-in-95"
-        >
-          <p className="text-sm leading-6">
-            <span className="inline">
-              {translateAssistantMessage(t, messageKey, interactionCount)}
-            </span>
-            {messageKey === "discover" && (
-              <>
-                <button
-                  type="button"
-                  data-widget-discovery-add=""
-                  disabled={adding}
-                  onClick={() => void addScheduleWidget()}
-                  className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-60"
-                >
-                  {adding ? t("desktopWidgets.adding") : t("desktopWidgets.assistantAdd")}
-                </button>
-                {t("desktopWidgets.assistantMoreBefore")}
-                <a
-                  href={widgetsSettingsHref}
-                  onClick={handleSettingsLinkClick}
-                  className="font-medium text-primary underline underline-offset-4"
-                >
-                  {t("desktopWidgets.assistantMoreLink")}
-                </a>
-                {t("desktopWidgets.assistantMoreAfter")}
-              </>
-            )}
-          </p>
-          {messageKey !== "farewell" && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t("desktopWidgets.assistantHideHint")}
-            </p>
-          )}
-          <span
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            ref={bubbleRef}
+            id="widget-discovery-bubble"
+            role="dialog"
+            aria-label={t("desktopWidgets.title")}
+            initial={{ opacity: 0, scale: 0.72, y: placement === "top" ? 14 : -14 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.82, y: placement === "top" ? 8 : -8 }}
+            transition={{ type: "spring", stiffness: 420, damping: 24 }}
             style={{
-              left: bubbleLayout?.tailX ?? 24,
-              ...(placement === "top" ? { bottom: -6 } : { top: -6 }),
+              left: bubbleLayout?.left ?? 16,
+              top: bubbleLayout?.top ?? (placement === "bottom" ? 16 : undefined),
+              bottom: bubbleLayout?.bottom ?? (placement === "top" ? 88 : undefined),
+              width: bubbleLayout?.width ?? 320,
+              transformOrigin: `${(bubbleLayout?.tailX ?? 24) + 6}px ${placement === "top" ? "100%" : "0%"}`,
             }}
-            className={cn(
-              "absolute size-3 rotate-45 border-border bg-popover",
-              placement === "top" ? "border-r border-b" : "border-t border-l"
+            className="fixed max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-popover p-4 text-popover-foreground shadow-xl"
+          >
+            <p className="text-sm leading-6">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={`${messageKey}-${interactionCount}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.16 }}
+                  className="inline"
+                >
+                  {translateAssistantMessage(t, messageKey, interactionCount)}
+                </motion.span>
+              </AnimatePresence>
+              {messageKey === "discover" && (
+                <>
+                  <button
+                    type="button"
+                    data-widget-discovery-add=""
+                    disabled={adding}
+                    onClick={() => void addScheduleWidget()}
+                    className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-60"
+                  >
+                    {adding ? t("desktopWidgets.adding") : t("desktopWidgets.assistantAdd")}
+                  </button>
+                  {t("desktopWidgets.assistantMoreBefore")}
+                  <a
+                    href={widgetsSettingsHref}
+                    onClick={handleSettingsLinkClick}
+                    className="font-medium text-primary underline underline-offset-4"
+                  >
+                    {t("desktopWidgets.assistantMoreLink")}
+                  </a>
+                  {t("desktopWidgets.assistantMoreAfter")}
+                </>
+              )}
+            </p>
+            {messageKey !== "farewell" && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t("desktopWidgets.assistantHideHint")}
+              </p>
             )}
-          />
-        </div>
-      )}
+            <span
+              style={{
+                left: bubbleLayout?.tailX ?? 24,
+                ...(placement === "top" ? { bottom: -6 } : { top: -6 }),
+              }}
+              className={cn(
+                "absolute size-3 rotate-45 border-border bg-popover",
+                placement === "top" ? "border-r border-b" : "border-t border-l"
+              )}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <button
+      <motion.button
         ref={buttonRef}
         type="button"
         data-widget-discovery-trigger=""
@@ -508,19 +525,35 @@ export function WidgetDiscovery({
         aria-expanded={open}
         aria-controls="widget-discovery-bubble"
         title={t("desktopWidgets.assistantHideHint")}
+        initial={{ opacity: 0, scale: 0, rotate: -14 }}
+        animate={
+          departing
+            ? {
+                opacity: [1, 1, 1, 0.85, 0],
+                scale: [1, 1.22, 0.92, 0.62, 0],
+                rotate: [0, -16, 18, -28, -48],
+                x: [0, -12, 12, 36, 96],
+                y: [0, 2, -10, 10, 52],
+              }
+            : { opacity: 1, scale: 1, rotate: 0 }
+        }
+        whileHover={departing ? undefined : { scale: 1.08, rotate: -4 }}
+        whileTap={departing ? undefined : { scale: 0.82 }}
+        transition={
+          departing
+            ? { duration: 1.05, ease: "easeInOut" }
+            : { type: "spring", stiffness: 360, damping: 16 }
+        }
         onClick={onClick}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
         onContextMenu={(event) => event.preventDefault()}
-        className={cn(
-          "block size-14 cursor-grab touch-none rounded-full transition-transform select-none hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95 active:cursor-grabbing md:size-16",
-          departing && "translate-x-12 translate-y-6 scale-0 opacity-0 duration-700"
-        )}
+        className="block size-14 cursor-grab touch-none rounded-full select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none active:cursor-grabbing md:size-16"
       >
         <WidgetAssistantAvatar src={assistantSrc} className="size-full drop-shadow-md" />
-      </button>
+      </motion.button>
     </div>
   )
 

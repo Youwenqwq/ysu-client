@@ -11,6 +11,7 @@
     "@orahako/academic-sdk": "workspace:*",
     "@orahako/sdk": "workspace:*",
     "@orahako/ui-primitives": "workspace:*",
+    "@orahako/ui-profile": "workspace:*",
     "lucide-react": "^1.17.0",
     "sonner": "^2.0.7"
   },

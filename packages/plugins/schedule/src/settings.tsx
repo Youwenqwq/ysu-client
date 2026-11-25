@@ -15,10 +15,15 @@ import { hasSlice, supportsPlugin, type ProviderRuntimeSnapshot } from "@orahako
 import type {
   DerivedComponentProps,
   ObservableSource,
+  RouteLocation,
   SlotComponent,
   Translator,
 } from "@orahako/sdk"
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
   Badge,
   Button,
   Card,
@@ -77,19 +82,26 @@ export const ScheduleStartupOption: SlotComponent<ScheduleStartupOptionProps> = 
   )
 }
 
+export const SCHEDULE_WIDGETS_CATEGORY_CHILDREN = {
+  "settings.widgets": { kind: "list" },
+  "settings.widgets.add": { kind: "list" },
+} as const
+
 export interface ScheduleWidgetsCategoryInject {
   readonly hooks: {
     readonly provider: ObservableSource<ProviderRuntimeSnapshot>
+    readonly location: ObservableSource<RouteLocation>
   }
   readonly pluginId: string
   readonly isNative: () => boolean
+  readonly previewSrc: string
   readonly requestPinWidget: (widget: ScheduleWidgetId) => Promise<boolean>
 }
 
 export type ScheduleWidgetsCategoryProps = DerivedComponentProps<
   Record<string, never>,
   ScheduleDictionary,
-  undefined,
+  typeof SCHEDULE_WIDGETS_CATEGORY_CHILDREN,
   ScheduleSettingsStoreInstance,
   ScheduleWidgetsCategoryInject
 >
@@ -98,12 +110,14 @@ function ScheduleWidgetPinCard({
   widgetId,
   name,
   sizeLabel,
+  previewSrc,
   t,
   onRequestPin,
 }: {
   readonly widgetId: ScheduleWidgetId
   readonly name: string
   readonly sizeLabel: string
+  readonly previewSrc: string
   readonly t: Translator<ScheduleDictionary>
   readonly onRequestPin: (widget: ScheduleWidgetId) => Promise<boolean>
 }): ReactNode {
@@ -135,19 +149,9 @@ function ScheduleWidgetPinCard({
           <Badge variant="secondary">{sizeLabel}</Badge>
         </CardAction>
       </CardHeader>
-      <CardContent className="mx-4 flex flex-1 flex-col gap-2 rounded-lg bg-muted/35 p-3">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{name}</span>
-          <span>08:00 - 09:40</span>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <div className="h-7 rounded-md bg-primary/15 px-2.5 py-1.5 text-xs font-medium text-foreground">
-            1-2 · A101
-          </div>
-          <div className="h-7 rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-foreground">
-            3-4 · B203
-          </div>
-        </div>
+      <CardContent className="mx-4 flex flex-1 items-center justify-center rounded-lg bg-muted/35 p-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={previewSrc} alt={name} className="h-auto w-full rounded-lg" />
       </CardContent>
       <CardFooter>
         <Button
@@ -168,10 +172,17 @@ function ScheduleWidgetPinCard({
 export const ScheduleWidgetsCategoryPanel: SlotComponent<ScheduleWidgetsCategoryProps> = (
   props
 ) => {
-  const { t, useStore, actions } = props
+  const { t, useStore, actions, renderSlot } = props
   const providerSnap = props.useProvider()
+  const location = props.useLocation()
   const syncReminderHours = useStore((s) => s.widgetSyncReminderHours)
   const showNextDaySchedule = useStore((s) => s.widgetShowNextDaySchedule)
+  const [addWidgetsOpen, setAddWidgetsOpen] = useState(location.params.expand === "add")
+  const autoExpandAddWidgets = location.params.expand === "add"
+
+  useEffect(() => {
+    if (autoExpandAddWidgets) setAddWidgetsOpen(true)
+  }, [autoExpandAddWidgets])
 
   const activeProvider = providerSnap.provider
   const supported =
@@ -199,25 +210,12 @@ export const ScheduleWidgetsCategoryPanel: SlotComponent<ScheduleWidgetsCategory
     t("desktopWidgets.manualStep3"),
     t("desktopWidgets.manualStep4"),
   ]
+  const widgetSettingsNode = renderSlot("settings.widgets")
+  const addWidgetNodes = renderSlot("settings.widgets.add")
 
   return (
     <div className="flex flex-col gap-6" data-schedule-widgets-category="">
-      <section className="grid gap-4 lg:grid-cols-2" aria-label={t("desktopWidgets.title")}>
-        <ScheduleWidgetPinCard
-          widgetId="schedule"
-          name={t("desktopWidgets.scheduleName")}
-          sizeLabel="4×3"
-          t={t}
-          onRequestPin={props.requestPinWidget}
-        />
-        <ScheduleWidgetPinCard
-          widgetId="tomorrow"
-          name={t("desktopWidgets.tomorrowName")}
-          sizeLabel="4×2"
-          t={t}
-          onRequestPin={props.requestPinWidget}
-        />
-      </section>
+      {widgetSettingsNode}
 
       <Card className="py-0">
         <CardContent className="flex flex-col py-1">
@@ -243,27 +241,73 @@ export const ScheduleWidgetsCategoryPanel: SlotComponent<ScheduleWidgetsCategory
         </CardContent>
       </Card>
 
-      <Card id="widget-manual-guide" className="scroll-mt-20">
-        <CardHeader>
-          <CardTitle>{t("desktopWidgets.manualTitle")}</CardTitle>
-          <CardDescription>{t("desktopWidgets.manualDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <ol className="grid gap-4 md:grid-cols-2">
-            {manualSteps.map((step, index) => (
-              <li key={step} className="flex items-start gap-3 text-sm leading-6">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                  {index + 1}
+      <Card className="py-0">
+        <Accordion
+          type="single"
+          collapsible
+          value={addWidgetsOpen ? "add" : ""}
+          onValueChange={(value) => setAddWidgetsOpen(value === "add")}
+        >
+          <AccordionItem value="add" className="border-b-0">
+            <AccordionTrigger className="px-4 py-3 hover:no-underline">
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span>{t("settings.addWidget")}</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {t("settings.addWidgetDesc")}
                 </span>
-                <span>{step}</span>
-              </li>
-            ))}
-          </ol>
-          <div className="flex flex-col gap-1 border-t border-border pt-3 text-xs leading-5 text-muted-foreground">
-            <p>{t("desktopWidgets.resizeNote")}</p>
-            <p>{t("desktopWidgets.syncNote")}</p>
-          </div>
-        </CardContent>
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="h-auto px-4 pb-4">
+              <div className="flex flex-col gap-6">
+                <section
+                  className="grid gap-4 lg:grid-cols-2"
+                  aria-label={t("desktopWidgets.title")}
+                >
+                  <ScheduleWidgetPinCard
+                    widgetId="schedule"
+                    name={t("desktopWidgets.scheduleName")}
+                    sizeLabel="4×3"
+                    previewSrc={props.previewSrc}
+                    t={t}
+                    onRequestPin={props.requestPinWidget}
+                  />
+                  <ScheduleWidgetPinCard
+                    widgetId="tomorrow"
+                    name={t("desktopWidgets.tomorrowName")}
+                    sizeLabel="4×2"
+                    previewSrc={props.previewSrc}
+                    t={t}
+                    onRequestPin={props.requestPinWidget}
+                  />
+                  {addWidgetNodes}
+                </section>
+
+                <Card id="widget-manual-guide" className="scroll-mt-20">
+                  <CardHeader>
+                    <CardTitle>{t("desktopWidgets.manualTitle")}</CardTitle>
+                    <CardDescription>{t("desktopWidgets.manualDescription")}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-4">
+                    <ol className="grid gap-4 md:grid-cols-2">
+                      {manualSteps.map((step, index) => (
+                        <li key={step} className="flex items-start gap-3 text-sm leading-6">
+                          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                            {index + 1}
+                          </span>
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                    <div className="flex flex-col gap-1 border-t border-border pt-3 text-xs leading-5 text-muted-foreground">
+                      <p>{t("desktopWidgets.resizeNote")}</p>
+                      <p>{t("desktopWidgets.syncNote")}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </Card>
     </div>
   )
@@ -291,8 +335,8 @@ export const ScheduleWidgetAssistantSettings: SlotComponent<
   if (!props.isNative()) return null
 
   return (
-    <Card data-schedule-widget-assistant-settings="">
-      <CardContent className="flex items-center gap-3 py-1">
+    <Card className="py-0" data-schedule-widget-assistant-settings="">
+      <CardContent className="flex min-h-18 items-center gap-3 py-3">
         <WidgetAssistantAvatar src={props.assistantSrc} className="size-11 shrink-0" />
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-sm font-medium">{t("desktopWidgets.assistantToggle")}</span>

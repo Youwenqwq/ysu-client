@@ -7,6 +7,7 @@ import {
   type StudentInfo,
   type TermCalendar,
 } from "@orahako/academic-sdk"
+import type { PluginProfileService } from "@orahako/ui-profile"
 import {
   definePlugin,
   PLUGIN_API_VERSION,
@@ -43,6 +44,10 @@ export const OVERVIEW_PLUGIN_ID = "orahako.overview"
 
 const SHORT_TTL_MS = 1000 * 60 * 60 * 12
 const LONG_TTL_MS = 1000 * 60 * 60 * 24 * 7
+const EMPTY_AVATAR_URL_SOURCE: PluginProfileService["avatarUrl"] = {
+  getSnapshot: () => null,
+  subscribe: () => () => {},
+}
 
 export {
   isWidgetSupportedByProvider,
@@ -104,8 +109,21 @@ export const overviewPlugin = definePlugin({
     "session",
     "query",
   ] as const,
+  optionalInject: ["profile"] as const,
   apply(ctx) {
-    const { ui, slots, settings, router, navigation, i18n, storage, provider, session, query } = ctx
+    const {
+      ui,
+      slots,
+      settings,
+      router,
+      navigation,
+      i18n,
+      storage,
+      provider,
+      session,
+      query,
+      profile,
+    } = ctx
     i18n.register(overviewDictionary)
     let disposed = false
 
@@ -273,6 +291,7 @@ export const overviewPlugin = definePlugin({
           hooks: {
             session: session.state,
             student: studentInfoSource,
+            avatarUrl: profile?.avatarUrl ?? EMPTY_AVATAR_URL_SOURCE,
           },
         }),
       },

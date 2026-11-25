@@ -223,11 +223,11 @@ export const examsPlugin = definePlugin({
       )
     )
 
-    slots.inject("settings.widgets", () => {
+    slots.inject("settings.widgets.add", () => {
       const disposeExam = slots.register(
         {
           id: "exam",
-          slot: "settings.widgets",
+          slot: "settings.widgets.add",
           order: 20,
           dictionary: examsDictionary,
           inject: (): ExamWidgetPinInject => ({
@@ -240,7 +240,7 @@ export const examsPlugin = definePlugin({
       const disposeCompact = slots.register(
         {
           id: "exam-compact",
-          slot: "settings.widgets",
+          slot: "settings.widgets.add",
           order: 20,
           dictionary: examsDictionary,
           inject: (): ExamWidgetPinInject => ({

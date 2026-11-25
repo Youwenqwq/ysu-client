@@ -13,6 +13,7 @@
     "@orahako/sdk": "workspace:*",
     "@orahako/ui-primitives": "workspace:*",
     "lucide-react": "^1.17.0",
+    "motion": "^12.42.2",
     "sonner": "^2.0.7"
   },
   "peerDependencies": {

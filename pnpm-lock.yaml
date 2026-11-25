@@ -2131,6 +2131,9 @@ importers:
       '@orahako/ui-primitives':
         specifier: workspace:*
         version: link:../../core/ui-primitives
+      '@orahako/ui-profile':
+        specifier: workspace:*
+        version: link:../../client/ui-profile
       lucide-react:
         specifier: ^1.17.0
         version: 1.17.0(react@19.2.6)
@@ -2204,6 +2207,9 @@ importers:
       lucide-react:
         specifier: ^1.17.0
         version: 1.17.0(react@19.2.6)
+      motion:
+        specifier: ^12.42.2
+        version: 12.42.2(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       react:
         specifier: ^19.0.0
         version: 19.2.6
@@ -2481,6 +2487,9 @@ importers:
       '@orahako/ui-primitives':
         specifier: workspace:*
         version: link:../../core/ui-primitives
+      '@orahako/ui-profile':
+        specifier: workspace:*
+        version: link:../../client/ui-profile
       lucide-react:
         specifier: ^1.17.0
         version: 1.17.0(react@19.2.6)

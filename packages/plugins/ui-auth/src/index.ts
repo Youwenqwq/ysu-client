@@ -8,6 +8,7 @@ import {
   type SchoolProvider,
   type StudentInfo,
 } from "@orahako/academic-sdk"
+import type { PluginProfileService } from "@orahako/ui-profile"
 import {
   definePlugin,
   isCapacitor,
@@ -49,6 +50,10 @@ export const AUTH_UI_PLUGIN_ID = "orahako.auth-ui"
 
 const LONG_TTL_MS = 1000 * 60 * 60 * 24 * 7
 const DEFAULT_CAPACITOR_RETRY_DELAY_MS = 800
+const EMPTY_AVATAR_URL_SOURCE: PluginProfileService["avatarUrl"] = {
+  getSnapshot: () => null,
+  subscribe: () => () => {},
+}
 
 export interface AuthUiPluginConfig extends PluginConfig {
   readonly defaultLanding?: string
@@ -156,7 +161,7 @@ export const authUiPlugin = definePlugin({
     "session",
     "query",
   ] as const,
-  optionalInject: ["mfa"] as const,
+  optionalInject: ["mfa", "profile"] as const,
   apply(ctx, config: AuthUiPluginConfig = {}) {
     const {
       ui,
@@ -170,6 +175,7 @@ export const authUiPlugin = definePlugin({
       session,
       query,
       mfa,
+      profile,
     } = ctx
     i18n.register(authUiDictionary)
     const t = i18n.translator(authUiDictionary)
@@ -490,6 +496,7 @@ export const authUiPlugin = definePlugin({
               provider: provider.state,
               navigationRevision: navigation.state,
               student: studentProfileSource,
+              avatarUrl: profile?.avatarUrl ?? EMPTY_AVATAR_URL_SOURCE,
             },
             canOpenStudentInfo: () => navigation.resolve("student-info") !== undefined,
             openStudentInfo: () => {

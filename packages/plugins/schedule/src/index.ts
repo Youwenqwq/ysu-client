@@ -55,6 +55,7 @@ import {
   ScheduleStartupOption,
   ScheduleWidgetAssistantSettings,
   ScheduleWidgetsCategoryPanel,
+  SCHEDULE_WIDGETS_CATEGORY_CHILDREN,
   type ClassReminderSettingsInject,
   type ClassReminderSettingsProps,
   type ScheduleStartupOptionInject,
@@ -439,11 +440,14 @@ export const schedulePlugin = definePlugin({
 
     const widgetsSettingsHref = router.href({
       route: "settings-category",
-      params: { category: "widgets" },
+      params: { category: "widgets", expand: "add" },
     })
 
     const openWidgetsSettings = (): void => {
-      router.push({ route: "settings-category", params: { category: "widgets" } })
+      router.push({
+        route: "settings-category",
+        params: { category: "widgets", expand: "add" },
+      })
     }
 
     const isSchoolScheduleRouteAvailable = (): boolean =>
@@ -618,13 +622,16 @@ export const schedulePlugin = definePlugin({
         descriptionKey: "settings.widgetsCategoryDesc",
         icon: LayoutGrid,
         dictionary: scheduleDictionary,
+        children: SCHEDULE_WIDGETS_CATEGORY_CHILDREN,
         store: settingsStore,
         inject: (): ScheduleWidgetsCategoryInject => ({
           hooks: {
             provider: provider.state,
+            location: router.current,
           },
           pluginId: SCHEDULE_PLUGIN_ID,
           isNative: () => native.isNative,
+          previewSrc: resolveWidgetAssetSrc("schedule.png"),
           requestPinWidget: (widgetId) => widgets.requestPin(widgetId),
         }),
       },

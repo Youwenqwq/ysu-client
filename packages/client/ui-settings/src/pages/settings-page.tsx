@@ -41,7 +41,6 @@ export const settingsPageChildren = {
   "settings.startupOptions": { kind: "list" },
   "settings.general": { kind: "list" },
   "settings.account": { kind: "list" },
-  "settings.widgets": { kind: "list" },
 } as const
 
 export interface SettingsPageInject {
@@ -103,7 +102,6 @@ export const SettingsPage: SlotComponent<SettingsPageProps> = (props) => {
   const startupOptionsNode = renderSlot("settings.startupOptions")
   const appearanceNode = renderSlot("settings.appearance")
   const generalNode = renderSlot("settings.general")
-  const widgetsNode = renderSlot("settings.widgets")
   const accountNode = renderSlot("settings.account")
 
   const effectiveUa = resolveEffectiveUserAgent(
@@ -214,12 +212,6 @@ export const SettingsPage: SlotComponent<SettingsPageProps> = (props) => {
               })}
             </CardContent>
           </Card>
-        </SettingsSection>
-      )}
-
-      {widgetsNode !== null && (
-        <SettingsSection title={t("sectionWidgets")}>
-          <div className="flex flex-col gap-3">{widgetsNode}</div>
         </SettingsSection>
       )}
 

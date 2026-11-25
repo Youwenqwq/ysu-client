@@ -13,6 +13,7 @@ import {
   AlertTitle,
   Avatar,
   AvatarFallback,
+  AvatarImage,
   Badge,
   Button,
   Card,
@@ -157,6 +158,7 @@ export interface StudentProfileHeaderInject {
     readonly provider: ObservableSource<ProviderRuntimeSnapshot>
     readonly navigationRevision: ObservableSource<number>
     readonly student: ObservableSource<QuerySnapshot<StudentInfo>>
+    readonly avatarUrl: ObservableSource<string | null>
   }
   readonly canOpenStudentInfo: () => boolean
   readonly openStudentInfo: () => void
@@ -176,6 +178,7 @@ export const StudentProfileHeader: SlotComponent<StudentProfileHeaderProps> = (p
   const providerSnap = props.useProvider()
   const navRevision = props.useNavigationRevision()
   const student = props.useStudent()
+  const avatarUrl = props.useAvatarUrl()
   void navRevision
 
   if (!session.isAuthenticated) {
@@ -184,6 +187,7 @@ export const StudentProfileHeader: SlotComponent<StudentProfileHeaderProps> = (p
         <CardContent className="flex items-center justify-between gap-4 py-5">
           <div className="flex items-center gap-4">
             <Avatar className="size-14">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
               <AvatarFallback className="text-lg">U</AvatarFallback>
             </Avatar>
             <div className="flex flex-col gap-0.5">
@@ -210,6 +214,7 @@ export const StudentProfileHeader: SlotComponent<StudentProfileHeaderProps> = (p
   const body = (
     <CardContent className="flex items-center gap-4 py-5">
       <Avatar className="size-14">
+        {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
         <AvatarFallback className="text-lg">{initials}</AvatarFallback>
       </Avatar>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">

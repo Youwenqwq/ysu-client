@@ -499,7 +499,7 @@ describe("@orahako/plugin-overview ownership, single store instantiation & keyed
     })
     const profileCard = findAllNodes(dom.container, (node) =>
       node.attributes.has("data-overview-profile-card")
-    )[0]
+    )[0]!
     const inlineSummary = findAllNodes(dom.container, (node) =>
       node.attributes.has("data-overview-inline")
     )[0]

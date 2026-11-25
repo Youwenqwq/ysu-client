@@ -36,6 +36,8 @@ export {
   type RuntimeDiagnosticsSnapshot,
 }
 
+export type { PluginProfileService } from "./contract"
+
 export const PROFILE_PLUGIN_ID = "orahako.profile"
 
 export interface ProfilePluginConfig {
@@ -60,6 +62,7 @@ export const manifest: PluginManifest = {
   entry: "index.js",
   providerIndependent: true,
   required: true,
+  provides: ["profile"],
   inject: ["ui", "slots", "router", "navigation", "i18n", "storage", "native"],
 }
 
@@ -102,6 +105,7 @@ export const uiProfilePlugin = definePlugin<
     const media = new AvatarMediaController({
       isNative: () => ctx.native.isNative,
     })
+    ctx.set("profile", { avatarUrl: media.urlSource })
 
     const unsubscribeStore = store.source.subscribe(() => {
       void media.syncToken(store.source.getSnapshot().avatarToken)

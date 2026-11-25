@@ -900,7 +900,6 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
       expect(dom.container.textContent).toContain("李青橙")
       expect(dom.container.textContent).toContain("20260001")
     })
-
     activeUnmount = undefined
     await dom.unmount()
     env.runtime.dispose()

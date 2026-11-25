@@ -22,6 +22,7 @@ import {
   AlertDescription,
   Avatar,
   AvatarFallback,
+  AvatarImage,
   Button,
   Card,
   CardContent,
@@ -170,6 +171,7 @@ export interface ProfileSummaryWidgetInject {
   readonly hooks: {
     readonly session: ObservableSource<SessionSnapshot>
     readonly student: ObservableSource<QuerySnapshot<StudentInfo>>
+    readonly avatarUrl: ObservableSource<string | null>
   }
 }
 
@@ -185,6 +187,7 @@ export const ProfileSummaryWidget: SlotComponent<ProfileSummaryWidgetProps> = (p
   const { t } = props
   const session = props.useSession()
   const student = props.useStudent()
+  const avatarUrl = props.useAvatarUrl()
   const compact = useIsMobile()
 
   const displayName = student.data?.name || session.username || t("widgets.profile.fallbackName")
@@ -194,6 +197,7 @@ export const ProfileSummaryWidget: SlotComponent<ProfileSummaryWidgetProps> = (p
     <Card data-overview-profile-card="">
       <CardHeader className="flex flex-row items-center gap-3">
         <Avatar className="size-12 shrink-0">
+          {avatarUrl && <AvatarImage src={avatarUrl} alt="avatar" />}
           <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">

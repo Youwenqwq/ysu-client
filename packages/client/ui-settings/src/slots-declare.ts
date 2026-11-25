@@ -7,7 +7,6 @@ declare module "@orahako/sdk" {
     "settings.startupOptions": { kind: "list"; owner: Record<string, never> }
     "settings.general": { kind: "list"; owner: Record<string, never> }
     "settings.account": { kind: "list"; owner: Record<string, never> }
-    "settings.widgets": { kind: "list"; owner: Record<string, never> }
     "debug.panels": { kind: "list"; owner: Record<string, never> }
   }
 }

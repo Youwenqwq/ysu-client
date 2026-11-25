@@ -265,6 +265,7 @@ describe("@orahako/ui-profile", () => {
     expect(validated.kind).toBe("feature")
     expect(validated.providerIndependent).toBe(true)
     expect(validated.required).toBe(true)
+    expect(validated.provides).toEqual(["profile"])
     expect(validated.inject).toEqual([
       "ui",
       "slots",
