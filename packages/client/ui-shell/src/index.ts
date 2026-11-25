@@ -36,6 +36,7 @@ import {
   type ShellSidebarItem,
 } from "./nav-helpers"
 import { BackgroundPage } from "./pages/background-page"
+import { buildThemePreviewDocument, ThemePage } from "./pages/theme-page"
 import {
   appearanceStore,
   buildCardStyleCss,
@@ -58,6 +59,7 @@ export {
   buildCardStyleCss,
   buildMobileBottomTabs,
   buildSidebarGroups,
+  buildThemePreviewDocument,
   clampSidebarWidth,
   computeCardBgOpacity,
   DEFAULT_SIDEBAR_WIDTH,
@@ -70,6 +72,7 @@ export {
   resolveActivePageForLocation,
   resolveActiveScopedNavId,
   shellDictionary,
+  ThemePage,
   type AppearanceStoreState,
   type AppNavContribution,
   type BackgroundStyle,
@@ -382,6 +385,28 @@ export const uiShellPlugin = definePlugin<
 
     ctx.ui.registerPage(
       {
+        id: "theme",
+        route: "theme",
+        title: "界面主题",
+        titleKey: "theme.title",
+        requiresProvider: false,
+        parent: "settings",
+        dictionary: shellDictionary,
+        inject: () => ({
+          hooks: {
+            ui: ctx.ui.state,
+            preference: ctx.packageRuntime.preferenceState ?? STATIC_PREFERENCE_SOURCE,
+          },
+          getActiveTheme: () => ctx.packageRuntime.getActiveTheme?.() ?? "",
+          setActiveTheme: (themeId: string | undefined) =>
+            ctx.packageRuntime.setActiveTheme?.(themeId),
+        }),
+      },
+      ThemePage
+    )
+
+    ctx.ui.registerPage(
+      {
         id: "background",
         route: "background",
         title: "背景图设置",
@@ -415,8 +440,10 @@ export const uiShellPlugin = definePlugin<
               preference: ctx.packageRuntime.preferenceState ?? STATIC_PREFERENCE_SOURCE,
             },
             getActiveTheme: () => ctx.packageRuntime.getActiveTheme?.() ?? "",
-            setActiveTheme: (themeId: string | undefined) =>
-              ctx.packageRuntime.setActiveTheme?.(themeId),
+            themeHref: ctx.router.href({ route: "theme" }),
+            navigateToTheme: () => {
+              ctx.router.push({ route: "theme" })
+            },
             backgroundHref: ctx.router.href({ route: "background" }),
             navigateToBackground: () => {
               ctx.router.push({ route: "background" })

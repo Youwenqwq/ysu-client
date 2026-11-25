@@ -18,7 +18,8 @@ export interface AppearanceSettingsInject {
     readonly preference: ObservableSource<PluginHostPreferenceSnapshot>
   }
   readonly getActiveTheme: () => string
-  readonly setActiveTheme: (themeId: string | undefined) => void
+  readonly themeHref: string
+  readonly navigateToTheme: () => void
   readonly backgroundHref: string
   readonly navigateToBackground: () => void
 }
@@ -51,13 +52,17 @@ function handleSpaClick(event: MouseEvent<HTMLAnchorElement>, navigate: () => vo
 }
 
 export const AppearanceSettingsSection: SlotComponent<AppearanceSettingsProps> = (props) => {
-  const { t, useStore, actions, getActiveTheme, setActiveTheme } = props
+  const { t, useStore, actions, getActiveTheme } = props
   const uiSnapshot = props.useUi()
   const preference = props.usePreference()
   const colorMode = useStore((s) => s.colorMode)
   const activeTheme = preference.activeTheme ?? getActiveTheme()
 
   const customThemes = uiSnapshot.themes.filter((theme) => theme.css.trim().length > 0)
+  const activeThemeName =
+    customThemes.find(
+      (theme) => activeTheme === `${theme.pluginId}:${theme.id}` || activeTheme === theme.id
+    )?.name ?? t("appearance.defaultTheme")
 
   return (
     <>
@@ -88,33 +93,19 @@ export const AppearanceSettingsSection: SlotComponent<AppearanceSettingsProps> =
       </div>
 
       {customThemes.length > 0 && (
-        <div className="flex items-center gap-3 py-3" data-settings-custom-theme="">
+        <a
+          href={props.themeHref}
+          onClick={(event) => handleSpaClick(event, props.navigateToTheme)}
+          className="flex min-w-0 items-center gap-3 py-3 transition-colors active:bg-muted/60"
+          data-settings-theme-link=""
+        >
           <Palette className="size-5 shrink-0 text-muted-foreground" />
           <span className="flex-1 text-sm">{t("appearance.customTheme")}</span>
-          <ToggleGroup
-            type="single"
-            value={activeTheme || "__default__"}
-            onValueChange={(value) => {
-              if (!value) return
-              setActiveTheme(value === "__default__" ? undefined : value)
-            }}
-            variant="outline"
-            size="sm"
-            className="flex flex-wrap justify-end"
-          >
-            <ToggleGroupItem value="__default__" className="text-xs">
-              {t("appearance.defaultTheme")}
-            </ToggleGroupItem>
-            {customThemes.map((theme) => {
-              const qualified = `${theme.pluginId}:${theme.id}`
-              return (
-                <ToggleGroupItem key={qualified} value={qualified} className="text-xs">
-                  {theme.name}
-                </ToggleGroupItem>
-              )
-            })}
-          </ToggleGroup>
-        </div>
+          <span className="max-w-[45%] truncate text-xs text-muted-foreground">
+            {activeThemeName}
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </a>
       )}
 
       <a

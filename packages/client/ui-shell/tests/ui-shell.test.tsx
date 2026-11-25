@@ -766,16 +766,30 @@ describe("Non-Academic Community Composition Integration (<OrahakoApp />)", () =
     expect(router.current.getSnapshot().pageId).toBe("board")
     expect(dom.container.findByAttr("data-shell-bottom-nav")).toBeDefined()
 
-    // 3. Navigate to semantic `?route=settings` -> canonicalizes & renders appearance controls (from ui-shell + ui-profile), custom theme selector ("樱花粉"), and community category!
+    // 3. Settings links to a standalone theme page with live, scoped previews.
     await act(async () => {
       router.push("/?route=settings")
     })
     expect(router.current.getSnapshot().href).toBe("/?plugin=orahako.settings&page=settings")
     expect(dom.container.textContent).toContain("深浅模式")
-    expect(dom.container.textContent).toContain("樱花粉")
+    expect(dom.container.textContent).toContain("默认主题")
     expect(dom.container.textContent).toContain("背景图")
     expect(dom.container.textContent).toContain("自定义头像")
     expect(dom.container.textContent).toContain("社区偏好")
+    expect(dom.container.findByAttr("data-settings-theme-link")?.getAttribute("href")).toBe(
+      "/?route=theme"
+    )
+    expect(dom.container.findByAttr("data-settings-custom-theme")).toBeUndefined()
+
+    await act(async () => {
+      router.push({ route: "theme" })
+    })
+    expect(dom.container.findByAttr("data-page", "theme")).toBeDefined()
+    expect(dom.container.textContent).toContain("默认主题")
+    expect(dom.container.textContent).toContain("樱花粉")
+    expect(dom.container.toHtml().match(/<iframe data-theme-preview="\d+"/g)).toHaveLength(2)
+    expect(dom.container.toHtml()).toContain("sandbox")
+    expect(dom.container.toHtml()).toContain(":root { --primary: oklch(0.7 0.2 350); }")
 
     // 4. Navigate to bridged category detail page -> renders `Community Preferences` panel via `settings.category.panel`!
     await act(async () => {
