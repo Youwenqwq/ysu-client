@@ -1,4 +1,4 @@
-import { Bell, Eye, Sparkles } from "lucide-react"
+import { Eye, Sparkles } from "lucide-react"
 import { hasSlice, type ProviderRuntimeSnapshot } from "@orahako/academic-sdk"
 import type { DerivedComponentProps, ObservableSource, SlotComponent } from "@orahako/sdk"
 import { Card, CardContent, Switch, ToggleGroupItem } from "@orahako/ui-primitives"
@@ -17,7 +17,6 @@ export const GradesSettingsPanel: SlotComponent<GradesSettingsPanelProps> = (pro
   const { t, useStore, actions } = props
   const gradeGachaEnabled = useStore((s) => s.gradeGachaEnabled)
   const gpaVisible = useStore((s) => s.gpaVisible)
-  const notifyGrades = useStore((s) => s.notifyGrades)
 
   return (
     <Card data-grades-settings="" className="py-0">
@@ -47,19 +46,6 @@ export const GradesSettingsPanel: SlotComponent<GradesSettingsPanelProps> = (pro
             onCheckedChange={actions.setGpaVisible}
           />
         </div>
-
-        <div className="flex items-center gap-3 py-3">
-          <Bell className="size-5 shrink-0 text-muted-foreground" />
-          <div className="flex flex-1 flex-col">
-            <span className="text-sm">{t("settings.notifyGradesTitle")}</span>
-            <span className="text-xs text-muted-foreground">{t("settings.notifyGradesDesc")}</span>
-          </div>
-          <Switch
-            aria-label={t("settings.notifyGradesTitle")}
-            checked={notifyGrades}
-            onCheckedChange={actions.setNotifyGrades}
-          />
-        </div>
       </CardContent>
     </Card>
   )
@@ -75,15 +61,14 @@ export type GradeNotificationContentProps = DerivedComponentProps<
   Record<string, never>,
   GradesDictionary,
   undefined,
-  GradesSettingsStoreInstance,
+  undefined,
   GradeNotificationContentInject
 >
 
 export const GradeNotificationContent: SlotComponent<GradeNotificationContentProps> = (props) => {
   const providerSnap = props.useProvider()
-  const notifyGrades = props.useStore((s) => s.notifyGrades)
 
-  if (!hasSlice(providerSnap.provider, "grades") || !notifyGrades) {
+  if (!hasSlice(providerSnap.provider, "grades")) {
     return null
   }
 

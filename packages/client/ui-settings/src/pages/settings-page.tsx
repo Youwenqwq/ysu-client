@@ -1,22 +1,9 @@
-import { useEffect, useState, type MouseEvent } from "react"
-import { toast } from "sonner"
+import type { MouseEvent } from "react"
+import { ChevronRight, Globe, Info, LayoutDashboard } from "lucide-react"
 import {
-  ChevronRight,
-  Globe,
-  Info,
-  LayoutDashboard,
-  RotateCcw,
-  Save,
-  Smartphone,
-} from "lucide-react"
-import {
-  Badge,
-  Button,
   Card,
   CardContent,
   SettingsSection,
-  Switch,
-  Textarea,
   ToggleGroup,
   ToggleGroupItem,
 } from "@orahako/ui-primitives"
@@ -30,11 +17,6 @@ import type {
 } from "@orahako/sdk"
 import "../slots-declare"
 import type { SettingsDictionary } from "../dictionary"
-import {
-  normalizeCustomUserAgent,
-  resolveEffectiveUserAgent,
-  type SettingsStoreInstance,
-} from "../store"
 
 export const settingsPageChildren = {
   "settings.appearance": { kind: "list" },
@@ -60,14 +42,13 @@ export interface SettingsPageInject {
   ) => string
   readonly getStartupPage: () => string | undefined
   readonly setStartupPage: (route: string | undefined) => void
-  readonly getDefaultUserAgent: () => string
 }
 
 export type SettingsPageProps = DerivedComponentProps<
   Record<string, never>,
   SettingsDictionary,
   typeof settingsPageChildren,
-  SettingsStoreInstance,
+  undefined,
   SettingsPageInject
 >
 
@@ -87,38 +68,15 @@ function handleSpaClick(event: MouseEvent<HTMLAnchorElement>, navigate: () => vo
 }
 
 export const SettingsPage: SlotComponent<SettingsPageProps> = (props) => {
-  const { t, locale, renderSlot, useStore, actions } = props
+  const { t, locale, renderSlot } = props
   const categories = props.useCategories()
   const preference = props.usePreference()
-  const customUserAgentEnabled = useStore((s) => s.customUserAgentEnabled)
-  const customUserAgent = useStore((s) => s.customUserAgent)
   const startupPage = preference.startupPage ?? props.getStartupPage() ?? ""
-
-  const [uaDraft, setUaDraft] = useState(customUserAgent)
-  useEffect(() => {
-    setUaDraft(customUserAgent)
-  }, [customUserAgent])
 
   const startupOptionsNode = renderSlot("settings.startupOptions")
   const appearanceNode = renderSlot("settings.appearance")
   const generalNode = renderSlot("settings.general")
   const accountNode = renderSlot("settings.account")
-
-  const effectiveUa = resolveEffectiveUserAgent(
-    { customUserAgentEnabled, customUserAgent },
-    props.getDefaultUserAgent()
-  )
-
-  const handleSaveUa = () => {
-    actions.setCustomUserAgent(normalizeCustomUserAgent(uaDraft))
-    toast.success(t("userAgentSaved"))
-  }
-
-  const handleResetUa = () => {
-    actions.resetCustomUserAgent()
-    setUaDraft("")
-    toast.success(t("userAgentReset"))
-  }
 
   return (
     <div className="flex flex-col gap-6" data-page="settings">
@@ -214,62 +172,6 @@ export const SettingsPage: SlotComponent<SettingsPageProps> = (props) => {
           </Card>
         </SettingsSection>
       )}
-
-      <SettingsSection title={t("sectionNetwork")}>
-        <Card className="py-0">
-          <CardContent className="flex flex-col gap-3 py-3">
-            <div className="flex items-center gap-3">
-              <Smartphone className="size-5 shrink-0 text-muted-foreground" />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">{t("enableCustomUserAgent")}</span>
-                  <Badge
-                    variant={customUserAgentEnabled ? "secondary" : "outline"}
-                    className="text-[10px]"
-                  >
-                    {customUserAgentEnabled
-                      ? t("customUserAgentBadge")
-                      : t("defaultUserAgentBadge")}
-                  </Badge>
-                </div>
-                <span className="text-xs text-muted-foreground">{t("customUserAgentDesc")}</span>
-              </div>
-              <Switch
-                checked={customUserAgentEnabled}
-                onCheckedChange={(enabled) => actions.setCustomUserAgentEnabled(enabled)}
-              />
-            </div>
-
-            {effectiveUa && (
-              <span className="font-mono text-[11px] break-all text-muted-foreground">
-                {effectiveUa}
-              </span>
-            )}
-
-            {customUserAgentEnabled && (
-              <div className="flex flex-col gap-2 pt-1">
-                <Textarea
-                  name="custom-user-agent"
-                  value={uaDraft}
-                  onChange={(event) => setUaDraft(event.target.value)}
-                  placeholder={t("emptyUserAgentPlaceholder")}
-                  className="min-h-20 font-mono text-[11px]"
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={handleResetUa}>
-                    <RotateCcw className="mr-1 size-3.5" />
-                    {t("resetUserAgent")}
-                  </Button>
-                  <Button type="button" size="sm" onClick={handleSaveUa}>
-                    <Save className="mr-1 size-3.5" />
-                    {t("saveUserAgent")}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </SettingsSection>
 
       {accountNode !== null && (
         <SettingsSection title={t("sectionAccount")}>

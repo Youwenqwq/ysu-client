@@ -155,10 +155,14 @@ export const uiShellPlugin = definePlugin<
       isNative: () => ctx.native.isNative,
     })
 
+    let lastBackgroundImage = store.source.getSnapshot().backgroundImage
     const unsubscribeStore = store.source.subscribe(() => {
-      void media.syncToken(store.source.getSnapshot().backgroundImage)
+      const nextBackgroundImage = store.source.getSnapshot().backgroundImage
+      if (nextBackgroundImage === lastBackgroundImage) return
+      lastBackgroundImage = nextBackgroundImage
+      void media.syncToken(nextBackgroundImage)
     })
-    void media.syncToken(store.source.getSnapshot().backgroundImage)
+    void media.syncToken(lastBackgroundImage)
 
     const resolveStartupPage = (): string =>
       ctx.packageRuntime.preferenceState?.getSnapshot().startupPage ??

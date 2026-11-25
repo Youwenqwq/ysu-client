@@ -839,15 +839,20 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       )
     ).toContain("成绩")
 
-    // Disabling notifyGrades in gradesSettingsStore gates polling flag to false
-    settingsStore.actions.setNotifyGrades(false)
+    // Disabling the grades channel in notification settings gates polling flag to false;
+    // GradesSettingsPanel itself only renders grade display preferences (no duplicate notification toggle).
     const disabledPlan = evaluateNotificationChannels(
       notifications.getSnapshot(),
       customFivePointSchool,
-      {}
+      { grades: true }
     )
     expect(disabledPlan.flags).toMatchObject({ checkGrades: false, grades: false })
-    settingsStore.actions.setNotifyGrades(true)
+    const gradesSettingsHtml = renderToStaticMarkup(
+      <ContributionOutlet entry={gradesCategory} slots={slots} i18n={i18n} />
+    )
+    expect(gradesSettingsHtml).toContain("新成绩抽卡")
+    expect(gradesSettingsHtml).toContain("默认显示绩点数值")
+    expect(gradesSettingsHtml).not.toContain("成绩发布通知")
 
     // Render GradesPage: GPA starts masked (`***`), then reveals `4.60` + custom 5.0 scale `A+` band
     const headerActions = slots.select("shell.header.actions")[0]!
@@ -1009,7 +1014,8 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       <ContributionOutlet entry={gradesCategory} slots={slots} i18n={i18n} />
     )
     expect(settingsHtml).toContain("新成绩抽卡")
-    expect(settingsHtml).toContain("成绩发布通知")
+    expect(settingsHtml).toContain("默认显示绩点数值")
+    expect(settingsHtml).not.toContain("成绩发布通知")
 
     // Render RecentGradesWidget via overview keyed slot and verify navigation to grades
     const widgetSlotEntry = slots.select("overview.widget", `${GRADES_PLUGIN_ID}:recent-grades`)[0]!
@@ -1140,9 +1146,9 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
     const notifications = runtime.context.get("notifications")!
 
     expect(
-      ui.getSnapshot().pages.some(
-        (page) => page.pluginId === GRADES_PLUGIN_ID && page.id === "index"
-      )
+      ui
+        .getSnapshot()
+        .pages.some((page) => page.pluginId === GRADES_PLUGIN_ID && page.id === "index")
     ).toBe(true)
     expect(ui.getSnapshot().navigation.some((item) => item.pluginId === GRADES_PLUGIN_ID)).toBe(
       true

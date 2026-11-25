@@ -97,14 +97,12 @@ export function toPendingGrade(grade: Grade): PendingGrade {
 export interface GradesSettingsState {
   readonly gpaVisible: boolean
   readonly gradeGachaEnabled: boolean
-  readonly notifyGrades: boolean
 }
 
 export const gradesSettingsStore = defineStore({
   init: (): GradesSettingsState => ({
     gpaVisible: false,
     gradeGachaEnabled: true,
-    notifyGrades: true,
   }),
   persist: {
     key: "grades-settings",
@@ -122,9 +120,6 @@ export const gradesSettingsStore = defineStore({
       ctx.set((prev) =>
         prev.gradeGachaEnabled === gradeGachaEnabled ? prev : { ...prev, gradeGachaEnabled }
       )
-    },
-    setNotifyGrades(ctx, notifyGrades: boolean) {
-      ctx.set((prev) => (prev.notifyGrades === notifyGrades ? prev : { ...prev, notifyGrades }))
     },
   },
 })

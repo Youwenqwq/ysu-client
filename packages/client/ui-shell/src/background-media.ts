@@ -72,6 +72,7 @@ export class BackgroundMediaController {
     { readonly blob: Blob; readonly dataUrl: string }
   >()
   private activeObjectUrl: string | null = null
+  private syncedToken: string | null = null
   private generation = 0
   private disposed = false
 
@@ -92,12 +93,11 @@ export class BackgroundMediaController {
         directory: Directory.Data,
         recursive: true,
       })
-      await this.syncToken(BG_KEY)
+      await this.syncToken(BG_KEY, { force: true })
       return BG_KEY
     }
 
     const blob = decodeDataUrlToBlob(dataUrl)
-    this.revokeObjectUrl()
 
     if (typeof indexedDB !== "undefined") {
       const db = await openMediaDatabase()
@@ -115,13 +115,13 @@ export class BackgroundMediaController {
       this.memoryFallback.set(BG_KEY, { blob, dataUrl })
     }
 
-    await this.syncToken(BG_KEY)
+    await this.syncToken(BG_KEY, { force: true })
     return BG_KEY
   }
 
   async remove(): Promise<void> {
     this.generation += 1
-    this.revokeObjectUrl()
+    this.syncedToken = ""
     this.memoryFallback.delete(BG_KEY)
 
     if (this.options.isNative()) {
@@ -151,42 +151,65 @@ export class BackgroundMediaController {
     if (!this.disposed) {
       this.internalSource.set(null)
     }
+    this.revokeObjectUrl(this.activeObjectUrl)
+    this.activeObjectUrl = null
   }
 
-  async syncToken(token: string): Promise<void> {
+  async syncToken(token: string, options?: { readonly force?: boolean }): Promise<void> {
+    if (!options?.force && this.syncedToken === token) {
+      return
+    }
+    this.syncedToken = token
     const currentGen = ++this.generation
     if (!token) {
-      this.revokeObjectUrl()
       if (!this.disposed) this.internalSource.set(null)
+      this.revokeObjectUrl(this.activeObjectUrl)
+      this.activeObjectUrl = null
       return
     }
     if (isRenderableBackgroundUrl(token)) {
-      this.revokeObjectUrl()
       if (!this.disposed) this.internalSource.set(token)
+      this.revokeObjectUrl(this.activeObjectUrl)
+      this.activeObjectUrl = null
       return
     }
 
     const loaded = await this.loadCurrentUrl()
-    if (this.disposed || currentGen !== this.generation) return
-    this.internalSource.set(loaded)
+    if (this.disposed || currentGen !== this.generation) {
+      if (loaded?.objectUrl) {
+        this.revokeObjectUrl(loaded.objectUrl)
+      }
+      return
+    }
+    const previousObjectUrl = this.activeObjectUrl
+    this.activeObjectUrl = loaded?.objectUrl ?? null
+    this.internalSource.set(loaded?.url ?? null)
+    if (previousObjectUrl && previousObjectUrl !== this.activeObjectUrl) {
+      this.revokeObjectUrl(previousObjectUrl)
+    }
   }
 
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
     this.generation += 1
-    this.revokeObjectUrl()
+    this.syncedToken = null
+    this.revokeObjectUrl(this.activeObjectUrl)
+    this.activeObjectUrl = null
     this.memoryFallback.clear()
   }
 
-  private async loadCurrentUrl(): Promise<string | null> {
+  private async loadCurrentUrl(): Promise<{
+    readonly url: string
+    readonly objectUrl: string | null
+  } | null> {
     if (this.options.isNative()) {
       try {
         const { uri } = await Filesystem.getUri({
           path: BG_KEY,
           directory: Directory.Data,
         })
-        return `${Capacitor.convertFileSrc(uri)}?t=${Date.now()}`
+        return { url: `${Capacitor.convertFileSrc(uri)}?t=${Date.now()}`, objectUrl: null }
       } catch {
         return null
       }
@@ -218,27 +241,25 @@ export class BackgroundMediaController {
 
     const mem = this.memoryFallback.get(BG_KEY)
     if (!mem) return null
-    return mem.dataUrl || (await this.blobToUrl(mem.blob))
+    if (mem.dataUrl) {
+      return { url: mem.dataUrl, objectUrl: null }
+    }
+    return this.blobToUrl(mem.blob)
   }
 
-  private async blobToUrl(blob: Blob): Promise<string> {
+  private async blobToUrl(
+    blob: Blob
+  ): Promise<{ readonly url: string; readonly objectUrl: string | null }> {
     if (typeof URL !== "undefined" && typeof URL.createObjectURL === "function") {
-      this.revokeObjectUrl()
       const objectUrl = URL.createObjectURL(blob)
-      this.activeObjectUrl = objectUrl
-      return objectUrl
+      return { url: objectUrl, objectUrl }
     }
-    return encodeBlobToDataUrl(blob)
+    return { url: await encodeBlobToDataUrl(blob), objectUrl: null }
   }
 
-  private revokeObjectUrl(): void {
-    if (
-      this.activeObjectUrl &&
-      typeof URL !== "undefined" &&
-      typeof URL.revokeObjectURL === "function"
-    ) {
-      URL.revokeObjectURL(this.activeObjectUrl)
+  private revokeObjectUrl(objectUrl: string | null): void {
+    if (objectUrl && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
+      URL.revokeObjectURL(objectUrl)
     }
-    this.activeObjectUrl = null
   }
 }

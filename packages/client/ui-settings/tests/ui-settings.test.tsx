@@ -339,7 +339,7 @@ describe("@orahako/ui-settings", () => {
     startupControls?.setStartupPage("schedule")
     expect(host.preferences.state.getSnapshot()).toMatchObject({ startupPage: "schedule" })
 
-    // Render Settings page
+    // Render Settings page (custom User-Agent stays in Debug menu, not main Settings)
     const settingsHtml = renderToStaticMarkup(<OrahakoApp host={host} />)
     expect(settingsHtml).toContain("STARTUP_SCHEDULE")
     expect(settingsHtml).toMatch(/data-state="on"[^>]*>[^<]*STARTUP_SCHEDULE/)
@@ -349,6 +349,8 @@ describe("@orahako/ui-settings", () => {
     expect(settingsHtml).toContain("通知渠道")
     expect(settingsHtml).toContain("管理推送渠道")
     expect(settingsHtml).toContain('href="/?route=settings-category&amp;category=channels"')
+    expect(settingsHtml).not.toContain("custom-user-agent")
+    expect(settingsHtml).not.toContain("网络与请求")
 
     // Switch locale to English and verify category row & labels localize
     host.i18n?.setLocale("en")

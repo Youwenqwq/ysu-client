@@ -453,104 +453,136 @@ export const EvaluationPage: SlotComponent<EvaluationPageProps> = (props) => {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card className="hidden md:block">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>{t("evaluation.title")}</CardTitle>
-              <CardDescription>{t("evaluation.description")}</CardDescription>
-            </div>
-            {hasBatchTasks && (
-              <Button variant="outline" size="sm" onClick={openBatchSelect}>
-                <Sparkles data-icon="inline-start" />
-                {t("evaluation.batchAuto")}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center gap-2">
-            {types.map((type) => (
-              <Button
-                key={type.code ?? type.name}
-                data-evaluation-type={type.code ?? ""}
-                variant={selectedType === type.code ? "default" : "outline"}
-                onClick={() => void props.selectType(type.code || "")}
-              >
-                {type.name}
-                {type.count > 0 && (
-                  <Badge variant="secondary" className="ml-2">
-                    {type.count}
-                  </Badge>
-                )}
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {selectedType && (
+      {types.length === 0 ? (
         <Card>
-          <CardHeader>
-            <CardTitle>{t("evaluation.pendingTasks")}</CardTitle>
-            <CardDescription>
-              {types.find((type) => type.code === selectedType)?.name}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loadingTasks ? (
-              <Skeleton className="h-48" />
-            ) : tasks.length === 0 ? (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <ClipboardCheck />
-                  </EmptyMedia>
-                  <EmptyTitle>{t("evaluation.noTasks")}</EmptyTitle>
-                </EmptyHeader>
-              </Empty>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {tasks.map((task) => {
-                  const status = getTaskStatus(task, t)
-                  return (
-                    <Card
-                      key={task.wid}
-                      data-evaluation-task={task.wid}
-                      className={
-                        status.active
-                          ? "cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                          : "opacity-60"
-                      }
-                      onClick={() => void handleOpenTask(task)}
-                    >
-                      <CardHeader className="pb-2">
-                        <CardTitle className="truncate text-base">{task.courseName}</CardTitle>
-                        <CardDescription className="truncate">{task.teacherName}</CardDescription>
-                        <CardAction>
-                          <Badge variant={status.variant}>{status.label}</Badge>
-                        </CardAction>
-                      </CardHeader>
-                      <CardContent className="flex flex-col gap-0.5 text-sm text-muted-foreground">
-                        <span className="truncate">
-                          {task.termName} · {task.className}
-                        </span>
-                        {task.startTime && task.endTime && (
-                          <span className="truncate text-xs">
-                            {t("evaluation.dateRange", {
-                              start: task.startTime,
-                              end: task.endTime,
-                            })}
-                          </span>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            )}
+          <CardContent className="py-12">
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <ClipboardCheck />
+                </EmptyMedia>
+                <EmptyTitle>{t("evaluation.noTasks")}</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           </CardContent>
         </Card>
+      ) : (
+        <>
+          <Card className="hidden md:block">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>{t("evaluation.title")}</CardTitle>
+                  <CardDescription>{t("evaluation.description")}</CardDescription>
+                </div>
+                {hasBatchTasks && (
+                  <Button variant="outline" size="sm" onClick={openBatchSelect}>
+                    <Sparkles data-icon="inline-start" />
+                    {t("evaluation.batchAuto")}
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap items-center gap-2">
+                {types.map((type) => (
+                  <Button
+                    key={type.code ?? type.name}
+                    data-evaluation-type={type.code ?? ""}
+                    variant={selectedType === type.code ? "default" : "outline"}
+                    onClick={() => void props.selectType(type.code || "")}
+                  >
+                    {type.name}
+                    {type.count > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {type.count}
+                      </Badge>
+                    )}
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {selectedType ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("evaluation.pendingTasks")}</CardTitle>
+                <CardDescription>
+                  {types.find((type) => type.code === selectedType)?.name}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingTasks ? (
+                  <Skeleton className="h-48" />
+                ) : tasks.length === 0 ? (
+                  <Empty>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <ClipboardCheck />
+                      </EmptyMedia>
+                      <EmptyTitle>{t("evaluation.noTasks")}</EmptyTitle>
+                    </EmptyHeader>
+                  </Empty>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {tasks.map((task) => {
+                      const status = getTaskStatus(task, t)
+                      return (
+                        <Card
+                          key={task.wid}
+                          data-evaluation-task={task.wid}
+                          className={
+                            status.active
+                              ? "cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                              : "opacity-60"
+                          }
+                          onClick={() => void handleOpenTask(task)}
+                        >
+                          <CardHeader className="pb-2">
+                            <CardTitle className="truncate text-base">{task.courseName}</CardTitle>
+                            <CardDescription className="truncate">
+                              {task.teacherName}
+                            </CardDescription>
+                            <CardAction>
+                              <Badge variant={status.variant}>{status.label}</Badge>
+                            </CardAction>
+                          </CardHeader>
+                          <CardContent className="flex flex-col gap-0.5 text-sm text-muted-foreground">
+                            <span className="truncate">
+                              {task.termName} · {task.className}
+                            </span>
+                            {task.startTime && task.endTime && (
+                              <span className="truncate text-xs">
+                                {t("evaluation.dateRange", {
+                                  start: task.startTime,
+                                  end: task.endTime,
+                                })}
+                              </span>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-12">
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <ClipboardCheck />
+                    </EmptyMedia>
+                    <EmptyTitle>{t("evaluation.noTasks")}</EmptyTitle>
+                  </EmptyHeader>
+                </Empty>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {/* Single evaluation rubric dialog */}

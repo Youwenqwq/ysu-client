@@ -836,9 +836,9 @@ describe("@orahako/plugin-evaluation", () => {
       expect.arrayContaining(["evaluation-types", "pending-evaluations", "evaluation-tasks"])
     )
 
-    // Both page ("暂无待评任务" for type "02") and overview widget ("你有 1 个待评教任务") updated!
+    // Both page ("现在没有评教任务哦" for type "02") and overview widget ("你有 1 个待评教任务") updated!
     await vi.waitFor(() => {
-      expect(dom.container.textContent).toContain("暂无待评任务")
+      expect(dom.container.textContent).toContain("现在没有评教任务哦")
       expect(dom.container.textContent).toContain("你有 1 个待评教任务")
       expect(findNode(header, isBatchButton)).toBeNull()
     })
@@ -884,6 +884,111 @@ describe("@orahako/plugin-evaluation", () => {
     expect(
       ui.getSnapshot().navigation.some((entry) => entry.pluginId === EVALUATION_PLUGIN_ID)
     ).toBe(false)
+
+    activeUnmount = undefined
+    await dom.unmount()
+    runtime.dispose()
+  })
+
+  it("shows empty state message when no evaluation types exist", async () => {
+    const dom = mountMiniDom()
+    activeUnmount = dom.unmount
+
+    const emptyProvider: SchoolProvider = defineSchoolProvider({
+      id: "empty-school",
+      name: "空评教大学",
+      timeZone: "Asia/Shanghai",
+      slices: {
+        evaluation: {
+          getEvaluationTypes: async (): Promise<EvaluationType[]> => [],
+          getPendingEvaluations: async (): Promise<EvaluationTask[]> => [],
+          getEvaluationTasks: async (): Promise<EvaluationTask[]> => [],
+          getEvaluationDetail: async (): Promise<EvaluationDetail> => ({ questions: [] }),
+          submitEvaluation: async () => {},
+        },
+      },
+      async initialize() {},
+      async reset() {},
+      async logout() {},
+      async dispose() {},
+      async relogin() {
+        return true
+      },
+    })
+
+    const providerPlugin = definePlugin({
+      manifest: {
+        id: "test.empty-provider",
+        name: "Empty Provider",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "provider",
+        entry: "index.js",
+        inject: ["providers"],
+      },
+      inject: ["providers"] as const,
+      apply(ctx) {
+        ctx.providers.registerProvider("empty-school", () => emptyProvider)
+      },
+    })
+
+    const runtime = new PluginRuntime()
+    runtime.context.set(
+      "storage",
+      new NamespacedStorageService({
+        local: createMemoryStorage(),
+        secure: createMemoryStorage(),
+      })
+    )
+    runtime.context.set("http", new StatelessHttpService())
+
+    for (const plugin of [
+      slotRegistryPlugin,
+      uiRegistryPlugin,
+      settingsRegistryPlugin,
+      i18nRegistryPlugin,
+      routerRuntimePlugin,
+      navigationRuntimePlugin,
+      providerRegistryRuntimePlugin,
+      sessionRuntimePlugin,
+      providerRuntimePlugin,
+      queryRuntimePlugin,
+      providerPlugin,
+      evaluationPlugin,
+    ]) {
+      if (
+        plugin.manifest.id === sessionRuntimePlugin.manifest.id ||
+        plugin.manifest.id === providerRuntimePlugin.manifest.id
+      ) {
+        runtime.register(plugin, "builtin", { defaultSchoolId: "empty-school" })
+      } else {
+        runtime.register(plugin, "builtin")
+      }
+      runtime.start(plugin.manifest.id)
+    }
+
+    const ui = runtime.context.get("ui")!
+    const slots = runtime.context.get("slots") as PluginSlotRegistry
+    const i18n = runtime.context.get("i18n") as PluginI18nRegistryService
+    const session = runtime.context.get("session")!
+    const providerRuntime = runtime.context.get("provider")!
+
+    await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
+    session.setCredential({
+      schoolId: "empty-school",
+      credential: "ticket-empty",
+      username: "20250607",
+    })
+    await providerRuntime.initialize()
+
+    const evalPage = ui
+      .getSnapshot()
+      .pages.find((entry) => entry.pluginId === EVALUATION_PLUGIN_ID && entry.id === "index")!
+
+    await dom.render(<ContributionOutlet entry={evalPage} slots={slots} i18n={i18n} />)
+    await vi.waitFor(() => {
+      expect(dom.container.textContent).toContain("现在没有评教任务哦")
+    })
 
     activeUnmount = undefined
     await dom.unmount()

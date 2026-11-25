@@ -235,10 +235,25 @@ function BackgroundLayer({
     if (typeof document === "undefined" || !document.documentElement?.style) return
     const opacityValue = computeCardBgOpacity(hasBackground, cardStyle, cardOpacity)
     document.documentElement.style.setProperty("--card-bg-opacity", opacityValue)
+  }, [hasBackground, cardStyle, cardOpacity])
+
+  useEffect(() => {
     return () => {
       document.documentElement?.style?.setProperty("--card-bg-opacity", "1")
     }
-  }, [hasBackground, cardStyle, cardOpacity])
+  }, [])
+
+  const backgroundStyleObj = useMemo<CSSProperties | undefined>(
+    () =>
+      backgroundUrl
+        ? {
+            backgroundImage: `url(${backgroundUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }
+        : undefined,
+    [backgroundUrl]
+  )
 
   if (!backgroundUrl) return null
 
@@ -261,11 +276,7 @@ function BackgroundLayer({
         aria-hidden="true"
         data-shell-background=""
         className="fixed inset-0 -z-10"
-        style={{
-          backgroundImage: `url(${backgroundUrl})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
+        style={backgroundStyleObj}
       >
         <div className="absolute inset-0" style={overlayStyle} />
       </div>

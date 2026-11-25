@@ -133,33 +133,14 @@ export const gradesPlugin = definePlugin({
     const gachaStore = gradeGachaStore.create(storage)
     const viewStore = gradesViewStore.create()
 
-    let unregisterChannel: (() => void) | null = null
-    let lastNotifyGrades = settingsStore.source.getSnapshot().notifyGrades
-
-    const registerGradesChannel = (notifyGrades: boolean): void => {
-      unregisterChannel?.()
-      unregisterChannel = notifications.registerChannel({
-        id: "grades",
-        order: 10,
-        slice: "grades",
-        toPollingFlag: (enabled) => {
-          const active = enabled && notifyGrades
-          return {
-            checkGrades: active,
-            grades: active,
-          }
-        },
-      })
-    }
-
-    registerGradesChannel(lastNotifyGrades)
-    const detachSettings = settingsStore.source.subscribe(() => {
-      if (disposed) return
-      const current = settingsStore.source.getSnapshot().notifyGrades
-      if (current !== lastNotifyGrades) {
-        lastNotifyGrades = current
-        registerGradesChannel(current)
-      }
+    const unregisterChannel = notifications.registerChannel({
+      id: "grades",
+      order: 10,
+      slice: "grades",
+      toPollingFlag: (enabled) => ({
+        checkGrades: enabled,
+        grades: enabled,
+      }),
     })
 
     const buildGradesSource = (courseName: string) =>
@@ -307,7 +288,6 @@ export const gradesPlugin = definePlugin({
           slot: "settings.notifications.content",
           order: 10,
           dictionary: gradesDictionary,
-          store: settingsStore,
           inject: () => ({
             hooks: {
               provider: provider.state,
@@ -391,9 +371,7 @@ export const gradesPlugin = definePlugin({
 
     ctx.effect(() => () => {
       disposed = true
-      detachSettings()
-      unregisterChannel?.()
-      unregisterChannel = null
+      unregisterChannel()
       pageGradesController.dispose()
       settingsStore.dispose()
       gachaStore.dispose()

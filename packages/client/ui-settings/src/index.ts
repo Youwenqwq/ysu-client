@@ -102,7 +102,6 @@ export const uiSettingsPlugin = definePlugin({
         parent: "me",
         dictionary: settingsDictionary,
         children: settingsPageChildren,
-        store,
         inject: () => ({
           hooks: {
             categories: ctx.settings.state,
@@ -129,7 +128,6 @@ export const uiSettingsPlugin = definePlugin({
           setStartupPage: (route: string | undefined) => {
             ctx.packageRuntime?.setStartupPage?.(route)
           },
-          getDefaultUserAgent: readDefaultBrowserUserAgent,
         }),
       },
       SettingsPage

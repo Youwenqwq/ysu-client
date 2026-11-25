@@ -390,7 +390,25 @@ describe("@orahako/ui-shell unit helpers", () => {
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
     const token = await media.save(sampleDataUrl)
     expect(token).toBe("background-image.jpg")
-    expect(media.urlSource.getSnapshot()).toBeTruthy()
+    const savedUrl = media.urlSource.getSnapshot()
+    expect(savedUrl).toBeTruthy()
+
+    // Re-syncing the same token (e.g. when unrelated appearance sliders change) must be a no-op.
+    const urlChangeSpy = vi.fn()
+    const unsubMedia = media.urlSource.subscribe(urlChangeSpy)
+    await media.syncToken(token)
+    await media.syncToken(token)
+    expect(urlChangeSpy).not.toHaveBeenCalled()
+    expect(media.urlSource.getSnapshot()).toBe(savedUrl)
+
+    // Saving a replacement image forces an update even though the storage token stays the same.
+    const secondDataUrl =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+    await media.save(secondDataUrl)
+    expect(urlChangeSpy).toHaveBeenCalledTimes(1)
+    expect(media.urlSource.getSnapshot()).not.toBe(savedUrl)
+    unsubMedia()
+
     await media.remove()
     expect(media.urlSource.getSnapshot()).toBeNull()
     media.dispose()
