@@ -27,7 +27,11 @@ export interface PageSpec<
   readonly dictionary?: Dict
   readonly children?: Children
   readonly store?: Store
-  readonly inject?: (ctx: Context) => ValidInject<I>
+  /**
+   * Returns renderer data; capture declared services in the `apply` closure.
+   * No Context is passed so contributions cannot escape their plugin scope.
+   */
+  readonly inject?: () => ValidInject<I>
 }
 
 export interface PluginPageContribution {
@@ -123,7 +127,8 @@ export interface ShellSpec<
    */
   readonly declareChildren?: boolean
   readonly store?: Store
-  readonly inject?: (ctx: Context) => ValidInject<I>
+  /** Returns renderer data from the `apply` closure; no Context escapes. */
+  readonly inject?: () => ValidInject<I>
 }
 
 export interface PluginShellContribution {

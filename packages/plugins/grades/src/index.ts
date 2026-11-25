@@ -86,7 +86,6 @@ const gradesManifest: PluginManifest = {
     "session",
     "query",
     "notifications",
-    "overview",
   ],
 }
 
@@ -103,8 +102,8 @@ export const gradesPlugin = definePlugin({
     "session",
     "query",
     "notifications",
-    "overview",
   ] as const,
+  optionalInject: ["overview"] as const,
   apply(ctx) {
     const {
       ui,
@@ -141,6 +140,7 @@ export const gradesPlugin = definePlugin({
       unregisterChannel?.()
       unregisterChannel = notifications.registerChannel({
         id: "grades",
+        order: 10,
         slice: "grades",
         toPollingFlag: (enabled) => {
           const active = enabled && notifyGrades
@@ -235,7 +235,7 @@ export const gradesPlugin = definePlugin({
       return { statistics, distribution, ranking }
     }
 
-    overview.registerWidget(
+    overview?.registerWidget(
       {
         id: "gpa-summary",
         title: "初始绩点",
@@ -256,7 +256,7 @@ export const gradesPlugin = definePlugin({
       GpaSummaryWidget
     )
 
-    overview.registerWidget(
+    overview?.registerWidget(
       {
         id: "recent-grades",
         title: "近期成绩",

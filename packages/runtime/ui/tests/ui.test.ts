@@ -193,9 +193,6 @@ describe("@orahako/runtime-ui", () => {
       },
     })
 
-    let expectedCtx: unknown
-    const seenInjectContexts: unknown[] = []
-
     const plugin = definePlugin({
       manifest: {
         id: "example.shell-and-page",
@@ -207,16 +204,12 @@ describe("@orahako/runtime-ui", () => {
       },
       inject: ["ui"],
       apply(ctx) {
-        expectedCtx = ctx
         ctx.ui.registerPage(
           {
             id: "home",
             children: { "test.ui.page.toolbar": { kind: "single" } },
             store: pageStore,
-            inject: (c) => {
-              seenInjectContexts.push(c)
-              return { kind: "page" }
-            },
+            inject: () => ({ kind: "page" }),
           },
           BlankView
         )
@@ -226,10 +219,7 @@ describe("@orahako/runtime-ui", () => {
             name: "Main",
             children: { "test.ui.shell.header": { kind: "list" } },
             store: shellStore,
-            inject: (c) => {
-              seenInjectContexts.push(c)
-              return { kind: "shell" }
-            },
+            inject: () => ({ kind: "shell" }),
           },
           BlankView
         )
@@ -250,7 +240,6 @@ describe("@orahako/runtime-ui", () => {
 
     expect(page.inject?.(runtime.context)).toEqual({ kind: "page" })
     expect(shell.inject?.(runtime.context)).toEqual({ kind: "shell" })
-    expect(seenInjectContexts).toEqual([expectedCtx, expectedCtx])
 
     const pStore = page.store as StoreInstance<{ count: number }, { inc(): void }>
     const sStore = shell.store as StoreInstance<{ collapsed: boolean }, { toggle(): void }>

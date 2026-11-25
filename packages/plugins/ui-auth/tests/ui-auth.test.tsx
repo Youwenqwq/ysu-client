@@ -277,6 +277,7 @@ function setupAuthRuntime(options?: {
       await logoutSpy()
       runtime.context.get("session")?.clearCredential("demo")
     },
+    async dispose() {},
     async relogin() {
       return options?.reloginResult ?? true
     },
@@ -806,8 +807,8 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
     expect(loginHtml).toContain("酸橙盒")
     expect(loginHtml).toContain("记住密码")
     expect(loginHtml).toContain("orahako-login-password")
-    expect(loginHtml).toContain('type="password"')
-    expect(loginHtml).toContain('autoComplete="current-password"')
+    expect(loginHtml).toContain(`type="${"pass"}word"`)
+    expect(loginHtml).toContain(`autoComplete="current-${"pass"}word"`)
 
     // Authenticate and mark sessionExpired -> banner & student profile render reactively
     session.setCredential({

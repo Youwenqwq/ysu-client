@@ -387,6 +387,7 @@ export const schoolSchedulePlugin = definePlugin({
           hooks: {
             location: router.current,
             clockTick: minuteClock.source,
+            provider: provider.state,
             currentWeek: currentWeekSource,
             termCalendar: termCalendarSource,
             periods: periodsSource,

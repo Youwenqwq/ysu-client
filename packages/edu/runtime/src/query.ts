@@ -997,9 +997,18 @@ export class QueryRuntimeService implements QueryService, ScopedPluginService<Qu
       this.recomputeActivity()
     }
 
+    // Invoke the fetcher now, but normalize a synchronous throw into a promise.
+    // The await below yields before the catch can clear `inFlight`, so the outer
+    // assignment cannot cache an already-settled failure.
+    let fetcherResult: Promise<unknown>
+    try {
+      fetcherResult = Promise.resolve(descriptor.fetcher(activeProvider))
+    } catch (error) {
+      fetcherResult = Promise.reject(error)
+    }
     const pending = (async (): Promise<unknown> => {
       try {
-        const result = await descriptor.fetcher(activeProvider)
+        const result = await fetcherResult
         if (this.disposed || record.fetchEpoch !== epoch) {
           return record.fields.data
         }

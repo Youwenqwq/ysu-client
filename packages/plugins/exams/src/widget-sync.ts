@@ -12,11 +12,15 @@ export type ExamWidgetId = (typeof EXAM_WIDGET_IDS)[number]
 
 export const DEFAULT_EXAM_SYNC_REMINDER_HOURS = 24
 
-export function computeExamDayDiff(exam: Exam, now: Date = new Date()): number | null {
-  const startDate = getExamStartTime(exam)
+export function computeExamDayDiff(
+  exam: Exam,
+  now: Date = new Date(),
+  timeZone?: string
+): number | null {
+  const startDate = getExamStartTime(exam, timeZone)
   if (!startDate) return null
-  const todayMs = Date.parse(getAcademicClock(now).date)
-  const targetMs = Date.parse(getAcademicClock(startDate).date)
+  const todayMs = Date.parse(getAcademicClock(now, timeZone).date)
+  const targetMs = Date.parse(getAcademicClock(startDate, timeZone).date)
   if (Number.isNaN(todayMs) || Number.isNaN(targetMs)) return null
   return Math.round((targetMs - todayMs) / 86_400_000)
 }

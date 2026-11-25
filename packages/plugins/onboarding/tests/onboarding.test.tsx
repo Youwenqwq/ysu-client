@@ -307,6 +307,7 @@ function createOnboardingEnv(options: {
             async initialize() {},
             async reset() {},
             async logout() {},
+            async dispose() {},
             async relogin() {
               return false
             },
@@ -380,6 +381,7 @@ function createOnboardingEnv(options: {
           async initialize() {},
           async reset() {},
           async logout() {},
+          async dispose() {},
           async relogin() {
             return false
           },

@@ -185,6 +185,7 @@ export const CourseProgressWidget: SlotComponent<CourseProgressWidgetProps> = (p
   const termCalendarQuery = props.useTermCalendar()
   const periodsQuery = props.usePeriods()
   const patchesState = useStore()
+  const timeZone = providerSnap.provider?.slices.timetable?.scheduleRules?.timeZone
 
   const rawWeek = currentWeekQuery.data ?? null
   const rawCalendar = termCalendarQuery.data
@@ -223,8 +224,18 @@ export const CourseProgressWidget: SlotComponent<CourseProgressWidgetProps> = (p
         currentWeek: rawWeek,
         calendar,
         now: new Date(clockTick),
+        timeZone,
       }),
-    [calendar, clockTick, effective.courses, effective.ready, periodsQuery.data, rawWeek, scheduleQuery.data]
+    [
+      calendar,
+      clockTick,
+      effective.courses,
+      effective.ready,
+      periodsQuery.data,
+      rawWeek,
+      scheduleQuery.data,
+      timeZone,
+    ]
   )
 
   const { currentCourse, currentRange, nextCourseInfo, nowMinutes } = overview
@@ -329,6 +340,7 @@ export const TodayCoursesWidget: SlotComponent<TodayCoursesWidgetProps> = (props
   const termCalendarQuery = props.useTermCalendar()
   const periodsQuery = props.usePeriods()
   const patchesState = useStore()
+  const timeZone = providerSnap.provider?.slices.timetable?.scheduleRules?.timeZone
 
   const [activityCourse, setActivityCourse] = useState<Course | null>(null)
   const [activityWeek, setActivityWeek] = useState(1)
@@ -374,8 +386,18 @@ export const TodayCoursesWidget: SlotComponent<TodayCoursesWidgetProps> = (props
         currentWeek: rawWeek,
         calendar,
         now: new Date(clockTick),
+        timeZone,
       }),
-    [calendar, clockTick, effective.courses, effective.ready, periodsQuery.data, rawWeek, scheduleQuery.data]
+    [
+      calendar,
+      clockTick,
+      effective.courses,
+      effective.ready,
+      periodsQuery.data,
+      rawWeek,
+      scheduleQuery.data,
+      timeZone,
+    ]
   )
 
   const noLiveWeek =

@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react"
-import type { ClassPeriod, Course, CurrentWeek } from "@orahako/academic-sdk"
+import type {
+  AcademicScheduleRules,
+  ClassPeriod,
+  Course,
+  CurrentWeek,
+} from "@orahako/academic-sdk"
 import {
   Card,
   CardContent,
@@ -61,6 +66,8 @@ export interface ScheduleTabletProps {
   nowMinutes: number
   labels: ScheduleLabels
   editor?: ScheduleEditorState
+  /** School timezone and break rows from the provider's timetable slice. */
+  scheduleRules?: AcademicScheduleRules
   onCourseTap?: (course: Course, week: number) => void
 }
 
@@ -79,6 +86,7 @@ export function ScheduleTablet({
   nowMinutes,
   labels,
   editor = DEFAULT_SCHEDULE_EDITOR_STATE,
+  scheduleRules,
   onCourseTap,
 }: ScheduleTabletProps) {
   const dateForDay = (day: number) =>
@@ -108,8 +116,8 @@ export function ScheduleTablet({
   }
 
   const { sectionToRow, totalRows, lunchRow, dinnerRow } = useMemo(
-    () => computeScheduleGridRows(periods),
-    [periods]
+    () => computeScheduleGridRows(periods, scheduleRules),
+    [periods, scheduleRules]
   )
 
   const gridTemplateRows = useMemo(() => {

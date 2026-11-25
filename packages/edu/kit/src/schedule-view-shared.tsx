@@ -1,4 +1,4 @@
-import type { ClassPeriod, Course } from "@orahako/academic-sdk"
+import type { AcademicScheduleRules, ClassPeriod, Course } from "@orahako/academic-sdk"
 import { Badge, cn } from "@orahako/ui-primitives"
 import { GripVertical, History } from "lucide-react"
 
@@ -12,8 +12,15 @@ import {
 } from "./schedule-patches"
 
 export const SCHEDULE_DAYS = [1, 2, 3, 4, 5, 6, 7] as const
-export const SCHEDULE_LUNCH_AFTER = 4
-export const SCHEDULE_DINNER_AFTER = 8
+
+/** Neutral default: no break rows until a school configures them. */
+export const DEFAULT_SCHEDULE_BREAK_RULES: Pick<
+  AcademicScheduleRules,
+  "lunchAfter" | "dinnerAfter"
+> = {
+  lunchAfter: 0,
+  dinnerAfter: 0,
+}
 
 export type WeekdayTuple = readonly [string, string, string, string, string, string, string]
 
@@ -88,18 +95,21 @@ export function courseHasScheduleTrace(course: Course, traces: readonly Schedule
   )
 }
 
-export function computeScheduleGridRows(periods: readonly ClassPeriod[]) {
+export function computeScheduleGridRows(
+  periods: readonly ClassPeriod[],
+  rules: Pick<AcademicScheduleRules, "lunchAfter" | "dinnerAfter"> = DEFAULT_SCHEDULE_BREAK_RULES
+) {
   const sectionToRow = new Map<number, number>()
   let row = 2
   let lunchRow: number | null = null
   let dinnerRow: number | null = null
   const sectionSet = new Set(periods.map((p) => p.section))
   for (const p of periods) {
-    if (p.section === SCHEDULE_LUNCH_AFTER + 1 && sectionSet.has(SCHEDULE_LUNCH_AFTER)) {
+    if (p.section === rules.lunchAfter + 1 && sectionSet.has(rules.lunchAfter)) {
       lunchRow = row
       row++
     }
-    if (p.section === SCHEDULE_DINNER_AFTER + 1 && sectionSet.has(SCHEDULE_DINNER_AFTER)) {
+    if (p.section === rules.dinnerAfter + 1 && sectionSet.has(rules.dinnerAfter)) {
       dinnerRow = row
       row++
     }

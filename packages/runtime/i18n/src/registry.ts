@@ -139,6 +139,9 @@ export class PluginI18nRegistry
         createTranslator(dictionary, this.getLocale),
       getLocale: this.getLocale,
       setLocale: this.setLocale,
+      translate: this.translate,
+      getDictionary: <T extends PluginDictionary>(locale: PluginLocale, base: T) =>
+        this.getDictionary(locale, base),
     }
   }
 

@@ -15,10 +15,9 @@ import {
   type ScopedPluginService,
 } from "@orahako/sdk"
 
-export const BUILT_IN_NOTIFICATION_CHANNELS = ["grades", "exams", "schedule"] as const
-
 interface ChannelRegistration {
   readonly channel: AcademicNotificationChannel
+  readonly sequence: number
   active: boolean
 }
 
@@ -28,6 +27,7 @@ function sameChannelEntry(
 ): boolean {
   return (
     left.id === right.id &&
+    left.order === right.order &&
     left.pluginId === right.pluginId &&
     left.slice === right.slice &&
     left.toPollingFlag === right.toPollingFlag &&
@@ -50,6 +50,7 @@ export class AcademicNotificationRegistry
   readonly state: ObservableSource<readonly AcademicNotificationChannel[]>
 
   private readonly registrations: ChannelRegistration[] = []
+  private nextSequence = 0
   private readonly stateSource = createObservableSource<readonly AcademicNotificationChannel[]>(
     [],
     sameChannelList
@@ -92,7 +93,11 @@ export class AcademicNotificationRegistry
       ...spec,
       pluginId,
     }
-    const entry: ChannelRegistration = { channel, active: true }
+    const entry: ChannelRegistration = {
+      channel,
+      sequence: this.nextSequence++,
+      active: true,
+    }
     this.registrations.push(entry)
     this.publish()
 
@@ -108,36 +113,30 @@ export class AcademicNotificationRegistry
   }
 
   private publish(): void {
-    // Latest active registration for a given channel id wins, preserving first-seen custom order
-    const byId = new Map<string, AcademicNotificationChannel>()
-    const firstSeenOrder: string[] = []
+    // Latest active registration for a channel id wins, but a replacement keeps
+    // the id's first-seen position so hot re-registration does not jump around.
+    const byId = new Map<
+      string,
+      { readonly channel: AcademicNotificationChannel; readonly sequence: number }
+    >()
 
     for (const registration of this.registrations) {
       if (!registration.active) continue
-      const { id } = registration.channel
-      if (!byId.has(id)) {
-        firstSeenOrder.push(id)
-      }
-      byId.set(id, registration.channel)
+      const existing = byId.get(registration.channel.id)
+      byId.set(registration.channel.id, {
+        channel: registration.channel,
+        sequence: existing?.sequence ?? registration.sequence,
+      })
     }
 
-    const ordered: AcademicNotificationChannel[] = []
-    const builtInSet = new Set<string>(BUILT_IN_NOTIFICATION_CHANNELS)
-
-    for (const builtInId of BUILT_IN_NOTIFICATION_CHANNELS) {
-      const found = byId.get(builtInId)
-      if (found) {
-        ordered.push(found)
-      }
-    }
-
-    for (const id of firstSeenOrder) {
-      if (builtInSet.has(id)) continue
-      const found = byId.get(id)
-      if (found) {
-        ordered.push(found)
-      }
-    }
+    const ordered = Array.from(byId.values())
+      .sort(
+        (left, right) =>
+          (left.channel.order ?? Number.POSITIVE_INFINITY) -
+            (right.channel.order ?? Number.POSITIVE_INFINITY) ||
+          left.sequence - right.sequence
+      )
+      .map((entry) => entry.channel)
 
     this.stateSource.set(ordered)
   }

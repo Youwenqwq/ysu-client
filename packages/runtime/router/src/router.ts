@@ -21,7 +21,8 @@ import {
 export const ROUTER_RUNTIME_PLUGIN_ID = "orahako.runtime.router"
 
 const HISTORY_INDEX_KEY = "orahakoIndex"
-const HISTORY_ENTRIES_KEY = "orahakoEntries"
+const HISTORY_KEY_KEY = "orahakoKey"
+const HISTORY_HREF_KEY = "currentHref"
 
 export interface RouterRuntimeConfig {
   readonly basePath?: string
@@ -93,21 +94,27 @@ function isPromiseLikeBoolean(value: boolean | Promise<boolean>): value is Promi
   return typeof value === "object" && value !== null && "then" in value
 }
 
+interface HistoryEntry {
+  readonly key: string
+  readonly href: string
+}
+
 interface HistoryRouteState {
   readonly index: number
-  readonly entries: readonly string[]
+  readonly key: string
+  readonly href: string
 }
 
 function readHistoryState(state: unknown): HistoryRouteState | undefined {
   if (typeof state !== "object" || state === null) return undefined
   const record = state as Record<string, unknown>
   const index = record[HISTORY_INDEX_KEY]
-  const entries = record[HISTORY_ENTRIES_KEY]
+  const key = record[HISTORY_KEY_KEY]
+  const href = record[HISTORY_HREF_KEY]
   if (typeof index !== "number" || !Number.isSafeInteger(index) || index < 0) return undefined
-  if (!Array.isArray(entries) || entries.length === 0) return undefined
-  if (!entries.every((entry) => typeof entry === "string")) return undefined
-  if (index >= entries.length) return undefined
-  return { index, entries }
+  if (typeof key !== "string" || key.length === 0) return undefined
+  if (typeof href !== "string" || href.length === 0) return undefined
+  return { index, key, href }
 }
 
 interface GuardEntry {
@@ -125,16 +132,21 @@ interface GuardEntry {
  * history navigation, while returning `true` allows navigation to proceed.
  * Async guard evaluation is single-flight and rejections veto the back request.
  *
- * The in-memory stack is mirrored in `history.state`. After a refresh the persisted
- * index is only reused when it still points at the current href; otherwise the
- * router rebuilds a single-entry safe stack and normalizes the current entry.
+ * The in-memory entry map is authoritative. `history.state` stores only the
+ * current position (`index`), its entry `key` and `href`, so state size stays
+ * constant regardless of stack depth. Popstate states from a previous page
+ * session repopulate the sparse in-memory map lazily; a refresh keeps the
+ * persisted position only when its href still matches the current location,
+ * otherwise the router rebuilds a single-entry safe stack.
  */
 export class PluginRouter implements PluginRouterService, ScopedPluginService<PluginRouterService> {
   readonly current: ObservableSource<RouteLocation>
   private readonly currentSource: ReturnType<typeof createObservableSource<RouteLocation>>
   private readonly basePath: string
   private readonly browserWindow?: BrowserWindowLike
-  private readonly entries: string[]
+  private readonly entries = new Map<number, HistoryEntry>()
+  private readonly keyPrefix = Math.random().toString(36).slice(2, 10)
+  private keyCounter = 0
   private readonly backGuards: GuardEntry[] = []
   private readonly backFallbacks: RouterBackFallback[] = []
   private index = 0
@@ -156,7 +168,7 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
           : this.href("/")
 
     const initialLocation = parseRouteLocation(initialRaw)
-    this.entries = [initialLocation.href]
+    this.entries.set(0, { key: this.nextKey(), href: initialLocation.href })
     this.currentSource = createObservableSource<RouteLocation>(initialLocation)
     this.current = {
       getSnapshot: this.currentSource.getSnapshot,
@@ -169,17 +181,19 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
         `${this.browserWindow.location.pathname || "/"}${this.browserWindow.location.search}`
       const nextLocation = parseRouteLocation(href)
       const stored = readHistoryState(event.state ?? this.browserWindow.history.state)
-      if (stored && stored.entries[stored.index] === nextLocation.href) {
-        this.entries.splice(0, this.entries.length, ...stored.entries)
+      if (stored && stored.href === nextLocation.href) {
+        this.entries.set(stored.index, { key: stored.key, href: stored.href })
         this.index = stored.index
       } else {
-        const matchedIndex = this.entries.lastIndexOf(nextLocation.href)
-        if (matchedIndex >= 0) {
+        const matchedIndex = this.findEntryIndex(nextLocation.href)
+        if (matchedIndex !== undefined) {
           this.index = matchedIndex
-          this.entries[matchedIndex] = nextLocation.href
+          this.entries.set(matchedIndex, {
+            key: this.entries.get(matchedIndex)!.key,
+            href: nextLocation.href,
+          })
         } else {
-          this.entries.splice(0, this.entries.length, nextLocation.href)
-          this.index = 0
+          this.resetStack(nextLocation.href)
         }
       }
       this.browserWindow.history.replaceState(this.createHistoryState(), "", nextLocation.href)
@@ -188,8 +202,9 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
 
     if (this.browserWindow) {
       const stored = readHistoryState(this.browserWindow.history.state)
-      if (stored && stored.entries[stored.index] === initialLocation.href) {
-        this.entries.splice(0, this.entries.length, ...stored.entries)
+      if (stored && stored.href === initialLocation.href) {
+        this.entries.clear()
+        this.entries.set(stored.index, { key: stored.key, href: stored.href })
         this.index = stored.index
       }
       this.browserWindow.history.replaceState(this.createHistoryState(), "", initialLocation.href)
@@ -240,9 +255,11 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     if (this.disposed) return
     const nextHref = this.href(target)
     const nextLocation = parseRouteLocation(nextHref)
-    this.entries.splice(this.index + 1)
-    this.entries.push(nextLocation.href)
-    this.index = this.entries.length - 1
+    for (const position of Array.from(this.entries.keys())) {
+      if (position > this.index) this.entries.delete(position)
+    }
+    this.index += 1
+    this.entries.set(this.index, { key: this.nextKey(), href: nextLocation.href })
     if (this.browserWindow) {
       this.browserWindow.history.pushState(this.createHistoryState(), "", nextLocation.href)
     }
@@ -253,7 +270,7 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     if (this.disposed) return
     const nextHref = this.href(target)
     const nextLocation = parseRouteLocation(nextHref)
-    this.entries[this.index] = nextLocation.href
+    this.entries.set(this.index, { key: this.nextKey(), href: nextLocation.href })
     if (this.browserWindow) {
       this.browserWindow.history.replaceState(this.createHistoryState(), "", nextLocation.href)
     }
@@ -383,22 +400,57 @@ export class PluginRouter implements PluginRouterService, ScopedPluginService<Pl
     this.performHistoryBack()
   }
 
+  private nextKey(): string {
+    this.keyCounter += 1
+    return `${this.keyPrefix}:${this.keyCounter}`
+  }
+
+  private findEntryIndex(href: string): number | undefined {
+    for (const [position, entry] of this.entries) {
+      if (entry.href === href) return position
+    }
+    return undefined
+  }
+
+  private resetStack(href: string): void {
+    this.entries.clear()
+    this.entries.set(0, { key: this.nextKey(), href })
+    this.index = 0
+  }
+
   private createHistoryState(): Record<string, unknown> {
+    const entry = this.entries.get(this.index)
+    if (!entry) {
+      this.resetStack(this.currentSource.getSnapshot().href)
+      return {
+        [HISTORY_INDEX_KEY]: 0,
+        [HISTORY_KEY_KEY]: this.entries.get(0)!.key,
+        [HISTORY_HREF_KEY]: this.currentSource.getSnapshot().href,
+      }
+    }
     return {
       [HISTORY_INDEX_KEY]: this.index,
-      [HISTORY_ENTRIES_KEY]: [...this.entries],
+      [HISTORY_KEY_KEY]: entry.key,
+      [HISTORY_HREF_KEY]: entry.href,
     }
   }
 
   private performHistoryBack(): boolean {
     if (this.disposed) return false
     if (this.index > 0) {
-      this.index -= 1
-      const targetHref = this.entries[this.index]!
+      const from = this.index
+      const target = this.entries.get(from - 1)
       if (this.browserWindow) {
         this.browserWindow.history.back()
+        // A synchronous popstate may already have adopted the destination.
+        if (this.index === from && target) {
+          this.index = from - 1
+          this.currentSource.set(parseRouteLocation(target.href))
+        }
+      } else if (target) {
+        this.index = from - 1
+        this.currentSource.set(parseRouteLocation(target.href))
       }
-      this.currentSource.set(parseRouteLocation(targetHref))
       return true
     }
     for (let index = this.backFallbacks.length - 1; index >= 0; index -= 1) {

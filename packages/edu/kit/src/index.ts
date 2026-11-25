@@ -1,10 +1,10 @@
-export { formatLocalDateTime, formatTimeRange, parseAcademicDateTime } from "./time"
 export {
-  SCHOOL_TIME_ZONE,
-  getAcademicClock,
-  resolveAcademicWeek,
-  type AcademicClock,
-} from "./academic-time"
+  DEFAULT_ACADEMIC_TIME_ZONE,
+  formatLocalDateTime,
+  formatTimeRange,
+  parseAcademicDateTime,
+} from "./time"
+export { getAcademicClock, resolveAcademicWeek, type AcademicClock } from "./academic-time"
 export { createMinuteClockSource, createParameterizedQuerySource } from "./schedule-sources"
 export {
   COURSE_BG_CLASSES,
@@ -92,10 +92,9 @@ export {
   type PluginOverviewWidgetId,
 } from "./overview-layout"
 export {
+  DEFAULT_SCHEDULE_BREAK_RULES,
   DEFAULT_SCHEDULE_EDITOR_STATE,
   SCHEDULE_DAYS,
-  SCHEDULE_DINNER_AFTER,
-  SCHEDULE_LUNCH_AFTER,
   ScheduleAdjustmentBadge,
   ScheduleDayHandle,
   ScheduleDayLabel,

@@ -145,6 +145,7 @@ function createHarness(options?: { isNative?: boolean }) {
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },
@@ -220,6 +221,7 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return false
       },

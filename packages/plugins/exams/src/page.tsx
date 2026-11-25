@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { CalendarOff, CheckCircle2, Clock, MapPin, Search } from "lucide-react"
 import { toast } from "sonner"
 import { compareExamStartTime, formatExamTime, isExamCompleted } from "@orahako/academic-kit"
-import type { Exam, QuerySnapshot } from "@orahako/academic-sdk"
+import type { Exam, ProviderRuntimeSnapshot, QuerySnapshot } from "@orahako/academic-sdk"
 import type { DerivedComponentProps, ObservableSource, SlotComponent } from "@orahako/sdk"
 import {
   Badge,
@@ -31,6 +31,7 @@ import { computeExamDayDiff } from "./widget-sync"
 export interface ExamsPageInject {
   readonly hooks: {
     readonly exams: ObservableSource<QuerySnapshot<Exam[]>>
+    readonly provider: ObservableSource<ProviderRuntimeSnapshot>
     readonly queriedTerm: ObservableSource<string>
   }
   readonly queryBySemester: (semester: string) => Promise<void>
@@ -47,7 +48,9 @@ export type ExamsPageProps = DerivedComponentProps<
 export const ExamsPage: SlotComponent<ExamsPageProps> = (props) => {
   const { t, actions, useStore } = props
   const examsQuery = props.useExams()
+  const providerSnap = props.useProvider()
   const queriedTerm = props.useQueriedTerm()
+  const timeZone = providerSnap.provider?.slices.timetable?.scheduleRules?.timeZone
 
   const [term, setTerm] = useState(queriedTerm)
   useEffect(() => {
@@ -104,11 +107,11 @@ export const ExamsPage: SlotComponent<ExamsPageProps> = (props) => {
   )
 
   const upcomingExams = exams
-    .filter((exam) => !isExamCompleted(exam, now))
-    .sort(compareExamStartTime)
+    .filter((exam) => !isExamCompleted(exam, now, timeZone))
+    .sort((a, b) => compareExamStartTime(a, b, timeZone))
   const completedExams = exams
-    .filter((exam) => isExamCompleted(exam, now))
-    .sort(compareExamStartTime)
+    .filter((exam) => isExamCompleted(exam, now, timeZone))
+    .sort((a, b) => compareExamStartTime(a, b, timeZone))
 
   if (loading && exams.length === 0) {
     return (
@@ -150,7 +153,7 @@ export const ExamsPage: SlotComponent<ExamsPageProps> = (props) => {
           {upcomingExams.length > 0 && (
             <div className="grid gap-4 md:grid-cols-2">
               {upcomingExams.map((exam) => {
-                const dayDiff = computeExamDayDiff(exam, now)
+                const dayDiff = computeExamDayDiff(exam, now, timeZone)
                 const countdownText =
                   dayDiff === null || dayDiff < 0
                     ? t("exams.upcomingExams")

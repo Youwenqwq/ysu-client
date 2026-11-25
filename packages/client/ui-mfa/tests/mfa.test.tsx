@@ -753,6 +753,7 @@ describe("@orahako/ui-mfa", () => {
       initialize: async () => {},
       reset: async () => {},
       logout: async () => {},
+      dispose: async () => {},
       relogin: async () => false,
     }
 

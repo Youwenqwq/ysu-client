@@ -3,9 +3,8 @@ import {
   definePlugin,
   PLUGIN_API_VERSION,
   resolveDictionaryMessage,
-  type Context,
   type DictionaryMessages,
-  type PluginI18nRegistryService,
+  type PluginI18nService,
   type PluginLocale,
 } from "@orahako/sdk"
 import { networkActivityDictionary, type NetworkActivityDictionary } from "./dictionary"
@@ -48,44 +47,27 @@ export {
   type NetworkActivityStripProps,
 }
 
-function isI18nRegistry(value: unknown): value is PluginI18nRegistryService {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "getDictionary" in value &&
-    typeof value.getDictionary === "function"
-  )
-}
-
 function isDictionaryMessages(value: unknown): value is DictionaryMessages {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 function translateAcrossPlugins(
-  registrantCtx: Context,
-  fallbackTranslate: (
-    key: string,
-    params?: Record<string, string | number>,
-    locale?: PluginLocale
-  ) => string,
+  i18n: PluginI18nService,
   key: string,
   locale: PluginLocale
 ): string {
-  const rootI18n: unknown = registrantCtx.root.get("i18n")
-  if (isI18nRegistry(rootI18n)) {
-    const merged: unknown = rootI18n.getDictionary(locale, {})
-    if (isDictionaryMessages(merged)) {
-      const primary = resolveDictionaryMessage(merged, key)
-      if (primary !== undefined) return primary
-    }
-    const fallbackLocale: PluginLocale = locale === "en" ? "zh" : "en"
-    const fallbackMerged: unknown = rootI18n.getDictionary(fallbackLocale, {})
-    if (isDictionaryMessages(fallbackMerged)) {
-      const secondary = resolveDictionaryMessage(fallbackMerged, key)
-      if (secondary !== undefined) return secondary
-    }
+  const merged: unknown = i18n.getDictionary(locale, {})
+  if (isDictionaryMessages(merged)) {
+    const primary = resolveDictionaryMessage(merged, key)
+    if (primary !== undefined) return primary
   }
-  return fallbackTranslate(key, undefined, locale)
+  const fallbackLocale: PluginLocale = locale === "en" ? "zh" : "en"
+  const fallbackMerged: unknown = i18n.getDictionary(fallbackLocale, {})
+  if (isDictionaryMessages(fallbackMerged)) {
+    const secondary = resolveDictionaryMessage(fallbackMerged, key)
+    if (secondary !== undefined) return secondary
+  }
+  return i18n.t(key, undefined, locale)
 }
 
 export const networkActivityPlugin = definePlugin({
@@ -131,7 +113,7 @@ export const networkActivityPlugin = definePlugin({
       NetworkActivitySettings
     )
 
-    ctx.slots.inject("shell.activity", (registrantCtx) =>
+    ctx.slots.inject("shell.activity", () =>
       ctx.slots.register(
         {
           id: "activity-strip",
@@ -140,7 +122,7 @@ export const networkActivityPlugin = definePlugin({
           store: storeInstance,
           inject: () => ({
             translateExternal: (key: string, locale: PluginLocale) =>
-              translateAcrossPlugins(registrantCtx, ctx.i18n.t, key, locale),
+              translateAcrossPlugins(ctx.i18n, key, locale),
             hooks: {
               activity: ctx.http.activity.state,
             },

@@ -33,20 +33,40 @@ describe("live academic time", () => {
     expect(formatTimeRange("2026-03-01T08:00:00", "2026-03-01T09:40:00")).toBe(
       "2026-03-01 08:00 ~ 2026-03-01 09:40"
     )
-    expect(parseAcademicDateTime("2026-03-01")?.toISOString()).toBe("2026-02-28T16:00:00.000Z")
+    expect(parseAcademicDateTime("2026-03-01", "Asia/Shanghai")?.toISOString()).toBe(
+      "2026-02-28T16:00:00.000Z"
+    )
+    expect(parseAcademicDateTime("2026-03-01T08:00:00")).toEqual(
+      new Date("2026-03-01T08:00:00.000Z")
+    )
   })
 
-  it("uses Shanghai midnight even when the device's date is still Sunday", () => {
-    expect(getAcademicClock(new Date("2026-10-04T15:59:00Z"))).toEqual({
+  it("uses the caller's school timezone even when the device's date differs", () => {
+    expect(getAcademicClock(new Date("2026-10-04T15:59:00Z"), "Asia/Shanghai")).toEqual({
       date: "2026-10-04",
       weekday: 7,
       minutes: 1439,
     })
-    expect(getAcademicClock(new Date("2026-10-04T16:00:00Z"))).toEqual({
+    expect(getAcademicClock(new Date("2026-10-04T16:00:00Z"), "Asia/Shanghai")).toEqual({
       date: "2026-10-05",
       weekday: 1,
       minutes: 0,
     })
+  })
+
+  it("supports non-Shanghai school timezones for clocks and offset-less timestamps", () => {
+    const timeZone = "America/New_York"
+    expect(getAcademicClock(new Date("2026-10-04T15:59:00Z"), timeZone)).toEqual({
+      date: "2026-10-04",
+      weekday: 7,
+      minutes: 719,
+    })
+    expect(parseAcademicDateTime("2026-03-01T08:00:00", timeZone)?.toISOString()).toBe(
+      "2026-03-01T13:00:00.000Z"
+    )
+    expect(parseAcademicDateTime("2026-03-01T08:00:00Z", timeZone)?.toISOString()).toBe(
+      "2026-03-01T08:00:00.000Z"
+    )
   })
 
   it("advances stale Friday cache to Monday without mutating the cached response", () => {
@@ -110,11 +130,15 @@ describe("live academic time", () => {
   })
 
   it("interprets offset-less exam time in the same school timezone but preserves explicit instants", () => {
-    expect(getExamStartTime({ name: "考试", startAt: "2026-10-05T08:00:00" })?.toISOString()).toBe(
-      "2026-10-05T00:00:00.000Z"
-    )
-    expect(getExamStartTime({ name: "考试", startAt: "2026-10-05T08:00:00Z" })?.toISOString()).toBe(
-      "2026-10-05T08:00:00.000Z"
-    )
+    expect(
+      getExamStartTime({ name: "考试", startAt: "2026-10-05T08:00:00" }, "Asia/Shanghai")
+        ?.toISOString()
+    ).toBe("2026-10-05T00:00:00.000Z")
+    expect(
+      getExamStartTime(
+        { name: "考试", startAt: "2026-10-05T08:00:00Z" },
+        "Asia/Shanghai"
+      )?.toISOString()
+    ).toBe("2026-10-05T08:00:00.000Z")
   })
 })

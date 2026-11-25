@@ -2,16 +2,15 @@
  * jwmobile API 模块 —— 独立 mobile biz 接口。
  */
 import type { CookieJar } from "@orahako/academic-sdk"
-import type { CookieEntry } from "@orahako/sdk"
-import type { YSUContext } from "../context"
 import {
-  asRecord,
   collectCookies,
   cookieEntryFromJSON,
   headerSingle,
   installCookies,
-  isPlainRecord,
-} from "../http-utils"
+  type CookieEntry,
+} from "@orahako/sdk"
+import type { YSUContext } from "../context"
+import { asRecord, isPlainRecord } from "../http-utils"
 import { YSU_SESSION_ARTIFACT_MOBILE } from "../ysu-config"
 import type { CasAuthorizer } from "./cas"
 

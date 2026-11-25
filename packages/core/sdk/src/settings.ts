@@ -21,7 +21,8 @@ export interface SettingsCategorySpec<
   readonly dictionary?: Dict
   readonly children?: Children
   readonly store?: Store
-  readonly inject?: (ctx: Context) => ValidInject<I>
+  /** Returns renderer data from the `apply` closure; no Context escapes. */
+  readonly inject?: () => ValidInject<I>
 }
 
 export interface PluginSettingsCategory {

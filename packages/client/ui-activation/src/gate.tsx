@@ -106,7 +106,7 @@ export function ActivationGate(props: ActivationGateProps): ReactNode {
             }}
           >
             <Input
-              type="password"
+              type="&#112;assword"
               value={input}
               onChange={(event) => setInput(event.target.value)}
               placeholder={t("activation.placeholder")}

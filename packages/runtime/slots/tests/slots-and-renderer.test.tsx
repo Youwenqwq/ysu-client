@@ -1130,4 +1130,111 @@ describe("OrahakoApp root component (root slot, shell selection/fallback, Kernel
     await dom.unmount()
     host.dispose()
   })
+
+  it("rejects explicit ?plugin&page deep links that bypass provider/capability filters", async () => {
+    const dom = mountInteractiveDom()
+    activeUnmount = dom.unmount
+
+    const shellPlugin = definePlugin({
+      manifest: {
+        id: "orahako.shell.gate",
+        name: "Gate Shell",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "shell",
+        entry: "index.js",
+      },
+      inject: ["ui"],
+      apply(ctx) {
+        ctx.ui.registerShell({ id: "default", name: "Default" }, (props) => (
+          <div data-shell="gate">{props.children}</div>
+        ))
+      },
+    })
+
+    const pagesPlugin = definePlugin({
+      manifest: {
+        id: "example.gated",
+        name: "Gated",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+      },
+      inject: ["ui"],
+      apply(ctx) {
+        ctx.ui.registerPage(
+          { id: "open", route: "open", requiresProvider: false },
+          () => <div>OpenPage</div>
+        )
+        ctx.ui.registerPage(
+          { id: "secret", route: "secret", requiresProvider: true },
+          () => <div>SecretPage</div>
+        )
+      },
+    })
+
+    const policyPlugin = definePlugin({
+      manifest: {
+        id: "example.provider-policy",
+        name: "Provider Policy",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "runtime",
+        entry: "index.js",
+      },
+      inject: ["navigation"],
+      apply(ctx) {
+        ctx.navigation.registerFilter((entry) => entry.requiresProvider === false)
+      },
+    })
+
+    const source: CompositionSource = {
+      appVersion: "0.16.0",
+      appBuild: "test-gated-deeplink",
+      composition: {
+        id: "test.gated-deeplink",
+        version: 1,
+        defaults: { shell: "orahako.shell.gate:default" },
+        plugins: [
+          { id: "orahako.runtime.slots", protected: true },
+          { id: "orahako.runtime.ui", protected: true },
+          { id: "orahako.runtime.router", protected: true, config: { initialHref: "/" } },
+          { id: "orahako.runtime.navigation", protected: true },
+          { id: "orahako.shell.gate", protected: true },
+          { id: "example.gated" },
+          { id: "example.provider-policy" },
+        ],
+      },
+      plugins: [
+        slotRegistryPlugin,
+        uiRegistryPlugin,
+        routerRuntimePlugin,
+        navigationRuntimePlugin,
+        shellPlugin,
+        pagesPlugin,
+        policyPlugin,
+      ],
+    }
+
+    const host = new PluginHost(source, { platformModules: {} })
+    await host.bootstrap()
+    const router = host.runtime.context.get("router") as PluginRouter
+
+    await dom.render(<OrahakoApp host={host} />)
+    await act(async () => {
+      router.push("/?plugin=example.gated&page=secret")
+    })
+    expect(dom.container.textContent).toContain("插件页面不可用")
+    expect(dom.container.textContent).not.toContain("SecretPage")
+
+    await act(async () => {
+      router.push("/?plugin=example.gated&page=open")
+    })
+    expect(dom.container.textContent).toContain("OpenPage")
+
+    activeUnmount = undefined
+    await dom.unmount()
+    host.dispose()
+  })
 })

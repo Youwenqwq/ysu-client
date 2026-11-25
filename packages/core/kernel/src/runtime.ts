@@ -1,8 +1,12 @@
-import { Context, Inject, type DisposableLike, type ForkScope, type Plugin } from "@cordisjs/core"
+import {
+  Context,
+  Inject,
+  ScopeStatus,
+  type DisposableLike,
+  type ForkScope,
+  type Plugin,
+} from "@cordisjs/core"
 import semver from "semver"
-
-/** Numeric value of Cordis `ScopeStatus.FAILED` (ambient const enum). */
-const CORDIS_SCOPE_FAILED = 3
 import {
   createObservableSource,
   isScopedPluginService,
@@ -13,6 +17,9 @@ import {
   type PluginManifest,
 } from "@orahako/sdk"
 import { validatePluginConfig } from "./config"
+
+// @ts-expect-error -- Cordis exports this value at runtime, but its ambient const enum declaration conflicts with isolatedModules.
+const CORDIS_SCOPE_FAILED: number = ScopeStatus.FAILED
 
 export type PluginSource = "builtin" | "external"
 export type PluginStatus = "registered" | "waiting" | "starting" | "active" | "disabled" | "failed"
@@ -113,7 +120,10 @@ function wrapDisposableLike(value: DisposableLike, track: CleanupTracker): Dispo
   if (value !== null && typeof value === "object" && "dispose" in value) {
     const dispose = value.dispose
     if (typeof dispose === "function") {
-      return { ...value, dispose: wrapCleanup(dispose.bind(value), track) }
+      // Cordis keeps this exact value in its scope disposables and may hand it
+      // back to the plugin, so preserve identity and prototype instead of
+      // replacing it with a shallow copy.
+      value.dispose = wrapCleanup(dispose.bind(value), track)
     }
   }
   return value
@@ -193,7 +203,12 @@ export class PluginRuntime {
   private readonly plugins = new Map<string, RegisteredPlugin>()
   private readonly contexts = new WeakMap<Context, PluginContextBinding>()
   private readonly pendingMounts = new Set<Promise<void>>()
+  private readonly pendingCleanupRecycling = new Set<Promise<void>>()
   private readonly cleanupById = new Map<string, Set<Promise<void>>>()
+  /** Registration epoch per cleanup set, so delayed recycling never drops a new owner. */
+  private readonly cleanupEpoch = new WeakMap<Set<Promise<void>>, number>()
+  private disposed = false
+  private disposal?: Promise<void>
 
   constructor() {
     this.state = {
@@ -409,6 +424,7 @@ export class PluginRuntime {
 
     const cleanup = this.cleanupById.get(resolvedManifest.id) ?? new Set<Promise<void>>()
     this.cleanupById.set(resolvedManifest.id, cleanup)
+    this.cleanupEpoch.set(cleanup, (this.cleanupEpoch.get(cleanup) ?? 0) + 1)
     this.plugins.set(resolvedManifest.id, {
       manifest: resolvedManifest,
       executable,
@@ -438,10 +454,33 @@ export class PluginRuntime {
     this.stop(id)
     this.context.registry.delete(plugin.cordisPlugin)
     this.plugins.delete(id)
+    const cleanup = plugin.cleanup
+    if (this.cleanupById.get(id) === cleanup) {
+      if (cleanup.size === 0) {
+        this.cleanupById.delete(id)
+      } else {
+        const epoch = this.cleanupEpoch.get(cleanup)
+        const pending = Array.from(cleanup)
+        const recycling = (async () => {
+          await Promise.allSettled(pending)
+          // A re-registration bumps the epoch and owns the same cleanup set;
+          // leave its pending cleanup registered for the new plugin instance.
+          if (this.cleanupById.get(id) === cleanup && this.cleanupEpoch.get(cleanup) === epoch) {
+            this.cleanupById.delete(id)
+          }
+        })()
+        this.pendingCleanupRecycling.add(recycling)
+        void recycling.then(
+          () => this.pendingCleanupRecycling.delete(recycling),
+          () => this.pendingCleanupRecycling.delete(recycling)
+        )
+      }
+    }
     this.publish()
   }
 
   start(id: string): void {
+    if (this.disposed) throw new Error("Plugin runtime has been disposed")
     const plugin = this.plugins.get(id)
     if (!plugin) throw new Error(`Plugin not registered: ${id}`)
     if (
@@ -617,6 +656,7 @@ export class PluginRuntime {
   private pendingWork(): Promise<void>[] {
     return [
       ...this.pendingMounts,
+      ...this.pendingCleanupRecycling,
       ...Array.from(this.cleanupById.values(), (cleanup) => Array.from(cleanup)).flat(),
     ]
   }
@@ -642,6 +682,7 @@ export class PluginRuntime {
    * plugin can rebuild its scoped facade and observe the new value.
    */
   private restartOptionalConsumers(name: string): void {
+    if (this.disposed) return
     for (const plugin of this.plugins.values()) {
       const dependency = plugin.inject[name]
       if (!dependency || dependency.required) continue
@@ -715,9 +756,18 @@ export class PluginRuntime {
     return plugin ? this.missingInjectedServices(plugin) : []
   }
 
-  dispose(): void {
+  dispose(): Promise<void> {
+    if (this.disposal) return this.disposal
+    this.disposed = true
     for (const id of Array.from(this.plugins.keys())) this.unregister(id)
-    void this.context.stop()
+    this.disposal = (async () => {
+      try {
+        await this.flush()
+      } finally {
+        await this.context.stop()
+      }
+    })()
+    return this.disposal
   }
 
   private missingInjectedServices(plugin: RegisteredPlugin): string[] {
@@ -748,6 +798,8 @@ export class PluginRuntime {
       plugin.status = "disabled"
       return
     }
+    // `ScopeStatus` is an ambient const enum in Cordis' typings; its runtime
+    // value was resolved above when defining CORDIS_SCOPE_FAILED.
     const rawStatus: number = runtimeScope.status
     if (rawStatus === CORDIS_SCOPE_FAILED) {
       plugin.status = "failed"

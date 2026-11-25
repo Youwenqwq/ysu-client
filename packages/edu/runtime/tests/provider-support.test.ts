@@ -47,6 +47,7 @@ function makeProvider(
     initialize: async () => {},
     reset: async () => {},
     logout: async () => {},
+    dispose: async () => {},
     relogin: async () => true,
   })
 }
@@ -110,6 +111,7 @@ function setupHarness(protectedIds: readonly string[] = []) {
     resolve: () => undefined,
     primary: () => undefined,
     landing: () => "",
+    available: () => true,
     forScope: () => [],
     registerFilter: (filter) => {
       activeFilters.add(filter)

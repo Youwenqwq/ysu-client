@@ -59,6 +59,7 @@ function makeProvider(id: string, slices: Partial<AcademicSliceMap> = {}): Schoo
     initialize: async () => {},
     reset: async () => {},
     logout: async () => {},
+    dispose: async () => {},
     relogin: async () => true,
   })
 }
@@ -797,6 +798,42 @@ describe("QueryRuntimeService & queryRuntimePlugin", () => {
     expect(fetcher).toHaveBeenCalledTimes(2)
 
     unsub()
+    rig.query.dispose()
+  })
+
+  it("refetches after a synchronously thrown fetcher instead of caching a settled promise", async () => {
+    const ysu = makeProvider("ysu", {
+      exams: { getExams: async () => [] },
+    })
+    const rig = createQueryTestRig({ provider: ysu })
+    await rig.query.hydrated
+
+    let calls = 0
+    const fetcher = vi.fn((): Promise<Exam[]> => {
+      calls += 1
+      if (calls === 1) throw new Error("synchronous failure")
+      return Promise.resolve([{ name: "OS", startAt: "2026-01-10T09:00:00" }])
+    })
+
+    const source = rig.query.source({
+      feature: "exams",
+      slice: "exams",
+      fetcher,
+    })
+
+    await expect(source.getSnapshot().refresh()).resolves.toBeUndefined()
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(source.getSnapshot()).toMatchObject({
+      status: "error",
+      error: expect.objectContaining({ message: "synchronous failure" }),
+    })
+
+    await expect(source.getSnapshot().refresh()).resolves.toEqual([
+      { name: "OS", startAt: "2026-01-10T09:00:00" },
+    ])
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(source.getSnapshot().status).toBe("success")
+
     rig.query.dispose()
   })
 

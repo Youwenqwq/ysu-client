@@ -11,12 +11,14 @@ import {
   type ScheduleLabels,
 } from "@orahako/academic-kit"
 import type {
+  AcademicScheduleRules,
   ClassPeriod,
   ClassroomInfo,
   CodeItem,
   Course,
   CurrentWeek,
   MajorInfo,
+  ProviderRuntimeSnapshot,
   QuerySnapshot,
   SchoolClassInfo,
   TermCalendar,
@@ -74,6 +76,7 @@ export interface SchoolSchedulePageInject {
   readonly hooks: {
     readonly location: ObservableSource<RouteLocation>
     readonly clockTick: ObservableSource<number>
+    readonly provider: ObservableSource<ProviderRuntimeSnapshot>
     readonly currentWeek: ObservableSource<QuerySnapshot<CurrentWeek>>
     readonly termCalendar: ObservableSource<QuerySnapshot<TermCalendar>>
     readonly periods: ObservableSource<QuerySnapshot<ClassPeriod[]>>
@@ -196,6 +199,7 @@ function CourseScheduleView({
   calendar,
   rawPeriods,
   clockTick,
+  scheduleRules,
   weekOverride,
   onWeekOverrideChange,
   onBack,
@@ -210,6 +214,7 @@ function CourseScheduleView({
   readonly calendar: TermCalendar | undefined
   readonly rawPeriods: readonly ClassPeriod[]
   readonly clockTick: number
+  readonly scheduleRules?: AcademicScheduleRules
   readonly weekOverride: number | null
   readonly onWeekOverrideChange: (week: number | null) => void
   readonly onBack: () => void
@@ -217,7 +222,10 @@ function CourseScheduleView({
   readonly labels: ScheduleLabels
 }): ReactNode {
   const isMobile = useIsMobile()
-  const clock = useMemo(() => getAcademicClock(new Date(clockTick)), [clockTick])
+  const clock = useMemo(
+    () => getAcademicClock(new Date(clockTick), scheduleRules?.timeZone),
+    [clockTick, scheduleRules?.timeZone]
+  )
   const currentWeek = useMemo(
     () => resolveAcademicWeek(snapshot, calendar, clock.date),
     [snapshot, calendar, clock.date]
@@ -325,6 +333,7 @@ function CourseScheduleView({
               courses={courses}
               colorMap={colorMap}
               periods={periods}
+              scheduleRules={scheduleRules}
               currentWeekday={clock.weekday}
               currentWeek={currentWeek}
               weekAnchor={snapshot}
@@ -341,6 +350,7 @@ function CourseScheduleView({
               courses={weekCourses}
               colorMap={colorMap}
               periods={periods}
+              scheduleRules={scheduleRules}
               currentWeekday={clock.weekday}
               currentWeek={currentWeek}
               weekAnchor={snapshot}
@@ -385,6 +395,8 @@ export const SchoolSchedulePage: SlotComponent<SchoolSchedulePageProps> = (props
   const { t, useStore, actions } = props
   const location = props.useLocation()
   const clockTick = props.useClockTick()
+  const providerSnap = props.useProvider()
+  const scheduleRules = providerSnap.provider?.slices.timetable?.scheduleRules
   const currentWeekQuery = props.useCurrentWeek()
   const termCalendarQuery = props.useTermCalendar()
   const periodsQuery = props.usePeriods()
@@ -557,6 +569,7 @@ export const SchoolSchedulePage: SlotComponent<SchoolSchedulePageProps> = (props
               calendar={termCalendarQuery.data}
               rawPeriods={periodsQuery.data ?? []}
               clockTick={clockTick}
+              scheduleRules={scheduleRules}
               weekOverride={weekOverride}
               onWeekOverrideChange={actions.setWeekOverride}
               onBack={() => actions.selectClass(null)}
@@ -604,6 +617,7 @@ export const SchoolSchedulePage: SlotComponent<SchoolSchedulePageProps> = (props
               calendar={termCalendarQuery.data}
               rawPeriods={periodsQuery.data ?? []}
               clockTick={clockTick}
+              scheduleRules={scheduleRules}
               weekOverride={weekOverride}
               onWeekOverrideChange={actions.setWeekOverride}
               onBack={() => actions.selectRoom(null)}

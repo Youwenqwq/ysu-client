@@ -4,7 +4,6 @@ import {
   type ProviderRegistryService,
   type ProviderRuntimeService,
   type ProviderRuntimeSnapshot,
-  type ProviderRuntimeStatus,
   type SchoolProvider,
   type SessionService,
 } from "@orahako/academic-sdk"
@@ -63,6 +62,12 @@ export class ProviderRuntime implements ProviderRuntimeService {
   private authOperation = 0
   private pending: PendingInitialization | null = null
   private disposed = false
+  /**
+   * Serializes asynchronous retirement of replaced provider instances. A new
+   * provider never starts initializing until every instance retired before it
+   * has finished releasing its local state.
+   */
+  private retirement: Promise<void> | null = null
 
   constructor({ ctx, registry, session, defaultSchoolId }: ProviderRuntimeOptions) {
     this.ctx = ctx
@@ -83,15 +88,15 @@ export class ProviderRuntime implements ProviderRuntimeService {
     this.detachRegistry = registry.subscribe((schoolId) => this.handleRegistrationChange(schoolId))
   }
 
-  dispose = (): void => {
-    if (this.disposed) return
-    this.disposed = true
-    this.detachRegistry()
-    this.pending = null
-    if (this.provider) {
+  dispose = (): Promise<void> => {
+    if (!this.disposed) {
+      this.disposed = true
+      this.detachRegistry()
+      this.pending = null
       this.retire(this.provider)
+      this.provider = null
     }
-    this.provider = null
+    return this.retirement ?? Promise.resolve()
   }
 
   getSnapshot = (): ProviderRuntimeSnapshot => {
@@ -207,15 +212,18 @@ export class ProviderRuntime implements ProviderRuntimeService {
   }
 
   private activate(schoolId: string): SchoolProvider {
-    if (this.provider && this.schoolId !== schoolId) {
-      this.retire(this.provider)
-    }
+    // Create the replacement first so a failing factory leaves the current
+    // ready provider and its snapshot untouched.
     const provider = this.registry.createProvider(schoolId)
+    const previous = this.provider
     this.provider = provider
     this.schoolId = schoolId
     this.generation += 1
     this.authOperation += 1
     this.pending = null
+    if (previous && previous !== provider) {
+      this.retire(previous)
+    }
     this.update({ status: "initializing", schoolId, provider, error: null })
     if (this.session.getSnapshot().activeSchoolId !== schoolId) {
       this.session.activateSchool(schoolId)
@@ -228,9 +236,6 @@ export class ProviderRuntime implements ProviderRuntimeService {
     const schoolId = sessionSchoolId ?? this.defaultSchoolId ?? null
     if (schoolId && this.registry.hasProvider(schoolId)) {
       return this.activate(schoolId)
-    }
-    if (this.provider) {
-      this.retire(this.provider)
     }
     this.markUnavailable(schoolId)
     throw schoolId
@@ -248,6 +253,15 @@ export class ProviderRuntime implements ProviderRuntimeService {
     generation: number
   ): Promise<SchoolProvider> {
     const guarded = (async () => {
+      if (this.retirement) await this.retirement
+      if (this.disposed || this.generation !== generation || this.provider !== provider) {
+        throw new ProviderError(
+          ProviderErrorCode.UNKNOWN,
+          "Provider initialization was superseded by a newer selection",
+          undefined,
+          409
+        )
+      }
       await provider.initialize()
       if (this.disposed || this.generation !== generation || this.provider !== provider) {
         throw new ProviderError(
@@ -278,25 +292,27 @@ export class ProviderRuntime implements ProviderRuntimeService {
 
   private handleRegistrationChange(schoolId: string): void {
     if (this.disposed || schoolId !== this.schoolId) return
-    if (this.provider) {
-      this.retire(this.provider)
-    }
+    const previous = this.provider
     this.provider = null
     this.pending = null
     this.authOperation += 1
     this.generation += 1
 
     if (!this.registry.hasProvider(schoolId)) {
-      const status: ProviderRuntimeStatus = "unavailable"
-      this.update({ status, schoolId, provider: null, error: null })
+      this.retire(previous)
+      this.update({ status: "unavailable", schoolId, provider: null, error: null })
       return
     }
 
     try {
       const nextProvider = this.registry.createProvider(schoolId)
       this.provider = nextProvider
+      this.retire(previous)
       this.update({ status: "initializing", schoolId, provider: nextProvider, error: null })
     } catch (cause) {
+      // The old instance belongs to a replaced or unloaded plugin bundle, so it
+      // must still be retired even when the new factory cannot construct.
+      this.retire(previous)
       this.update({
         status: "error",
         schoolId,
@@ -306,9 +322,18 @@ export class ProviderRuntime implements ProviderRuntimeService {
     }
   }
 
-  private retire(provider: SchoolProvider): void {
-    void provider.reset().catch((error) => {
-      this.ctx.emit("internal/warning", `Provider reset failed: ${String(error)}`)
+  private retire(provider: SchoolProvider | null): void {
+    if (!provider) return
+    const pending = (this.retirement ?? Promise.resolve()).then(async () => {
+      try {
+        await provider.dispose()
+      } catch (error) {
+        this.ctx.emit("internal/warning", `Provider dispose failed: ${String(error)}`)
+      }
+    })
+    this.retirement = pending
+    void pending.then(() => {
+      if (this.retirement === pending) this.retirement = null
     })
   }
 
@@ -320,6 +345,7 @@ export class ProviderRuntime implements ProviderRuntimeService {
       currentSnapshot.status !== "unavailable" ||
       currentSnapshot.error !== null
 
+    this.retire(this.provider)
     this.provider = null
     this.schoolId = schoolId
     this.pending = null

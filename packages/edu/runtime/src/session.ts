@@ -159,6 +159,11 @@ export class ScopedSessionService implements SessionService {
   private hasHydrated = false
   private disposed = false
 
+  // Full-snapshot writes are serialized per backend so a slow older write can
+  // never land after and overwrite a newer snapshot.
+  private metaWriteTail: Promise<void> = Promise.resolve()
+  private secretsWriteTail: Promise<void> = Promise.resolve()
+
   // Track mutations made prior to async hydration completion so user actions win over stale storage
   private dirtySchoolSelection = false
   private dirtySessionExpired = false
@@ -430,8 +435,13 @@ export class ScopedSessionService implements SessionService {
       activeSchoolId: this.activeSchoolId,
       sessionExpired: this.sessionExpired,
     }
-    void this.storage.local.setItem(SESSION_META_KEY, JSON.stringify(payload)).catch(() => {
-      // Storage quota or unavailable errors must not crash active session state.
+    const value = JSON.stringify(payload)
+    this.metaWriteTail = this.metaWriteTail.then(async () => {
+      try {
+        await this.storage.local.setItem(SESSION_META_KEY, value)
+      } catch {
+        // Storage quota or unavailable errors must not crash active session state.
+      }
     })
   }
 
@@ -441,8 +451,13 @@ export class ScopedSessionService implements SessionService {
       credentialsBySchool: this.credentialsBySchool,
       artifactsBySchool: this.artifactsBySchool,
     }
-    void this.storage.secure.setItem(SESSION_SECRETS_KEY, JSON.stringify(payload)).catch(() => {
-      // Storage quota or unavailable errors must not crash active session state.
+    const value = JSON.stringify(payload)
+    this.secretsWriteTail = this.secretsWriteTail.then(async () => {
+      try {
+        await this.storage.secure.setItem(SESSION_SECRETS_KEY, value)
+      } catch {
+        // Storage quota or unavailable errors must not crash active session state.
+      }
     })
   }
 

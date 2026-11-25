@@ -112,7 +112,8 @@ plugin running even when a school's allowlist omits it.
 
 Page, Shell, Slot and settings components receive derived props, not `ctx`.
 Their registrations can declare `dictionary`, `children`, `store` and `inject`
-as needed. The sole `ui-renderer` derives four shares:
+as needed. `inject` is a zero-argument closure that captures only services explicitly declared by
+the plugin; it does not receive a full Cordis `Context`. The sole `ui-renderer` derives four shares:
 
 1. **Runtime share**: owner-supplied props, scoped typed translator `t`, and `locale`.
 2. **Child render share** — only the declared `renderSlot` and

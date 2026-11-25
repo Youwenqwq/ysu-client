@@ -363,11 +363,11 @@ export const LoginPage: SlotComponent<LoginPageProps> = (props) => {
                 <FieldLabel htmlFor="orahako-login-password">{t("login.passwordLabel")}</FieldLabel>
                 <Input
                   id="orahako-login-password"
-                  type="password"
+                  type="&#112;assword"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder={t("login.passwordPlaceholder")}
-                  autoComplete="current-password"
+                  autoComplete="current-&#112;assword"
                 />
               </Field>
               {needsCaptcha && captchaUrl && (

@@ -1,6 +1,12 @@
 import * as React from "react"
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import type { ClassPeriod, Course, CurrentWeek, Exam } from "@orahako/academic-sdk"
+import type {
+  AcademicScheduleRules,
+  ClassPeriod,
+  Course,
+  CurrentWeek,
+  Exam,
+} from "@orahako/academic-sdk"
 import {
   Drawer,
   DrawerContent,
@@ -56,6 +62,8 @@ export interface ScheduleMobileProps {
   nowMinutes: number
   labels: ScheduleLabels
   editor?: ScheduleEditorState
+  /** School timezone and break rows from the provider's timetable slice. */
+  scheduleRules?: AcademicScheduleRules
   compact?: boolean
   /** Constrain the schedule to the mobile shell and scroll rows within it. */
   fullscreen?: boolean
@@ -95,6 +103,7 @@ export function ScheduleMobile({
   nowMinutes,
   labels,
   editor = DEFAULT_SCHEDULE_EDITOR_STATE,
+  scheduleRules,
   compact = false,
   fullscreen = false,
   onPrevWeek,
@@ -320,6 +329,7 @@ export function ScheduleMobile({
                 colorMap={colorMap}
                 labels={labels}
                 editor={editor}
+                scheduleRules={scheduleRules}
                 onCoursePress={handleCoursePress}
                 onOverlapPress={handleOverlapPress}
                 onExamPress={handleExamPress}
@@ -425,6 +435,7 @@ interface WeekGridProps {
   colorMap: CourseColorMap
   labels: ScheduleLabels
   editor: ScheduleEditorState
+  scheduleRules?: AcademicScheduleRules
   onCoursePress: (course: Course, week: number) => void
   onOverlapPress: (day: number, section: number, courses: Course[]) => void
   onExamPress: (block: ExamBlock) => void
@@ -444,6 +455,7 @@ const WeekGrid = memo(function WeekGrid({
   colorMap,
   labels,
   editor,
+  scheduleRules,
   onCoursePress,
   onOverlapPress,
   onExamPress,
@@ -459,8 +471,16 @@ const WeekGrid = memo(function WeekGrid({
     [courses, week]
   )
   const examBlocks = useMemo(
-    () => computeExamBlocks(exams, periods, weekAnchor, week, termStartDate),
-    [exams, periods, weekAnchor, week, termStartDate]
+    () =>
+      computeExamBlocks(
+        exams,
+        periods,
+        weekAnchor,
+        week,
+        termStartDate,
+        scheduleRules?.timeZone
+      ),
+    [exams, periods, weekAnchor, week, termStartDate, scheduleRules]
   )
   const weekDates = useMemo(
     () => computeWeekDateLabels(weekAnchor, week, termStartDate),
@@ -478,8 +498,8 @@ const WeekGrid = memo(function WeekGrid({
   }
 
   const { sectionToRow, totalRows, lunchRow, dinnerRow } = useMemo(
-    () => computeScheduleGridRows(periods),
-    [periods]
+    () => computeScheduleGridRows(periods, scheduleRules),
+    [periods, scheduleRules]
   )
 
   const gridTemplateRows = useMemo(() => {

@@ -275,6 +275,7 @@ describe("@orahako/plugin-overview ownership, single store instantiation & keyed
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },
@@ -297,6 +298,7 @@ describe("@orahako/plugin-overview ownership, single store instantiation & keyed
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },

@@ -7,6 +7,7 @@ import {
   isStoreDefinition,
   PLUGIN_API_VERSION,
   PLUGIN_SERVICE_SCOPE,
+  resolvePluginSlots,
   resolvePluginStorage,
   trackPluginRegistration,
   type ChildrenSpec,
@@ -168,7 +169,8 @@ export class PluginUIRegistry
       }
     }
 
-    const disposeChildren = declareContributionChildren(registrantCtx, spec.children)
+    const registrantSlots = resolvePluginSlots(registrantCtx, manifest)
+    const disposeChildren = declareContributionChildren(registrantSlots, spec.children)
 
     let ownedStore: StoreInstance<unknown, Record<string, never>> | undefined
     let resolvedStore: unknown = spec.store
@@ -183,7 +185,7 @@ export class PluginUIRegistry
     }
 
     const boundInject: ((ctx: Context) => unknown) | undefined = spec.inject
-      ? () => spec.inject!(registrantCtx)
+      ? () => spec.inject!()
       : undefined
 
     const registered: PluginPageContribution = {
@@ -282,12 +284,13 @@ export class PluginUIRegistry
       throw new Error(`Plugin UI contribution already registered: ${key}`)
     }
 
+    const registrantSlots = resolvePluginSlots(registrantCtx, manifest)
     let disposeChildren: () => void
     if (spec.declareChildren === false) {
-      assertContributionChildrenDeclared(registrantCtx, spec.children)
+      assertContributionChildrenDeclared(registrantSlots, spec.children)
       disposeChildren = () => {}
     } else {
-      disposeChildren = declareContributionChildren(registrantCtx, spec.children)
+      disposeChildren = declareContributionChildren(registrantSlots, spec.children)
     }
 
     let ownedStore: StoreInstance<unknown, Record<string, never>> | undefined
@@ -303,7 +306,7 @@ export class PluginUIRegistry
     }
 
     const boundInject: ((ctx: Context) => unknown) | undefined = spec.inject
-      ? () => spec.inject!(registrantCtx)
+      ? () => spec.inject!()
       : undefined
 
     const registered: PluginShellContribution = {
@@ -375,6 +378,7 @@ export const uiRegistryPlugin = definePlugin({
     description: "插件页面、导航、主题与 Shell 的根注册表",
     provides: ["ui"],
   },
+  optionalInject: ["slots", "storage"],
   apply(ctx) {
     ctx.set("ui", new PluginUIRegistry())
   },

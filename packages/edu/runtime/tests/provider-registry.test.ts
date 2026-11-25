@@ -18,6 +18,7 @@ function makeProvider(id: string, name = id): SchoolProvider {
     initialize: async () => {},
     reset: async () => {},
     logout: async () => {},
+    dispose: async () => {},
     relogin: async () => true,
   })
 }

@@ -1,17 +1,20 @@
 import { CapacitorHttp, type HttpOptions, type HttpResponseType } from "@capacitor/core"
-import { isCapacitor, type HttpRequest, type HttpResponse } from "@orahako/sdk"
 import {
   extractSetCookies,
-  headerSingle,
+  followRedirects,
+  isCapacitor,
   isRequestScopedCookie,
+  MAX_COOKIE_REDIRECTS,
   mergeScopedCookies,
   SimpleCookieJar,
   splitSetCookie,
-  stripBodyHeaders,
-} from "./cookie"
+  withCookieHeader,
+  type HttpRequest,
+  type HttpResponse,
+} from "@orahako/sdk"
 
 export const DEFAULT_TIMEOUT_MS = 30_000
-export const MAX_REDIRECTS = 10
+export const MAX_REDIRECTS = MAX_COOKIE_REDIRECTS
 export const DEFAULT_PROXY_PATH = "/api/proxy"
 
 const DEFAULT_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
@@ -271,21 +274,6 @@ export async function executeTransportHop(
   return proxyHttpSend(req, proxyPath)
 }
 
-function buildCookieHeaders(
-  headers: Readonly<Record<string, string>> | undefined,
-  cookieHeader: string
-): Record<string, string> | undefined {
-  const out: Record<string, string> = {}
-  for (const [key, value] of Object.entries(headers ?? {})) {
-    if (key.toLowerCase() === "cookie") continue
-    out[key] = value
-  }
-  if (cookieHeader) {
-    out["Cookie"] = cookieHeader
-  }
-  return Object.keys(out).length > 0 ? out : undefined
-}
-
 export async function executeStatelessTransport(
   req: HttpRequest,
   options?: TransportOptions
@@ -305,60 +293,19 @@ export async function executeStatelessTransport(
     }
   }
 
-  let currentUrl = req.url
-  let currentMethod = req.method
-  let currentBody = req.body
-  let currentHeaders = req.headers
+  return followRedirects(req, async (hopRequest) => {
+    const jarCookie = await ephemeralJar.getCookieString(hopRequest.url)
+    const cookieHeader = mergeScopedCookies(jarCookie, hopRequest.url, req.cookies)
+    const headers = withCookieHeader(hopRequest.headers, cookieHeader)
 
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const jarCookie = await ephemeralJar.getCookieString(currentUrl)
-    const cookieHeader = mergeScopedCookies(jarCookie, currentUrl, req.cookies)
-    const hopHeaders = buildCookieHeaders(currentHeaders, cookieHeader)
+    const response = await executeTransportHop({ ...hopRequest, headers }, options)
 
-    const resp = await executeTransportHop(
-      {
-        method: currentMethod,
-        url: currentUrl,
-        ...(hopHeaders !== undefined ? { headers: hopHeaders } : {}),
-        ...(currentBody !== undefined ? { body: currentBody } : {}),
-        redirect: "manual",
-        ...(req.timeoutMs !== undefined ? { timeoutMs: req.timeoutMs } : {}),
-        ...(req.signal !== undefined ? { signal: req.signal } : {}),
-        ...(req.responseType !== undefined ? { responseType: req.responseType } : {}),
-        ...(req.proxyTargetInHeader !== undefined
-          ? { proxyTargetInHeader: req.proxyTargetInHeader }
-          : {}),
-      },
-      options
-    )
-
-    for (const sc of extractSetCookies(resp.headers)) {
-      if (!isRequestScopedCookie(req, sc)) {
-        await ephemeralJar.setCookie(sc, currentUrl, { ignoreError: true })
+    for (const setCookie of extractSetCookies(response.headers)) {
+      if (!isRequestScopedCookie(req, setCookie)) {
+        await ephemeralJar.setCookie(setCookie, hopRequest.url, { ignoreError: true })
       }
     }
 
-    if (resp.status < 300 || resp.status >= 400) {
-      return resp
-    }
-    const location = headerSingle(resp.headers, "location")
-    if (!location) {
-      return resp
-    }
-    if (hop === MAX_REDIRECTS) {
-      break
-    }
-
-    currentUrl = new URL(location, currentUrl).toString()
-    if (
-      resp.status === 303 ||
-      ((resp.status === 301 || resp.status === 302) && currentMethod === "POST")
-    ) {
-      currentMethod = "GET"
-      currentBody = undefined
-      currentHeaders = stripBodyHeaders(currentHeaders)
-    }
-  }
-
-  throw new Error(`Exceeded max redirects (${MAX_REDIRECTS}) for ${req.url}`)
+    return response
+  })
 }

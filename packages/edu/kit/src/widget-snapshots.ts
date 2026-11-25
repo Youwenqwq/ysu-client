@@ -2,6 +2,7 @@ import type { ClassPeriod, Course, CurrentWeek, Exam, TermCalendar } from "@orah
 
 import { getAcademicClock, resolveAcademicWeek } from "./academic-time"
 import { parseWeeks } from "./schedule-utils"
+import { DEFAULT_ACADEMIC_TIME_ZONE } from "./time"
 
 export interface WidgetScheduleCourse {
   name: string
@@ -57,7 +58,8 @@ export function buildScheduleWidgetSnapshot(
   currentWeek: CurrentWeek | null,
   periods: readonly ClassPeriod[],
   calendar?: TermCalendar,
-  now = new Date()
+  now = new Date(),
+  timeZone: string = DEFAULT_ACADEMIC_TIME_ZONE
 ): ScheduleWidgetSnapshot {
   const periodMap = new Map(periods.map((period) => [period.section, period]))
 
@@ -79,7 +81,7 @@ export function buildScheduleWidgetSnapshot(
   const liveWeek = resolveAcademicWeek(
     currentWeek,
     calendar,
-    getAcademicClock(now).date,
+    getAcademicClock(now, timeZone).date,
     currentWeek?.semester
   )
   const matchingCalendar =

@@ -19,6 +19,8 @@ export interface OverviewScheduleInput<TCourse extends Course = Course> {
   currentWeek: CurrentWeek | null
   calendar?: TermCalendar
   now?: Date
+  /** IANA school timezone for the live clock and offset-less exam timestamps. */
+  timeZone?: string
 }
 
 export interface OverviewScheduleSnapshot<TCourse extends Course = Course> {
@@ -73,15 +75,16 @@ export function computeOverviewSchedule<TCourse extends Course = Course>({
   currentWeek,
   calendar,
   now = new Date(),
+  timeZone,
 }: OverviewScheduleInput<TCourse>): OverviewScheduleSnapshot<TCourse> {
-  const { date, weekday, minutes: nowMinutes } = getAcademicClock(now)
+  const { date, weekday, minutes: nowMinutes } = getAcademicClock(now, timeZone)
   const liveWeek = resolveAcademicWeek(currentWeek, calendar, date, currentWeek?.semester)
   const periods = rawPeriods.filter(periodIsInUse).sort((a, b) => a.section - b.section)
   const timeMap = buildSectionTimeMap(periods)
   const todayCourses = computeTodayCourses(courses, liveWeek)
   const upcomingExams = exams
-    .filter((exam) => !isExamCompleted(exam, now))
-    .sort(compareExamStartTime)
+    .filter((exam) => !isExamCompleted(exam, now, timeZone))
+    .sort((a, b) => compareExamStartTime(a, b, timeZone))
 
   const courseTimeRange = (course: Course) => computeCourseTimeRange(course, timeMap)
   const currentCourse =

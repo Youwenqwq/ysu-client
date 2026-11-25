@@ -186,6 +186,56 @@ describe("@orahako/runtime-i18n", () => {
     runtime.dispose()
   })
 
+  it("hydrates from and writes to a replacement storage backend after service swap", async () => {
+    const first = createMemoryStorageMap()
+    first.records.set(I18N_SCOPED_STORAGE_KEY, "en")
+    const second = createMemoryStorageMap()
+
+    const storagePlugin = (id: string, storage: ScopedPluginService<PluginStorageService>) =>
+      definePlugin({
+        manifest: {
+          id,
+          name: id,
+          version: "1.0.0",
+          apiVersion: PLUGIN_API_VERSION,
+          kind: "runtime",
+          entry: "index.js",
+          provides: ["storage"],
+        },
+        apply(ctx) {
+          ctx.set("storage", storage)
+        },
+      })
+
+    const runtime = new PluginRuntime()
+    runtime.register(i18nRegistryPlugin, "builtin")
+    runtime.register(storagePlugin("test.storage.first", first.service), "builtin")
+    runtime.register(storagePlugin("test.storage.second", second.service), "builtin")
+
+    runtime.start(I18N_RUNTIME_PLUGIN_ID)
+    runtime.start("test.storage.first")
+    await runtime.flush()
+
+    const firstRegistry = runtime.context.get("i18n") as PluginI18nRegistry
+    await vi.waitFor(() => expect(firstRegistry.getLocale()).toBe("en"))
+    firstRegistry.setLocale("zh")
+    await vi.waitFor(() => expect(first.records.get(I18N_SCOPED_STORAGE_KEY)).toBe("zh"))
+
+    // Replacing the storage service remounts i18n against the new backend.
+    runtime.stop("test.storage.first")
+    await runtime.flush()
+    runtime.start("test.storage.second")
+    await runtime.flush()
+
+    const secondRegistry = runtime.context.get("i18n") as PluginI18nRegistry
+    expect(secondRegistry).not.toBe(firstRegistry)
+    await vi.waitFor(() => expect(secondRegistry.getLocale()).toBe("zh"))
+    secondRegistry.setLocale("en")
+    await vi.waitFor(() => expect(second.records.get(I18N_SCOPED_STORAGE_KEY)).toBe("en"))
+    expect(first.records.get(I18N_SCOPED_STORAGE_KEY)).toBe("zh")
+    runtime.dispose()
+  })
+
   it("does not overwrite explicit setLocale called before async storage hydration settles", async () => {
     const pendingGet = Promise.withResolvers<string | null>()
     const setItem = vi.fn(async () => {})

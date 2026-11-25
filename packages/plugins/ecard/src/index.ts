@@ -38,12 +38,13 @@ const ecardManifest: PluginManifest = {
   kind: "feature",
   entry: "index.js",
   description: "校园一卡通余额、卡片状态查询与总览摘要卡片",
-  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query", "overview"],
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"],
 }
 
 export const ecardPlugin = definePlugin({
   manifest: ecardManifest,
-  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query", "overview"] as const,
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"] as const,
+  optionalInject: ["overview"] as const,
   apply(ctx) {
     const { ui, slots, router, i18n, provider, session, query, overview } = ctx
     i18n.register(ecardDictionary)
@@ -82,8 +83,8 @@ export const ecardPlugin = definePlugin({
       EcardPage
     )
 
-    slots.inject("shell.header.actions", (slotCtx) =>
-      slotCtx.slots.register(
+    slots.inject("shell.header.actions", () =>
+      slots.register(
         {
           id: "ecard-header-actions",
           slot: "shell.header.actions",
@@ -113,7 +114,7 @@ export const ecardPlugin = definePlugin({
       order: 10,
     })
 
-    overview.registerWidget(
+    overview?.registerWidget(
       {
         id: ECARD_BALANCE_WIDGET_ID,
         title: "一卡通余额",

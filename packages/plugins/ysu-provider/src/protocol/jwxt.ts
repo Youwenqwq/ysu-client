@@ -2,17 +2,16 @@
  * 教务系统查询模块 —— 燕山大学 EMAP 教务平台。
  */
 import type { CookieJar } from "@orahako/academic-sdk"
-import type { CookieEntry, HttpResponse } from "@orahako/sdk"
-import type { YSUContext } from "../context"
 import {
-  asRecord,
   collectCookies,
   cookieEntryFromJSON,
-  errorMessage,
   headerSingle,
   installCookies,
-  isPlainRecord,
-} from "../http-utils"
+  type CookieEntry,
+  type HttpResponse,
+} from "@orahako/sdk"
+import type { YSUContext } from "../context"
+import { asRecord, errorMessage, isPlainRecord } from "../http-utils"
 import type { CasAuthorizer } from "./cas"
 
 export interface Course {

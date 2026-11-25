@@ -232,7 +232,17 @@ describe("SlotMap & 4-share derived component props", () => {
 
   it("derives all 4 component shares with bare call signature and narrowed child slots", () => {
     const registrations: unknown[] = []
+    const slotSnapshot = createObservableSource({
+      declarations: [{ name: "root" as const, kind: "single" as const }],
+      contributions: [],
+    })
     const fakeSlots: PluginSlotService = {
+      state: {
+        getSnapshot: slotSnapshot.getSnapshot,
+        subscribe: slotSnapshot.subscribe,
+      },
+      getSnapshot: slotSnapshot.getSnapshot,
+      subscribe: slotSnapshot.subscribe,
       register(spec: unknown, component?: unknown) {
         registrations.push({ spec, component })
         return () => {}

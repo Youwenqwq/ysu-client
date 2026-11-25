@@ -1,32 +1,14 @@
 import {
-  Context,
   definePlugin,
-  isScopedPluginService,
   PLUGIN_API_VERSION,
-  PLUGIN_SERVICE_SCOPE,
   type PluginLocale,
   type PluginManifest,
-  type PluginStorageService,
 } from "@orahako/sdk"
 import { I18N_RUNTIME_PLUGIN_ID, PluginI18nRegistry } from "./registry"
 
 export interface I18nRuntimeConfig {
   readonly defaultLocale?: PluginLocale
   readonly [key: string]: unknown
-}
-
-function isPluginStorageService(value: unknown): value is PluginStorageService {
-  return typeof value === "object" && value !== null && "local" in value && "secure" in value
-}
-
-function resolveOptionalLocalStorage(ctx: Context, manifest: PluginManifest) {
-  const raw: unknown = ctx.get("storage")
-  if (!raw) return undefined
-  if (isScopedPluginService(raw)) {
-    const scoped = raw[PLUGIN_SERVICE_SCOPE](ctx, manifest)
-    return isPluginStorageService(scoped) ? scoped.local : undefined
-  }
-  return isPluginStorageService(raw) ? raw.local : undefined
 }
 
 const i18nManifest: PluginManifest = {
@@ -52,25 +34,14 @@ export const i18nRegistryPlugin = definePlugin({
     },
     additionalProperties: false,
   },
+  optionalInject: ["storage"],
   apply(ctx, config: I18nRuntimeConfig = {}) {
-    const cordisCtx = ctx instanceof Context ? ctx : undefined
-    const initialStorage = cordisCtx
-      ? resolveOptionalLocalStorage(cordisCtx, i18nManifest)
-      : undefined
+    // Kernel remounts this plugin when storage appears, is replaced or revoked;
+    // the registry then hydrates from the new backend and writes only to it.
     const registry = new PluginI18nRegistry({
       ...(config.defaultLocale !== undefined ? { defaultLocale: config.defaultLocale } : {}),
-      ...(initialStorage !== undefined ? { storage: initialStorage } : {}),
+      ...(ctx.storage !== undefined ? { storage: ctx.storage.local } : {}),
     })
-
-    if (cordisCtx && !initialStorage) {
-      ctx.on("internal/service", (name: string) => {
-        if (name !== "storage") return
-        const lateStorage = resolveOptionalLocalStorage(cordisCtx, i18nManifest)
-        if (lateStorage) {
-          registry.attachStorage(lateStorage)
-        }
-      })
-    }
 
     ctx.effect(() => () => {
       registry.dispose()

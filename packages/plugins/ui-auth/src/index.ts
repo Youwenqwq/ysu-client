@@ -4,7 +4,6 @@ import {
   hasSlice,
   requireSlice,
   type AuthSlice,
-  type MfaService,
   type ProviderRuntimeSnapshot,
   type SchoolProvider,
   type StudentInfo,
@@ -14,7 +13,6 @@ import {
   definePlugin,
   isCapacitor,
   PLUGIN_API_VERSION,
-  type Context,
   type PluginConfig,
   type PluginPageContribution,
   type RouteLocation,
@@ -174,9 +172,21 @@ export const authUiPlugin = definePlugin({
     "session",
     "query",
   ] as const,
+  optionalInject: ["mfa"] as const,
   apply(ctx, config: AuthUiPluginConfig = {}) {
-    const { ui, slots, router, navigation, i18n, storage, providers, provider, session, query } =
-      ctx
+    const {
+      ui,
+      slots,
+      router,
+      navigation,
+      i18n,
+      storage,
+      providers,
+      provider,
+      session,
+      query,
+      mfa,
+    } = ctx
     i18n.register(authUiDictionary)
     const t = i18n.translator(authUiDictionary)
     query.registerPolicy("student-info", { ttl: LONG_TTL_MS, persist: true })
@@ -443,7 +453,7 @@ export const authUiPlugin = definePlugin({
         root: true,
         dictionary: authUiDictionary,
         store: rememberStore,
-        inject: (fullCtx: Context): LoginPageInject => ({
+        inject: (): LoginPageInject => ({
           hooks: {
             session: session.state,
             provider: provider.state,
@@ -466,10 +476,7 @@ export const authUiPlugin = definePlugin({
           },
           checkRateLimit: () => rateLimiter.checkRateLimit(),
           recordLoginAttempt: () => rateLimiter.recordLoginAttempt(),
-          showMfa: (request) => {
-            const mfaService: MfaService | undefined = fullCtx.get("mfa")
-            return mfaService?.show(request)
-          },
+          showMfa: (request) => mfa?.show(request),
         }),
       },
       LoginPage

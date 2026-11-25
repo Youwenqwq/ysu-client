@@ -5,6 +5,7 @@ import {
   isProviderError,
   ProviderErrorCode,
   type CurrentWeek,
+  type ProviderRuntimeSnapshot,
   type QuerySnapshot,
   type SessionSnapshot,
   type StudentInfo,
@@ -222,6 +223,7 @@ export interface WeekSummaryWidgetInject {
   readonly hooks: {
     readonly currentWeek: ObservableSource<QuerySnapshot<CurrentWeek>>
     readonly termCalendar: ObservableSource<QuerySnapshot<TermCalendar>>
+    readonly provider: ObservableSource<ProviderRuntimeSnapshot>
   }
 }
 
@@ -258,12 +260,15 @@ export const WeekSummaryWidget: SlotComponent<WeekSummaryWidgetProps> = (props) 
   const { t } = props
   const currentWeek = props.useCurrentWeek()
   const termCalendar = props.useTermCalendar()
+  const provider = props.useProvider()
   const compact = useIsMobile()
+  const timeZone = provider.provider?.slices.timetable?.scheduleRules?.timeZone
 
   const schedule = computeOverviewSchedule({
     courses: [],
     currentWeek: currentWeek.data ?? null,
     calendar: termCalendar.data,
+    timeZone,
   })
 
   const effectiveWeek = schedule.liveWeek?.week ?? currentWeek.data?.week

@@ -874,7 +874,9 @@ export function OrahakoApp({
     }
 
     if (routeLocation.pluginId) {
-      return lookupPage(routeLocation.pluginId, routeLocation.pageId ?? "index")
+      const pageId = routeLocation.pageId ?? "index"
+      if (navigation && !navigation.available(routeLocation.pluginId, pageId)) return undefined
+      return lookupPage(routeLocation.pluginId, pageId)
     }
 
     if (navigation) {

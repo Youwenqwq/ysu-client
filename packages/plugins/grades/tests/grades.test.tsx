@@ -567,8 +567,8 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       "session",
       "query",
       "notifications",
-      "overview",
     ])
+    expect(gradesPlugin.optionalInject).toEqual(["overview"])
   })
 
   it("maintains per-username gacha revealed keys in gradeGachaStore without cross-account leakage", async () => {
@@ -698,6 +698,7 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },
@@ -1054,6 +1055,104 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
 
     activeUnmount = undefined
     await dom.unmount()
+    runtime.dispose()
+  })
+
+  it("keeps the grades page, navigation, settings and notification channel when overview is disabled", async () => {
+    const localBackend = createMemoryStorage()
+    const secureBackend = createMemoryStorage()
+    const runtime = new PluginRuntime()
+    runtime.context.set(
+      "storage",
+      new NamespacedStorageService({ local: localBackend, secure: secureBackend })
+    )
+    runtime.context.set("http", new StatelessHttpService())
+
+    const provider: SchoolProvider = defineSchoolProvider({
+      id: "optional-overview-uni",
+      name: "Optional Overview University",
+      slices: {
+        grades: {
+          getGrades: async () => [],
+        },
+        timetable: {
+          getSchedule: async () => [],
+          getCurrentWeek: async () => ({ week: 1, weekday: 1 }),
+        },
+      },
+      async initialize() {},
+      async reset() {},
+      async logout() {},
+      async dispose() {},
+      async relogin() {
+        return true
+      },
+    })
+
+    const schoolPlugin = definePlugin({
+      manifest: {
+        id: "test.optional-overview-school",
+        name: "Optional Overview School",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "provider",
+        entry: "index.js",
+        inject: ["providers"],
+      },
+      inject: ["providers"] as const,
+      apply(ctx) {
+        ctx.providers.registerProvider("optional-overview-uni", () => provider)
+      },
+    })
+
+    for (const p of [
+      slotRegistryPlugin,
+      uiRegistryPlugin,
+      settingsRegistryPlugin,
+      i18nRegistryPlugin,
+      routerRuntimePlugin,
+      navigationRuntimePlugin,
+      providerRegistryRuntimePlugin,
+      sessionRuntimePlugin,
+      providerRuntimePlugin,
+      queryRuntimePlugin,
+      notificationRegistryRuntimePlugin,
+      schoolPlugin,
+      gradesPlugin,
+    ]) {
+      if (p.manifest.id === queryRuntimePlugin.manifest.id) {
+        runtime.register(p, "builtin", { policies: {} })
+      } else if (
+        p.manifest.id === sessionRuntimePlugin.manifest.id ||
+        p.manifest.id === providerRuntimePlugin.manifest.id
+      ) {
+        runtime.register(p, "builtin", { defaultSchoolId: "optional-overview-uni" })
+      } else {
+        runtime.register(p, "builtin")
+      }
+      runtime.start(p.manifest.id)
+    }
+
+    const ui = runtime.context.get("ui")!
+    const settings = runtime.context.get("settings") as PluginSettingsRegistry
+    const notifications = runtime.context.get("notifications")!
+
+    expect(
+      ui.getSnapshot().pages.some(
+        (page) => page.pluginId === GRADES_PLUGIN_ID && page.id === "index"
+      )
+    ).toBe(true)
+    expect(ui.getSnapshot().navigation.some((item) => item.pluginId === GRADES_PLUGIN_ID)).toBe(
+      true
+    )
+    expect(settings.getSnapshot().some((category) => category.pluginId === GRADES_PLUGIN_ID)).toBe(
+      true
+    )
+    expect(
+      notifications.getSnapshot().some((channel) => channel.pluginId === GRADES_PLUGIN_ID)
+    ).toBe(true)
+    expect(runtime.context.get("overview")).toBeUndefined()
+
     runtime.dispose()
   })
 })

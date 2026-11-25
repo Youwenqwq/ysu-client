@@ -29,7 +29,8 @@ describe("computeExamBlocks & exam-utils", () => {
       periods,
       null,
       2,
-      "2026-08-31"
+      "2026-08-31",
+      "Asia/Shanghai"
     )
 
     expect(blocks).toMatchObject([{ day: 3, start: 2, end: 3 }])
@@ -49,7 +50,9 @@ describe("computeExamBlocks & exam-utils", () => {
       ],
       periods,
       { week: 1, weekday: 1, date: "2026-08-31" },
-      2
+      2,
+      undefined,
+      "Asia/Shanghai"
     )
 
     expect(blocks).toMatchObject([
@@ -69,7 +72,8 @@ describe("computeExamBlocks & exam-utils", () => {
       periods,
       null,
       2,
-      "2026-08-31"
+      "2026-08-31",
+      "Asia/Shanghai"
     )
 
     expect(blocks).toMatchObject([{ day: 7, start: 4, end: 4 }])
@@ -87,9 +91,13 @@ describe("computeExamBlocks & exam-utils", () => {
       endAt: "2026-09-10T16:00:00",
       timeText: "14:00 ~ 16:00",
     })
-    expect([second, first].sort(compareExamStartTime).map((e) => e.name)).toEqual(["线代", "英语"])
-    expect(isExamCompleted(first, new Date("2026-09-09T04:00:00Z"))).toBe(true)
-    expect(isExamCompleted(second, new Date("2026-09-09T04:00:00Z"))).toBe(false)
+    expect(
+      [second, first]
+        .sort((a, b) => compareExamStartTime(a, b, "Asia/Shanghai"))
+        .map((e) => e.name)
+    ).toEqual(["线代", "英语"])
+    expect(isExamCompleted(first, new Date("2026-09-09T04:00:00Z"), "Asia/Shanghai")).toBe(true)
+    expect(isExamCompleted(second, new Date("2026-09-09T04:00:00Z"), "Asia/Shanghai")).toBe(false)
     expect(formatExamTime(first)).toBe("09:00-11:00")
     expect(formatExamTime(second)).toBe("14:00 ~ 16:00")
   })

@@ -1,8 +1,7 @@
 import type { CurrentWeek, TermCalendar } from "@orahako/academic-sdk"
 
 import { scheduleDate, scheduleWeek } from "./schedule-patches"
-
-export const SCHOOL_TIME_ZONE = "Asia/Shanghai"
+import { DEFAULT_ACADEMIC_TIME_ZONE } from "./time"
 
 export interface AcademicClock {
   date: string
@@ -10,24 +9,39 @@ export interface AcademicClock {
   minutes: number
 }
 
-const clockFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: SCHOOL_TIME_ZONE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-})
+const clockFormatters = new Map<string, Intl.DateTimeFormat>()
 
-/** School wall time, independent of the device's display timezone. */
-export function getAcademicClock(now = new Date()): AcademicClock {
+function clockFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = clockFormatters.get(timeZone)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+    clockFormatters.set(timeZone, formatter)
+  }
+  return formatter
+}
+
+/**
+ * School wall time in an explicit IANA timezone, independent of the device's
+ * display timezone. Callers without school configuration get UTC.
+ */
+export function getAcademicClock(
+  now = new Date(),
+  timeZone: string = DEFAULT_ACADEMIC_TIME_ZONE
+): AcademicClock {
   let year = ""
   let month = ""
   let day = ""
   let hour = 0
   let minute = 0
-  for (const part of clockFormatter.formatToParts(now)) {
+  for (const part of clockFormatter(timeZone).formatToParts(now)) {
     switch (part.type) {
       case "year":
         year = part.value

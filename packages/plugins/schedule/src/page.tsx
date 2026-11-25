@@ -215,7 +215,12 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   const weekAnchor =
     queriedTerm && snapshot?.semester && snapshot.semester !== queriedTerm ? null : snapshot
 
-  const clock = useMemo(() => getAcademicClock(new Date(clockTick)), [clockTick])
+  const scheduleRules = providerSnap.provider?.slices.timetable?.scheduleRules
+  const timeZone = scheduleRules?.timeZone
+  const clock = useMemo(
+    () => getAcademicClock(new Date(clockTick), timeZone),
+    [clockTick, timeZone]
+  )
   const currentWeek = useMemo(
     () => resolveAcademicWeek(snapshot, rawCalendar, clock.date, queriedTerm || undefined),
     [clock.date, queriedTerm, rawCalendar, snapshot]
@@ -440,9 +445,10 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         periods,
         weekAnchor,
         selectedWeek,
-        termCalendar?.startDate
+        termCalendar?.startDate,
+        timeZone
       ),
-    [examsQuery.data, periods, selectedWeek, termCalendar?.startDate, weekAnchor]
+    [examsQuery.data, periods, selectedWeek, termCalendar?.startDate, timeZone, weekAnchor]
   )
 
   const handleCourseTap = (course: Course, week: number): void => {
@@ -686,6 +692,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 courses={courses}
                 exams={examsQuery.data}
                 periods={periods}
+                scheduleRules={scheduleRules}
                 currentWeekday={clock.weekday}
                 currentWeek={currentWeek}
                 weekAnchor={weekAnchor}
@@ -709,6 +716,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                   courses={filteredCourses}
                   examBlocks={examBlocks}
                   periods={periods}
+                  scheduleRules={scheduleRules}
                   currentWeekday={clock.weekday}
                   currentWeek={currentWeek}
                   weekAnchor={weekAnchor}
@@ -878,7 +886,8 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
       ? undefined
       : rawCalendar
 
-  const clock = getAcademicClock(new Date(clockTick))
+  const timeZone = activeProvider?.slices.timetable?.scheduleRules?.timeZone
+  const clock = getAcademicClock(new Date(clockTick), timeZone)
   const currentWeek = resolveAcademicWeek(snapshot, rawCalendar, clock.date, queriedTerm || undefined)
   const selectedWeek = weekOverride ?? currentWeek?.week ?? 1
 

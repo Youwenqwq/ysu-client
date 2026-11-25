@@ -216,6 +216,7 @@ export class PluginHost {
   recovery?: PluginRecoveryState
   bootstrapError?: string
   private bootstrapPromise?: Promise<void>
+  private disposal?: Promise<void>
   private hostModules?: HostModuleRegistry
   private readonly platformModules: Readonly<Record<string, object>>
   private readonly bootFinishDelayMs: number
@@ -405,6 +406,10 @@ export class PluginHost {
   async uninstall(id: string): Promise<void> {
     const snapshot = await this.packages.read(id)
     if (!snapshot) throw new Error(`External plugin not found: ${id}`)
+    const registeredRoutes = new Set<string>()
+    for (const page of this.ui?.getSnapshot().pages ?? []) {
+      if (page.pluginId === id && page.route !== undefined) registeredRoutes.add(page.route)
+    }
     if (this.runtime.get(id)?.source === "external") {
       this.runtime.stop(id)
       this.runtime.unregister(id)
@@ -417,6 +422,13 @@ export class PluginHost {
     this.preferences.setPluginDisabled(id, false)
     if (this.preferences.getActiveShell()?.startsWith(`${id}:`)) {
       this.preferences.setActiveShell(undefined)
+    }
+    if (this.preferences.getActiveTheme()?.startsWith(`${id}:`)) {
+      this.preferences.setActiveTheme(undefined)
+    }
+    const startupPage = this.preferences.getStartupPage()
+    if (startupPage !== undefined && registeredRoutes.has(startupPage)) {
+      this.preferences.setStartupPage(undefined)
     }
     await this.packages.remove(id)
   }
@@ -454,18 +466,31 @@ export class PluginHost {
     return this.hostModules
   }
 
-  dispose(): void {
-    for (const id of Array.from(this.styleElements.keys())) {
-      this.removeStyles(id)
+  dispose(): Promise<void> {
+    this.disposal ??= this.disposeInternal()
+    return this.disposal
+  }
+
+  private async disposeInternal(): Promise<void> {
+    try {
+      // Runtime scopes may own async native cleanup; finish it before the
+      // plugin module and host-module URLs disappear.
+      await this.runtime.dispose()
+    } finally {
+      try {
+        for (const id of Array.from(this.styleElements.keys())) {
+          this.removeStyles(id)
+        }
+        for (const loaded of this.external.values()) {
+          loaded.dispose()
+        }
+        this.external.clear()
+        this.hostModules?.dispose()
+        this.hostModules = undefined
+      } finally {
+        this.packages.close()
+      }
     }
-    for (const loaded of this.external.values()) {
-      loaded.dispose()
-    }
-    this.external.clear()
-    this.hostModules?.dispose()
-    this.hostModules = undefined
-    this.packages.close()
-    this.runtime.dispose()
   }
 
   private assertAppCompatible(manifest: PluginManifest): void {

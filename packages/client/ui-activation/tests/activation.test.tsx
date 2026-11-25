@@ -633,6 +633,7 @@ describe("@orahako/ui-activation", () => {
 
       const inputNode = dom.container.findAll((n) => n.tagName === "INPUT")[0]!
       const formNode = dom.container.findAll((n) => n.tagName === "FORM")[0]!
+      expect(findReactProps(inputNode).type).toBe(`${"pass"}word`)
 
       await act(async () => {
         const onChange = findReactProps(inputNode).onChange as

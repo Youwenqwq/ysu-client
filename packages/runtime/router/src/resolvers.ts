@@ -225,7 +225,7 @@ function compareRank(
   )
 }
 
-function pageAvailable(sources: SemanticNavSources, page: SemanticPageInput): boolean {
+export function pageAvailable(sources: SemanticNavSources, page: SemanticPageInput): boolean {
   if (
     !passesFilters(sources.filters, {
       pluginId: page.pluginId,

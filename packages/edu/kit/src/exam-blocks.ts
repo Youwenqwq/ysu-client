@@ -3,6 +3,7 @@ import type { ClassPeriod, CurrentWeek, Exam } from "@orahako/academic-sdk"
 import { getAcademicClock } from "./academic-time"
 import { getExamEndTime, getExamStartTime } from "./exam-utils"
 import { buildSectionTimeMap } from "./schedule-utils"
+import { DEFAULT_ACADEMIC_TIME_ZONE } from "./time"
 
 export interface ExamBlock {
   exam: Exam
@@ -69,7 +70,8 @@ export function computeExamBlocks(
   periods: readonly ClassPeriod[],
   currentWeek: CurrentWeek | null,
   selectedWeek: number,
-  termStartDate?: string
+  termStartDate?: string,
+  timeZone: string = DEFAULT_ACADEMIC_TIME_ZONE
 ): ExamBlock[] {
   if (selectedWeek <= 0 || (!termStartDate && !currentWeek?.week)) return []
   const monday = mondayOfWeek(currentWeek, selectedWeek, termStartDate)
@@ -78,14 +80,18 @@ export function computeExamBlocks(
   const timeMap = buildSectionTimeMap(periods)
   const blocks: ExamBlock[] = []
   for (const exam of exams) {
-    const date = getExamStartTime(exam)
+    const date = getExamStartTime(exam, timeZone)
     if (!date) continue
-    const start = getAcademicClock(date)
+    const start = getAcademicClock(date, timeZone)
     const dayDiff = (Date.parse(start.date) - monday) / 86_400_000
     if (dayDiff < 0 || dayDiff > 6) continue
-    const end = getExamEndTime(exam)
+    const end = getExamEndTime(exam, timeZone)
     if (!end) continue
-    const sections = mapExamToSections(start.minutes, getAcademicClock(end).minutes, timeMap)
+    const sections = mapExamToSections(
+      start.minutes,
+      getAcademicClock(end, timeZone).minutes,
+      timeMap
+    )
     if (!sections) continue
     blocks.push({ exam, day: dayDiff + 1, ...sections })
   }

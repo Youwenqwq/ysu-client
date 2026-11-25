@@ -535,6 +535,7 @@ describe("@orahako/plugin-school-schedule export discipline, lazy filtering & ti
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },

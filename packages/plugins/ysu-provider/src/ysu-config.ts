@@ -1,3 +1,4 @@
+import type { AcademicScheduleRules } from "@orahako/academic-sdk"
 import rawConfig from "./ysu.json"
 
 /**
@@ -45,6 +46,12 @@ export interface YSUConfig {
 
 /** YSU-owned school configuration contributed by this provider plugin. */
 export const YSU_CONFIG: YSUConfig = rawConfig
+/** YSU wall-clock timezone and the break rows its class-period table expects. */
+export const YSU_SCHEDULE_RULES: AcademicScheduleRules = {
+  timeZone: "Asia/Shanghai",
+  lunchAfter: 4,
+  dinnerAfter: 8,
+}
 export const YSU_SESSION_ARTIFACT_JWXT = "jwxtSession"
 export const YSU_SESSION_ARTIFACT_MOBILE = "mobileSession"
 export const YSU_SECURE_KEY_CAS_TGC = "casTgc"

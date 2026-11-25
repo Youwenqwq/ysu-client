@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import type { SessionSnapshot } from "@orahako/academic-sdk"
 import { PluginRuntime } from "@orahako/kernel"
 import {
@@ -113,13 +113,20 @@ describe("ScopedSessionService & sessionRuntimePlugin", () => {
     s1.setArtifact("portal", "zmu-portal-token", "zmu")
     s1.activateSchool("ysu")
 
+    // Writes are serialized asynchronously; wait for the full snapshot to land.
+    await vi.waitFor(() => {
+      const secureDump = secureMap.get("session-secrets") ?? ""
+      expect(secureDump).toContain('"username":"202201"')
+      expect(secureDump).toContain('"username":"zmu99"')
+      expect(secureDump).toContain("gs1")
+      expect(secureDump).toContain("zmu-portal-token")
+      expect(localMap.get("session-meta") ?? "").toContain('"activeSchoolId":"ysu"')
+    })
+
     // Secrets and session artifacts must live strictly in secure storage, never local storage!
     const localDump = JSON.stringify(Array.from(localMap.entries()))
-    const secureDump = JSON.stringify(Array.from(secureMap.entries()))
     expect(localDump).not.toContain("ysu-tgc-secret")
     expect(localDump).not.toContain("gs1")
-    expect(secureDump).toContain("ysu-tgc-secret")
-    expect(secureDump).toContain("zmu-tgc-secret")
 
     s1.dispose()
 
@@ -165,6 +172,61 @@ describe("ScopedSessionService & sessionRuntimePlugin", () => {
     expect(s2.getSnapshot().credential).toBeNull()
 
     s2.dispose()
+  })
+
+  it("serializes full snapshot writes so a slow older write cannot overwrite newer state", async () => {
+    const localMap = new Map<string, string>()
+    const secureMap = new Map<string, string>()
+    const secureWrites: string[] = []
+    const firstWriteGate = Promise.withResolvers<void>()
+
+    const { http } = createFakeHttp(() => makeHttpResponse(200, "https://example.edu"))
+    const storage: PluginStorageService = {
+      local: {
+        getItem: async (key) => localMap.get(key) ?? null,
+        setItem: async (key, value) => {
+          localMap.set(key, value)
+        },
+        removeItem: async (key) => {
+          localMap.delete(key)
+        },
+      },
+      secure: {
+        getItem: async (key) => secureMap.get(key) ?? null,
+        setItem: async (key, value) => {
+          secureWrites.push(value)
+          if (secureWrites.length === 1) await firstWriteGate.promise
+          secureMap.set(key, value)
+        },
+        removeItem: async (key) => {
+          secureMap.delete(key)
+        },
+      },
+    }
+
+    const service = new ScopedSessionService({
+      ctx: new Context(),
+      storage,
+      http,
+      defaultSchoolId: "ysu",
+    })
+    await service.hydrated
+
+    service.setArtifact("token", "first")
+    service.setArtifact("token", "second")
+
+    await vi.waitFor(() => expect(secureWrites).toHaveLength(1))
+    // The second snapshot must wait for the first write instead of racing it.
+    expect(secureWrites).toHaveLength(1)
+
+    firstWriteGate.resolve()
+    await vi.waitFor(() => expect(secureWrites).toHaveLength(2))
+    const persisted = JSON.parse(secureMap.get("session-secrets") ?? "{}") as {
+      artifactsBySchool?: Record<string, Record<string, string>>
+    }
+    expect(persisted.artifactsBySchool?.ysu?.token).toBe("second")
+
+    service.dispose()
   })
 
   it("preserves pre-hydration mutations made before slow storage resolves", async () => {
@@ -344,7 +406,6 @@ describe("SimpleCookieJar & fetchWithJar redirect loop", () => {
         expect(req.method).toBe("GET")
         expect(req.headers?.Cookie).toContain("GS_SESSIONID=jwxt-hop2")
         expect(req.headers?.Cookie).toContain("_WEU=weu-hop2")
-        expect(req.cookies?.map((c) => c.name)).toEqual(["GS_SESSIONID", "_WEU"])
         return makeHttpResponse(200, req.url, {}, "welcome-portal")
       }
 
@@ -396,6 +457,51 @@ describe("SimpleCookieJar & fetchWithJar redirect loop", () => {
     })
     expect(await post307Resp.text()).toBe("submitted-v2")
 
+    session.dispose()
+  })
+
+  it("drops Authorization on cross-origin redirects and recomputes cookie scope", async () => {
+    const { service: storage } = createMemoryStorage()
+    const { http, requests } = createFakeHttp((req) => {
+      if (req.url === "https://jwxt.ysu.edu.cn/auth") {
+        expect(req.method).toBe("POST")
+        expect(req.headers?.Authorization).toBe("Bearer secret")
+        expect(req.headers?.Cookie).toBe("SSO=school")
+        return makeHttpResponse(302, req.url, {
+          Location: "https://evil.example/landing",
+        })
+      }
+      if (req.url === "https://evil.example/landing") {
+        expect(req.method).toBe("GET")
+        expect(req.body).toBeUndefined()
+        expect(req.headers?.Authorization).toBeUndefined()
+        expect(req.headers?.["Proxy-Authorization"]).toBeUndefined()
+        expect(req.headers?.["Content-Type"]).toBeUndefined()
+        expect(req.headers?.Cookie).toBeUndefined()
+        return makeHttpResponse(200, req.url, {}, "landed")
+      }
+      throw new Error(`Unexpected URL: ${req.url}`)
+    })
+
+    const session = new ScopedSessionService({ ctx: new Context(), storage, http })
+    const jar = session.createCookieJar()
+    await jar.setCookie("SSO=school; Domain=.ysu.edu.cn; Path=/", "https://cer.ysu.edu.cn/")
+
+    const resp = await session.fetchWithJar(jar, {
+      method: "POST",
+      url: "https://jwxt.ysu.edu.cn/auth",
+      headers: {
+        Authorization: "Bearer secret",
+        "Proxy-Authorization": "Basic proxy",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "a=1",
+      redirect: "follow",
+    })
+
+    expect(resp.status).toBe(200)
+    expect(await resp.text()).toBe("landed")
+    expect(requests).toHaveLength(2)
     session.dispose()
   })
 

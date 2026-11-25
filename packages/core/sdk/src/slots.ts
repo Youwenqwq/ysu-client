@@ -177,7 +177,8 @@ export type SlotRegistrationSpec<
   readonly dictionary?: Dict
   readonly children?: Children
   readonly store?: Store
-  readonly inject?: (ctx: Context) => ValidInject<I>
+  /** Returns renderer data from the `apply` closure; no Context escapes. */
+  readonly inject?: () => ValidInject<I>
 } & SlotKeyField<S>
 
 export interface PluginSlotDeclaration {
@@ -203,6 +204,14 @@ export interface SlotContribution {
 export type SlotInjectCallback = (ctx: Context) => void | (() => void)
 
 export interface PluginSlotService {
+  /**
+   * Read-only declaration/contribution snapshot. Feature plugins may observe
+   * shared slots (for example notification channels) without touching the
+   * root registry management API.
+   */
+  readonly state: ObservableSource<PluginSlotRegistrySnapshot>
+  getSnapshot(): PluginSlotRegistrySnapshot
+  subscribe(listener: () => void): () => void
   register<
     S extends SlotName,
     Dict = undefined,

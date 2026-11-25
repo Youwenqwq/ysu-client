@@ -438,6 +438,7 @@ describe("@orahako/plugin-comprehensive", () => {
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },

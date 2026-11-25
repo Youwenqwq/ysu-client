@@ -2,12 +2,7 @@ import type { Context } from "@cordisjs/core"
 import type { PluginManifest } from "./manifest"
 import { isScopedPluginService, PLUGIN_SERVICE_SCOPE } from "./plugin"
 import type { PluginStorageService } from "./services"
-import type {
-  ChildrenSpec,
-  PluginSlotDeclaration,
-  PluginSlotRegistryService,
-  SlotName,
-} from "./slots"
+import type { ChildrenSpec, PluginSlotDeclaration, PluginSlotService, SlotName } from "./slots"
 import type { StoreDefinition } from "./store"
 
 /** Runtime helper shared by the UI, settings and slot registries. */
@@ -41,18 +36,36 @@ export function isStoreDefinition(
   )
 }
 
-export function isSlotRegistryService(value: unknown): value is PluginSlotRegistryService {
+export function isPluginSlotService(value: unknown): value is PluginSlotService {
   return (
     typeof value === "object" &&
     value !== null &&
     "declare" in value &&
-    typeof value.declare === "function"
+    typeof value.declare === "function" &&
+    "register" in value &&
+    typeof value.register === "function" &&
+    "getSnapshot" in value &&
+    typeof value.getSnapshot === "function"
   )
 }
 
-function resolveRootSlotRegistry(ctx: Context): PluginSlotRegistryService | undefined {
-  const raw: unknown = ctx.root.get("slots")
-  return isSlotRegistryService(raw) ? raw : undefined
+/**
+ * Reads the slot service visible to the registering plugin. When the kernel
+ * isolated a scoped facade for a declared `slots` dependency it is used as-is;
+ * a raw root service is bound to the caller's identity once. Root internals
+ * remain private to the caller's own service resolution - never `ctx.root`.
+ */
+export function resolvePluginSlots(
+  ctx: Context,
+  manifest: PluginManifest
+): PluginSlotService | undefined {
+  const raw: unknown = ctx.get("slots")
+  if (!raw) return undefined
+  if (isScopedPluginService(raw)) {
+    const scoped = raw[PLUGIN_SERVICE_SCOPE](ctx, manifest)
+    return isPluginSlotService(scoped) ? scoped : undefined
+  }
+  return isPluginSlotService(raw) ? raw : undefined
 }
 
 function toDeclarations(children: ChildrenSpec): PluginSlotDeclaration[] {
@@ -67,73 +80,62 @@ function toDeclarations(children: ChildrenSpec): PluginSlotDeclaration[] {
 
 /**
  * Declares every child slot owned by a page, settings category or shell that
- * opted into automatic declaration. Duplicate declarations intentionally throw.
+ * opted into automatic declaration. Declarations are owned exclusively: a
+ * name already declared by another contribution throws, while a shell
+ * sharing a public slot should claim it through `slots.declare` itself and
+ * use `declareChildren: false`.
  */
 export function declareContributionChildren(
-  ctx: Context | undefined,
+  slots: PluginSlotService | undefined,
   children: ChildrenSpec | undefined
 ): () => void {
-  if (!ctx || !children) return () => {}
+  if (!children) return () => {}
   const entries = toDeclarations(children)
   if (entries.length === 0) return () => {}
+  // Registries that depend on `slots` via `optionalInject` are remounted by the
+  // kernel when the service appears, so an early registration without slots is
+  // replayed against the eventual service instead of failing startup.
+  if (!slots) return () => {}
+
+  const disposers: Array<() => void> = []
+  try {
+    for (const entry of entries) {
+      if (
+        slots.getSnapshot().declarations.some((declaration) => declaration.name === entry.name)
+      ) {
+        throw new Error(`Plugin slot already declared: ${entry.name}`)
+      }
+      disposers.push(slots.declare(entry))
+    }
+  } catch (error) {
+    for (let i = disposers.length - 1; i >= 0; i -= 1) {
+      disposers[i]?.()
+    }
+    throw error
+  }
 
   let disposed = false
-  let childDisposers: Array<() => void> = []
-  let stopServiceListener: (() => void) | undefined
-
-  const applyDeclarations = (slots: PluginSlotRegistryService): void => {
-    const created: Array<() => void> = []
-    try {
-      for (const entry of entries) {
-        created.push(slots.declare(entry))
-      }
-      childDisposers = created
-    } catch (error) {
-      for (let i = created.length - 1; i >= 0; i -= 1) {
-        created[i]?.()
-      }
-      throw error
-    }
-  }
-
-  const rootSlots = resolveRootSlotRegistry(ctx)
-  if (rootSlots) {
-    applyDeclarations(rootSlots)
-  } else {
-    stopServiceListener = ctx.on("internal/service", (serviceName: string) => {
-      if (disposed || serviceName !== "slots" || childDisposers.length > 0) return
-      const lateSlots = resolveRootSlotRegistry(ctx)
-      if (lateSlots) {
-        applyDeclarations(lateSlots)
-      }
-    })
-  }
-
   return () => {
     if (disposed) return
     disposed = true
-    stopServiceListener?.()
-    stopServiceListener = undefined
-    const toDispose = childDisposers
-    childDisposers = []
-    for (let i = toDispose.length - 1; i >= 0; i -= 1) {
-      toDispose[i]?.()
+    for (let i = disposers.length - 1; i >= 0; i -= 1) {
+      disposers[i]?.()
     }
+    disposers.length = 0
   }
 }
 
 /**
  * Validates a shell's `children` when `declareChildren` is false. The shell must
- * already have claimed the same name/kind through the scoped slot service.
+ * already have claimed the same name/kind through `slots.declare`.
  */
 export function assertContributionChildrenDeclared(
-  ctx: Context | undefined,
+  slots: PluginSlotService | undefined,
   children: ChildrenSpec | undefined
 ): void {
   if (!children) return
   const entries = toDeclarations(children)
   if (entries.length === 0) return
-  const slots = ctx ? resolveRootSlotRegistry(ctx) : undefined
   if (!slots) {
     throw new Error("Slot registry is unavailable while validating shell child slots")
   }

@@ -4,6 +4,7 @@ import {
   isProviderError,
   ProviderErrorCode,
   type Exam,
+  type ProviderRuntimeSnapshot,
   type QuerySnapshot,
 } from "@orahako/academic-sdk"
 import type { DerivedComponentProps, ObservableSource, SlotComponent } from "@orahako/sdk"
@@ -30,6 +31,7 @@ function hasErrorCode(error: Error | null, code: ProviderErrorCode): boolean {
 export interface UpcomingExamsWidgetInject {
   readonly hooks: {
     readonly exams: ObservableSource<QuerySnapshot<Exam[]>>
+    readonly provider: ObservableSource<ProviderRuntimeSnapshot>
   }
   readonly openExams: () => void
 }
@@ -45,11 +47,13 @@ export type UpcomingExamsWidgetProps = DerivedComponentProps<
 export const UpcomingExamsWidget: SlotComponent<UpcomingExamsWidgetProps> = (props) => {
   const { t } = props
   const examsQuery = props.useExams()
+  const providerSnap = props.useProvider()
   const now = new Date()
+  const timeZone = providerSnap.provider?.slices.timetable?.scheduleRules?.timeZone
 
   const upcomingExams = (examsQuery.data ?? [])
-    .filter((exam) => !isExamCompleted(exam, now))
-    .sort(compareExamStartTime)
+    .filter((exam) => !isExamCompleted(exam, now, timeZone))
+    .sort((a, b) => compareExamStartTime(a, b, timeZone))
 
   const error = examsQuery.error
   const authExpired =
@@ -118,7 +122,7 @@ export const UpcomingExamsWidget: SlotComponent<UpcomingExamsWidgetProps> = (pro
             {upcomingExams.length > 0 && (
               <div className="flex flex-col gap-3">
                 {upcomingExams.map((exam, index) => {
-                  const dayDiff = computeExamDayDiff(exam, now)
+                  const dayDiff = computeExamDayDiff(exam, now, timeZone)
                   return (
                     <div
                       key={`${exam.name}-${exam.startAt ?? ""}-${index}`}

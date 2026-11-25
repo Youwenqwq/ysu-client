@@ -9,6 +9,9 @@ import {
   type PluginManifest,
   type PluginNativeService,
   type PluginPackageRuntime,
+  type PluginPageContribution,
+  type PluginUIService,
+  type PluginUIServiceSnapshot,
 } from "@orahako/sdk"
 import {
   beginPluginBoot,
@@ -761,5 +764,185 @@ describe("PluginHost Cordis-native boot, bundles, and recovery", () => {
       startupPage: "overview",
     })
     host.dispose()
+  })
+
+  it("awaits runtime cleanup before revoking module URLs and closing the package store", async () => {
+    const events: string[] = []
+    const { promise: gate, resolve: release } = Promise.withResolvers<void>()
+    const cleanupPlugin = definePlugin({
+      manifest: makeManifest("app.cleanup"),
+      apply(ctx) {
+        ctx.effect(() => async () => {
+          events.push("cleanup:start")
+          await gate
+          events.push("cleanup:end")
+        })
+      },
+    })
+
+    let urlCounter = 0
+    vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      const code = blob instanceof Blob ? "export default { apply() {} }" : ""
+      return `data:text/javascript;base64,${btoa(code)}#dispose-${++urlCounter}`
+    })
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation((url) => {
+      events.push(`revoke:${url}`)
+    })
+
+    const backend = createMemoryPackageBackend()
+    const closeBackend = backend.close.bind(backend)
+    backend.close = () => {
+      events.push("store:close")
+      closeBackend()
+    }
+
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b-dispose",
+        composition: {
+          id: "test.dispose",
+          version: 1,
+          defaults: {},
+          plugins: [{ id: cleanupPlugin.manifest.id }],
+        },
+        plugins: [cleanupPlugin],
+      },
+      {
+        platformModules: { "@orahako/sdk": SdkNamespace },
+        packages: new PluginPackageStore({ backend }),
+      }
+    )
+    await host.bootstrap()
+
+    const encoder = new TextEncoder()
+    const zipBytes = zipSync({
+      "manifest.json": encoder.encode(
+        JSON.stringify({
+          id: "ext.dispose",
+          name: "Dispose",
+          version: "1.0.0",
+          apiVersion: 1,
+          kind: "feature",
+          entry: "index.js",
+        })
+      ),
+      "index.js": encoder.encode("export default { apply() {} }\n"),
+    })
+    await host.install(zipBytes)
+
+    const disposal = host.dispose()
+    await Promise.resolve()
+    expect(events).toEqual(["cleanup:start"])
+
+    release()
+    await disposal
+    expect(events.slice(0, 2)).toEqual(["cleanup:start", "cleanup:end"])
+    const revocations = events.filter((event) => event.startsWith("revoke:"))
+    expect(revocations).toHaveLength(2)
+    expect(events.at(-1)).toBe("store:close")
+    expect(events.indexOf("cleanup:end")).toBeLessThan(events.indexOf(revocations[0]!))
+  })
+
+  it("clears uninstalled plugin theme and startup routes without touching the active shell", async () => {
+    let urlCounter = 0
+    vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      const code =
+        blob instanceof Blob
+          ? "export default { apply(ctx) { ctx.ui.registerPage({ id: 'settings', route: 'ext-preferences' }, () => null) } }"
+          : ""
+      return `data:text/javascript;base64,${btoa(code)}#preferences-${++urlCounter}`
+    })
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {})
+
+    const pages: PluginPageContribution[] = []
+    const snapshot = (): PluginUIServiceSnapshot => ({
+      pages,
+      navigation: [],
+      themes: [],
+      shells: [],
+    })
+    const subscribe = () => () => {}
+    // Test double: uninstall only reads the page snapshot.
+    const uiService = {
+      state: { getSnapshot: snapshot, subscribe },
+      getSnapshot: snapshot,
+      subscribe,
+      findPage: (pluginId: string, pageId: string) =>
+        pages.find((page) => page.pluginId === pluginId && page.id === pageId),
+      registerPage(spec: { id: string; route?: string }) {
+        const page: PluginPageContribution = {
+          id: spec.id,
+          pluginId: "ext.preferences",
+          ...(spec.route !== undefined ? { route: spec.route } : {}),
+          component: () => null,
+          generation: pages.length + 1,
+        }
+        pages.push(page)
+        return () => {
+          const index = pages.indexOf(page)
+          if (index >= 0) pages.splice(index, 1)
+        }
+      },
+      registerNavigation: () => () => {},
+      registerTheme: () => () => {},
+      registerShell: () => () => {},
+    } as unknown as PluginUIService
+
+    const uiPlugin = definePlugin({
+      manifest: makeManifest("app.ui", { kind: "runtime", provides: ["ui"] }),
+      apply(ctx) {
+        ctx.set("ui", uiService)
+      },
+    })
+
+    const host = new PluginHost(
+      {
+        appVersion: "0.17.0",
+        appBuild: "b-preferences-cleanup",
+        composition: {
+          id: "test.preferences-cleanup",
+          version: 1,
+          defaults: {},
+          plugins: [{ id: uiPlugin.manifest.id }],
+        },
+        plugins: [uiPlugin],
+      },
+      {
+        platformModules: {},
+        packages: new PluginPackageStore({ backend: createMemoryPackageBackend() }),
+      }
+    )
+    await host.bootstrap()
+
+    const encoder = new TextEncoder()
+    const zipBytes = zipSync({
+      "manifest.json": encoder.encode(
+        JSON.stringify({
+          id: "ext.preferences",
+          name: "Preferences",
+          version: "1.0.0",
+          apiVersion: 1,
+          kind: "feature",
+          entry: "index.js",
+          inject: ["ui"],
+        })
+      ),
+      "index.js": encoder.encode(
+        "export default { apply(ctx) { ctx.ui.registerPage({ id: 'settings', route: 'ext-preferences' }, () => null) } }\n"
+      ),
+    })
+    await host.install(zipBytes)
+    expect(pages).toHaveLength(1)
+
+    host.preferences.setActiveShell("app.shell:default")
+    host.preferences.setActiveTheme("ext.preferences:sakura")
+    host.preferences.setStartupPage("ext-preferences")
+
+    await host.uninstall("ext.preferences")
+    expect(host.preferences.getActiveTheme()).toBeUndefined()
+    expect(host.preferences.getStartupPage()).toBeUndefined()
+    expect(host.preferences.getActiveShell()).toBe("app.shell:default")
+    await host.dispose()
   })
 })

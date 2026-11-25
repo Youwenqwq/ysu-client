@@ -6,16 +6,17 @@ import type {
 } from "@orahako/academic-sdk"
 import {
   createObservableSource,
-  isScopedPluginService,
   PLUGIN_SERVICE_SCOPE,
   resolveDictionaryMessage,
+  resolvePluginSlots,
+  resolvePluginStorage,
   trackPluginRegistration,
   type ChildrenSpec,
   type DefinedDictionary,
   type DerivedComponentProps,
   type DictionaryMessages,
   type ObservableSource,
-  type PluginI18nRegistryService,
+  type PluginI18nService,
   type PluginLocale,
   type PluginManifest,
   type PluginSlotService,
@@ -28,47 +29,6 @@ import {
 import "./slots"
 
 const DEFAULT_WIDGET_ORDER = 100
-
-function isPluginStorageService(value: unknown): value is PluginStorageService {
-  return typeof value === "object" && value !== null && "local" in value && "secure" in value
-}
-
-function resolveRegistrantStorage(
-  ctx: Context,
-  manifest: PluginManifest
-): PluginStorageService | undefined {
-  const raw: unknown = ctx.get("storage")
-  if (!raw) return undefined
-  if (isScopedPluginService(raw)) {
-    const scoped = raw[PLUGIN_SERVICE_SCOPE](ctx, manifest)
-    return isPluginStorageService(scoped) ? scoped : undefined
-  }
-  return isPluginStorageService(raw) ? raw : undefined
-}
-
-function isPluginSlotService(value: unknown): value is PluginSlotService {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "register" in value &&
-    typeof value.register === "function" &&
-    "inject" in value &&
-    typeof value.inject === "function"
-  )
-}
-
-function resolveRegistrantSlots(
-  ctx: Context,
-  manifest: PluginManifest
-): PluginSlotService | undefined {
-  const raw: unknown = ctx.get("slots") ?? ctx.root.get("slots")
-  if (!raw) return undefined
-  if (isScopedPluginService(raw)) {
-    const scoped = raw[PLUGIN_SERVICE_SCOPE](ctx, manifest)
-    return isPluginSlotService(scoped) ? scoped : undefined
-  }
-  return isPluginSlotService(raw) ? raw : undefined
-}
 
 function isStoreDefinition(
   value: unknown
@@ -97,7 +57,7 @@ export function resolveOverviewWidgetText(
   widget: OverviewWidgetContribution,
   kind: "title" | "description",
   locale: PluginLocale,
-  i18nRegistry?: PluginI18nRegistryService
+  i18nRegistry?: Pick<PluginI18nService, "translate">
 ): string {
   const key = kind === "title" ? widget.titleKey : widget.descriptionKey
   const literal = kind === "title" ? widget.title : widget.description
@@ -131,7 +91,10 @@ export class OverviewRegistry implements OverviewService, ScopedPluginService<Ov
   private readonly stateSource = createObservableSource<readonly OverviewWidgetContribution[]>([])
   private readonly widgets = new Map<string, OverviewWidgetContribution>()
 
-  constructor() {
+  constructor(
+    private readonly ownerSlots: PluginSlotService,
+    private readonly ownerStorage: PluginStorageService
+  ) {
     this.state = {
       getSnapshot: this.stateSource.getSnapshot,
       subscribe: this.stateSource.subscribe,
@@ -139,14 +102,25 @@ export class OverviewRegistry implements OverviewService, ScopedPluginService<Ov
   }
 
   [PLUGIN_SERVICE_SCOPE](ctx: Context, manifest: PluginManifest): OverviewService {
-    return this.createScopedFacade(ctx, manifest)
+    // Consumers receive slots/storage scoped to their own plugin identity so
+    // widget contributions and stores keep the consumer's namespace.
+    return this.createFacade(
+      ctx,
+      manifest,
+      resolvePluginSlots(ctx, manifest) ?? this.ownerSlots,
+      resolvePluginStorage(ctx, manifest) ?? this.ownerStorage
+    )
   }
 
-  createScopedFacade(
-    ctx: Pick<Context, "effect"> & Partial<Pick<Context, "get" | "root" | "on">>,
+  createScopedFacade(ctx: Pick<Context, "effect">, manifest: PluginManifest): OverviewService {
+    return this.createFacade(ctx, manifest, this.ownerSlots, this.ownerStorage)
+  }
+
+  private createFacade(
+    ctx: Pick<Context, "effect">,
     manifest: PluginManifest,
-    explicitSlots?: PluginSlotService,
-    explicitStorage?: PluginStorageService
+    slots: PluginSlotService,
+    storage: PluginStorageService
   ): OverviewService {
     const registerScoped = <
       Dict = undefined,
@@ -164,7 +138,7 @@ export class OverviewRegistry implements OverviewService, ScopedPluginService<Ov
       >
     ): (() => void) =>
       trackPluginRegistration(ctx, () =>
-        this.registerInternal(manifest, ctx, spec, maybeComponent, explicitSlots, explicitStorage)
+        this.registerInternal(manifest, spec, maybeComponent, slots, storage)
       )
 
     return {
@@ -221,7 +195,13 @@ export class OverviewRegistry implements OverviewService, ScopedPluginService<Ov
       NoInfer<DerivedComponentProps<Record<string, never>, Dict, Children, Store, I>>
     >
   ): () => void {
-    return this.registerInternal(undefined, undefined, spec, maybeComponent)
+    return this.registerInternal(
+      undefined,
+      spec,
+      maybeComponent,
+      this.ownerSlots,
+      this.ownerStorage
+    )
   }
 
   private registerInternal<
@@ -231,19 +211,16 @@ export class OverviewRegistry implements OverviewService, ScopedPluginService<Ov
     I = undefined,
   >(
     manifest: PluginManifest | undefined,
-    registrantCtx:
-      | (Pick<Context, "effect"> & Partial<Pick<Context, "get" | "root" | "on">>)
-      | undefined,
     spec: OverviewWidgetSpec<Dict, Children, Store, I> & {
       readonly component?: SlotComponent<
         NoInfer<DerivedComponentProps<Record<string, never>, Dict, Children, Store, I>>
       >
     },
-    maybeComponent?: SlotComponent<
+    maybeComponent: SlotComponent<
       NoInfer<DerivedComponentProps<Record<string, never>, Dict, Children, Store, I>>
-    >,
-    explicitSlots?: PluginSlotService,
-    explicitStorage?: PluginStorageService
+    > | undefined,
+    explicitSlots: PluginSlotService,
+    explicitStorage: PluginStorageService
   ): () => void {
     if (!spec.id) {
       throw new Error("Overview widget id must not be empty")
@@ -259,25 +236,15 @@ export class OverviewRegistry implements OverviewService, ScopedPluginService<Ov
       throw new Error(`Overview widget already registered: ${slotKey}`)
     }
 
-    const fullRegistrantCtx: Context | undefined =
-      registrantCtx && "get" in registrantCtx && "root" in registrantCtx
-        ? (registrantCtx as Context)
-        : undefined
-
     let ownedStore: StoreInstance<unknown, Record<string, never>> | undefined
     let resolvedStore: unknown = spec.store
     if (isStoreDefinition(spec.store)) {
-      const storage =
-        explicitStorage ??
-        (fullRegistrantCtx && manifest
-          ? resolveRegistrantStorage(fullRegistrantCtx, manifest)
-          : undefined)
-      ownedStore = spec.store.create(storage)
+      ownedStore = spec.store.create(explicitStorage)
       resolvedStore = ownedStore
     }
 
-    const boundInject: ((ctx: Context) => unknown) | undefined = spec.inject
-      ? (fallbackCtx: Context) => spec.inject!(fullRegistrantCtx ?? fallbackCtx)
+    const boundInject: (() => unknown) | undefined = spec.inject
+      ? () => spec.inject!()
       : undefined
 
     const contribution: OverviewWidgetContribution = {
@@ -301,7 +268,6 @@ export class OverviewRegistry implements OverviewService, ScopedPluginService<Ov
     }
 
     let disposeSlotInject: (() => void) | undefined
-    let stopLateSlotsWatcher: (() => void) | undefined
 
     const attachToSlotService = (slots: PluginSlotService): void => {
       const slotComponent: SlotComponent<
@@ -330,31 +296,11 @@ export class OverviewRegistry implements OverviewService, ScopedPluginService<Ov
       )
     }
 
-    if (explicitSlots) {
-      try {
-        attachToSlotService(explicitSlots)
-      } catch (error) {
-        ownedStore?.dispose()
-        throw error
-      }
-    } else if (fullRegistrantCtx && manifest) {
-      const immediateSlots = resolveRegistrantSlots(fullRegistrantCtx, manifest)
-      if (immediateSlots) {
-        try {
-          attachToSlotService(immediateSlots)
-        } catch (error) {
-          ownedStore?.dispose()
-          throw error
-        }
-      } else {
-        stopLateSlotsWatcher = fullRegistrantCtx.on("internal/service", (serviceName: string) => {
-          if (serviceName !== "slots" || disposeSlotInject) return
-          const lateSlots = resolveRegistrantSlots(fullRegistrantCtx, manifest)
-          if (lateSlots) {
-            attachToSlotService(lateSlots)
-          }
-        })
-      }
+    try {
+      attachToSlotService(explicitSlots)
+    } catch (error) {
+      ownedStore?.dispose()
+      throw error
     }
 
     this.widgets.set(slotKey, contribution)
@@ -364,8 +310,6 @@ export class OverviewRegistry implements OverviewService, ScopedPluginService<Ov
     return () => {
       if (disposed) return
       disposed = true
-      stopLateSlotsWatcher?.()
-      stopLateSlotsWatcher = undefined
       disposeSlotInject?.()
       disposeSlotInject = undefined
       if (this.widgets.get(slotKey) === contribution) {

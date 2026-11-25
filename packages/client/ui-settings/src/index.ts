@@ -1,7 +1,6 @@
 import {
   definePlugin,
   PLUGIN_API_VERSION,
-  pluginPageHref,
   type ObservableSource,
   type PluginHostPreferenceSnapshot,
   type PluginLocale,
@@ -111,15 +110,9 @@ export const uiSettingsPlugin = definePlugin({
             ctx.i18n.setLocale(locale)
           },
           categoryHref: (categoryId: string) =>
-            ctx.router.href(
-              pluginPageHref(SETTINGS_PLUGIN_ID, "category", { category: categoryId })
-            ),
+            ctx.router.href({ route: "settings-category", params: { category: categoryId } }),
           navigateToCategory: (categoryId: string) => {
-            ctx.router.push({
-              pluginId: SETTINGS_PLUGIN_ID,
-              pageId: "category",
-              params: { category: categoryId },
-            })
+            ctx.router.push({ route: "settings-category", params: { category: categoryId } })
           },
           aboutHref: ctx.router.href({ route: "about" }),
           navigateToAbout: () => {
@@ -143,6 +136,7 @@ export const uiSettingsPlugin = definePlugin({
     ctx.ui.registerPage(
       {
         id: "category",
+        route: "settings-category",
         title: "插件设置",
         titleKey: "sectionPluginSettings",
         requiresProvider: false,

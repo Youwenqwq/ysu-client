@@ -5,8 +5,6 @@ import {
   PLUGIN_API_VERSION,
   WIDGETS_EXAM_CAPABILITY,
   WIDGETS_GENERIC_CAPABILITY,
-  type Context,
-  type PluginAssetService,
   type PluginManifest,
 } from "@orahako/sdk"
 import { examsDictionary, type ExamsDictionary } from "./dictionary"
@@ -61,7 +59,6 @@ const examsManifest: PluginManifest = {
     "session",
     "query",
     "notifications",
-    "overview",
     "native",
     "widgets",
   ],
@@ -79,10 +76,10 @@ export const examsPlugin = definePlugin({
     "session",
     "query",
     "notifications",
-    "overview",
     "native",
     "widgets",
   ] as const,
+  optionalInject: ["overview", "assets"] as const,
   apply(ctx) {
     const {
       ui,
@@ -95,6 +92,7 @@ export const examsPlugin = definePlugin({
       query,
       notifications,
       overview,
+      assets,
       widgets,
     } = ctx
 
@@ -146,6 +144,7 @@ export const examsPlugin = definePlugin({
       unregisterChannel?.()
       unregisterChannel = notifications.registerChannel({
         id: "exams",
+        order: 20,
         slice: "exams",
         toPollingFlag: (enabled) => {
           const active = enabled && notifyExams
@@ -177,12 +176,10 @@ export const examsPlugin = definePlugin({
       }
     })
 
-    const resolveWidgetPreviewSrc = (fullCtx: Context, fileName: string): string => {
-      const assets: PluginAssetService | undefined = fullCtx.get("assets")
-      return assets?.url(`widgets/${fileName}`) ?? router.href(`/widgets/${fileName}`)
-    }
+    const resolveWidgetPreviewSrc = (fileName: string): string =>
+      assets?.url(`widgets/${fileName}`) ?? router.href(`/widgets/${fileName}`)
 
-    overview.registerWidget(
+    overview?.registerWidget(
       {
         id: "upcoming-exams",
         title: "近期考试",
@@ -198,6 +195,7 @@ export const examsPlugin = definePlugin({
         inject: (): UpcomingExamsWidgetInject => ({
           hooks: {
             exams: defaultExamsSource,
+            provider: provider.state,
           },
           openExams: () => {
             router.push({ route: "exams" })
@@ -232,8 +230,8 @@ export const examsPlugin = definePlugin({
           slot: "settings.widgets",
           order: 20,
           dictionary: examsDictionary,
-          inject: (fullCtx: Context): ExamWidgetPinInject => ({
-            previewSrc: resolveWidgetPreviewSrc(fullCtx, "exam.png"),
+          inject: (): ExamWidgetPinInject => ({
+            previewSrc: resolveWidgetPreviewSrc("exam.png"),
             requestPin: (widget) => widgets.requestPin(widget),
           }),
         },
@@ -245,8 +243,8 @@ export const examsPlugin = definePlugin({
           slot: "settings.widgets",
           order: 20,
           dictionary: examsDictionary,
-          inject: (fullCtx: Context): ExamWidgetPinInject => ({
-            previewSrc: resolveWidgetPreviewSrc(fullCtx, "exam-compact.png"),
+          inject: (): ExamWidgetPinInject => ({
+            previewSrc: resolveWidgetPreviewSrc("exam-compact.png"),
             requestPin: (widget) => widgets.requestPin(widget),
           }),
         },
@@ -291,6 +289,7 @@ export const examsPlugin = definePlugin({
         inject: (): ExamsPageInject => ({
           hooks: {
             exams: pageExamsController.source,
+            provider: provider.state,
             queriedTerm: pageExamsController.term,
           },
           queryBySemester: async (semester: string) => {

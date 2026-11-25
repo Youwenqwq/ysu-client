@@ -10,8 +10,6 @@ import {
 import {
   definePlugin,
   PLUGIN_API_VERSION,
-  type Context,
-  type PluginI18nRegistryService,
   type PluginLocale,
   type PluginManifest,
 } from "@orahako/sdk"
@@ -69,15 +67,6 @@ export {
   type ResolvedWidgetMeta,
 }
 
-function isI18nRegistryService(value: unknown): value is PluginI18nRegistryService {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "translate" in value &&
-    typeof value.translate === "function"
-  )
-}
-
 const overviewManifest: PluginManifest = {
   id: OVERVIEW_PLUGIN_ID,
   name: "总览",
@@ -124,11 +113,11 @@ export const overviewPlugin = definePlugin({
     query.registerPolicy("current-week", { ttl: SHORT_TTL_MS, persist: true })
     query.registerPolicy("term-calendar", { ttl: LONG_TTL_MS, persist: true })
 
-    const registry = new OverviewRegistry()
+    const registry = new OverviewRegistry(slots, storage)
     ctx.set("overview", registry)
 
     const layoutStore = overviewLayoutStore.create(storage)
-    const ownOverview = registry.createScopedFacade(ctx, overviewManifest, slots, storage)
+    const ownOverview = registry.createScopedFacade(ctx, overviewManifest)
 
     const openSettingsRoute = (): void => {
       if (navigation.resolve("settings")) {
@@ -153,21 +142,17 @@ export const overviewPlugin = definePlugin({
         dictionary: overviewDictionary,
         children: OVERVIEW_PAGE_CHILDREN,
         store: layoutStore,
-        inject: (fullCtx: Context): OverviewPageInject => {
-          const rootI18n: unknown = fullCtx.root.get("i18n")
-          const i18nRegistry = isI18nRegistryService(rootI18n) ? rootI18n : undefined
-          return {
-            hooks: {
-              layoutHydrated: layoutStore.hydrated,
-              widgets: registry.state,
-              provider: provider.state,
-            },
-            pluginId: OVERVIEW_PLUGIN_ID,
-            resolveWidgetTitle: (widget: OverviewWidgetContribution, locale: PluginLocale) =>
-              resolveOverviewWidgetText(widget, "title", locale, i18nRegistry),
-            openSettings: openSettingsRoute,
-          }
-        },
+        inject: (): OverviewPageInject => ({
+          hooks: {
+            layoutHydrated: layoutStore.hydrated,
+            widgets: registry.state,
+            provider: provider.state,
+          },
+          pluginId: OVERVIEW_PLUGIN_ID,
+          resolveWidgetTitle: (widget: OverviewWidgetContribution, locale: PluginLocale) =>
+            resolveOverviewWidgetText(widget, "title", locale, i18n),
+          openSettings: openSettingsRoute,
+        }),
       },
       OverviewPage
     )
@@ -206,29 +191,25 @@ export const overviewPlugin = definePlugin({
         icon: LayoutDashboard,
         dictionary: overviewDictionary,
         store: layoutStore,
-        inject: (fullCtx: Context): OverviewEditorInject => {
-          const rootI18n: unknown = fullCtx.root.get("i18n")
-          const i18nRegistry = isI18nRegistryService(rootI18n) ? rootI18n : undefined
-          return {
-            hooks: {
-              layoutHydrated: layoutStore.hydrated,
-              widgets: registry.state,
-              provider: provider.state,
-            },
-            pluginId: OVERVIEW_PLUGIN_ID,
-            resolveWidgetMeta: (
-              widget: OverviewWidgetContribution,
-              locale: PluginLocale
-            ): ResolvedWidgetMeta => ({
-              title: resolveOverviewWidgetText(widget, "title", locale, i18nRegistry),
-              description: resolveOverviewWidgetText(widget, "description", locale, i18nRegistry),
-              icon: widget.icon,
-              region: widget.region,
-            }),
-            openOverview: openOverviewRoute,
-            openSettings: openSettingsRoute,
-          }
-        },
+        inject: (): OverviewEditorInject => ({
+          hooks: {
+            layoutHydrated: layoutStore.hydrated,
+            widgets: registry.state,
+            provider: provider.state,
+          },
+          pluginId: OVERVIEW_PLUGIN_ID,
+          resolveWidgetMeta: (
+            widget: OverviewWidgetContribution,
+            locale: PluginLocale
+          ): ResolvedWidgetMeta => ({
+            title: resolveOverviewWidgetText(widget, "title", locale, i18n),
+            description: resolveOverviewWidgetText(widget, "description", locale, i18n),
+            icon: widget.icon,
+            region: widget.region,
+          }),
+          openOverview: openOverviewRoute,
+          openSettings: openSettingsRoute,
+        }),
       },
       OverviewLayoutEditor
     )
@@ -315,6 +296,7 @@ export const overviewPlugin = definePlugin({
           hooks: {
             currentWeek: currentWeekSource,
             termCalendar: termCalendarSource,
+            provider: provider.state,
           },
         }),
       },

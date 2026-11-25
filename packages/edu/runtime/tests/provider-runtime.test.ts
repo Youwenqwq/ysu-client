@@ -20,6 +20,7 @@ type ControllableProvider = SchoolProvider & {
   initialize: Mock<() => Promise<void>>
   reset: Mock<() => Promise<void>>
   logout: Mock<() => Promise<void>>
+  dispose: Mock<() => Promise<void>>
   relogin: Mock<() => Promise<boolean>>
 }
 
@@ -27,6 +28,7 @@ function makeProvider(id: string, name = id): ControllableProvider {
   const initialize = vi.fn(async () => {})
   const reset = vi.fn(async () => {})
   const logout = vi.fn(async () => {})
+  const dispose = vi.fn(async () => {})
   const relogin = vi.fn(async () => true)
 
   const base = defineSchoolProvider({
@@ -36,9 +38,10 @@ function makeProvider(id: string, name = id): ControllableProvider {
     initialize,
     reset,
     logout,
+    dispose,
     relogin,
   })
-  return { ...base, initialize, reset, logout, relogin }
+  return { ...base, initialize, reset, logout, dispose, relogin }
 }
 
 function makeMockSession(initialSchoolId: string | null = null): SessionService {
@@ -151,6 +154,67 @@ describe("ProviderRuntime & providerRuntimePlugin", () => {
     runtime.dispose()
   })
 
+  it("waits for the retired provider's async dispose before initializing its replacement", async () => {
+    const registry = new ProviderPluginRegistry()
+    const ysu = makeProvider("ysu")
+    const zmu = makeProvider("zmu")
+    const disposeGate = Promise.withResolvers<void>()
+    ysu.dispose.mockReturnValueOnce(disposeGate.promise)
+    registry.registerProvider("ysu", () => ysu)
+    registry.registerProvider("zmu", () => zmu)
+
+    const session = makeMockSession("ysu")
+    const runtime = new ProviderRuntime({ ctx: new Context(), registry, session })
+
+    await runtime.initialize()
+    expect(runtime.getSnapshot().status).toBe("ready")
+
+    expect(runtime.selectSchool("zmu")).toBe(zmu)
+    const replacementInit = runtime.initialize()
+
+    // The replacement must not touch provider state while the old instance is
+    // still disposing; user-facing reset/logout paths must not be reused.
+    expect(zmu.initialize).not.toHaveBeenCalled()
+    expect(ysu.reset).not.toHaveBeenCalled()
+    expect(ysu.logout).not.toHaveBeenCalled()
+
+    disposeGate.resolve()
+    await expect(replacementInit).resolves.toBe(zmu)
+    expect(ysu.dispose).toHaveBeenCalledTimes(1)
+    expect(zmu.initialize).toHaveBeenCalledTimes(1)
+    expect(runtime.getSnapshot()).toMatchObject({ status: "ready", provider: zmu })
+
+    runtime.dispose()
+  })
+
+  it("keeps the current ready provider untouched when a school switch factory fails", async () => {
+    const registry = new ProviderPluginRegistry()
+    const ysu = makeProvider("ysu")
+    registry.registerProvider("ysu", () => ysu)
+    registry.registerProvider("zmu", () => {
+      throw new Error("zmu factory failed")
+    })
+
+    const session = makeMockSession("ysu")
+    const runtime = new ProviderRuntime({ ctx: new Context(), registry, session })
+
+    const provider = runtime.selectSchool("ysu")
+    await runtime.initialize()
+    expect(provider).toBe(ysu)
+    expect(runtime.getSnapshot()).toMatchObject({ status: "ready", provider: ysu })
+
+    expect(() => runtime.selectSchool("zmu")).toThrow("zmu factory failed")
+    expect(runtime.getSnapshot()).toMatchObject({
+      status: "ready",
+      schoolId: "ysu",
+      provider: ysu,
+    })
+    expect(ysu.dispose).not.toHaveBeenCalled()
+
+    await expect(runtime.initialize()).resolves.toBe(ysu)
+    runtime.dispose()
+  })
+
   it("guards generation races across reset, school switch, logout, and relogin", async () => {
     const ctx = new Context()
     const registry = new ProviderPluginRegistry()
@@ -172,7 +236,8 @@ describe("ProviderRuntime & providerRuntimePlugin", () => {
     })
 
     expect(runtime.selectSchool("zmu")).toBe(zmu)
-    expect(ysu.reset).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(ysu.dispose).toHaveBeenCalledTimes(1))
+    expect(ysu.reset).not.toHaveBeenCalled()
     initGate1.resolve()
     await staleReject
     expect(runtime.getSnapshot().schoolId).toBe("zmu")
@@ -238,7 +303,9 @@ describe("ProviderRuntime & providerRuntimePlugin", () => {
     const genBefore = providerRuntime.getSnapshot().generation
     const ysuV2 = makeProvider("ysu", "YSU v2")
     const disposeV2 = providers.registerProvider("ysu", () => ysuV2)
-    expect(ysuV1.reset).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(ysuV1.dispose).toHaveBeenCalledTimes(1))
+    expect(ysuV1.reset).not.toHaveBeenCalled()
+    expect(ysuV1.logout).not.toHaveBeenCalled()
     expect(providerRuntime.getSnapshot().generation).toBeGreaterThan(genBefore)
     expect(providerRuntime.getSnapshot().provider).toBe(ysuV2)
     expect(providerRuntime.getSnapshot().status).toBe("initializing")
@@ -248,7 +315,8 @@ describe("ProviderRuntime & providerRuntimePlugin", () => {
 
     // Unloading v2 transitions runtime back to unavailable
     disposeV2()
-    expect(ysuV2.reset).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(ysuV2.dispose).toHaveBeenCalledTimes(1))
+    expect(ysuV2.reset).not.toHaveBeenCalled()
     expect(providerRuntime.getSnapshot()).toMatchObject({
       status: "unavailable",
       schoolId: "ysu",

@@ -103,6 +103,7 @@ import type {
 import type { CreditRecord as ScxtCreditRecord } from "./protocol/scxt"
 import { createYSUProviderRuntime } from "./runtime"
 import { getYSUMfaMethods, isYSUMfaMethod } from "./types"
+import { YSU_SCHEDULE_RULES } from "./ysu-config"
 
 function providerTaskId(task: {
   groupNo?: string
@@ -460,6 +461,7 @@ export function createYsuSchoolProvider(source: YSUContextSource): YsuSchoolProv
     },
     hasLabSchedule,
     mobile: hasMobile ? runtime.mobileAdapter : undefined,
+    scheduleRules: YSU_SCHEDULE_RULES,
   }
 
   const schoolScheduleSlice: SchoolScheduleSlice = {
@@ -1118,14 +1120,29 @@ export function createYsuSchoolProvider(source: YSUContextSource): YsuSchoolProv
       return promise
     },
     async reset(): Promise<void> {
-      lifecycleGeneration += 1
+      const generation = ++lifecycleGeneration
       initialized = false
       pendingInit = null
-      await runtime.lifecycle.resetSession()
+      await runtime.lifecycle.resetSession(() => lifecycleGeneration === generation)
     },
     async logout(): Promise<void> {
-      await this.reset()
-      runtime.ctx.session.clearCredential(config.id)
+      const generation = ++lifecycleGeneration
+      initialized = false
+      pendingInit = null
+      await runtime.lifecycle.resetSession(() => lifecycleGeneration === generation)
+      if (lifecycleGeneration === generation) {
+        runtime.ctx.session.clearCredential(config.id)
+      }
+    },
+    async dispose(): Promise<void> {
+      lifecycleGeneration += 1
+      initialized = false
+      const pending = pendingInit
+      pendingInit = null
+      if (pending) {
+        await pending.promise.catch(() => {})
+      }
+      runtime.lifecycle.disposeSession()
     },
     async relogin(): Promise<boolean> {
       return runtime.relogin.reloginYSU()

@@ -804,6 +804,42 @@ describe("YSU SchoolProvider 15-slice functional integration", () => {
 })
 
 describe("YSU SchoolProvider lifecycle, concurrency, relogin, and session expiry", () => {
+  it("dispose releases only local state without remote logout or shared cache/credential clearing", async () => {
+    const fetchWithJar = vi.fn<JarFetch>(async (_jar, request) => emptyResponse(request.url))
+    const { ctx, secureStore, state } = createTestContext({
+      initialState: {
+        activeSchoolId: "ysu",
+        username: "20230001",
+        credential: makeStoredCasJson(),
+        isAuthenticated: true,
+        artifacts: {
+          [YSU_SESSION_ARTIFACT_JWXT]: JSON.stringify({ cookies: [] }),
+        },
+      },
+      fetchWithJar,
+    })
+    secureStore.set(YSU_SECURE_KEY_CAS_TGC, makeStoredCasJson())
+
+    const provider = createYsuSchoolProvider({
+      session: ctx.session,
+      http: ctx.http,
+      storage: ctx.storage,
+      native: ctx.native,
+      i18n: ctx.i18n,
+      query: ctx.query,
+      mfa: ctx.mfa,
+    })
+
+    await provider.initialize()
+    await provider.dispose()
+
+    expect(fetchWithJar).not.toHaveBeenCalled()
+    expect(ctx.query.clearPersistent).not.toHaveBeenCalled()
+    expect(ctx.query.invalidate).not.toHaveBeenCalled()
+    expect(secureStore.has(YSU_SECURE_KEY_CAS_TGC)).toBe(true)
+    expect(state.isAuthenticated).toBe(true)
+  })
+
   it("deduplicates concurrent initialize() calls and cancels stale generation on reset()", async () => {
     const gate = Promise.withResolvers<void>()
     let authChecks = 0

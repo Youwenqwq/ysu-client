@@ -79,17 +79,18 @@ export function computeClassAlarms(
   days = 7,
   calendar?: TermCalendar,
   remindMinutes = 15,
-  now = new Date()
+  now = new Date(),
+  timeZone?: string
 ): ClassAlarmConfig[] {
   const alarms: ClassAlarmConfig[] = []
   const periodMap = new Map(periods.map((period) => [period.section, period]))
-  const today = getAcademicClock(now).date
+  const today = getAcademicClock(now, timeZone).date
 
   for (let dayOffset = 0; dayOffset < days; dayOffset += 1) {
     const date = scheduleDate(today, 1, dayOffset + 1)
     const targetWeek = resolveAcademicWeek(currentWeek, calendar, date, currentWeek?.semester)
     if (!targetWeek) continue
-    const dayStart = parseAcademicDateTime(`${date}T00:00:00`)?.getTime()
+    const dayStart = parseAcademicDateTime(`${date}T00:00:00`, timeZone)?.getTime()
     if (dayStart === undefined) continue
     const dayCourses = courses.filter(
       (course) =>
@@ -277,6 +278,10 @@ export class ClassReminderAndWidgetController {
     )
   }
 
+  private resolveTimeZone(): string | undefined {
+    return this.provider.getSnapshot().provider?.slices.timetable?.scheduleRules?.timeZone
+  }
+
   private resolveQueryScheduleInput(): ScheduleSyncInput | null {
     if (!this.scheduleSource) return null
     const scheduleSnap = this.scheduleSource.getSnapshot()
@@ -301,7 +306,7 @@ export class ClassReminderAndWidgetController {
       patchesHydrated: this.patchesStore.hydrated.getSnapshot(),
     })
 
-    const nowDate = getAcademicClock(this.now()).date
+    const nowDate = getAcademicClock(this.now(), this.resolveTimeZone()).date
     const liveWeek = resolveAcademicWeek(rawWeek, calendar, nowDate, rawWeek?.semester)
     if (!effective.ready && liveWeek) {
       return null
@@ -447,7 +452,8 @@ export class ClassReminderAndWidgetController {
           settings.classReminderDays,
           schedule.calendar,
           settings.classReminderMinutes,
-          this.now()
+          this.now(),
+          this.resolveTimeZone()
         )
         for (const alarm of alarms) {
           alarm.liveUpdateEnabled = settings.classLiveUpdateEnabled
@@ -509,7 +515,8 @@ export class ClassReminderAndWidgetController {
         schedule.currentWeek,
         schedule.periods,
         schedule.calendar,
-        this.now()
+        this.now(),
+        this.resolveTimeZone()
       )
       const widgetSettings: ScheduleWidgetSettings = {
         syncReminderHours: settings.widgetSyncReminderHours,

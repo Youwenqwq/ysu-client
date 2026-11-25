@@ -114,6 +114,7 @@ function createStubNavigationPlugin() {
         resolve: () => undefined,
         primary: () => undefined,
         landing: () => "",
+        available: () => true,
         forScope: () => [],
         registerFilter: () => {
           state.set((n) => n + 1)
@@ -126,7 +127,7 @@ function createStubNavigationPlugin() {
 }
 
 describe("AcademicNotificationRegistry & notificationRegistryRuntimePlugin", () => {
-  it("scopes registerChannel per plugin, orders built-in channels canonically, and revokes on plugin stop", async () => {
+  it("scopes registerChannel per plugin, orders by declared order and registration, and revokes on plugin stop", async () => {
     const runtime = new PluginRuntime()
     runtime.register(notificationRegistryRuntimePlugin, "builtin")
     await runtime.startAndWait(notificationRegistryRuntimePlugin.manifest.id)
@@ -144,6 +145,7 @@ describe("AcademicNotificationRegistry & notificationRegistryRuntimePlugin", () 
       apply(ctx) {
         ctx.notifications.registerChannel({
           id: "schedule",
+          order: 2,
           slice: "timetable",
           toPollingFlag: "schedule",
         })
@@ -163,6 +165,7 @@ describe("AcademicNotificationRegistry & notificationRegistryRuntimePlugin", () 
       apply(ctx) {
         ctx.notifications.registerChannel({
           id: "grades",
+          order: 1,
           slice: "grades",
           toPollingFlag: "grades",
         })
@@ -183,13 +186,14 @@ describe("AcademicNotificationRegistry & notificationRegistryRuntimePlugin", () 
       apply(ctx) {
         ctx.notifications.registerChannel({
           id: "library-due",
+          order: 3,
           toPollingFlag: (enabled) => ({ libraryDue: enabled }),
           onEnable: libraryOnEnable,
         })
       },
     })
 
-    // Start in reverse order (custom -> schedule -> grades) and verify canonical built-in ordering!
+    // Start in reverse order (custom -> schedule -> grades); explicit order wins.
     runtime.register(customPlugin, "external")
     runtime.register(schedulePlugin, "builtin")
     runtime.register(gradesPlugin, "builtin")
@@ -217,6 +221,25 @@ describe("AcademicNotificationRegistry & notificationRegistryRuntimePlugin", () 
     expect(() => standalone.registerChannel({ id: "  " })).toThrow("must not be empty")
 
     runtime.dispose()
+  })
+
+  it("orders unconfigured channels by stable registration and lets explicit order override it", () => {
+    const registry = new AcademicNotificationRegistry()
+    registry.registerChannel({ id: "schedule" })
+    registry.registerChannel({ id: "exams" })
+    registry.registerChannel({ id: "grades" })
+    expect(registry.getSnapshot().map((channel) => channel.id)).toEqual([
+      "schedule",
+      "exams",
+      "grades",
+    ])
+
+    registry.registerChannel({ id: "exams", order: 0 })
+    expect(registry.getSnapshot().map((channel) => channel.id)).toEqual([
+      "exams",
+      "schedule",
+      "grades",
+    ])
   })
 })
 
@@ -315,6 +338,7 @@ describe("academicRuntimePlugins bundle & non-academic composition isolation", (
             initialize: async () => {},
             reset: async () => {},
             logout: async () => {},
+            dispose: async () => {},
             relogin: async () => true,
           })
         )

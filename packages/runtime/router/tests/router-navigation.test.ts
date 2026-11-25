@@ -185,10 +185,13 @@ describe("PluginRouter & routerRuntimePlugin", () => {
     first.dispose()
 
     const refreshed = new PluginRouter({ window: browser.window })
-    expect(browser.window.history.state).toMatchObject({
+    const persisted = browser.window.history.state as Record<string, unknown>
+    expect(persisted).toMatchObject({
       orahakoIndex: 1,
-      orahakoEntries: ["/?route=home", "/?route=detail"],
+      currentHref: "/?route=detail",
     })
+    expect(typeof persisted.orahakoKey).toBe("string")
+    expect(persisted).not.toHaveProperty("orahakoEntries")
     expect(refreshed.current.getSnapshot().route).toBe("detail")
 
     refreshed.push("editor")
@@ -204,17 +207,20 @@ describe("PluginRouter & routerRuntimePlugin", () => {
     browser.window.history.replaceState(
       {
         orahakoIndex: 2,
-        orahakoEntries: ["/?route=home", "/?route=detail", "/?route=editor"],
+        orahakoKey: "stale:2",
+        currentHref: "/?route=editor",
       },
       "",
       "/?route=home"
     )
 
     const router = new PluginRouter({ window: browser.window })
-    expect(browser.window.history.state).toMatchObject({
+    const normalized = browser.window.history.state as Record<string, unknown>
+    expect(normalized).toMatchObject({
       orahakoIndex: 0,
-      orahakoEntries: ["/?route=home"],
+      currentHref: "/?route=home",
     })
+    expect(normalized).not.toHaveProperty("orahakoEntries")
     expect(router.current.getSnapshot().route).toBe("home")
 
     router.push("detail")
@@ -229,12 +235,36 @@ describe("PluginRouter & routerRuntimePlugin", () => {
     router.push("detail")
     router.push("editor")
 
-    browser.triggerPopState("/?route=detail", { orahakoIndex: 2 })
-    expect(router.current.getSnapshot().route).toBe("detail")
-    expect(browser.window.history.state).toMatchObject({
-      orahakoIndex: 1,
-      orahakoEntries: ["/?route=home", "/?route=detail", "/?route=editor"],
+    browser.triggerPopState("/?route=detail", {
+      orahakoIndex: 2,
+      orahakoKey: "stale:2",
+      currentHref: "/?route=editor",
     })
+    expect(router.current.getSnapshot().route).toBe("detail")
+    const normalized = browser.window.history.state as Record<string, unknown>
+    expect(normalized).toMatchObject({
+      orahakoIndex: 1,
+      currentHref: "/?route=detail",
+    })
+    expect(normalized).not.toHaveProperty("orahakoEntries")
+    router.dispose()
+  })
+
+  it("keeps history.state constant-size regardless of stack depth", () => {
+    const browser = createFakeBrowserWindow("/?route=home")
+    const router = new PluginRouter({ window: browser.window })
+    const initial = browser.window.history.state as Record<string, unknown>
+    const initialShape = Object.keys(initial).sort()
+    expect(initialShape).toEqual(["currentHref", "orahakoIndex", "orahakoKey"])
+
+    for (let step = 0; step < 40; step += 1) {
+      router.push(step % 2 === 0 ? "/?route=detail" : "/?route=home")
+      const state = browser.window.history.state as Record<string, unknown>
+      expect(Object.keys(state).sort()).toEqual(initialShape)
+      expect(state).not.toHaveProperty("orahakoEntries")
+    }
+
+    expect(JSON.stringify(browser.window.history.state).length).toBeLessThan(200)
     router.dispose()
   })
 
@@ -670,6 +700,9 @@ describe("NavigationRuntimeService & pure semantic resolvers", () => {
       source: "page",
     })
     expect(navigation.landing("schedule")).toBe("/?plugin=org.orahako.schedule&page=index")
+    expect(navigation.available("org.orahako.schedule", "index")).toBe(true)
+    expect(navigation.available("org.orahako.calc", "index")).toBe(true)
+    expect(navigation.available("org.orahako.schedule", "missing")).toBe(false)
 
     // Start policy plugin: filters out timetable capability, keeps requiresProvider: false
     runtime.start(policyPlugin.manifest.id)
@@ -679,6 +712,8 @@ describe("NavigationRuntimeService & pure semantic resolvers", () => {
       pageId: "index",
       source: "page",
     })
+    expect(navigation.available("org.orahako.schedule", "index")).toBe(false)
+    expect(navigation.available("org.orahako.calc", "index")).toBe(true)
     expect(navigation.landing("schedule")).toBe("/?route=login")
 
     // Stop policy plugin: filter automatically revoked and schedule resolves again!
@@ -688,6 +723,7 @@ describe("NavigationRuntimeService & pure semantic resolvers", () => {
       pageId: "index",
       source: "page",
     })
+    expect(navigation.available("org.orahako.schedule", "index")).toBe(true)
     expect(revisions.length).toBeGreaterThanOrEqual(4)
     runtime.dispose()
   })

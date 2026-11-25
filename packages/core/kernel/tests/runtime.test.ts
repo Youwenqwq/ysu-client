@@ -442,4 +442,116 @@ describe("PluginRuntime Cordis fiber waiting & lifecycle", () => {
     expect(runtime.get(manifest.id)?.status).toBe("active")
     runtime.dispose()
   })
+
+  it("does not restart optional consumers while disposing", async () => {
+    const runtime = new PluginRuntime()
+    let applies = 0
+    const provider = makeManifest("example.dispose-provider", {
+      kind: "runtime",
+      provides: ["ui"],
+    })
+    const optional = definePlugin({
+      manifest: makeManifest("example.dispose-optional", { kind: "feature" }),
+      optionalInject: ["ui"] as const,
+      apply() {
+        applies += 1
+      },
+    })
+
+    // Provider first: releasing its service must not revive the optional
+    // consumer while the runtime is walking through disposal.
+    runtime.register(provider, (ctx) => ctx.set("ui", { label: "root" }), "builtin")
+    runtime.register(optional, "builtin")
+    await runtime.startAndWait(provider.id)
+    await runtime.startAndWait(optional.manifest.id)
+    expect(applies).toBe(1)
+
+    await runtime.dispose()
+    expect(applies).toBe(1)
+    expect(runtime.get(optional.manifest.id)).toBeUndefined()
+  })
+
+  it("keeps effect-returned resource identity and prototype while awaiting disposal", async () => {
+    const runtime = new PluginRuntime()
+    const releaseCleanup = Promise.withResolvers<void>()
+
+    class Resource {
+      disposed = 0
+      ping(): string {
+        return "pong"
+      }
+      async dispose(): Promise<void> {
+        this.disposed += 1
+        await releaseCleanup.promise
+      }
+    }
+
+    let returned: Resource | undefined
+    const manifest = makeManifest("example.resource")
+    runtime.register(
+      manifest,
+      (ctx: Context) => {
+        const resource = new Resource()
+        returned = ctx.effect(() => resource)
+      },
+      "builtin"
+    )
+
+    await runtime.startAndWait(manifest.id)
+    expect(returned).toBeInstanceOf(Resource)
+    expect(returned?.ping()).toBe("pong")
+
+    runtime.stop(manifest.id)
+    expect(returned?.disposed).toBe(1)
+    returned?.dispose()
+    expect(returned?.disposed).toBe(1)
+
+    const disposal = runtime.dispose()
+    let settled = false
+    void disposal.then(() => {
+      settled = true
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    releaseCleanup.resolve()
+    await disposal
+    expect(settled).toBe(true)
+  })
+
+  it("recycles cleanup registrations after unregister and keeps re-registration isolated", async () => {
+    const runtime = new PluginRuntime()
+    const releaseCleanup = Promise.withResolvers<void>()
+    const manifest = makeManifest("example.cleanup-bucket")
+    // Test-only introspection: the cleanup registry is private runtime state.
+    const internals = runtime as unknown as {
+      cleanupById: Map<string, Set<Promise<void>>>
+    }
+    const cleanupById = internals.cleanupById
+
+    runtime.register(
+      manifest,
+      (ctx: Context) => {
+        ctx.effect(() => async () => {
+          await releaseCleanup.promise
+        })
+      },
+      "builtin"
+    )
+    await runtime.startAndWait(manifest.id)
+    runtime.unregister(manifest.id)
+    expect(cleanupById.has(manifest.id)).toBe(true)
+
+    // The pending cleanup belongs to a retired registration; re-registering
+    // must keep its own bucket entry once the old promise settles.
+    runtime.register(manifest, () => {}, "builtin")
+    releaseCleanup.resolve()
+    await runtime.flush()
+    expect(cleanupById.has(manifest.id)).toBe(true)
+
+    await runtime.startAndWait(manifest.id)
+    runtime.unregister(manifest.id)
+    expect(cleanupById.has(manifest.id)).toBe(false)
+    await runtime.dispose()
+  })
 })

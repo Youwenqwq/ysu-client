@@ -357,6 +357,11 @@ describe("ysu.provider manifest & plugin lifecycle", () => {
     const providerRuntime = env.kernel.context.get("provider")!
     const provider = providerRuntime.selectSchool("ysu")
 
+    expect(provider.slices.timetable!.scheduleRules).toEqual({
+      timeZone: "Asia/Shanghai",
+      lunchAfter: 4,
+      dinnerAfter: 8,
+    })
     expect(provider.slices.nativePolling!.getServerConfig()).toMatchObject({
       cerBaseUrl: YSU_CONFIG.cas.cerBaseUrl,
       jwxtBaseUrl: YSU_CONFIG.jwxt.jwxtBaseUrl,

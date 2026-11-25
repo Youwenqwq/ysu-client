@@ -271,6 +271,7 @@ describe("@orahako/plugin-ecard", () => {
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },
@@ -283,6 +284,7 @@ describe("@orahako/plugin-ecard", () => {
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },

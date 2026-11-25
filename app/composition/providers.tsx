@@ -15,6 +15,16 @@ export function AppComposition() {
     let instance: PluginHost | undefined
     let boot: Promise<void> | undefined
 
+    async function disposeInstance(): Promise<void> {
+      const target = instance
+      if (!target) return
+      try {
+        await target.dispose()
+      } catch (failure) {
+        console.error("Failed to dispose plugin host:", failure)
+      }
+    }
+
     async function start() {
       try {
         const [{ officialCompositionSource }, { platformModules }] = await Promise.all([
@@ -29,8 +39,7 @@ export function AppComposition() {
         if (!cancelled) setHost(instance)
       } catch (failure) {
         if (!cancelled) {
-          instance?.dispose()
-          instance = undefined
+          await disposeInstance()
           setError(failure instanceof Error ? failure.message : String(failure))
         }
       }
@@ -41,10 +50,9 @@ export function AppComposition() {
       cancelled = true
       if (boot) {
         // Let an in-flight bootstrap settle before disposing its package store and runtime.
-        const dispose = () => instance?.dispose()
-        void boot.then(dispose, dispose)
+        void boot.then(disposeInstance, disposeInstance)
       } else {
-        instance?.dispose()
+        void disposeInstance()
       }
     }
   }, [])

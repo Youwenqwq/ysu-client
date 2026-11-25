@@ -95,6 +95,15 @@ export interface AuthSlice {
   readonly diagnostics?: ProviderDiagnostics
 }
 
+export interface AcademicScheduleRules {
+  /** IANA school timezone used to interpret offset-less academic timestamps. */
+  readonly timeZone: string
+  /** Last section before the lunch break; breaks are off when not configured. */
+  readonly lunchAfter: number
+  /** Last section before the dinner break; breaks are off when not configured. */
+  readonly dinnerAfter: number
+}
+
 export interface TimetableSlice {
   getSchedule(options?: ScheduleQueryOptions): Promise<Course[]>
   getUnscheduledCourses?(options?: UnscheduledCourseQueryOptions): Promise<Course[]>
@@ -104,6 +113,8 @@ export interface TimetableSlice {
   getCurrentWeekNumber?(options?: CurrentWeekQueryOptions): Promise<number>
   readonly hasLabSchedule?: boolean
   readonly mobile?: ProviderMobile
+  /** School-local timezone and break rows for schedule presentation. */
+  readonly scheduleRules?: AcademicScheduleRules
 }
 
 export interface SchoolScheduleSlice {
@@ -255,8 +266,19 @@ export interface SchoolProvider {
   readonly diagnostics?: ProviderDiagnostics
   warmup?(): Promise<void>
   initialize(): Promise<void>
+  /**
+   * User-requested academic reset. May perform remote session termination and
+   * clear school-wide caches, so it must only run on explicit reset actions.
+   */
   reset(): Promise<void>
+  /** User-requested logout. Clears the stored credential after resetting. */
   logout(): Promise<void>
+  /**
+   * Instance retirement used for school switches, plugin hot replacement, and
+   * runtime shutdown. Must release only this instance's local resources: never
+   * log out remotely or clear shared query/session/native state.
+   */
+  dispose(): Promise<void>
   relogin(): Promise<boolean>
 }
 

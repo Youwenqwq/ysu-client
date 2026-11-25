@@ -31,7 +31,13 @@ export interface YSUSessionProtocols {
 export interface YSUSessionLifecycle {
   initializeSession(): Promise<void>
   warmupSession(): Promise<void>
-  resetSession(): Promise<void>
+  /**
+   * User-initiated reset: remote termination plus school-wide cache cleanup.
+   * `isActive` lets a retired or superseded instance skip global side effects.
+   */
+  resetSession(isActive?: () => boolean): Promise<void>
+  /** Instance retirement: drop local protocol sessions only. */
+  disposeSession(): void
   resetDerivedSessions(): void
   persistJWXTSession(): Promise<void>
   persistMobileSession(): Promise<void>
@@ -124,18 +130,22 @@ export function createSessionLifecycle(
     mobile.resetMobileAuth()
   }
 
-  async function resetSession(): Promise<void> {
+  async function resetSession(isActive: () => boolean = () => true): Promise<void> {
     await withAuthTransition(async () => {
       try {
-        await cas.logoutCAS()
+        if (isActive()) {
+          await cas.logoutCAS()
+        }
       } catch {
         // Ignore remote CAS logout failure during local session reset.
       } finally {
         resetDerivedSessions()
-        ctx.query.clearPersistent()
-        ctx.query.invalidate()
-        await stopNativeIntegrations(ctx)
-        await ctx.storage.secure.removeItem(YSU_SECURE_KEY_CAS_TGC).catch(() => {})
+        if (isActive()) {
+          ctx.query.clearPersistent()
+          ctx.query.invalidate()
+          await stopNativeIntegrations(ctx)
+          await ctx.storage.secure.removeItem(YSU_SECURE_KEY_CAS_TGC).catch(() => {})
+        }
       }
     })
   }
@@ -144,6 +154,7 @@ export function createSessionLifecycle(
     initializeSession,
     warmupSession,
     resetSession,
+    disposeSession: resetDerivedSessions,
     resetDerivedSessions,
     persistJWXTSession,
     persistMobileSession,

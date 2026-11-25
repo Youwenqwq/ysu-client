@@ -42,7 +42,8 @@ describe("schedule widget snapshots", () => {
       currentWeek,
       periods,
       calendar,
-      new Date("2026-09-09T04:00:00Z")
+      new Date("2026-09-09T04:00:00Z"),
+      "Asia/Shanghai"
     )
 
     expect(snapshot.courses).toEqual([
@@ -74,7 +75,8 @@ describe("schedule widget snapshots", () => {
         null,
         periods,
         undefined,
-        new Date("2026-09-09T04:00:00Z")
+        new Date("2026-09-09T04:00:00Z"),
+        "Asia/Shanghai"
       ).week
     ).toBeNull()
   })

@@ -3,10 +3,10 @@ import {
   createObservableSource,
   declareContributionChildren,
   definePlugin,
-  isScopedPluginService,
   isStoreDefinition,
   PLUGIN_API_VERSION,
   PLUGIN_SERVICE_SCOPE,
+  resolvePluginSlots,
   resolvePluginStorage,
   trackPluginRegistration,
   type ChildrenSpec,
@@ -30,30 +30,6 @@ declare module "@orahako/sdk" {
 
 const DEFAULT_CATEGORY_ORDER = 100
 export const SETTINGS_RUNTIME_PLUGIN_ID = "orahako.runtime.settings"
-
-function isPluginSlotService(value: unknown): value is PluginSlotService {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "register" in value &&
-    typeof value.register === "function" &&
-    "inject" in value &&
-    typeof value.inject === "function"
-  )
-}
-
-function resolveRegistrantSlots(
-  ctx: Context,
-  manifest: PluginManifest
-): PluginSlotService | undefined {
-  const raw: unknown = ctx.get("slots") ?? ctx.root.get("slots")
-  if (!raw) return undefined
-  if (isScopedPluginService(raw)) {
-    const scoped = raw[PLUGIN_SERVICE_SCOPE](ctx, manifest)
-    return isPluginSlotService(scoped) ? scoped : undefined
-  }
-  return isPluginSlotService(raw) ? raw : undefined
-}
 
 export class PluginSettingsRegistry
   implements PluginSettingsService, ScopedPluginService<PluginSettingsService>
@@ -180,7 +156,8 @@ export class PluginSettingsRegistry
     let panelMounted = false
     let disposeStandaloneChildren: (() => void) | undefined
     let disposeSlotInject: (() => void) | undefined
-    let stopSlotsServiceListener: (() => void) | undefined
+    const resolvedSlots =
+      registrantCtx && manifest ? resolvePluginSlots(registrantCtx, manifest) : undefined
 
     let ownedStore: StoreInstance<unknown, Record<string, never>> | undefined
     let resolvedStore: unknown = spec.store
@@ -192,7 +169,7 @@ export class PluginSettingsRegistry
     }
 
     const boundInject: ((ctx: Context) => unknown) | undefined = spec.inject
-      ? (fallbackCtx: Context) => spec.inject!(registrantCtx ?? fallbackCtx)
+      ? () => spec.inject!()
       : undefined
 
     const releaseStandaloneChildren = (): void => {
@@ -221,34 +198,21 @@ export class PluginSettingsRegistry
           panelMounted = false
           disposePanel()
           if (!disposed && spec.children && !disposeStandaloneChildren) {
-            disposeStandaloneChildren = declareContributionChildren(registrantCtx, spec.children)
+            disposeStandaloneChildren = declareContributionChildren(slots, spec.children)
           }
         }
       })
     }
 
     try {
-      if (registrantCtx && manifest) {
-        const initialSlots = resolveRegistrantSlots(registrantCtx, manifest)
-        if (initialSlots) {
-          attachSlotBridge(initialSlots)
-        } else {
-          stopSlotsServiceListener = registrantCtx.on("internal/service", (serviceName: string) => {
-            if (disposed || serviceName !== "slots" || disposeSlotInject) return
-            const lateSlots = resolveRegistrantSlots(registrantCtx, manifest)
-            if (lateSlots) {
-              attachSlotBridge(lateSlots)
-            }
-          })
-        }
+      if (resolvedSlots) {
+        attachSlotBridge(resolvedSlots)
       }
-
       if (!panelMounted) {
-        disposeStandaloneChildren = declareContributionChildren(registrantCtx, spec.children)
+        disposeStandaloneChildren = declareContributionChildren(resolvedSlots, spec.children)
       }
     } catch (error) {
       disposed = true
-      stopSlotsServiceListener?.()
       disposeSlotInject?.()
       releaseStandaloneChildren()
       ownedStore?.dispose()
@@ -282,8 +246,6 @@ export class PluginSettingsRegistry
         this.categories.delete(spec.id)
         this.publish()
       }
-      stopSlotsServiceListener?.()
-      stopSlotsServiceListener = undefined
       disposeSlotInject?.()
       disposeSlotInject = undefined
       releaseStandaloneChildren()
@@ -313,6 +275,7 @@ export const settingsRegistryPlugin = definePlugin({
     description: "插件设置分类的根注册表",
     provides: ["settings"],
   },
+  optionalInject: ["slots", "storage"],
   apply(ctx) {
     ctx.set("settings", new PluginSettingsRegistry())
   },

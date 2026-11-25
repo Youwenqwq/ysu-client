@@ -2,9 +2,9 @@
  * 学工系统（综合测评）—— 只读查询模块。
  */
 import type { CookieJar } from "@orahako/academic-sdk"
-import type { HttpResponse } from "@orahako/sdk"
+import { headerSingle, type HttpResponse } from "@orahako/sdk"
 import type { YSUContext } from "../context"
-import { errorMessage, headerSingle, isPlainRecord } from "../http-utils"
+import { errorMessage, isPlainRecord } from "../http-utils"
 import type { CasAuthorizer } from "./cas"
 
 const APP_NAME = "zhcptybbapp"

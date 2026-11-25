@@ -1,7 +1,7 @@
 import type { Context } from "@cordisjs/core"
 import type {
   ChildrenSpec,
-  CookieEntry,
+  CookieJar,
   DerivedComponentProps,
   HttpRequest,
   HttpResponse,
@@ -14,6 +14,8 @@ import type { MfaChallenge, MfaMethod } from "./entities"
 import type { ProviderError } from "./errors"
 import type { AcademicSliceKey, SchoolProvider } from "./slices"
 
+export type { CookieJar } from "@orahako/sdk"
+
 export type ProviderFactory = (ctx: Context) => SchoolProvider
 
 export interface ProviderRegistryService {
@@ -22,14 +24,6 @@ export interface ProviderRegistryService {
   listProviders(): readonly string[]
   createProvider(schoolId: string): SchoolProvider
   subscribe(listener: (schoolId: string) => void): () => void
-}
-
-export interface CookieJar {
-  setCookie(cookie: string, url: string, options?: { ignoreError?: boolean }): Promise<void>
-  getCookieString(url: string): Promise<string>
-  getAllCookies(): Promise<readonly CookieEntry[]>
-  removeCookie(domain: string, path: string, key: string): Promise<void>
-  toJSON(): string
 }
 
 export interface SessionSnapshot {
@@ -152,6 +146,7 @@ export type PollingFlagMapping =
 
 export interface AcademicNotificationChannelSpec {
   readonly id: string
+  readonly order?: number
   readonly slice?: AcademicSliceKey
   readonly toPollingFlag?: PollingFlagMapping
   onDisable?(): void | Promise<void>
@@ -211,7 +206,7 @@ export interface OverviewWidgetSpec<
   readonly dictionary?: Dict
   readonly children?: Children
   readonly store?: Store
-  readonly inject?: (ctx: Context) => ValidInject<I>
+  readonly inject?: () => ValidInject<I>
 }
 
 export interface OverviewWidgetContribution {
@@ -230,7 +225,7 @@ export interface OverviewWidgetContribution {
   readonly dictionary?: unknown
   readonly children?: ChildrenSpec
   readonly store?: unknown
-  readonly inject?: (ctx: Context) => unknown
+  readonly inject?: () => unknown
   readonly component: SlotComponent<never>
 }
 

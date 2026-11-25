@@ -48,6 +48,7 @@ describe("computeOverviewSchedule", () => {
       currentWeek,
       calendar,
       now: new Date("2026-08-31T00:30:00Z"),
+      timeZone: "Asia/Shanghai",
     })
 
     expect(snapshot.todayCourses.map((c) => c.name)).toEqual(["高等数学", "大学英语"])
@@ -67,6 +68,7 @@ describe("computeOverviewSchedule", () => {
       currentWeek,
       calendar,
       now: new Date("2026-08-31T01:50:00Z"),
+      timeZone: "Asia/Shanghai",
     })
 
     expect(snapshot.currentCourse).toBeNull()
@@ -81,6 +83,7 @@ describe("computeOverviewSchedule", () => {
       currentWeek: null,
       calendar,
       now: new Date("2026-08-25T02:00:00Z"),
+      timeZone: "Asia/Shanghai",
     })
     expect(snapshot.liveWeek).toBeNull()
     expect(snapshot.todayCourses).toEqual([])

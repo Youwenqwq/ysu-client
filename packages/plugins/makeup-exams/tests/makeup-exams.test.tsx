@@ -550,6 +550,7 @@ describe("@orahako/plugin-makeup-exams export discipline, signup & navigation", 
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },

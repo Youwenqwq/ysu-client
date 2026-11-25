@@ -402,6 +402,7 @@ describe("@orahako/plugin-credits", () => {
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },

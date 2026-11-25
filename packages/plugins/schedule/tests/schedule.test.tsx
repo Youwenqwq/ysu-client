@@ -568,11 +568,11 @@ describe("@orahako/plugin-schedule export discipline & manifest", () => {
       "session",
       "query",
       "notifications",
-      "overview",
       "native",
       "widgets",
       "assets",
     ])
+    expect(schedulePlugin.optionalInject).toEqual(["overview"])
   })
 })
 
@@ -663,6 +663,7 @@ describe("scheduleSettingsStore & schedulePatchesStore validation and persistenc
         async initialize() {},
         async reset() {},
         async logout() {},
+        async dispose() {},
         async relogin() {
           return true
         },
@@ -784,7 +785,8 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       1,
       sampleCalendar,
       15,
-      now
+      now,
+      "Asia/Shanghai"
     )
     expect(alarms).toEqual([
       {
@@ -948,6 +950,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
           getCurrentWeek: async () => sampleWeek,
           getTermCalendar: async () => sampleCalendar,
           getClassPeriods: async () => samplePeriods,
+          scheduleRules: { timeZone: "Asia/Shanghai", lunchAfter: 4, dinnerAfter: 8 },
           mobile: {
             getCurrentLesson: async () => ({
               lessonId: "LESSON-1",
@@ -990,6 +993,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },

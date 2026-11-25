@@ -8,6 +8,7 @@ import {
   ScheduleTablet,
   buildCourseColorMap,
   computeExamBlocks,
+  computeScheduleGridRows,
   expandScheduleCourses,
   type ScheduleLabels,
 } from "../src"
@@ -96,6 +97,21 @@ const exams: Exam[] = [
   },
 ]
 
+describe("schedule grid break rules", () => {
+  it("uses neutral defaults and lets a school configure its own break sections", () => {
+    expect(computeScheduleGridRows(periods)).toMatchObject({
+      lunchRow: null,
+      dinnerRow: null,
+    })
+    expect(
+      computeScheduleGridRows(periods, { lunchAfter: 1, dinnerAfter: 4 })
+    ).toMatchObject({
+      lunchRow: 3,
+      dinnerRow: 6,
+    })
+  })
+})
+
 describe("ScheduleMobile and ScheduleTablet pure-props views", () => {
   it("renders empty states using labels.noData when no courses, exams, or traces exist", () => {
     const emptyColors = buildCourseColorMap([])
@@ -135,7 +151,19 @@ describe("ScheduleMobile and ScheduleTablet pure-props views", () => {
   it("renders courses, breaks, overlaps, exam blocks, and editor badges from props", () => {
     const colorMap = buildCourseColorMap(courses)
     const occurrences = expandScheduleCourses(courses, "2026-08-31", 2)
-    const examBlocks = computeExamBlocks(exams, periods, currentWeek, 1, "2026-08-31")
+    const examBlocks = computeExamBlocks(
+      exams,
+      periods,
+      currentWeek,
+      1,
+      "2026-08-31",
+      "Asia/Shanghai"
+    )
+    const scheduleRules = {
+      timeZone: "Asia/Shanghai",
+      lunchAfter: 4,
+      dinnerAfter: 8,
+    }
 
     const mobileHtml = renderToStaticMarkup(
       createElement(ScheduleMobile, {
@@ -150,6 +178,7 @@ describe("ScheduleMobile and ScheduleTablet pure-props views", () => {
         termStartDate: "2026-08-31",
         nowMinutes: 500,
         labels,
+        scheduleRules,
         editor: {
           enabled: true,
           editing: true,
@@ -186,6 +215,7 @@ describe("ScheduleMobile and ScheduleTablet pure-props views", () => {
         termStartDate: "2026-08-31",
         nowMinutes: 500,
         labels,
+        scheduleRules,
       })
     )
 

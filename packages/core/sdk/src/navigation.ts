@@ -38,6 +38,12 @@ export interface PluginNavigationService {
   resolve(id: string): NavigationTarget | undefined
   primary(): NavigationTarget | undefined
   landing(preference: string): string
+  /**
+   * Whether a concrete page passes the same provider/capability filters used
+   * for semantic routes. Explicit `?plugin=…&page=…` deep links MUST check this
+   * instead of looking the page up directly.
+   */
+  available(pluginId: string, pageId: string): boolean
   forScope<T extends PluginNavigationDefinition = PluginNavigationContribution>(
     scope: PluginNavigationScope,
     pluginId?: string

@@ -134,6 +134,7 @@ describe("SchoolProvider & AcademicSliceMap helpers", () => {
     initialize: async () => {},
     reset: async () => {},
     logout: async () => {},
+    dispose: async () => {},
     relogin: async () => true,
   })
 

@@ -451,18 +451,24 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
       "session",
       "query",
       "notifications",
-      "overview",
       "native",
       "widgets",
     ])
+    expect(examsPlugin.optionalInject).toEqual(["overview", "assets"])
   })
 
   it("computes school-timezone exam day countdowns accurately", () => {
     const now = new Date("2026-12-20T02:00:00Z") // 2026-12-20 10:00 Asia/Shanghai
-    expect(computeExamDayDiff({ name: "编译原理", startAt: "2026-12-20T14:00:00" }, now)).toBe(0)
-    expect(computeExamDayDiff({ name: "操作系统", startAt: "2026-12-21T09:00:00" }, now)).toBe(1)
-    expect(computeExamDayDiff({ name: "计算机网络", startAt: "2026-12-25T09:00:00" }, now)).toBe(5)
-    expect(computeExamDayDiff({ name: "待定考试" }, now)).toBeNull()
+    expect(
+      computeExamDayDiff({ name: "编译原理", startAt: "2026-12-20T14:00:00" }, now, "Asia/Shanghai")
+    ).toBe(0)
+    expect(
+      computeExamDayDiff({ name: "操作系统", startAt: "2026-12-21T09:00:00" }, now, "Asia/Shanghai")
+    ).toBe(1)
+    expect(
+      computeExamDayDiff({ name: "计算机网络", startAt: "2026-12-25T09:00:00" }, now, "Asia/Shanghai")
+    ).toBe(5)
+    expect(computeExamDayDiff({ name: "待定考试" }, now, "Asia/Shanghai")).toBeNull()
   })
 
   it("syncs exam widget snapshots on query success, pins home-screen widgets, and clears widgets on channel disable & plugin dispose", async () => {
@@ -534,6 +540,7 @@ describe("@orahako/plugin-exams export discipline, widget sync/clear & runtime i
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },

@@ -2,9 +2,9 @@
  * 创新创业学分认定系统 —— 只读查询模块。
  */
 import type { CookieJar } from "@orahako/academic-sdk"
-import type { HttpResponse } from "@orahako/sdk"
+import { headerSingle, type HttpResponse } from "@orahako/sdk"
 import type { YSUContext } from "../context"
-import { errorMessage, headerSingle } from "../http-utils"
+import { errorMessage } from "../http-utils"
 import type { CasAuthorizer } from "./cas"
 import { parseTables, type TableData } from "./table"
 

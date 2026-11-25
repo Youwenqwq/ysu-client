@@ -2,16 +2,18 @@
  * CAS 认证模块 —— 燕山大学统一身份认证网关。
  */
 import type { CookieJar } from "@orahako/academic-sdk"
-import { bytesToBase64, type CookieEntry, type HttpRequest, type HttpResponse } from "@orahako/sdk"
-import type { YSUContext } from "../context"
 import {
+  bytesToBase64,
   collectCookies,
   cookieEntryFromJSON,
-  errorMessage,
   headerSingle,
   installCookies,
-  isPlainRecord,
-} from "../http-utils"
+  type CookieEntry,
+  type HttpRequest,
+  type HttpResponse,
+} from "@orahako/sdk"
+import type { YSUContext } from "../context"
+import { errorMessage, isPlainRecord } from "../http-utils"
 import type { YSUMfaMethod } from "../types"
 import { YSU_SECURE_KEY_CAS_TGC } from "../ysu-config"
 

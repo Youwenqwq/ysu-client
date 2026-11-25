@@ -6,6 +6,7 @@ import {
   isStoreDefinition,
   PLUGIN_API_VERSION,
   PLUGIN_SERVICE_SCOPE,
+  resolvePluginSlots,
   resolvePluginStorage,
   trackPluginRegistration,
   type ChildrenSpec,
@@ -102,6 +103,9 @@ export class PluginSlotRegistry
       trackPluginRegistration(ctx, () => this.registerInternal(manifest, ctx, spec, maybeComponent))
 
     return {
+      state: this.state,
+      getSnapshot: this.getSnapshot,
+      subscribe: this.subscribe,
       register: registerScoped as PluginSlotService["register"],
       inject: <S extends SlotName>(slotName: S, callback: SlotInjectCallback): (() => void) =>
         trackPluginRegistration(ctx, () => this.injectInternal(slotName, callback, ctx)),
@@ -111,7 +115,9 @@ export class PluginSlotRegistry
   }
 
   getSnapshot = (): PluginSlotRegistrySnapshot => {
-    return this.stateSource.getSnapshot()
+    // Authoritative live view: nested registrations during a batched teardown
+    // must observe declarations removed earlier in the same batch.
+    return this.buildSnapshot()
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -302,7 +308,7 @@ export class PluginSlotRegistry
     }
 
     const boundInject: ((ctx: Context) => unknown) | undefined = spec.inject
-      ? (fallbackCtx: Context) => spec.inject!(registrantCtx ?? fallbackCtx)
+      ? () => spec.inject!()
       : undefined
 
     const entry: SlotContribution = {
@@ -347,9 +353,13 @@ export class PluginSlotRegistry
       this.contributions.set(contributionKey, record)
       this.markDirty()
       try {
-        disposeChildren = registrantCtx
-          ? declareContributionChildren(registrantCtx, spec.children)
-          : this.declareChildrenDirect(spec.children)
+        disposeChildren =
+          registrantCtx && manifest
+            ? declareContributionChildren(
+                resolvePluginSlots(registrantCtx, manifest),
+                spec.children
+              )
+            : this.declareChildrenDirect(spec.children)
       } catch (error) {
         record.cleanup()
         throw error
@@ -561,7 +571,7 @@ export class PluginSlotRegistry
     }
   }
 
-  private publish(): void {
+  private buildSnapshot(): PluginSlotRegistrySnapshot {
     const declarations: PluginSlotDeclaration[] = Array.from(
       this.declarations.values(),
       (item) => ({
@@ -579,10 +589,11 @@ export class PluginSlotRegistry
         a.pluginId.localeCompare(b.pluginId) ||
         a.id.localeCompare(b.id)
     )
-    this.stateSource.set({
-      declarations,
-      contributions,
-    })
+    return { declarations, contributions }
+  }
+
+  private publish(): void {
+    this.stateSource.set(this.buildSnapshot())
   }
 }
 

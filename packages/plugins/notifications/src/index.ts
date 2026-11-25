@@ -1,13 +1,5 @@
 import { Bell } from "lucide-react"
-import {
-  createObservableSource,
-  definePlugin,
-  PLUGIN_API_VERSION,
-  type Context,
-  type ObservableSource,
-  type PluginSlotRegistryService,
-  type PluginSlotRegistrySnapshot,
-} from "@orahako/sdk"
+import { definePlugin, PLUGIN_API_VERSION } from "@orahako/sdk"
 import {
   ACADEMIC_POLLING_CAPABILITY,
   AcademicPollingController,
@@ -52,25 +44,6 @@ export {
   type NotificationsDictionary,
   type NotificationSettingsState,
   type NotificationSettingsStoreInstance,
-}
-
-const EMPTY_SLOTS_SNAPSHOT: PluginSlotRegistrySnapshot = {
-  declarations: [],
-  contributions: [],
-}
-
-const STATIC_EMPTY_SLOTS_SOURCE: ObservableSource<PluginSlotRegistrySnapshot> =
-  createObservableSource(EMPTY_SLOTS_SNAPSHOT)
-
-function isSlotRegistryService(value: unknown): value is PluginSlotRegistryService {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "state" in value &&
-    typeof value.state === "object" &&
-    value.state !== null &&
-    "getSnapshot" in value.state
-  )
 }
 
 export const notificationsPlugin = definePlugin({
@@ -133,24 +106,18 @@ export const notificationsPlugin = definePlugin({
         dictionary: notificationsDictionary,
         children: NOTIFICATION_CATEGORY_CHILDREN,
         store,
-        inject: (fullCtx: Context): NotificationSettingsInject => {
-          const rootSlots: unknown = fullCtx.root.get("slots")
-          const slotsSnapshot = isSlotRegistryService(rootSlots)
-            ? rootSlots.state
-            : STATIC_EMPTY_SLOTS_SOURCE
-          return {
-            hooks: {
-              provider: provider.state,
-              channels: notifications.state,
-              slotsSnapshot,
-            },
-            isNative: () => native.isNative,
-            checkBatteryOptimization: () => controller.checkBatteryOptimization(),
-            requestBatteryOptimizationExemption: () => native.requestBatteryOptimizationExemption(),
-            requestNotificationPermission: () => native.requestNotificationPermission(),
-            togglePollingEnabled: (enabled: boolean) => controller.setPollingEnabled(enabled),
-          }
-        },
+        inject: (): NotificationSettingsInject => ({
+          hooks: {
+            provider: provider.state,
+            channels: notifications.state,
+            slotsSnapshot: slots.state,
+          },
+          isNative: () => native.isNative,
+          checkBatteryOptimization: () => controller.checkBatteryOptimization(),
+          requestBatteryOptimizationExemption: () => native.requestBatteryOptimizationExemption(),
+          requestNotificationPermission: () => native.requestNotificationPermission(),
+          togglePollingEnabled: (enabled: boolean) => controller.setPollingEnabled(enabled),
+        }),
       },
       NotificationSettingsPanel
     )

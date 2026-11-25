@@ -26,6 +26,7 @@ import {
 import {
   collectCookies,
   cookieEntryFromJSON,
+  executeStatelessTransport,
   fetchWithCookieJar,
   HttpActivityRecorder,
   httpRuntimePlugin,
@@ -109,6 +110,33 @@ describe("SimpleCookieJar", () => {
     expect(await targetJar.getCookieString("https://cer.ysu.edu.cn/")).toBe("SID=xyz")
 
     expect(() => cookieEntryFromJSON({ value: "missing-name" })).toThrow(TypeError)
+  })
+
+  it("rejects Domain attributes that do not host-match the response host", async () => {
+    const jar = new SimpleCookieJar()
+
+    // A response from evil.example cannot plant a cookie for the school domain.
+    await jar.setCookie("EVIL=1; Domain=.ysu.edu.cn; Path=/", "https://evil.example/")
+    expect(await jar.getCookieString("https://jwxt.ysu.edu.cn/")).toBe("")
+
+    // A sibling host cannot claim the parent of another sibling.
+    await jar.setCookie("CROSS=1; Domain=cer.ysu.edu.cn; Path=/", "https://jwxt.ysu.edu.cn/")
+    expect(await jar.getCookieString("https://jwxt.ysu.edu.cn/")).toBe("")
+    expect(await jar.getCookieString("https://cer.ysu.edu.cn/")).toBe("")
+
+    // Legitimate school SSO domain remains accepted and shared with siblings.
+    await jar.setCookie(
+      "SSO=ok; Domain=.ysu.edu.cn; Path=/",
+      "https://cer.ysu.edu.cn/authserver/login"
+    )
+    expect(await jar.getCookieString("https://jwxt.ysu.edu.cn/")).toBe("SSO=ok")
+
+    // Host-only cookies never leak to subdomains.
+    await jar.setCookie("HOSTONLY=1; Path=/", "https://jwxt.ysu.edu.cn/")
+    const hostHeader = await jar.getCookieString("https://jwxt.ysu.edu.cn/")
+    expect(hostHeader).toContain("HOSTONLY=1")
+    expect(hostHeader).toContain("SSO=ok")
+    expect(await jar.getCookieString("https://sub.jwxt.ysu.edu.cn/")).toBe("SSO=ok")
   })
 })
 
@@ -474,6 +502,104 @@ describe("httpRuntimePlugin waterfall pipeline, proxy & native transports, and f
       })
     ).rejects.toThrow("Exceeded max redirects (10)")
     expect(loopHttp.send).toHaveBeenCalledTimes(11)
+  })
+
+  it("drops Authorization and recomputes Cookie across a cross-origin 302 while stripping the POST body", async () => {
+    const seen: HttpRequest[] = []
+    const fakeHttp: PluginHttpService = {
+      activity: new HttpActivityRecorder(),
+      send: vi.fn(async (req: HttpRequest): Promise<HttpResponse> => {
+        seen.push(req)
+        if (seen.length === 1) {
+          return {
+            status: 302,
+            headers: { Location: "https://evil.example/landing" },
+            url: req.url,
+            text: async () => "",
+            arrayBuffer: async () => new ArrayBuffer(0),
+          }
+        }
+        return {
+          status: 200,
+          headers: {},
+          url: req.url,
+          text: async () => "landed",
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
+      }),
+    }
+
+    const jar = new SimpleCookieJar()
+    await jar.setCookie("SSO=school; Domain=.ysu.edu.cn; Path=/", "https://cer.ysu.edu.cn/")
+
+    const resp = await fetchWithCookieJar(fakeHttp, jar, {
+      method: "POST",
+      url: "https://jwxt.ysu.edu.cn/auth",
+      headers: {
+        Authorization: "Bearer secret",
+        "Proxy-Authorization": "Basic proxy",
+        "Content-Type": "application/x-www-form-urlencoded",
+        Cookie: "SSO=manual",
+      },
+      body: "a=1",
+      redirect: "follow",
+    })
+
+    expect(await resp.text()).toBe("landed")
+    expect(seen).toHaveLength(2)
+    // First hop only sends the target-scoped jar cookie, never the manual one.
+    expect(seen[0]?.headers?.Cookie).toBe("SSO=school")
+    expect(seen[0]?.headers?.Authorization).toBe("Bearer secret")
+    // Cross-origin 302 drops credentials and converts POST to a bodyless GET.
+    expect(seen[1]?.method).toBe("GET")
+    expect(seen[1]?.body).toBeUndefined()
+    expect(seen[1]?.headers?.Authorization).toBeUndefined()
+    expect(seen[1]?.headers?.["Proxy-Authorization"]).toBeUndefined()
+    expect(seen[1]?.headers?.["Content-Type"]).toBeUndefined()
+    expect(seen[1]?.headers?.Cookie).toBeUndefined()
+  })
+
+  it("strips Authorization on a cross-origin 307 in the stateless transport while preserving method and body", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("", {
+          status: 200,
+          headers: {
+            "x-proxy-status": "307",
+            location: "https://evil.example/next",
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response("ok", { status: 200, headers: { "x-proxy-status": "200" } })
+      )
+    vi.stubGlobal("fetch", fetchMock)
+
+    const resp = await executeStatelessTransport(
+      {
+        method: "POST",
+        url: "https://jwxt.ysu.edu.cn/start",
+        headers: {
+          Authorization: "Bearer secret",
+          "Proxy-Authorization": "Basic proxy",
+          "Content-Type": "application/json",
+        },
+        body: '{"a":1}',
+        redirect: "follow",
+      },
+      { proxyPath: "/api/proxy" }
+    )
+
+    expect(resp.status).toBe(200)
+    expect(await resp.text()).toBe("ok")
+    const secondInit = fetchMock.mock.calls[1]![1]
+    const secondHeaders = new Headers(secondInit?.headers)
+    expect(secondHeaders.get("authorization")).toBeNull()
+    expect(secondHeaders.get("proxy-authorization")).toBeNull()
+    expect(secondHeaders.get("content-type")).toBe("application/json")
+    expect(secondInit?.method).toBe("POST")
+    expect(secondInit?.body).toBe('{"a":1}')
   })
 
   it("normalizes CapacitorHttp headers to lowercase, decodes base64 arrayBuffer, and handles AbortSignal", async () => {

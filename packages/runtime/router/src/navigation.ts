@@ -19,6 +19,7 @@ import {
 } from "@orahako/sdk"
 import {
   navigationForScope,
+  pageAvailable,
   resolvePrimaryTarget,
   resolveSemanticTarget,
   semanticTargetHref,
@@ -63,6 +64,7 @@ export class NavigationRuntimeService
       resolve: this.resolve,
       primary: this.primary,
       landing: this.landing,
+      available: this.available,
       forScope,
       registerFilter: (filter) => trackPluginRegistration(ctx, () => this.registerFilter(filter)),
     }
@@ -99,6 +101,14 @@ export class NavigationRuntimeService
   landing = (preference: string): string => {
     const target = this.resolve(preference) ?? this.primary()
     return target ? semanticTargetHref(target) : (this.fallbackHref ?? "")
+  }
+
+  available = (pluginId: string, pageId: string): boolean => {
+    const sources = this.internalSources()
+    const page = sources.pages.find(
+      (candidate) => candidate.pluginId === pluginId && candidate.id === pageId
+    )
+    return page ? pageAvailable(sources, page) : false
   }
 
   forScope<T extends PluginNavigationDefinition = PluginNavigationContribution>(

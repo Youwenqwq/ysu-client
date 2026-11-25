@@ -270,6 +270,8 @@ export function createTestContext(options: TestContextOptions = {}): TestContext
       register: () => () => {},
       t: (key) => key,
       translator: () => (key) => String(key),
+      translate: (_pluginId, key) => key,
+      getDictionary: (_locale, base) => base,
       getLocale: () => localeSource.getSnapshot(),
       setLocale: (next) => localeSource.set(next),
     },

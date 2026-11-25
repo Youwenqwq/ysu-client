@@ -11,7 +11,11 @@ import {
   type ScopedPluginService,
   type StoreInstance,
 } from "@orahako/sdk"
-import { PluginSlotRegistry } from "@orahako/runtime-slots"
+import {
+  PluginSlotRegistry,
+  SLOTS_RUNTIME_PLUGIN_ID,
+  slotRegistryPlugin,
+} from "@orahako/runtime-slots"
 import { PluginSettingsRegistry, SETTINGS_RUNTIME_PLUGIN_ID, settingsRegistryPlugin } from "../src"
 
 declare module "@orahako/sdk" {
@@ -206,9 +210,6 @@ describe("@orahako/runtime-settings", () => {
       },
     })
 
-    let capturedInjectCtx: unknown
-    let capturedRegistrationCtx: unknown
-
     const plugin = definePlugin({
       manifest: {
         id: "example.notifications",
@@ -220,7 +221,6 @@ describe("@orahako/runtime-settings", () => {
       },
       inject: ["settings"],
       apply(ctx) {
-        capturedRegistrationCtx = ctx
         ctx.settings.registerCategory(
           {
             id: "notifications",
@@ -230,10 +230,7 @@ describe("@orahako/runtime-settings", () => {
               "test.settings.subsection": { kind: "list" },
             },
             store: categoryStore,
-            inject: (innerCtx) => {
-              capturedInjectCtx = innerCtx
-              return { label: "notif" }
-            },
+            inject: () => ({ label: "notif" }),
           },
           () => null
         )
@@ -251,7 +248,6 @@ describe("@orahako/runtime-settings", () => {
 
     const injectResult = category.inject?.(runtime.context)
     expect(injectResult).toEqual({ label: "notif" })
-    expect(capturedInjectCtx).toBe(capturedRegistrationCtx)
 
     const storeInstance = category.store as StoreInstance<
       { notificationsEnabled: boolean },
@@ -393,6 +389,67 @@ describe("@orahako/runtime-settings", () => {
     expect(slotsRegistry.select("settings.category.panel", "network")).toEqual([])
 
     disposePanelDecl2()
+    runtime.dispose()
+  })
+
+  it("rebridges category panels after the slots service is replaced", async () => {
+    const runtime = new PluginRuntime()
+    runtime.register(slotRegistryPlugin, "builtin")
+    runtime.register(settingsRegistryPlugin, "builtin")
+
+    const feature = definePlugin({
+      manifest: {
+        id: "example.replacement",
+        name: "Replacement",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+        inject: ["settings"],
+      },
+      inject: ["settings"] as const,
+      apply(ctx) {
+        ctx.settings.registerCategory(
+          { id: "replacement", title: "Replacement", icon: Icon },
+          Panel
+        )
+      },
+    })
+    runtime.register(feature, "builtin")
+
+    runtime.start(SLOTS_RUNTIME_PLUGIN_ID)
+    runtime.start(SETTINGS_RUNTIME_PLUGIN_ID)
+    runtime.start(feature.manifest.id)
+    await runtime.flush()
+
+    const firstSlots = runtime.context.get("slots") as PluginSlotRegistry
+    const firstPanel = firstSlots.declare({
+      name: "settings.category.panel",
+      kind: "keyed",
+    })
+    expect(firstSlots.select("settings.category.panel", "replacement")).toHaveLength(1)
+
+    // Replace the whole slots service while settings and the feature stay mounted.
+    runtime.stop(SLOTS_RUNTIME_PLUGIN_ID)
+    await runtime.flush()
+    runtime.register(slotRegistryPlugin, "builtin")
+    runtime.start(SLOTS_RUNTIME_PLUGIN_ID)
+    await runtime.flush()
+
+    const replacementSlots = runtime.context.get("slots") as PluginSlotRegistry
+    expect(replacementSlots).not.toBe(firstSlots)
+    const replacementPanel = replacementSlots.declare({
+      name: "settings.category.panel",
+      kind: "keyed",
+    })
+    await vi.waitFor(() =>
+      expect(replacementSlots.select("settings.category.panel", "replacement")).toHaveLength(1)
+    )
+    expect(runtime.get(SETTINGS_RUNTIME_PLUGIN_ID)?.status).toBe("active")
+    expect(runtime.get(feature.manifest.id)?.status).toBe("active")
+
+    firstPanel()
+    replacementPanel()
     runtime.dispose()
   })
 })

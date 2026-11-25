@@ -348,9 +348,7 @@ describe("@orahako/ui-settings", () => {
     expect(settingsHtml).toContain("ACCOUNT_CONTRIB")
     expect(settingsHtml).toContain("通知渠道")
     expect(settingsHtml).toContain("管理推送渠道")
-    expect(settingsHtml).toContain(
-      'href="/?plugin=orahako.settings&amp;page=category&amp;category=channels"'
-    )
+    expect(settingsHtml).toContain('href="/?route=settings-category&amp;category=channels"')
 
     // Switch locale to English and verify category row & labels localize
     host.i18n?.setLocale("en")

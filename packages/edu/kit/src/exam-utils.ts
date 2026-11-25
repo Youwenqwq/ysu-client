@@ -1,6 +1,6 @@
 import type { Exam } from "@orahako/academic-sdk"
 
-import { parseAcademicDateTime } from "./time"
+import { DEFAULT_ACADEMIC_TIME_ZONE, parseAcademicDateTime } from "./time"
 
 function dateFromTimestamp(value: number | undefined): Date | null {
   if (value === undefined) return null
@@ -14,33 +14,47 @@ function formatTimeFromDateTime(value: string | undefined): string | null {
   return match?.[1] ?? null
 }
 
-export function getExamStartTime(exam: Exam): Date | null {
-  return dateFromTimestamp(exam.startTimestamp) ?? parseAcademicDateTime(exam.startAt)
+export function getExamStartTime(
+  exam: Exam,
+  timeZone: string = DEFAULT_ACADEMIC_TIME_ZONE
+): Date | null {
+  return dateFromTimestamp(exam.startTimestamp) ?? parseAcademicDateTime(exam.startAt, timeZone)
 }
 
-export function getExamEndTime(exam: Exam): Date | null {
+export function getExamEndTime(
+  exam: Exam,
+  timeZone: string = DEFAULT_ACADEMIC_TIME_ZONE
+): Date | null {
   return (
     dateFromTimestamp(exam.endTimestamp) ??
-    parseAcademicDateTime(exam.endAt) ??
-    getExamStartTime(exam)
+    parseAcademicDateTime(exam.endAt, timeZone) ??
+    getExamStartTime(exam, timeZone)
   )
 }
 
-export function isExamCompleted(exam: Exam, now: Date = new Date()): boolean {
-  const end = getExamEndTime(exam)
+export function isExamCompleted(
+  exam: Exam,
+  now: Date = new Date(),
+  timeZone: string = DEFAULT_ACADEMIC_TIME_ZONE
+): boolean {
+  const end = getExamEndTime(exam, timeZone)
   if (end) return end < now
   if (exam.status === "completed") return true
   if (exam.status === "upcoming") return false
   return false
 }
 
-export function compareExamStartTime(a: Exam, b: Exam): number {
-  const aStart = getExamStartTime(a)?.getTime() ?? Number.POSITIVE_INFINITY
-  const bStart = getExamStartTime(b)?.getTime() ?? Number.POSITIVE_INFINITY
+export function compareExamStartTime(
+  a: Exam,
+  b: Exam,
+  timeZone: string = DEFAULT_ACADEMIC_TIME_ZONE
+): number {
+  const aStart = getExamStartTime(a, timeZone)?.getTime() ?? Number.POSITIVE_INFINITY
+  const bStart = getExamStartTime(b, timeZone)?.getTime() ?? Number.POSITIVE_INFINITY
   if (aStart !== bStart) return aStart - bStart
 
-  const aEnd = getExamEndTime(a)?.getTime() ?? Number.POSITIVE_INFINITY
-  const bEnd = getExamEndTime(b)?.getTime() ?? Number.POSITIVE_INFINITY
+  const aEnd = getExamEndTime(a, timeZone)?.getTime() ?? Number.POSITIVE_INFINITY
+  const bEnd = getExamEndTime(b, timeZone)?.getTime() ?? Number.POSITIVE_INFINITY
   return aEnd - bEnd
 }
 

@@ -103,6 +103,15 @@ export interface PluginI18nService {
   translator<D extends DefinedDictionary>(dictionary: D): Translator<D>
   getLocale(): PluginLocale
   setLocale(locale: PluginLocale): void
+  /** Read-only cross-plugin resolution, e.g. overview widget dictionaries. */
+  translate(
+    pluginId: string,
+    key: string,
+    locale: PluginLocale,
+    params?: Record<string, string | number>
+  ): string
+  /** Read-only merged dictionary snapshot for the requested locale. */
+  getDictionary<T extends PluginDictionary>(locale: PluginLocale, base: T): T
 }
 
 export interface PluginI18nRegistryService extends PluginI18nService {

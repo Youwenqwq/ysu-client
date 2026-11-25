@@ -83,6 +83,7 @@ describe("runEpayAutoCheck (scoped epaySettingsStore)", () => {
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },

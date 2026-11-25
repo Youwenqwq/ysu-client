@@ -62,7 +62,6 @@ const EVALUATION_INJECT = [
   "provider",
   "session",
   "query",
-  "overview",
 ] as const
 
 const evaluationManifest: PluginManifest = {
@@ -79,6 +78,7 @@ const evaluationManifest: PluginManifest = {
 export const evaluationPlugin = definePlugin({
   manifest: evaluationManifest,
   inject: EVALUATION_INJECT,
+  optionalInject: ["overview"] as const,
   apply(ctx) {
     const { ui, slots, router, i18n, provider, session, query, overview } = ctx
     i18n.register(evaluationDictionary)
@@ -109,7 +109,7 @@ export const evaluationPlugin = definePlugin({
       query.invalidate({ feature: "evaluation-tasks" })
     }
 
-    overview.registerWidget(
+    overview?.registerWidget(
       {
         id: EVALUATION_SUMMARY_WIDGET_ID,
         title: "评教数量",
@@ -133,7 +133,7 @@ export const evaluationPlugin = definePlugin({
       EvaluationSummaryWidget
     )
 
-    overview.registerWidget(
+    overview?.registerWidget(
       {
         id: PENDING_EVALUATIONS_WIDGET_ID,
         title: "评教任务",

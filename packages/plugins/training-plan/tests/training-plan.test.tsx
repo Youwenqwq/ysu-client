@@ -417,6 +417,7 @@ describe("@orahako/plugin-training-plan", () => {
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },
@@ -603,6 +604,7 @@ describe("@orahako/plugin-training-plan", () => {
       async initialize() {},
       async reset() {},
       async logout() {},
+      async dispose() {},
       async relogin() {
         return true
       },

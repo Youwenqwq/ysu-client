@@ -12,12 +12,7 @@ import {
   type TermCalendar,
 } from "@orahako/academic-sdk"
 import { createMinuteClockSource, createParameterizedQuerySource } from "@orahako/academic-kit"
-import {
-  definePlugin,
-  PLUGIN_API_VERSION,
-  pluginPageHref,
-  type PluginManifest,
-} from "@orahako/sdk"
+import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/sdk"
 import {
   ClassReminderAndWidgetController,
   NOTIFICATIONS_CORE_CAPABILITY,
@@ -135,8 +130,6 @@ export type {
   WidgetAssistantPosition,
 }
 
-const SETTINGS_CATEGORY_HOST_PLUGIN_ID = "orahako.settings"
-
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
 
@@ -184,7 +177,6 @@ const scheduleManifest: PluginManifest = {
     "session",
     "query",
     "notifications",
-    "overview",
     "native",
     "widgets",
     "assets",
@@ -205,11 +197,11 @@ export const schedulePlugin = definePlugin({
     "session",
     "query",
     "notifications",
-    "overview",
     "native",
     "widgets",
     "assets",
   ] as const,
+  optionalInject: ["overview"] as const,
   apply(ctx) {
     const {
       ui,
@@ -445,16 +437,13 @@ export const schedulePlugin = definePlugin({
       },
     }
 
-    const widgetsSettingsHref = router.href(
-      pluginPageHref(SETTINGS_CATEGORY_HOST_PLUGIN_ID, "category", { category: "widgets" })
-    )
+    const widgetsSettingsHref = router.href({
+      route: "settings-category",
+      params: { category: "widgets" },
+    })
 
     const openWidgetsSettings = (): void => {
-      router.push({
-        pluginId: SETTINGS_CATEGORY_HOST_PLUGIN_ID,
-        pageId: "category",
-        params: { category: "widgets" },
-      })
+      router.push({ route: "settings-category", params: { category: "widgets" } })
     }
 
     const isSchoolScheduleRouteAvailable = (): boolean =>
@@ -484,6 +473,7 @@ export const schedulePlugin = definePlugin({
 
     notifications.registerChannel({
       id: "schedule",
+      order: 30,
       slice: "timetable",
       onDisable: () => controller.handleChannelDisabled(),
       onEnable: () => controller.handleChannelEnabled(),
@@ -580,7 +570,7 @@ export const schedulePlugin = definePlugin({
       mobileBridge,
     })
 
-    overview.registerWidget(
+    overview?.registerWidget(
       {
         id: COURSE_PROGRESS_WIDGET_ID,
         title: "课程动态",
@@ -599,7 +589,7 @@ export const schedulePlugin = definePlugin({
       CourseProgressWidget
     )
 
-    overview.registerWidget(
+    overview?.registerWidget(
       {
         id: TODAY_COURSES_WIDGET_ID,
         title: "今日课程",
