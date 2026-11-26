@@ -1880,13 +1880,10 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         <ResponsiveModal open={calendarSyncOpen} onOpenChange={setCalendarSyncOpen}>
           <ResponsiveModalContent className="sm:max-w-md">
             <ResponsiveModalHeader>
-              <ResponsiveModalTitle className="flex items-center gap-2">
+              <ResponsiveModalTitle className="flex items-center justify-center gap-2 md:justify-start">
                 <CalendarSync className="size-4 text-primary" />
                 {t("settings.calendarSyncTitle")}
               </ResponsiveModalTitle>
-              <ResponsiveModalDescription>
-                {t("settings.calendarSyncHint")}
-              </ResponsiveModalDescription>
             </ResponsiveModalHeader>
             <ResponsiveModalBody className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3 py-1">
@@ -1998,7 +1995,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         <ResponsiveModal open={webcalOpen} onOpenChange={setWebcalOpen}>
           <ResponsiveModalContent className="sm:max-w-md">
             <ResponsiveModalHeader>
-              <ResponsiveModalTitle className="flex items-center gap-2">
+              <ResponsiveModalTitle className="flex items-center justify-center gap-2 md:justify-start">
                 <Link2 className="size-4 text-primary" />
                 {t("schedule.webcalTitle")}
               </ResponsiveModalTitle>
@@ -2093,10 +2090,6 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                   {t("schedule.webcalEnable")}
                 </Button>
               )}
-
-              <p className="border-t border-border pt-2 text-xs leading-5 text-muted-foreground">
-                {t("schedule.webcalPrivacyNote")}
-              </p>
             </ResponsiveModalBody>
             <ResponsiveModalFooter>
               {settings.webcalEnabled && (
@@ -2122,7 +2115,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         <ResponsiveModal open={shareOpen} onOpenChange={setShareOpen}>
           <ResponsiveModalContent className="overflow-hidden sm:max-w-md">
             <ResponsiveModalHeader>
-              <ResponsiveModalTitle className="flex items-center gap-2">
+              <ResponsiveModalTitle className="flex items-center justify-center gap-2 md:justify-start">
                 <Share2 className="size-4 text-primary" />
                 {t("schedule.shareTitle")}
               </ResponsiveModalTitle>

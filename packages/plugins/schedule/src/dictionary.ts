@@ -83,7 +83,7 @@ export const scheduleDictionary = defineDictionary({
       exportIcsEmpty: "当前学期暂无可导出的日程",
       syncSystemCalendar: "系统日历同步",
       webcalSubscribe: "日历订阅 (iOS / 跨平台)",
-      webcalTitle: "日历订阅（webcal://）",
+      webcalTitle: "日历订阅",
       webcalDesc: "生成专属订阅链接，一键添加到 iOS 日历、macOS、Google Calendar 等并支持定时更新",
       webcalEnable: "生成 / 更新订阅链接",
       webcalOpenApp: "一键订阅日历",
@@ -96,8 +96,6 @@ export const scheduleDictionary = defineDictionary({
       webcalRotatedToast: "已重置订阅链接，请在日历 App 中重新订阅",
       webcalClearedToast: "已停用并清除云端日历缓存",
       webcalFailedToast: "订阅更新失败，请检查网络或确认服务端已配置 KV",
-      webcalPrivacyNote:
-        "仅托管生成的 .ics 日历文本，不上传任何教务账号密码。iOS 系统日历按系统周期自动拉取更新；链接等同于只读凭证，请勿随意转发。",
       shareSchedule: "分享日程链接",
       shareTitle: "分享日程",
       shareMask: "隐私遮罩",
@@ -531,7 +529,7 @@ export const scheduleDictionary = defineDictionary({
       exportIcsEmpty: "No schedule items available to export",
       syncSystemCalendar: "System calendar sync",
       webcalSubscribe: "Calendar subscription (iOS / Web)",
-      webcalTitle: "Calendar Subscription (webcal://)",
+      webcalTitle: "Calendar Subscription",
       webcalDesc:
         "Create a private subscription URL for Apple Calendar (iOS/macOS), Google Calendar, and Outlook",
       webcalEnable: "Create / update subscription",
@@ -545,8 +543,6 @@ export const scheduleDictionary = defineDictionary({
       webcalRotatedToast: "Subscription URL reset; please re-subscribe in your calendar app",
       webcalClearedToast: "Subscription disabled and removed from cloud cache",
       webcalFailedToast: "Failed to update subscription. Please check network or KV setup.",
-      webcalPrivacyNote:
-        "Only the generated .ics text is hosted—no university credentials are ever uploaded. iOS Calendar refreshes automatically on its own schedule; treat this URL as private.",
       shareSchedule: "Share schedule link",
       shareTitle: "Share Schedule",
       shareMask: "Privacy mask",
