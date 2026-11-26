@@ -24,6 +24,16 @@ export interface WidgetAssistantPosition {
   readonly y: number
 }
 
+export interface SharedScheduleLinkRecord {
+  readonly shareId: string
+  readonly writeToken: string
+  readonly createdAt: number
+  readonly expiresAt: number
+  readonly masked: boolean
+  readonly includePersonal: boolean
+  readonly includeExams: boolean
+}
+
 export interface ScheduleSettingsState {
   readonly compactMode: boolean
   readonly widgetSyncReminderHours: number
@@ -45,10 +55,11 @@ export interface ScheduleSettingsState {
   readonly webcalWriteToken: string | null
   readonly webcalLastSyncedAt: number | null
   readonly webcalLastSyncedCount: number | null
-  readonly shareId: string | null
-  readonly shareWriteToken: string | null
-  readonly shareExpiresAt: number | null
-  readonly shareBusyOnly: boolean
+  readonly sharedLinks: readonly SharedScheduleLinkRecord[]
+  readonly shareMaskEnabled: boolean
+  readonly shareMaskShowTitle: boolean
+  readonly shareMaskShowLocation: boolean
+  readonly shareMaskShowSubtitle: boolean
   readonly shareIncludePersonal: boolean
   readonly shareIncludeExams: boolean
   readonly shareTtlDays: number
@@ -81,10 +92,11 @@ export const scheduleSettingsStore = defineStore({
     webcalWriteToken: null,
     webcalLastSyncedAt: null,
     webcalLastSyncedCount: null,
-    shareId: null,
-    shareWriteToken: null,
-    shareExpiresAt: null,
-    shareBusyOnly: false,
+    sharedLinks: [],
+    shareMaskEnabled: false,
+    shareMaskShowTitle: false,
+    shareMaskShowLocation: false,
+    shareMaskShowSubtitle: false,
     shareIncludePersonal: false,
     shareIncludeExams: false,
     shareTtlDays: 7,
@@ -211,9 +223,36 @@ export const scheduleSettingsStore = defineStore({
         webcalLastSyncedAt: null,
       }))
     },
-    setShareBusyOnly(ctx, busyOnly: boolean) {
+    setShareMaskEnabled(ctx, enabled: boolean) {
       ctx.set((prev) =>
-        prev.shareBusyOnly === busyOnly ? prev : { ...prev, shareBusyOnly: busyOnly }
+        prev.shareMaskEnabled === enabled
+          ? prev
+          : {
+              ...prev,
+              shareMaskEnabled: enabled,
+              ...(enabled
+                ? {
+                    shareMaskShowTitle: false,
+                    shareMaskShowLocation: false,
+                    shareMaskShowSubtitle: false,
+                  }
+                : {}),
+            }
+      )
+    },
+    setShareMaskShowTitle(ctx, show: boolean) {
+      ctx.set((prev) =>
+        prev.shareMaskShowTitle === show ? prev : { ...prev, shareMaskShowTitle: show }
+      )
+    },
+    setShareMaskShowLocation(ctx, show: boolean) {
+      ctx.set((prev) =>
+        prev.shareMaskShowLocation === show ? prev : { ...prev, shareMaskShowLocation: show }
+      )
+    },
+    setShareMaskShowSubtitle(ctx, show: boolean) {
+      ctx.set((prev) =>
+        prev.shareMaskShowSubtitle === show ? prev : { ...prev, shareMaskShowSubtitle: show }
       )
     },
     setShareIncludePersonal(ctx, includePersonal: boolean) {
@@ -231,31 +270,27 @@ export const scheduleSettingsStore = defineStore({
       )
     },
     setShareTtlDays(ctx, ttlDays: number) {
-      const clamped = clampInt(ttlDays, 1, 180, 7)
+      const clamped = clampInt(ttlDays, 1, 7, 7)
       ctx.set((prev) => (prev.shareTtlDays === clamped ? prev : { ...prev, shareTtlDays: clamped }))
     },
-    setSharePublished(
-      ctx,
-      payload: {
-        readonly shareId: string
-        readonly writeToken: string
-        readonly expiresAt: number
-      }
-    ) {
-      ctx.set((prev) => ({
-        ...prev,
-        shareId: payload.shareId,
-        shareWriteToken: payload.writeToken,
-        shareExpiresAt: payload.expiresAt,
-      }))
+    addSharedLink(ctx, record: SharedScheduleLinkRecord) {
+      ctx.set((prev) => {
+        const list = Array.isArray(prev.sharedLinks) ? prev.sharedLinks : []
+        return {
+          ...prev,
+          sharedLinks: [record, ...list.filter((item) => item.shareId !== record.shareId)].slice(
+            0,
+            20
+          ),
+        }
+      })
     },
-    clearShare(ctx) {
-      ctx.set((prev) => ({
-        ...prev,
-        shareId: null,
-        shareWriteToken: null,
-        shareExpiresAt: null,
-      }))
+    removeSharedLink(ctx, shareId: string) {
+      ctx.set((prev) => {
+        const list = Array.isArray(prev.sharedLinks) ? prev.sharedLinks : []
+        const next = list.filter((item) => item.shareId !== shareId)
+        return next.length === list.length ? prev : { ...prev, sharedLinks: next }
+      })
     },
     reset(ctx) {
       ctx.reset()

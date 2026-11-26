@@ -112,6 +112,7 @@ import {
   type ScheduleSettingsStoreInstance,
   type ScheduleViewState,
   type ScheduleViewStoreInstance,
+  type SharedScheduleLinkRecord,
   type WidgetAssistantPosition,
 } from "./stores"
 
@@ -157,6 +158,7 @@ export type {
   ScheduleSyncInput,
   ScheduleViewState,
   ScheduleViewStoreInstance,
+  SharedScheduleLinkRecord,
   ScheduleWidgetAssistantSettingsInject,
   ScheduleWidgetAssistantSettingsProps,
   ScheduleWidgetId,
@@ -863,25 +865,13 @@ export const schedulePlugin = definePlugin({
     const shareApiEndpoint = `${shareOrigin}/api/share`
     const shareViewerBaseUrl = `${shareOrigin}/share`
 
-    const publishScheduleShare = async (
+    const createScheduleShare = async (
       payload: SharedSchedulePayload,
       ttlSeconds: number,
-      rotate = false
-    ): Promise<{ readonly shareId: string; readonly expiresAt: number }> => {
-      const current = settingsStore.source.getSnapshot()
-      if (rotate && current.shareId && current.shareWriteToken) {
-        await fetch(shareApiEndpoint, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            shareId: current.shareId,
-            writeToken: current.shareWriteToken,
-          }),
-        }).catch(() => {})
-      }
-      const shareId = !rotate && current.shareId ? current.shareId : generateWebcalToken()
-      const writeToken =
-        !rotate && current.shareWriteToken ? current.shareWriteToken : generateWebcalToken()
+      meta: { readonly includePersonal: boolean; readonly includeExams: boolean }
+    ): Promise<SharedScheduleLinkRecord> => {
+      const shareId = generateWebcalToken()
+      const writeToken = generateWebcalToken()
 
       const response = await fetch(shareApiEndpoint, {
         method: "PUT",
@@ -892,29 +882,40 @@ export const schedulePlugin = definePlugin({
         const detail = await response.text().catch(() => "")
         throw new Error(detail || `HTTP ${response.status}`)
       }
-      const data = (await response.json().catch(() => null)) as { expiresAt?: number } | null
-      const expiresAt = data?.expiresAt ?? Date.now() + ttlSeconds * 1000
-      settingsStore.actions.setSharePublished({
+      const data = (await response.json().catch(() => null)) as {
+        updatedAt?: number
+        expiresAt?: number
+      } | null
+      const now = data?.updatedAt ?? Date.now()
+      const expiresAt = data?.expiresAt ?? now + ttlSeconds * 1000
+      const record: SharedScheduleLinkRecord = {
         shareId,
         writeToken,
+        createdAt: now,
         expiresAt,
-      })
-      return { shareId, expiresAt }
+        masked: payload.masked,
+        includePersonal: meta.includePersonal,
+        includeExams: meta.includeExams,
+      }
+      settingsStore.actions.addSharedLink(record)
+      return record
     }
 
-    const revokeScheduleShare = async (): Promise<void> => {
+    const revokeScheduleShare = async (shareId: string): Promise<void> => {
       const current = settingsStore.source.getSnapshot()
-      if (current.shareId && current.shareWriteToken) {
+      const list = Array.isArray(current.sharedLinks) ? current.sharedLinks : []
+      const target = list.find((item) => item.shareId === shareId)
+      if (target && target.expiresAt > Date.now()) {
         await fetch(shareApiEndpoint, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            shareId: current.shareId,
-            writeToken: current.shareWriteToken,
+            shareId: target.shareId,
+            writeToken: target.writeToken,
           }),
         }).catch(() => {})
       }
-      settingsStore.actions.clearShare()
+      settingsStore.actions.removeSharedLink(shareId)
     }
 
     ui.registerPage(
@@ -976,9 +977,16 @@ export const schedulePlugin = definePlugin({
           setWebcalWriteReminders: (write: boolean) =>
             settingsStore.actions.setWebcalWriteReminders(write),
           shareViewerBaseUrl,
-          publishScheduleShare,
+          createScheduleShare,
           revokeScheduleShare,
-          setShareBusyOnly: (busyOnly: boolean) => settingsStore.actions.setShareBusyOnly(busyOnly),
+          setShareMaskEnabled: (enabled: boolean) =>
+            settingsStore.actions.setShareMaskEnabled(enabled),
+          setShareMaskShowTitle: (show: boolean) =>
+            settingsStore.actions.setShareMaskShowTitle(show),
+          setShareMaskShowLocation: (show: boolean) =>
+            settingsStore.actions.setShareMaskShowLocation(show),
+          setShareMaskShowSubtitle: (show: boolean) =>
+            settingsStore.actions.setShareMaskShowSubtitle(show),
           setShareIncludePersonal: (include: boolean) =>
             settingsStore.actions.setShareIncludePersonal(include),
           setShareIncludeExams: (include: boolean) =>

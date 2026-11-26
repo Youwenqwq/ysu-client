@@ -21,7 +21,7 @@ const SHARE_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const WRITE_TOKEN_RE = /^[A-Za-z0-9_-]{24,64}$/;
 const MAX_SHARE_BYTES = 64 * 1024; // 64 KB
 const MIN_TTL_SECONDS = 3600; // 1 hour
-const MAX_TTL_SECONDS = 60 * 60 * 24 * 180; // 180 days
+const MAX_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days max
 const DEFAULT_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 const ALLOWED_ORIGINS = new Set([

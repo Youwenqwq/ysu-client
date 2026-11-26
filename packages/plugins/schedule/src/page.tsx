@@ -138,6 +138,7 @@ import {
   type SchedulePatchMutators,
   type ScheduleSettingsState,
   type ScheduleViewStoreInstance,
+  type SharedScheduleLinkRecord,
   type WidgetAssistantPosition,
 } from "./stores"
 import { WidgetDiscovery } from "./widget-discovery"
@@ -209,13 +210,16 @@ export interface SchedulePageInject {
   readonly setWebcalIncludeExams?: (include: boolean) => void
   readonly setWebcalWriteReminders?: (write: boolean) => void
   readonly shareViewerBaseUrl?: string
-  readonly publishScheduleShare?: (
+  readonly createScheduleShare?: (
     payload: SharedSchedulePayload,
     ttlSeconds: number,
-    rotate?: boolean
-  ) => Promise<{ readonly shareId: string; readonly expiresAt: number }>
-  readonly revokeScheduleShare?: () => Promise<void>
-  readonly setShareBusyOnly?: (busyOnly: boolean) => void
+    meta: { readonly includePersonal: boolean; readonly includeExams: boolean }
+  ) => Promise<SharedScheduleLinkRecord>
+  readonly revokeScheduleShare?: (shareId: string) => Promise<void>
+  readonly setShareMaskEnabled?: (enabled: boolean) => void
+  readonly setShareMaskShowTitle?: (show: boolean) => void
+  readonly setShareMaskShowLocation?: (show: boolean) => void
+  readonly setShareMaskShowSubtitle?: (show: boolean) => void
   readonly setShareIncludePersonal?: (include: boolean) => void
   readonly setShareIncludeExams?: (include: boolean) => void
   readonly setShareTtlDays?: (days: number) => void
@@ -962,14 +966,14 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     }
   }
 
-  const shareUrl =
-    settings.shareId && props.shareViewerBaseUrl
-      ? `${props.shareViewerBaseUrl}?id=${encodeURIComponent(settings.shareId)}`
-      : null
-  const isShareExpired = Boolean(settings.shareExpiresAt && clockTick > settings.shareExpiresAt)
+  const sharedLinks = Array.isArray(settings.sharedLinks) ? settings.sharedLinks : []
+  const activeSharedLinkCount = sharedLinks.filter((item) => item.expiresAt > clockTick).length
 
-  const handlePublishShare = async (): Promise<void> => {
-    if (!props.publishScheduleShare) return
+  const buildShareUrl = (shareId: string): string =>
+    props.shareViewerBaseUrl ? `${props.shareViewerBaseUrl}?id=${encodeURIComponent(shareId)}` : ""
+
+  const handleCreateShare = async (): Promise<void> => {
+    if (!props.createScheduleShare) return
     const payload = buildSharedSchedulePayload({
       courses,
       extraEntries: overlayEntries,
@@ -977,7 +981,12 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
       currentWeek: currentWeek ?? snapshot,
       calendar: termCalendar,
       timeZone,
-      busyOnly: settings.shareBusyOnly,
+      privacy: {
+        enabled: settings.shareMaskEnabled,
+        showTitle: settings.shareMaskShowTitle,
+        showLocation: settings.shareMaskShowLocation,
+        showSubtitle: settings.shareMaskShowSubtitle,
+      },
       includePersonal: settings.shareIncludePersonal,
       includeExams: settings.shareIncludeExams,
       examTitlePrefix: t("schedule.examTitlePrefix"),
@@ -990,9 +999,16 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     }
     setSharePending(true)
     try {
-      const ttlSeconds = Math.max(1, settings.shareTtlDays) * 86400
-      await props.publishScheduleShare(payload, ttlSeconds, isShareExpired)
-      toast.success(t("schedule.shareUpdatedToast"))
+      const ttlSeconds = Math.min(7, Math.max(1, settings.shareTtlDays)) * 86400
+      const created = await props.createScheduleShare(payload, ttlSeconds, {
+        includePersonal: settings.shareIncludePersonal,
+        includeExams: settings.shareIncludeExams,
+      })
+      const url = buildShareUrl(created.shareId)
+      if (url) {
+        await navigator.clipboard?.writeText(url).catch(() => {})
+      }
+      toast.success(t("schedule.shareCreatedToast"))
     } catch {
       toast.error(t("schedule.shareFailedToast"))
     } finally {
@@ -1000,11 +1016,11 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     }
   }
 
-  const handleRevokeShare = async (): Promise<void> => {
+  const handleRevokeShare = async (shareId: string): Promise<void> => {
     if (!props.revokeScheduleShare) return
     setSharePending(true)
     try {
-      await props.revokeScheduleShare()
+      await props.revokeScheduleShare(shareId)
       toast.success(t("schedule.shareRevokedToast"))
     } catch {
       toast.error(t("schedule.shareFailedToast"))
@@ -1013,10 +1029,11 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     }
   }
 
-  const handleCopyShareUrl = async (): Promise<void> => {
-    if (!shareUrl) return
+  const handleCopyShareUrl = async (shareId: string): Promise<void> => {
+    const url = buildShareUrl(shareId)
+    if (!url) return
     try {
-      await navigator.clipboard?.writeText(shareUrl)
+      await navigator.clipboard?.writeText(url)
       toast.success(t("schedule.shareCopied"))
     } catch {
       toast.error(t("schedule.shareFailedToast"))
@@ -1245,7 +1262,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                   )}
                 </DropdownMenuItem>
               )}
-              {props.publishScheduleShare && (
+              {props.createScheduleShare && (
                 <DropdownMenuItem
                   disabled={courses.length === 0 && overlayEntries.length === 0}
                   onSelect={() => {
@@ -1255,9 +1272,9 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 >
                   <Share2 className="mr-2 size-4" />
                   <span className="flex-1">{t("schedule.shareSchedule")}</span>
-                  {settings.shareId && !isShareExpired && (
+                  {activeSharedLinkCount > 0 && (
                     <Badge variant="secondary" className="ml-2 text-[10px]">
-                      ON
+                      {activeSharedLinkCount}
                     </Badge>
                   )}
                 </DropdownMenuItem>
@@ -1828,7 +1845,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         </ResponsiveModal>
       )}
 
-      {props.publishScheduleShare && (
+      {props.createScheduleShare && (
         <ResponsiveModal open={shareOpen} onOpenChange={setShareOpen}>
           <ResponsiveModalContent className="sm:max-w-md">
             <ResponsiveModalHeader>
@@ -1836,20 +1853,53 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 <Share2 className="size-4 text-primary" />
                 {t("schedule.shareTitle")}
               </ResponsiveModalTitle>
-              <ResponsiveModalDescription>{t("schedule.shareDesc")}</ResponsiveModalDescription>
             </ResponsiveModalHeader>
             <ResponsiveModalBody className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-sm">{t("schedule.shareBusyOnly")}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {t("schedule.shareBusyOnlyHint")}
-                  </span>
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium">{t("schedule.shareMask")}</span>
+                  <Switch
+                    checked={settings.shareMaskEnabled}
+                    onCheckedChange={(checked) => props.setShareMaskEnabled?.(checked)}
+                  />
                 </div>
-                <Switch
-                  checked={settings.shareBusyOnly}
-                  onCheckedChange={(checked) => props.setShareBusyOnly?.(checked)}
-                />
+                {settings.shareMaskEnabled && (
+                  <div className="flex flex-col gap-1.5 rounded-lg border bg-muted/30 px-3 py-2.5">
+                    <span className="text-xs text-muted-foreground">
+                      {t("schedule.shareMaskFieldsLabel")}
+                    </span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={settings.shareMaskShowTitle ? "default" : "outline"}
+                        onClick={() => props.setShareMaskShowTitle?.(!settings.shareMaskShowTitle)}
+                      >
+                        {t("schedule.shareMaskShowTitle")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={settings.shareMaskShowLocation ? "default" : "outline"}
+                        onClick={() =>
+                          props.setShareMaskShowLocation?.(!settings.shareMaskShowLocation)
+                        }
+                      >
+                        {t("schedule.shareMaskShowLocation")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={settings.shareMaskShowSubtitle ? "default" : "outline"}
+                        onClick={() =>
+                          props.setShareMaskShowSubtitle?.(!settings.shareMaskShowSubtitle)
+                        }
+                      >
+                        {t("schedule.shareMaskShowSubtitle")}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
@@ -1870,20 +1920,21 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
 
               <div className="flex flex-col gap-2 border-t border-border pt-3">
                 <span className="text-sm">{t("schedule.shareTtlLabel")}</span>
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-3 gap-1.5">
                   {(
                     [
                       { days: 1, label: t("schedule.shareTtl1d") },
+                      { days: 3, label: t("schedule.shareTtl3d") },
                       { days: 7, label: t("schedule.shareTtl7d") },
-                      { days: 30, label: t("schedule.shareTtl30d") },
-                      { days: 180, label: t("schedule.shareTtl180d") },
                     ] as const
                   ).map((opt) => (
                     <Button
                       key={opt.days}
                       type="button"
                       size="sm"
-                      variant={settings.shareTtlDays === opt.days ? "default" : "outline"}
+                      variant={
+                        Math.min(7, settings.shareTtlDays) === opt.days ? "default" : "outline"
+                      }
                       onClick={() => props.setShareTtlDays?.(opt.days)}
                     >
                       {opt.label}
@@ -1892,77 +1943,109 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 </div>
               </div>
 
-              {shareUrl ? (
+              <Button
+                type="button"
+                disabled={sharePending}
+                onClick={() => void handleCreateShare()}
+              >
+                <Share2 className="mr-1.5 size-4" />
+                {t("schedule.shareGenerate")}
+              </Button>
+
+              {sharedLinks.length > 0 && (
                 <div className="flex flex-col gap-2 border-t border-border pt-3">
-                  <div className="rounded-md border bg-muted/40 px-2.5 py-2 font-mono text-[11px] break-all text-muted-foreground">
-                    {shareUrl}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={isShareExpired}
-                      onClick={() => void handleCopyShareUrl()}
-                    >
-                      <Copy className="mr-1.5 size-3.5" />
-                      {t("schedule.shareCopyLink")}
-                    </Button>
-                    <Button asChild size="sm" variant="outline">
-                      <a href={shareUrl} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="mr-1.5 size-3.5" />
-                        {t("schedule.shareOpenLink")}
-                      </a>
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                    <span className="text-xs text-muted-foreground">
-                      {isShareExpired
-                        ? t("schedule.shareExpired")
-                        : settings.shareExpiresAt
-                          ? t("schedule.shareExpiresAt", {
-                              date: new Date(settings.shareExpiresAt).toISOString().slice(0, 10),
-                            })
-                          : ""}
-                    </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={sharePending}
-                      onClick={() => void handlePublishShare()}
-                    >
-                      <RefreshCw className="mr-1 size-3.5" />
-                      {t("schedule.shareUpdateNow")}
-                    </Button>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {t("schedule.shareLinksTitle")}
+                  </span>
+                  <div className="flex max-h-52 flex-col gap-2 overflow-y-auto pr-0.5">
+                    {sharedLinks.map((link) => {
+                      const url = buildShareUrl(link.shareId)
+                      const expired = clockTick > link.expiresAt
+                      return (
+                        <div
+                          key={link.shareId}
+                          className="flex flex-col gap-1.5 rounded-lg border bg-muted/25 p-2.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-1">
+                              {expired ? (
+                                <Badge variant="outline" className="text-[10px]">
+                                  {t("schedule.shareExpiredBadge")}
+                                </Badge>
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground">
+                                  {t("schedule.shareExpiresAt", {
+                                    date: new Date(link.expiresAt).toISOString().slice(0, 10),
+                                  })}
+                                </span>
+                              )}
+                              {link.masked && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {t("schedule.shareTagMasked")}
+                                </Badge>
+                              )}
+                              {link.includePersonal && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {t("schedule.shareTagPersonal")}
+                                </Badge>
+                              )}
+                              {link.includeExams && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {t("schedule.shareTagExams")}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              {!expired && (
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    aria-label={t("schedule.shareCopyLink")}
+                                    onClick={() => void handleCopyShareUrl(link.shareId)}
+                                  >
+                                    <Copy className="size-3.5" />
+                                  </Button>
+                                  <Button
+                                    asChild
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    aria-label={t("schedule.shareOpenLink")}
+                                  >
+                                    <a href={url} target="_blank" rel="noopener noreferrer">
+                                      <ExternalLink className="size-3.5" />
+                                    </a>
+                                  </Button>
+                                </>
+                              )}
+                              <Button
+                                type="button"
+                                size="icon-sm"
+                                variant="ghost"
+                                disabled={sharePending}
+                                aria-label={
+                                  expired
+                                    ? t("schedule.shareRemoveExpired")
+                                    : t("schedule.shareRevoke")
+                                }
+                                onClick={() => void handleRevokeShare(link.shareId)}
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="truncate font-mono text-[11px] text-muted-foreground">
+                            {url}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
-              ) : (
-                <Button
-                  type="button"
-                  disabled={sharePending}
-                  onClick={() => void handlePublishShare()}
-                >
-                  <Share2 className="mr-1.5 size-4" />
-                  {t("schedule.shareGenerate")}
-                </Button>
               )}
-
-              <p className="border-t border-border pt-2 text-xs leading-5 text-muted-foreground">
-                {t("schedule.sharePrivacyNote")}
-              </p>
             </ResponsiveModalBody>
             <ResponsiveModalFooter>
-              {settings.shareId && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={sharePending}
-                  onClick={() => void handleRevokeShare()}
-                >
-                  <Trash2 className="mr-1.5 size-4" />
-                  {t("schedule.shareRevoke")}
-                </Button>
-              )}
               <Button type="button" onClick={() => setShareOpen(false)}>
                 {t("closeDialog")}
               </Button>

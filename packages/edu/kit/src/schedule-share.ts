@@ -36,10 +36,17 @@ export interface SharedScheduleItem {
   readonly endTime?: string
 }
 
+export interface SharedSchedulePrivacy {
+  readonly enabled: boolean
+  readonly showTitle?: boolean
+  readonly showLocation?: boolean
+  readonly showSubtitle?: boolean
+}
+
 export interface SharedSchedulePayload {
   readonly version: 1
   readonly title: string
-  readonly busyOnly: boolean
+  readonly masked: boolean
   readonly semester?: string
   readonly termStartDate?: string
   readonly totalWeeks: number
@@ -56,7 +63,7 @@ export interface BuildSharedSchedulePayloadInput {
   readonly currentWeek: CurrentWeek | null
   readonly calendar?: TermCalendar
   readonly timeZone?: string
-  readonly busyOnly?: boolean
+  readonly privacy?: SharedSchedulePrivacy
   readonly includePersonal?: boolean
   readonly includeExams?: boolean
   readonly examTitlePrefix?: string
@@ -75,7 +82,10 @@ function sortUniqueNumbers(values: Iterable<number>): number[] {
 export function buildSharedSchedulePayload(
   input: BuildSharedSchedulePayloadInput
 ): SharedSchedulePayload {
-  const busyOnly = input.busyOnly === true
+  const masked = input.privacy?.enabled === true
+  const showTitle = !masked || input.privacy?.showTitle === true
+  const showLocation = !masked || input.privacy?.showLocation === true
+  const showSubtitle = !masked || input.privacy?.showSubtitle === true
   const includePersonal = input.includePersonal === true
   const includeExams = input.includeExams === true
   const examTitlePrefix = input.examTitlePrefix ?? ""
@@ -125,9 +135,9 @@ export function buildSharedSchedulePayload(
     if (weekDay < 1 || weekDay > 7) continue
     const startTime = periodMap.get(startSection)?.startTime
     const endTime = periodMap.get(endSection)?.endTime
-    const title = busyOnly ? busyLabel : course.name
-    const location = busyOnly ? undefined : course.classroom?.trim() || undefined
-    const subtitle = busyOnly ? undefined : course.teacher?.trim() || undefined
+    const title = showTitle ? course.name : busyLabel
+    const location = showLocation ? course.classroom?.trim() || undefined : undefined
+    const subtitle = showSubtitle ? course.teacher?.trim() || undefined : undefined
 
     const weeks: number[] = []
     if (isScheduleOccurrence(course) && term?.termStartDate) {
@@ -171,7 +181,7 @@ export function buildSharedSchedulePayload(
       title: bucket.title,
       ...(bucket.location ? { location: bucket.location } : {}),
       ...(bucket.subtitle ? { subtitle: bucket.subtitle } : {}),
-      category: busyOnly ? "busy" : "course",
+      category: showTitle ? "course" : "busy",
       weekDay: bucket.weekDay,
       weekList: sortUniqueNumbers(bucket.weeks),
       startSection: bucket.startSection,
@@ -192,15 +202,15 @@ export function buildSharedSchedulePayload(
       entry.category === "exam" && examTitlePrefix && !entry.title.startsWith(examTitlePrefix)
         ? `${examTitlePrefix}${entry.title}`
         : entry.title
-    const title = busyOnly ? busyLabel : rawTitle
-    const location = busyOnly ? undefined : entry.location?.trim() || undefined
-    const subtitle = busyOnly ? undefined : entry.subtitle?.trim() || undefined
+    const title = showTitle ? rawTitle : busyLabel
+    const location = showLocation ? entry.location?.trim() || undefined : undefined
+    const subtitle = showSubtitle ? entry.subtitle?.trim() || undefined : undefined
 
     items.push({
       title,
       ...(location ? { location } : {}),
       ...(subtitle ? { subtitle } : {}),
-      category: busyOnly
+      category: !showTitle
         ? "busy"
         : entry.category === "exam"
           ? "exam"
@@ -227,18 +237,10 @@ export function buildSharedSchedulePayload(
     })
   }
 
-  const autoTitle = busyOnly
-    ? semester
-      ? `${semester} 忙碌时段`
-      : "忙碌时段分享"
-    : semester
-      ? `${semester} 日程`
-      : "日程分享"
-
   return {
     version: 1,
-    title: autoTitle,
-    busyOnly,
+    title: semester ? `${semester} 日程` : "日程",
+    masked,
     ...(semester ? { semester } : {}),
     ...(term?.termStartDate ? { termStartDate: term.termStartDate } : {}),
     totalWeeks,

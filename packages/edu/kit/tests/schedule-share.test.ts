@@ -73,7 +73,7 @@ describe("buildSharedSchedulePayload", () => {
 
     expect(payload.version).toBe(1)
     expect(payload.title).toBe("2026-2027-1 日程")
-    expect(payload.busyOnly).toBe(false)
+    expect(payload.masked).toBe(false)
     expect(payload.items).toHaveLength(1)
     expect(payload.items[0]).toMatchObject({
       title: "高等数学",
@@ -87,38 +87,47 @@ describe("buildSharedSchedulePayload", () => {
     })
   })
 
-  it("supports busyOnly redaction and optional personal/exam inclusion with exam prefix", () => {
-    const full = buildSharedSchedulePayload({
+  it("hides all three fields when privacy mask is enabled and allows selective reveal", () => {
+    const allMasked = buildSharedSchedulePayload({
       courses,
       extraEntries,
       currentWeek,
       calendar,
-      includePersonal: true,
-      includeExams: true,
-      examTitlePrefix: "【考试】",
-    })
-    expect(full.items).toHaveLength(3)
-    expect(full.items.find((i) => i.category === "exam")?.title).toBe("【考试】线性代数")
-    expect(full.items.find((i) => i.category === "event")?.title).toBe("社团例会")
-
-    const busy = buildSharedSchedulePayload({
-      courses,
-      extraEntries,
-      currentWeek,
-      calendar,
-      busyOnly: true,
+      privacy: { enabled: true },
       includePersonal: true,
       includeExams: true,
       busyLabel: "忙碌",
     })
-    expect(busy.title).toBe("2026-2027-1 忙碌时段")
-    expect(busy.busyOnly).toBe(true)
-    expect(busy.items).toHaveLength(3)
-    for (const item of busy.items) {
+    expect(allMasked.masked).toBe(true)
+    expect(allMasked.items).toHaveLength(3)
+    for (const item of allMasked.items) {
       expect(item.title).toBe("忙碌")
       expect(item.category).toBe("busy")
       expect(item.location).toBeUndefined()
       expect(item.subtitle).toBeUndefined()
     }
+
+    const partial = buildSharedSchedulePayload({
+      courses,
+      extraEntries,
+      currentWeek,
+      calendar,
+      privacy: { enabled: true, showTitle: true, showLocation: false, showSubtitle: true },
+      includeExams: true,
+      examTitlePrefix: "【考试】",
+    })
+    expect(partial.masked).toBe(true)
+    expect(partial.items).toHaveLength(2)
+    expect(partial.items[0]).toMatchObject({
+      title: "高等数学",
+      subtitle: "张老师",
+      category: "course",
+    })
+    expect(partial.items[0]?.location).toBeUndefined()
+    expect(partial.items[1]).toMatchObject({
+      title: "【考试】线性代数",
+      category: "exam",
+    })
+    expect(partial.items[1]?.location).toBeUndefined()
   })
 })

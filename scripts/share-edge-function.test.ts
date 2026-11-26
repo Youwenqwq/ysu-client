@@ -24,7 +24,7 @@ describe("EdgeOne /api/share Edge Function", () => {
   const samplePayload = {
     version: 1,
     title: "2026-2027-1 日程",
-    busyOnly: false,
+    masked: false,
     semester: "2026-2027-1",
     termStartDate: "2026-09-07",
     totalWeeks: 20,
@@ -57,16 +57,16 @@ describe("EdgeOne /api/share Edge Function", () => {
         body: JSON.stringify({
           shareId,
           writeToken,
-          ttlSeconds: 86400 * 7,
+          ttlSeconds: 86400 * 30, // exceeds 7d max, should be clamped to 7d
           payload: samplePayload,
         }),
       }),
       env,
     })
     expect(putRes.status).toBe(200)
-    const putBody = (await putRes.json()) as { ok: boolean; expiresAt: number }
+    const putBody = (await putRes.json()) as { ok: boolean; updatedAt: number; expiresAt: number }
     expect(putBody.ok).toBe(true)
-    expect(putBody.expiresAt).toBeGreaterThan(Date.now())
+    expect(putBody.expiresAt - putBody.updatedAt).toBe(86400 * 7 * 1000)
 
     const getRes = await onRequest({
       request: new Request(`https://ysu.welain.com/api/share?id=${shareId}`, {

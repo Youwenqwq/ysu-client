@@ -90,6 +90,7 @@ export {
   type SharedScheduleItem,
   type SharedSchedulePayload,
   type SharedSchedulePeriod,
+  type SharedSchedulePrivacy,
 } from "./schedule-share"
 export {
   buildCalendarSyncEvents,
