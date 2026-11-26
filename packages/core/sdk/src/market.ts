@@ -2,6 +2,7 @@ import semver from "semver"
 import { PLUGIN_API_VERSION } from "./manifest"
 
 export type PluginPlatform = "web" | "android"
+export type MarketplacePluginTrust = "official" | "community"
 
 export interface MarketplaceRelease {
   version: string
@@ -24,6 +25,7 @@ export interface MarketplacePlugin {
   name: string
   summary: string
   author: string
+  trust?: MarketplacePluginTrust
   homepage?: string
   icon?: string
   categories: string[]
@@ -144,6 +146,10 @@ function isPlatform(value: unknown): value is PluginPlatform {
   return value === "web" || value === "android"
 }
 
+function isTrustLevel(value: unknown): value is MarketplacePluginTrust {
+  return value === "official" || value === "community"
+}
+
 function isNonEmptyStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isNonEmptyString)
 }
@@ -171,6 +177,7 @@ export function validateMarketplaceIndex(input: unknown): MarketplaceIndex {
       !isPlainRecord(rawPlugin) ||
       typeof rawPlugin.id !== "string" ||
       typeof rawPlugin.name !== "string" ||
+      (rawPlugin.trust !== undefined && !isTrustLevel(rawPlugin.trust)) ||
       !Array.isArray(rawPlugin.versions)
     ) {
       throw new Error("Invalid plugin market entry")
@@ -231,6 +238,7 @@ export function validateMarketplaceIndex(input: unknown): MarketplaceIndex {
       name: rawPlugin.name,
       summary: typeof rawPlugin.summary === "string" ? rawPlugin.summary : "",
       author: typeof rawPlugin.author === "string" ? rawPlugin.author : "",
+      ...(rawPlugin.trust !== undefined ? { trust: rawPlugin.trust } : {}),
       ...(typeof rawPlugin.homepage === "string" ? { homepage: rawPlugin.homepage } : {}),
       ...(typeof rawPlugin.icon === "string" ? { icon: rawPlugin.icon } : {}),
       categories: Array.isArray(rawPlugin.categories)

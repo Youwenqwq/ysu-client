@@ -685,15 +685,38 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
                   <Card key={plugin.id} className="py-0">
                     <CardContent className="flex items-center gap-3 p-4">
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium">{plugin.name}</div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-sm font-medium">{plugin.name}</span>
+                          {plugin.trust === "official" && (
+                            <Badge variant="secondary">{t("official")}</Badge>
+                          )}
+                          {plugin.trust === "community" && (
+                            <Badge variant="outline">{t("community")}</Badge>
+                          )}
+                        </div>
                         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                           {plugin.summary}
                         </p>
-                        <div className="mt-2 font-mono text-xs text-muted-foreground">
-                          {plugin.author} ·{" "}
-                          {hasUpdate && installed
-                            ? `v${installed.version} → v${release.version}`
-                            : `v${release.version}`}
+                        <div className="mt-2 flex flex-wrap items-center gap-x-1.5 font-mono text-xs text-muted-foreground">
+                          <span>
+                            {plugin.author} ·{" "}
+                            {hasUpdate && installed
+                              ? `v${installed.version} → v${release.version}`
+                              : `v${release.version}`}
+                          </span>
+                          {plugin.homepage && (
+                            <>
+                              <span>·</span>
+                              <a
+                                href={plugin.homepage}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-sans text-primary underline-offset-4 hover:underline"
+                              >
+                                {t("sourceLink")}
+                              </a>
+                            </>
+                          )}
                         </div>
                       </div>
                       <Button

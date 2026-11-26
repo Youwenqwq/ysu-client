@@ -172,6 +172,21 @@ describe("marketplace index validation & v1 release selection", () => {
     ).toThrow("Invalid release for plugin zmu.provider")
   })
 
+  it("accepts optional official/community trust levels and rejects invalid values", () => {
+    const withTrust = validateMarketplaceIndex({
+      ...marketJson,
+      plugins: [{ ...mixedPlugin, trust: "community" }],
+    })
+    expect(withTrust.plugins[0]?.trust).toBe("community")
+
+    expect(() =>
+      validateMarketplaceIndex({
+        ...marketJson,
+        plugins: [{ ...mixedPlugin, trust: "unknown" }],
+      })
+    ).toThrow("Invalid plugin market entry")
+  })
+
   it("strictly filters release.apiVersion === 1 in selectCompatibleRelease and findAvailableUpdates", () => {
     // 3.0.0 has apiVersion 2 -> must be ignored!
     // 2.2.0 requires app 0.20.0 -> ignored on 0.16.0!
