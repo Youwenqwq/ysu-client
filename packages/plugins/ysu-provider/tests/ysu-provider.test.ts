@@ -9,6 +9,12 @@ vi.mock("sonner", () => ({
 }))
 
 import {
+  fetchWithCookieJar,
+  SimpleCookieJar,
+  type HttpRequest,
+  type HttpResponse,
+} from "@orahako/sdk"
+import {
   BUILT_IN_ACADEMIC_SLICES,
   getEnabledSlices,
   getSlice,
@@ -1248,5 +1254,120 @@ describe("YSU SchoolProvider lifecycle, concurrency, relogin, and session expiry
       code: ProviderErrorCode.FEATURE_NOT_SUPPORTED,
       status: 501,
     })
+  })
+
+  it("reauthorizes jwmobile cleanly when persisted JSESSIONID and Authorization are stale", async () => {
+    const staleMobileSession = new MobileSession([
+      {
+        name: "JSESSIONID",
+        value: "STALE-MOBILE-SID",
+        domain: ".jwxt.ysu.edu.cn",
+        path: "/jwmobile",
+        secure: false,
+        expires: null,
+      },
+      {
+        name: "Authorization",
+        value: "EXPIRED-JWT",
+        domain: ".jwxt.ysu.edu.cn",
+        path: "/jwmobile",
+        secure: true,
+        expires: null,
+      },
+    ]).toJSON()
+
+    const sendHop = async (req: HttpRequest): Promise<HttpResponse> => {
+      const cookie = req.headers?.Cookie ?? ""
+
+      if (req.url === "https://jwxt.ysu.edu.cn/jwmobile/biz/v410/") {
+        return jsonResponse(req.url, { code: 401, msg: "token expired" })
+      }
+
+      if (req.url.startsWith("https://cer.ysu.edu.cn/authserver/login?service=")) {
+        expect(cookie).toContain("CASTGC=TGT-valid")
+        return textResponse(req.url, "", 302, {
+          location: "https://jwxt.ysu.edu.cn/jwmobile/auth/index?ticket=ST-mobile-1",
+        })
+      }
+
+      if (req.url === "https://jwxt.ysu.edu.cn/jwmobile/auth/index?ticket=ST-mobile-1") {
+        // Stale JSESSIONID must have been discarded before re-authorizing
+        expect(cookie).not.toContain("STALE-MOBILE-SID")
+        return textResponse(req.url, "", 302, {
+          "set-cookie": "JSESSIONID=FRESH-MOBILE-SID; Path=/jwmobile; HttpOnly",
+          location: "https://jwxt.ysu.edu.cn/jwmobile/auth/index",
+        })
+      }
+
+      if (req.url === "https://jwxt.ysu.edu.cn/jwmobile/auth/index") {
+        if (!cookie.includes("JSESSIONID=FRESH-MOBILE-SID")) {
+          // Simulates real jwmobile server redirecting back to CAS when JSESSIONID is stale
+          return textResponse(req.url, "", 302, {
+            location:
+              "https://cer.ysu.edu.cn/authserver/login?service=https%3A%2F%2Fjwxt.ysu.edu.cn%2Fjwmobile%2Fauth%2Findex",
+          })
+        }
+        return textResponse(req.url, "", 302, {
+          location: "https://jwxt.ysu.edu.cn/jwmobile/index#/?token=FRESH-JWT",
+        })
+      }
+
+      if (req.url.startsWith("https://jwxt.ysu.edu.cn/jwmobile/index")) {
+        return textResponse(req.url, "<html>jwmobile</html>", 200)
+      }
+
+      if (req.url === "https://jwxt.ysu.edu.cn/jwmobile/biz/v410/lesson/queryCurrentLesson") {
+        expect(cookie).toContain("Authorization=FRESH-JWT")
+        return jsonResponse(req.url, {
+          code: 200,
+          data: {
+            lessonId: "L-2026",
+            activityList: [],
+          },
+        })
+      }
+
+      throw new Error(`Unexpected request: ${req.method} ${req.url}`)
+    }
+
+    const { ctx } = createTestContext({
+      initialState: {
+        credential: makeStoredCasJson(),
+        isAuthenticated: true,
+        artifacts: {
+          [YSU_SESSION_ARTIFACT_MOBILE]: staleMobileSession,
+        },
+      },
+      fetchWithJar: (jar, request) =>
+        fetchWithCookieJar({ ...ctx.http, send: sendHop }, jar, request),
+    })
+
+    const provider = createYsuSchoolProvider({
+      session: {
+        ...ctx.session,
+        createCookieJar: (serialized) =>
+          serialized ? SimpleCookieJar.fromJSON(serialized) : new SimpleCookieJar(),
+      },
+      http: ctx.http,
+      storage: ctx.storage,
+      native: ctx.native,
+      i18n: ctx.i18n,
+      query: ctx.query,
+    })
+
+    await provider.initialize()
+    await provider.warmup()
+
+    const lesson = await provider.slices.timetable!.mobile!.getCurrentLesson({
+      teachClassId: "TC-1",
+      teachClassType: "1",
+      scheduleId: "SCH-1",
+      week: 10,
+      weekDay: 4,
+      startNode: 1,
+      endNode: 2,
+    })
+
+    expect(lesson.lessonId).toBe("L-2026")
   })
 })

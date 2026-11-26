@@ -431,7 +431,7 @@ export function createJWMobile(ctx: YSUContext, cas: CasAuthorizer): JWMobilePro
             mobileAuthorized = true
             return
           }
-          await mobileJar.removeCookie(jwxtCookieDomain, "/jwmobile", "Authorization")
+          mobileJar = ctx.session.createCookieJar()
         } else {
           mobileAuthorized = true
           return

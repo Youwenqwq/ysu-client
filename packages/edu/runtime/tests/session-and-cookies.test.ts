@@ -4,6 +4,7 @@ import { PluginRuntime } from "@orahako/kernel"
 import {
   Context,
   createObservableSource,
+  installCookies,
   type HttpRequest,
   type HttpResponse,
   type NetworkActivitySnapshot,
@@ -556,5 +557,58 @@ describe("SimpleCookieJar & fetchWithJar redirect loop", () => {
     expect(hopCounter).toBe(MAX_COOKIE_REDIRECTS + 1)
 
     session.dispose()
+  })
+
+  it("preserves host-only cookies in installCookies and replaces/deletes across leading-dot domain variants", async () => {
+    const jar = new SimpleCookieJar()
+
+    // Simulate legacy persisted cookie stored with a leading-dot domain
+    await installCookies(jar, [
+      {
+        name: "JSESSIONID",
+        value: "stale-sid",
+        domain: ".jwxt.ysu.edu.cn",
+        path: "/jwmobile",
+        secure: false,
+        expires: null,
+      },
+      {
+        name: "HOST_ONLY",
+        value: "v1",
+        domain: "jwxt.ysu.edu.cn",
+        path: "/jwmobile",
+        secure: false,
+        expires: null,
+      },
+    ])
+
+    // Host-only cookie must stay host-only (no leading dot) and not match sibling subdomains
+    const allAfterInstall = await jar.getAllCookies()
+    expect(allAfterInstall.find((c) => c.name === "HOST_ONLY")?.domain).toBe("jwxt.ysu.edu.cn")
+    expect(await jar.getCookieString("https://sub.jwxt.ysu.edu.cn/jwmobile/auth/index")).not.toContain(
+      "HOST_ONLY"
+    )
+
+    // Server issuing a host-only JSESSIONID must replace the legacy leading-dot entry, not be shadowed by it
+    await jar.setCookie(
+      "JSESSIONID=fresh-sid; Path=/jwmobile; HttpOnly",
+      "https://jwxt.ysu.edu.cn/jwmobile/auth/index?ticket=ST-1"
+    )
+    expect(await jar.getCookieString("https://jwxt.ysu.edu.cn/jwmobile/auth/index")).toBe(
+      "HOST_ONLY=v1; JSESSIONID=fresh-sid"
+    )
+
+    // Max-Age=0 without Domain must also delete an existing leading-dot entry on the same host & path
+    await jar.setCookie(
+      "Authorization=old-jwt; Domain=jwxt.ysu.edu.cn; Path=/jwmobile; Secure",
+      "https://jwxt.ysu.edu.cn/jwmobile/"
+    )
+    await jar.setCookie(
+      "Authorization=; Max-Age=0; Path=/jwmobile",
+      "https://jwxt.ysu.edu.cn/jwmobile/auth/index"
+    )
+    expect(await jar.getCookieString("https://jwxt.ysu.edu.cn/jwmobile/biz/v410/")).not.toContain(
+      "Authorization"
+    )
   })
 })

@@ -129,7 +129,7 @@ export async function installCookies(
   for (const entry of entries) {
     if (entry.value === "") continue
     const parts = [`${entry.name}=${entry.value}`]
-    if (entry.domain) parts.push(`Domain=${entry.domain}`)
+    if (entry.domain.startsWith(".")) parts.push(`Domain=${entry.domain}`)
     if (entry.path) parts.push(`Path=${entry.path}`)
     if (entry.secure) parts.push("Secure")
     if (entry.expires !== null) {
@@ -226,26 +226,17 @@ export class SimpleCookieJar implements CookieJar {
     try {
       const parsed = parseSetCookie(cookieStr, url)
       if (!parsed) return
+      const parsedDomain = normalizeDomain(parsed.domain)
+      const isSameCookie = (entry: StoredCookie): boolean =>
+        entry.name === parsed.name &&
+        normalizeDomain(entry.domain) === parsedDomain &&
+        entry.path === parsed.path
       const nowSeconds = Math.floor(Date.now() / 1000)
       if (parsed.expires !== null && parsed.expires <= nowSeconds) {
-        this.cookies = this.cookies.filter(
-          (entry) =>
-            !(
-              entry.name === parsed.name &&
-              entry.domain === parsed.domain &&
-              entry.path === parsed.path
-            )
-        )
+        this.cookies = this.cookies.filter((entry) => !isSameCookie(entry))
         return
       }
-      this.cookies = this.cookies.filter(
-        (entry) =>
-          !(
-            entry.name === parsed.name &&
-            entry.domain === parsed.domain &&
-            entry.path === parsed.path
-          )
-      )
+      this.cookies = this.cookies.filter((entry) => !isSameCookie(entry))
       this.cookies.push(parsed)
     } catch (error) {
       if (!options?.ignoreError) throw error
