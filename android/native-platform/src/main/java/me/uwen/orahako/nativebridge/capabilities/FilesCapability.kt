@@ -38,6 +38,7 @@ class FilesCapability(
         "installApk",
         "clearDirectory",
         "saveImageToGallery",
+        "exportTextFile",
     )
 
     private val apkDirectory: String = config.requiredString("apkDirectory")
@@ -57,6 +58,7 @@ class FilesCapability(
                 "installApk" -> installApk(payload, result)
                 "clearDirectory" -> clearDirectory(result)
                 "saveImageToGallery" -> saveImageToGallery(payload, result)
+                "exportTextFile" -> exportTextFile(payload, result)
             }
         }
 
@@ -286,6 +288,87 @@ class FilesCapability(
         } catch (error: Exception) {
             result.reject("Failed to save image", error)
         }
+    }
+
+    // ─── Text file export (e.g. .ics calendar) ──────────────────────────── //
+
+    private fun exportTextFile(payload: Map<String, Any?>, result: NativeInvokeResult) {
+        val content = payload["content"] as? String
+        if (content == null) {
+            result.reject("content is required")
+            return
+        }
+        val rawName = (payload["fileName"] as? String)?.trim().orEmpty()
+        val safeName = rawName.replace(Regex("[^A-Za-z0-9._\\-\\u4e00-\\u9fa5]"), "_")
+            .ifBlank { "export_${System.currentTimeMillis()}.txt" }
+        val mimeType = (payload["mimeType"] as? String)?.takeIf { it.isNotBlank() } ?: "text/plain"
+        val shouldShare = payload["share"] as? Boolean ?: true
+        val bytes = content.toByteArray(Charsets.UTF_8)
+
+        var savedToDownloads = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            savedToDownloads = runCatching {
+                val resolver = host.context.contentResolver
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, safeName)
+                    put(MediaStore.Downloads.MIME_TYPE, mimeType)
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    ?: return@runCatching false
+                val stream = resolver.openOutputStream(uri)
+                if (stream == null) {
+                    resolver.delete(uri, null, null)
+                    return@runCatching false
+                }
+                stream.use { it.write(bytes) }
+                resolver.update(
+                    uri,
+                    ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
+                    null,
+                    null,
+                )
+                true
+            }.getOrDefault(false)
+        }
+
+        var shared = false
+        if (shouldShare) {
+            shared = runCatching {
+                val exportDir = File(host.context.cacheDir, "exports").apply { mkdirs() }
+                val cacheFile = File(exportDir, safeName)
+                FileOutputStream(cacheFile).use { it.write(bytes) }
+                val uri = FileProvider.getUriForFile(
+                    host.context,
+                    "${host.context.packageName}.fileprovider",
+                    cacheFile,
+                )
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = mimeType
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_SUBJECT, safeName)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val chooser = Intent.createChooser(sendIntent, safeName).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                host.context.startActivity(chooser)
+                true
+            }.getOrDefault(false)
+        }
+
+        if (!savedToDownloads && !shared) {
+            result.reject("Unable to export file")
+            return
+        }
+        result.resolve(
+            mapOf(
+                "fileName" to safeName,
+                "savedToDownloads" to savedToDownloads,
+                "shared" to shared,
+            ),
+        )
     }
 
     private fun extensionOf(mimeType: String): String {

@@ -85,6 +85,13 @@ export {
   type OverviewScheduleSnapshot,
 } from "./overview-schedule"
 export {
+  buildCalendarSyncEvents,
+  serializeCalendarIcs,
+  type BuildCalendarSyncEventsInput,
+  type CalendarSyncEvent,
+  type SerializeCalendarIcsOptions,
+} from "./calendar-export"
+export {
   buildExamWidgetSnapshot,
   buildScheduleWidgetSnapshot,
   type ExamWidgetSettings,

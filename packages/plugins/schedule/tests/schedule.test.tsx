@@ -49,7 +49,9 @@ import {
 import * as publicApi from "../src"
 import { SCHEDULE_PLUGIN_ID, schedulePlugin } from "../src"
 import {
+  CALENDAR_SYNC_CAPABILITY,
   ClassReminderAndWidgetController,
+  NATIVE_FILES_CAPABILITY,
   computeClassAlarms,
   NOTIFICATIONS_CORE_CAPABILITY,
   REMINDERS_CLASSES_CAPABILITY,
@@ -552,6 +554,8 @@ describe("@orahako/plugin-schedule export discipline & manifest", () => {
     expect(validated.nativeCapabilities).toEqual([
       NOTIFICATIONS_CORE_CAPABILITY,
       REMINDERS_CLASSES_CAPABILITY,
+      CALENDAR_SYNC_CAPABILITY,
+      NATIVE_FILES_CAPABILITY,
       WIDGETS_GENERIC_CAPABILITY,
       WIDGETS_SCHEDULE_CAPABILITY,
     ])
@@ -1320,7 +1324,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       <ContributionOutlet entry={widgetsCategory} slots={slots} i18n={i18n} />
     )
     expect(widgetsHtml).toContain("添加小组件")
-    expect(widgetsHtml).toContain("日程页小组件助手")
+    expect(widgetsHtml).toContain("日程页小助手")
     expect(widgetsHtml).toContain("/widgets/buro.png")
     expect(widgetsHtml).not.toContain("data-widget-pin-card")
 
@@ -1333,7 +1337,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     expect(expandedWidgetsHtml).toContain("今日日程")
     expect(expandedWidgetsHtml).toContain("明日日程")
     expect(expandedWidgetsHtml.match(/src="\/widgets\/schedule\.png"/g)).toHaveLength(2)
-    expect(expandedWidgetsHtml).toContain("日程页小组件助手")
+    expect(expandedWidgetsHtml).toContain("日程页小助手")
     expect(expandedWidgetsHtml).toContain("手动添加")
 
     const reminderSlotEntry = slots

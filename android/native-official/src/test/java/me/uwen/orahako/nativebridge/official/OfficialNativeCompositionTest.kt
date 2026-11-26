@@ -82,7 +82,7 @@ class OfficialNativeCompositionTest {
         assertEquals(listOf("native.files", "native.webview"), registry.describe().map { it.id })
         assertEquals(listOf(1, 1), registry.describe().map { it.version })
         assertEquals(
-            listOf("clearDirectory", "downloadApk", "installApk", "saveImageToGallery"),
+            listOf("clearDirectory", "downloadApk", "exportTextFile", "installApk", "saveImageToGallery"),
             registry.describe()[0].methods,
         )
         assertEquals(listOf("check", "initSafeArea"), registry.describe()[1].methods)

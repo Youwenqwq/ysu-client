@@ -21,6 +21,10 @@ const LONG_PRESS_MS = 600
 
 type AssistantMessageKey =
   | "discover"
+  | "tipCalendarSync"
+  | "tipReminders"
+  | "tipExportIcs"
+  | "tipQuickAdd"
   | "playful1"
   | "playful2"
   | "tease"
@@ -33,8 +37,12 @@ type AssistantMessageKey =
 function messageKeyForCount(count: number): AssistantMessageKey {
   if (count >= 100) return "farewell"
   if (count === 1) return "discover"
-  if (count === 2) return "playful1"
-  if (count === 3) return "playful2"
+  if (count === 2) return "tipCalendarSync"
+  if (count === 3) return "tipReminders"
+  if (count === 4) return "tipExportIcs"
+  if (count === 5) return "tipQuickAdd"
+  if (count === 6) return "playful1"
+  if (count === 7) return "playful2"
   if (count < 10) return "tease"
   if (count < 20) return "ten"
   if (count < 50) return "twenty"
@@ -50,6 +58,14 @@ function translateAssistantMessage(
   switch (key) {
     case "discover":
       return t("desktopWidgets.assistantMessages.discover")
+    case "tipCalendarSync":
+      return t("desktopWidgets.assistantMessages.tipCalendarSync")
+    case "tipReminders":
+      return t("desktopWidgets.assistantMessages.tipReminders")
+    case "tipExportIcs":
+      return t("desktopWidgets.assistantMessages.tipExportIcs")
+    case "tipQuickAdd":
+      return t("desktopWidgets.assistantMessages.tipQuickAdd")
     case "playful1":
       return t("desktopWidgets.assistantMessages.playful1")
     case "playful2":
@@ -123,6 +139,10 @@ export interface WidgetDiscoveryProps {
   readonly onSetPosition: (position: WidgetAssistantPosition | null) => void
   readonly onRequestPinSchedule: () => Promise<boolean>
   readonly onOpenWidgetsSettings: () => void
+  readonly onOpenCalendarSync?: () => void
+  readonly onOpenRemindersSettings?: () => void
+  readonly onExportIcs?: () => void
+  readonly onQuickAdd?: () => void
 }
 
 export function WidgetDiscovery({
@@ -137,6 +157,10 @@ export function WidgetDiscovery({
   onSetPosition,
   onRequestPinSchedule,
   onOpenWidgetsSettings,
+  onOpenCalendarSync,
+  onOpenRemindersSettings,
+  onExportIcs,
+  onQuickAdd,
 }: WidgetDiscoveryProps): ReactNode {
   const isMobile = useIsMobile()
   const [viewport, setViewport] = useState(() => ({
@@ -495,6 +519,54 @@ export function WidgetDiscovery({
                   </a>
                   {t("desktopWidgets.assistantMoreAfter")}
                 </>
+              )}
+              {messageKey === "tipCalendarSync" && onOpenCalendarSync && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false)
+                    onOpenCalendarSync()
+                  }}
+                  className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
+                >
+                  {t("desktopWidgets.assistantActionSync")}
+                </button>
+              )}
+              {messageKey === "tipReminders" && onOpenRemindersSettings && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false)
+                    onOpenRemindersSettings()
+                  }}
+                  className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
+                >
+                  {t("desktopWidgets.assistantActionReminders")}
+                </button>
+              )}
+              {messageKey === "tipExportIcs" && onExportIcs && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false)
+                    onExportIcs()
+                  }}
+                  className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
+                >
+                  {t("desktopWidgets.assistantActionExport")}
+                </button>
+              )}
+              {messageKey === "tipQuickAdd" && onQuickAdd && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false)
+                    onQuickAdd()
+                  }}
+                  className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
+                >
+                  {t("desktopWidgets.assistantActionQuickAdd")}
+                </button>
               )}
             </p>
             {messageKey !== "farewell" && (

@@ -1,22 +1,29 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import {
+  Bell,
+  Calendar,
+  CalendarSync,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Download,
   Eye,
   Grid3x2,
   Grid3x3,
   History,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   SlidersHorizontal,
+  Trash2,
   TriangleAlert,
   Undo2,
 } from "lucide-react"
 import {
+  buildCalendarSyncEvents,
   buildCourseColorMap,
   courseIdentity,
   DEFAULT_STANDALONE_PERIODS,
@@ -29,6 +36,7 @@ import {
   scheduleWeek,
   ScheduleMobile,
   ScheduleTablet,
+  serializeCalendarIcs,
   type CourseOverride,
   type ScheduleDrop,
   type ScheduleEmptyCellTarget,
@@ -71,6 +79,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   Field,
   FieldGroup,
@@ -78,11 +88,20 @@ import {
   FilterDrawer,
   FilterTrigger,
   Input,
+  ResponsiveModal,
+  ResponsiveModalBody,
+  ResponsiveModalContent,
+  ResponsiveModalDescription,
+  ResponsiveModalFooter,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
   Skeleton,
   Spinner,
+  Switch,
   useBackHandler,
   useIsMobile,
 } from "@orahako/ui-primitives"
+import type { CalendarSyncStatus } from "./controller"
 import {
   ScheduleEntryDetailDialog,
   ScheduleItemFormDialog,
@@ -134,6 +153,7 @@ export interface SchedulePageInject {
     readonly customizations: ObservableSource<ScheduleCustomizationsState>
     readonly customizationsHydrated: ObservableSource<boolean>
     readonly scheduleState: ObservableSource<ScheduleEffectiveSnapshot>
+    readonly calendarSyncStatus: ObservableSource<CalendarSyncStatus>
     readonly provider: ObservableSource<ProviderRuntimeSnapshot>
     readonly session: ObservableSource<SessionSnapshot>
     readonly schedule: ObservableSource<QuerySnapshot<Course[]>>
@@ -158,6 +178,20 @@ export interface SchedulePageInject {
   readonly requestPinScheduleWidget: () => Promise<boolean>
   readonly widgetsSettingsHref: string
   readonly openWidgetsSettings: () => void
+  readonly openNotificationsSettings?: () => void
+  readonly exportIcsFile?: (
+    fileName: string,
+    content: string
+  ) => Promise<{
+    readonly savedToDownloads: boolean
+    readonly shared: boolean
+    readonly fileName: string
+  }>
+  readonly toggleCalendarSync?: (enabled: boolean) => Promise<boolean>
+  readonly setCalendarSyncIncludeExams?: (include: boolean) => void
+  readonly setCalendarSyncWriteReminders?: (write: boolean) => void
+  readonly syncCalendarNow?: () => Promise<void>
+  readonly clearSystemCalendar?: () => Promise<void>
 }
 
 export type SchedulePageProps = DerivedComponentProps<
@@ -275,6 +309,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   const customizationsState = props.useCustomizations()
   const customizationsHydrated = props.useCustomizationsHydrated()
   const scheduleState = props.useScheduleState()
+  const calendarSyncStatus = props.useCalendarSyncStatus()
   const providerSnap = props.useProvider()
   const sessionSnap = props.useSession()
   const scheduleQuery = props.useSchedule()
@@ -301,6 +336,8 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   const [signinOpen, setSigninOpen] = useState(false)
   const [itemFormTarget, setItemFormTarget] = useState<ScheduleItemFormTarget>(null)
   const [detailEntry, setDetailEntry] = useState<ScheduleEntry | null>(null)
+  const [calendarSyncOpen, setCalendarSyncOpen] = useState(false)
+  const [calendarSyncPending, setCalendarSyncPending] = useState(false)
   const lastCreateNonceRef = useRef(createRequestNonce)
 
   const activeProvider = providerSnap.provider
@@ -723,6 +760,102 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     setActivityOpen(true)
   }
 
+  const handleExportIcs = async (): Promise<void> => {
+    const events = buildCalendarSyncEvents({
+      courses,
+      extraEntries: overlayEntries,
+      periods,
+      currentWeek: currentWeek ?? snapshot,
+      calendar: termCalendar,
+      timeZone,
+      now: new Date(clockTick),
+      includeExams: true,
+      examTitlePrefix: t("schedule.examTitlePrefix"),
+      remindMinutes: settings.classReminderEnabled ? settings.classReminderMinutes : undefined,
+    })
+    if (events.length === 0) {
+      toast.info(t("schedule.exportIcsEmpty"))
+      return
+    }
+    const calendarLabel = semester ? `${semester} 日程` : t("navTitle")
+    const icsContent = serializeCalendarIcs(events, {
+      calendarName: calendarLabel,
+      now: new Date(clockTick),
+    })
+    const fileName = `orahako-schedule-${semester || clock.date}.ics`
+    try {
+      if (props.exportIcsFile) {
+        const res = await props.exportIcsFile(fileName, icsContent)
+        if (props.isNative() && res.savedToDownloads) {
+          toast.success(
+            t("schedule.exportIcsSavedDownloads", { count: events.length, fileName: res.fileName })
+          )
+        } else {
+          toast.success(
+            t("schedule.exportIcsSuccess", { count: events.length, fileName: res.fileName })
+          )
+        }
+        return
+      }
+      if (typeof document !== "undefined" && typeof URL !== "undefined") {
+        const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" })
+        const url = URL.createObjectURL(blob)
+        const anchor = document.createElement("a")
+        anchor.href = url
+        anchor.download = fileName
+        document.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
+        URL.revokeObjectURL(url)
+      }
+      toast.success(t("schedule.exportIcsSuccess", { count: events.length, fileName }))
+    } catch {
+      toast.error(t("schedule.exportIcsFailed"))
+    }
+  }
+
+  const handleToggleCalendarSync = async (enabled: boolean): Promise<void> => {
+    if (!props.toggleCalendarSync) return
+    setCalendarSyncPending(true)
+    try {
+      const ok = await props.toggleCalendarSync(enabled)
+      if (!ok && enabled) {
+        toast.error(t("settings.calendarSyncPermissionDenied"))
+      } else if (ok && !enabled) {
+        toast.success(t("settings.calendarSyncCleared"))
+      }
+    } catch {
+      toast.error(t("settings.calendarSyncFailed"))
+    } finally {
+      setCalendarSyncPending(false)
+    }
+  }
+
+  const handleSyncCalendarNow = async (): Promise<void> => {
+    if (!props.syncCalendarNow) return
+    setCalendarSyncPending(true)
+    try {
+      await props.syncCalendarNow()
+    } catch {
+      toast.error(t("settings.calendarSyncFailed"))
+    } finally {
+      setCalendarSyncPending(false)
+    }
+  }
+
+  const handleClearSystemCalendar = async (): Promise<void> => {
+    if (!props.clearSystemCalendar) return
+    setCalendarSyncPending(true)
+    try {
+      await props.clearSystemCalendar()
+      toast.success(t("settings.calendarSyncCleared"))
+    } catch {
+      toast.error(t("settings.calendarSyncFailed"))
+    } finally {
+      setCalendarSyncPending(false)
+    }
+  }
+
   if (activeProvider && !supportsPlugin(activeProvider.supportedPlugins, props.pluginId)) {
     return null
   }
@@ -866,7 +999,10 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 <ChevronDown className="ml-0.5 size-3.5 opacity-70" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                {t("schedule.manageSectionEdit")}
+              </DropdownMenuLabel>
               {hasAcademicTimetable && (
                 <DropdownMenuItem
                   disabled={!canEdit}
@@ -904,6 +1040,47 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 >
                   <Eye className="mr-2 size-4" />
                   {t("scheduleEditor.showOriginal")}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                {t("schedule.manageSectionSync")}
+              </DropdownMenuLabel>
+              {props.isNative() && props.toggleCalendarSync && (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    actions.setFilterDrawerOpen(false)
+                    setCalendarSyncOpen(true)
+                  }}
+                >
+                  <CalendarSync className="mr-2 size-4" />
+                  <span className="flex-1">{t("schedule.syncSystemCalendar")}</span>
+                  {settings.calendarSyncEnabled && (
+                    <Badge variant="secondary" className="ml-2 text-[10px]">
+                      ON
+                    </Badge>
+                  )}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                disabled={courses.length === 0 && overlayEntries.length === 0}
+                onSelect={() => {
+                  actions.setFilterDrawerOpen(false)
+                  void handleExportIcs()
+                }}
+              >
+                <Download className="mr-2 size-4" />
+                {t("schedule.exportIcs")}
+              </DropdownMenuItem>
+              {props.isNative() && props.openNotificationsSettings && (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    actions.setFilterDrawerOpen(false)
+                    props.openNotificationsSettings?.()
+                  }}
+                >
+                  <Bell className="mr-2 size-4" />
+                  {t("schedule.reminderSettingsShortcut")}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -1209,6 +1386,124 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         {renderFilterControls("schedule-drawer")}
       </FilterDrawer>
 
+      {props.isNative() && props.toggleCalendarSync && (
+        <ResponsiveModal open={calendarSyncOpen} onOpenChange={setCalendarSyncOpen}>
+          <ResponsiveModalContent className="sm:max-w-md">
+            <ResponsiveModalHeader>
+              <ResponsiveModalTitle className="flex items-center gap-2">
+                <CalendarSync className="size-4 text-primary" />
+                {t("settings.calendarSyncTitle")}
+              </ResponsiveModalTitle>
+              <ResponsiveModalDescription>
+                {t("settings.calendarSyncHint")}
+              </ResponsiveModalDescription>
+            </ResponsiveModalHeader>
+            <ResponsiveModalBody className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3 py-1">
+                <span className="text-sm font-medium">{t("settings.calendarSyncEnabled")}</span>
+                <Switch
+                  aria-label={t("settings.calendarSyncEnabled")}
+                  checked={settings.calendarSyncEnabled}
+                  disabled={calendarSyncPending}
+                  onCheckedChange={(enabled) => void handleToggleCalendarSync(enabled)}
+                />
+              </div>
+
+              {settings.calendarSyncEnabled && (
+                <>
+                  <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                    <span className="flex items-center gap-2 text-sm">
+                      <Calendar className="size-4 text-muted-foreground" />
+                      {t("settings.calendarSyncIncludeExams")}
+                    </span>
+                    <Switch
+                      checked={settings.calendarSyncIncludeExams}
+                      onCheckedChange={(checked) => props.setCalendarSyncIncludeExams?.(checked)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="text-sm">{t("settings.calendarSyncWriteReminders")}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {t("settings.calendarSyncWriteRemindersHint")}
+                      </span>
+                    </div>
+                    <Switch
+                      checked={settings.calendarSyncWriteReminders}
+                      onCheckedChange={(checked) => props.setCalendarSyncWriteReminders?.(checked)}
+                    />
+                  </div>
+
+                  {settings.classReminderEnabled && settings.calendarSyncWriteReminders && (
+                    <Alert>
+                      <TriangleAlert className="size-4" />
+                      <AlertDescription className="text-xs">
+                        {t("settings.calendarSyncDuplicateWarning")}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+                    <span className="text-xs text-muted-foreground">
+                      {calendarSyncStatus.syncing
+                        ? t("settings.calendarSyncSyncing")
+                        : calendarSyncStatus.error
+                          ? calendarSyncStatus.error
+                          : calendarSyncStatus.lastSyncedCount !== null
+                            ? t("settings.calendarSyncSyncedCount", {
+                                count: calendarSyncStatus.lastSyncedCount,
+                              })
+                            : t("settings.calendarSyncTitle")}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={calendarSyncPending || calendarSyncStatus.syncing}
+                        onClick={() => void handleSyncCalendarNow()}
+                      >
+                        <RefreshCw className="mr-1 size-3.5" />
+                        {t("settings.calendarSyncNow")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={calendarSyncPending || calendarSyncStatus.syncing}
+                        onClick={() => void handleClearSystemCalendar()}
+                      >
+                        <Trash2 className="mr-1 size-3.5" />
+                        {t("settings.calendarSyncClear")}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </ResponsiveModalBody>
+            <ResponsiveModalFooter>
+              {props.openNotificationsSettings && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setCalendarSyncOpen(false)
+                    props.openNotificationsSettings?.()
+                  }}
+                >
+                  <Bell className="mr-1.5 size-4" />
+                  {t("schedule.reminderSettingsShortcut")}
+                </Button>
+              )}
+              <Button type="button" onClick={() => setCalendarSyncOpen(false)}>
+                {t("closeDialog")}
+              </Button>
+            </ResponsiveModalFooter>
+          </ResponsiveModalContent>
+        </ResponsiveModal>
+      )}
+
       <WidgetDiscovery
         isNative={props.isNative()}
         hidden={settings.widgetAssistantHidden}
@@ -1221,6 +1516,18 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         onSetPosition={props.setWidgetAssistantPosition}
         onRequestPinSchedule={props.requestPinScheduleWidget}
         onOpenWidgetsSettings={props.openWidgetsSettings}
+        onOpenCalendarSync={props.toggleCalendarSync ? () => setCalendarSyncOpen(true) : undefined}
+        onOpenRemindersSettings={props.openNotificationsSettings}
+        onExportIcs={() => void handleExportIcs()}
+        onQuickAdd={() =>
+          setItemFormTarget({
+            mode: "create",
+            initialKind: isStandalone ? "event" : "course",
+            initialDay: clock.weekday,
+            initialDate: clock.date,
+            initialWeek: selectedWeek,
+          })
+        }
       />
     </div>
   )

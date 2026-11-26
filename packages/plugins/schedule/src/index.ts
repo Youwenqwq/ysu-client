@@ -24,11 +24,14 @@ import {
   type ScheduleEntry,
 } from "@orahako/sdk"
 import {
+  CALENDAR_SYNC_CAPABILITY,
   ClassReminderAndWidgetController,
+  NATIVE_FILES_CAPABILITY,
   NOTIFICATIONS_CORE_CAPABILITY,
   REMINDERS_CLASSES_CAPABILITY,
   WIDGETS_GENERIC_CAPABILITY,
   WIDGETS_SCHEDULE_CAPABILITY,
+  type CalendarSyncStatus,
   type ClassAlarmConfig,
   type ClassReminderAndWidgetControllerOptions,
   type ScheduleSyncInput,
@@ -112,6 +115,7 @@ export const SCHEDULE_PLUGIN_ID = "orahako.schedule"
 
 export type {
   ActivePatchManager,
+  CalendarSyncStatus,
   ClassAlarmConfig,
   ClassReminderAndWidgetControllerOptions,
   ClassReminderSettingsInject,
@@ -264,6 +268,8 @@ const scheduleManifest: PluginManifest = {
   nativeCapabilities: [
     NOTIFICATIONS_CORE_CAPABILITY,
     REMINDERS_CLASSES_CAPABILITY,
+    CALENDAR_SYNC_CAPABILITY,
+    NATIVE_FILES_CAPABILITY,
     WIDGETS_GENERIC_CAPABILITY,
     WIDGETS_SCHEDULE_CAPABILITY,
   ],
@@ -610,6 +616,8 @@ export const schedulePlugin = definePlugin({
             currentWeekSource: defaultCurrentWeekSource,
             termCalendarSource: defaultTermCalendarSource,
             periodsSource,
+            getExamTitlePrefix: () =>
+              i18n.translator(scheduleDictionary)("schedule.examTitlePrefix"),
           })
         : null
 
@@ -676,6 +684,13 @@ export const schedulePlugin = definePlugin({
       })
     }
 
+    const openNotificationsSettings = (): void => {
+      router.push({
+        route: "settings-category",
+        params: { category: "notifications" },
+      })
+    }
+
     const openScheduleRoute = (): void => {
       router.push({ route: "schedule" })
     }
@@ -706,6 +721,52 @@ export const schedulePlugin = definePlugin({
       return true
     })
 
+    const emptyCalendarSyncStatus = createObservableSource<CalendarSyncStatus>({
+      syncing: false,
+      lastSyncedCount: null,
+      lastSyncedAt: null,
+      error: null,
+    })
+
+    const exportIcsFile = async (
+      fileName: string,
+      content: string
+    ): Promise<{
+      readonly savedToDownloads: boolean
+      readonly shared: boolean
+      readonly fileName: string
+    }> => {
+      if (native.isNative && native.capabilities.has(NATIVE_FILES_CAPABILITY)) {
+        const result = await native.capabilities.invoke<{
+          fileName?: string
+          savedToDownloads?: boolean
+          shared?: boolean
+        }>(NATIVE_FILES_CAPABILITY, "exportTextFile", {
+          fileName,
+          content,
+          mimeType: "text/calendar",
+          share: true,
+        })
+        return {
+          fileName: result?.fileName || fileName,
+          savedToDownloads: result?.savedToDownloads === true,
+          shared: result?.shared === true,
+        }
+      }
+      if (typeof document !== "undefined" && typeof URL !== "undefined") {
+        const blob = new Blob([content], { type: "text/calendar;charset=utf-8" })
+        const url = URL.createObjectURL(blob)
+        const anchor = document.createElement("a")
+        anchor.href = url
+        anchor.download = fileName
+        document.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
+        URL.revokeObjectURL(url)
+      }
+      return { fileName, savedToDownloads: true, shared: false }
+    }
+
     ui.registerPage(
       {
         id: "index",
@@ -726,6 +787,7 @@ export const schedulePlugin = definePlugin({
             customizations: customizationsStore.source,
             customizationsHydrated: customizationsStore.hydrated,
             scheduleState: registry.state,
+            calendarSyncStatus: controller?.calendarSyncStatus ?? emptyCalendarSyncStatus,
             provider: providerStateSource,
             session: sessionStateSource,
             schedule: pageScheduleSource,
@@ -754,6 +816,20 @@ export const schedulePlugin = definePlugin({
           requestPinScheduleWidget: () => widgets.requestPin("schedule"),
           widgetsSettingsHref,
           openWidgetsSettings,
+          openNotificationsSettings,
+          exportIcsFile,
+          ...(controller
+            ? {
+                toggleCalendarSync: (enabled: boolean) =>
+                  controller.setCalendarSyncEnabled(enabled),
+                setCalendarSyncIncludeExams: (include: boolean) =>
+                  settingsStore.actions.setCalendarSyncIncludeExams(include),
+                setCalendarSyncWriteReminders: (write: boolean) =>
+                  settingsStore.actions.setCalendarSyncWriteReminders(write),
+                syncCalendarNow: () => controller.refreshCalendarSync({ force: true }),
+                clearSystemCalendar: () => controller.clearSystemCalendar(),
+              }
+            : {}),
         }),
       },
       SchedulePage
@@ -907,6 +983,7 @@ export const schedulePlugin = definePlugin({
               hooks: {
                 provider: providerStateSource,
                 scheduledAlarms: controller.scheduledAlarms,
+                calendarSyncStatus: controller.calendarSyncStatus,
               },
               pluginId: SCHEDULE_PLUGIN_ID,
               isNative: () => native.isNative,
@@ -915,6 +992,9 @@ export const schedulePlugin = definePlugin({
               requestExactAlarmPermission: () => native.requestExactAlarmPermission(),
               checkExactAlarmPermission,
               openNotificationSettings: () => controller.openNotificationSettings(),
+              toggleCalendarSync: (enabled) => controller.setCalendarSyncEnabled(enabled),
+              syncCalendarNow: () => controller.refreshCalendarSync({ force: true }),
+              clearSystemCalendar: () => controller.clearSystemCalendar(),
             }),
           },
           ClassReminderSettings

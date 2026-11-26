@@ -35,6 +35,9 @@ export interface ScheduleSettingsState {
   readonly classLiveUpdateEnabled: boolean
   readonly classVibrationEnabled: boolean
   readonly classReminderDays: number
+  readonly calendarSyncEnabled: boolean
+  readonly calendarSyncIncludeExams: boolean
+  readonly calendarSyncWriteReminders: boolean
 }
 
 function clampInt(value: number, min: number, max: number, fallback: number): number {
@@ -54,6 +57,9 @@ export const scheduleSettingsStore = defineStore({
     classLiveUpdateEnabled: false,
     classVibrationEnabled: false,
     classReminderDays: 7,
+    calendarSyncEnabled: false,
+    calendarSyncIncludeExams: true,
+    calendarSyncWriteReminders: false,
   }),
   persist: {
     key: "schedule-settings",
@@ -114,6 +120,25 @@ export const scheduleSettingsStore = defineStore({
       const clamped = clampInt(days, 1, 14, 7)
       ctx.set((prev) =>
         prev.classReminderDays === clamped ? prev : { ...prev, classReminderDays: clamped }
+      )
+    },
+    setCalendarSyncEnabled(ctx, enabled: boolean) {
+      ctx.set((prev) =>
+        prev.calendarSyncEnabled === enabled ? prev : { ...prev, calendarSyncEnabled: enabled }
+      )
+    },
+    setCalendarSyncIncludeExams(ctx, includeExams: boolean) {
+      ctx.set((prev) =>
+        prev.calendarSyncIncludeExams === includeExams
+          ? prev
+          : { ...prev, calendarSyncIncludeExams: includeExams }
+      )
+    },
+    setCalendarSyncWriteReminders(ctx, writeReminders: boolean) {
+      ctx.set((prev) =>
+        prev.calendarSyncWriteReminders === writeReminders
+          ? prev
+          : { ...prev, calendarSyncWriteReminders: writeReminders }
       )
     },
     reset(ctx) {

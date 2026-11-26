@@ -13,6 +13,7 @@ import me.uwen.orahako.nativebridge.NativeComposition
 import me.uwen.orahako.nativebridge.NativeCompositionProvider
 import me.uwen.orahako.nativebridge.capabilities.FilesCapability
 import me.uwen.orahako.nativebridge.capabilities.WebViewCapability
+import me.uwen.orahako.nativebridge.capabilities.calendar.CalendarSyncCapability
 import me.uwen.orahako.nativebridge.capabilities.geolocation.GeolocationCapability
 import me.uwen.orahako.nativebridge.capabilities.notifications.NotificationsCoreCapability
 import me.uwen.orahako.nativebridge.capabilities.polling.AcademicPollingCapability
@@ -45,6 +46,7 @@ object OfficialNativeComposition : NativeCapabilityFactories, NativeCompositionP
         FilesCapability.ID to { host, config -> FilesCapability(host, config) },
         WebViewCapability.ID to { host, config -> WebViewCapability(host, config) },
         GeolocationCapability.ID to { host, config -> GeolocationCapability(host, config) },
+        CalendarSyncCapability.ID to { host, config -> CalendarSyncCapability(host, config) },
         NotificationsCoreCapability.ID to { host, config ->
             NotificationsCoreCapability(host, config)
         },

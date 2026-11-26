@@ -43,6 +43,13 @@
       "config": {}
     },
     {
+      "id": "calendar.sync@1",
+      "config": {
+        "accountName": "Orahako",
+        "calendarDisplayName": "酸橙盒 · 日程"
+      }
+    },
+    {
       "id": "widgets.generic@1",
       "config": {}
     },

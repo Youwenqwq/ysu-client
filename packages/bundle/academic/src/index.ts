@@ -6,6 +6,7 @@ export const academicBundle = defineBundle({
   nativeCapabilities: [
     "academic.polling@1",
     "reminders.classes@1",
+    "calendar.sync@1",
     "widgets.schedule@1",
     "widgets.exam@1",
     "native.geolocation@1",

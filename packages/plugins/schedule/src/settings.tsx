@@ -2,13 +2,17 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import {
   AlarmClock,
+  Bell,
   Calendar,
   CalendarClock,
+  CalendarSync,
   Clock,
   LayoutGrid,
   Plus,
   Radio,
+  RefreshCw,
   Timer,
+  Trash2,
   Vibrate,
 } from "lucide-react"
 import { hasSlice, supportsPlugin, type ProviderRuntimeSnapshot } from "@orahako/academic-sdk"
@@ -43,7 +47,7 @@ import {
   Switch,
   ToggleGroupItem,
 } from "@orahako/ui-primitives"
-import type { ClassAlarmConfig, ScheduleWidgetId } from "./controller"
+import type { CalendarSyncStatus, ClassAlarmConfig, ScheduleWidgetId } from "./controller"
 import type { ScheduleDictionary } from "./dictionary"
 import type { ScheduleSettingsStoreInstance } from "./stores"
 import { WidgetAssistantAvatar } from "./widget-discovery"
@@ -354,6 +358,7 @@ export interface ClassReminderSettingsInject {
   readonly hooks: {
     readonly provider: ObservableSource<ProviderRuntimeSnapshot>
     readonly scheduledAlarms: ObservableSource<readonly ClassAlarmConfig[]>
+    readonly calendarSyncStatus: ObservableSource<CalendarSyncStatus>
   }
   readonly pluginId: string
   readonly isNative: () => boolean
@@ -362,6 +367,9 @@ export interface ClassReminderSettingsInject {
   readonly requestExactAlarmPermission: () => Promise<boolean>
   readonly checkExactAlarmPermission: () => Promise<boolean>
   readonly openNotificationSettings?: () => Promise<boolean>
+  readonly toggleCalendarSync?: (enabled: boolean) => Promise<boolean>
+  readonly syncCalendarNow?: () => Promise<void>
+  readonly clearSystemCalendar?: () => Promise<void>
 }
 
 export type ClassReminderSettingsProps = DerivedComponentProps<
@@ -387,14 +395,19 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
   const { setClassLiveUpdateEnabled } = actions
   const providerSnap = props.useProvider()
   const scheduledAlarms = props.useScheduledAlarms()
+  const calendarSyncStatus = props.useCalendarSyncStatus()
   const classReminderEnabled = useStore((s) => s.classReminderEnabled)
   const classReminderMinutes = useStore((s) => s.classReminderMinutes)
   const classLiveUpdateEnabled = useStore((s) => s.classLiveUpdateEnabled)
   const classVibrationEnabled = useStore((s) => s.classVibrationEnabled)
   const classReminderDays = useStore((s) => s.classReminderDays)
+  const calendarSyncEnabled = useStore((s) => s.calendarSyncEnabled)
+  const calendarSyncIncludeExams = useStore((s) => s.calendarSyncIncludeExams)
+  const calendarSyncWriteReminders = useStore((s) => s.calendarSyncWriteReminders)
 
   const [notificationPermissionPending, setNotificationPermissionPending] = useState(false)
   const [liveUpdatePermissionPending, setLiveUpdatePermissionPending] = useState(false)
+  const [calendarSyncPending, setCalendarSyncPending] = useState(false)
   const [exactAlarmGranted, setExactAlarmGranted] = useState<boolean | null>(null)
   const awaitingExactAlarmPermission = useRef(false)
 
@@ -527,6 +540,48 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
       toast.error(t("settings.notificationSyncFailed"))
     } finally {
       setLiveUpdatePermissionPending(false)
+    }
+  }
+
+  const handleCalendarSyncToggle = async (enabled: boolean): Promise<void> => {
+    if (!props.toggleCalendarSync) return
+    setCalendarSyncPending(true)
+    try {
+      const ok = await props.toggleCalendarSync(enabled)
+      if (!ok && enabled) {
+        toast.error(t("settings.calendarSyncPermissionDenied"))
+      } else if (ok && !enabled) {
+        toast.success(t("settings.calendarSyncCleared"))
+      }
+    } catch {
+      toast.error(t("settings.calendarSyncFailed"))
+    } finally {
+      setCalendarSyncPending(false)
+    }
+  }
+
+  const handleSyncCalendarNow = async (): Promise<void> => {
+    if (!props.syncCalendarNow) return
+    setCalendarSyncPending(true)
+    try {
+      await props.syncCalendarNow()
+    } catch {
+      toast.error(t("settings.calendarSyncFailed"))
+    } finally {
+      setCalendarSyncPending(false)
+    }
+  }
+
+  const handleClearSystemCalendar = async (): Promise<void> => {
+    if (!props.clearSystemCalendar) return
+    setCalendarSyncPending(true)
+    try {
+      await props.clearSystemCalendar()
+      toast.success(t("settings.calendarSyncCleared"))
+    } catch {
+      toast.error(t("settings.calendarSyncFailed"))
+    } finally {
+      setCalendarSyncPending(false)
     }
   }
 
@@ -688,6 +743,108 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
             </Accordion>
           </div>
         </>
+      )}
+
+      {props.toggleCalendarSync && (
+        <div data-calendar-sync-settings="">
+          <h3 className="flex items-center gap-2 border-t border-border px-0.5 pt-3 pb-0.5 text-xs font-medium text-muted-foreground">
+            {t("settings.calendarSyncTitle")}
+          </h3>
+
+          <div className="flex items-center gap-3 py-3">
+            <CalendarSync className="size-5 shrink-0 text-muted-foreground" />
+            <div className="flex flex-1 flex-col">
+              <span className="text-sm">{t("settings.calendarSyncEnabled")}</span>
+              <span className="text-xs text-muted-foreground">
+                {t("settings.calendarSyncHint")}
+              </span>
+            </div>
+            <Switch
+              aria-label={t("settings.calendarSyncEnabled")}
+              checked={calendarSyncEnabled}
+              disabled={calendarSyncPending}
+              onCheckedChange={(enabled) => void handleCalendarSyncToggle(enabled)}
+            />
+          </div>
+
+          {calendarSyncEnabled && (
+            <>
+              <div className="flex items-center gap-3 border-t border-border py-3">
+                <Calendar className="size-5 shrink-0 text-muted-foreground" />
+                <label htmlFor="calendar-sync-exams" className="min-w-0 flex-1 text-sm">
+                  {t("settings.calendarSyncIncludeExams")}
+                </label>
+                <Switch
+                  id="calendar-sync-exams"
+                  checked={calendarSyncIncludeExams}
+                  onCheckedChange={actions.setCalendarSyncIncludeExams}
+                />
+              </div>
+
+              <div className="flex items-center gap-3 border-t border-border py-3">
+                <Bell className="size-5 shrink-0 text-muted-foreground" />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <label htmlFor="calendar-sync-reminders" className="text-sm">
+                    {t("settings.calendarSyncWriteReminders")}
+                  </label>
+                  <span className="text-xs text-muted-foreground">
+                    {t("settings.calendarSyncWriteRemindersHint")}
+                  </span>
+                </div>
+                <Switch
+                  id="calendar-sync-reminders"
+                  checked={calendarSyncWriteReminders}
+                  onCheckedChange={actions.setCalendarSyncWriteReminders}
+                />
+              </div>
+
+              {classReminderEnabled && calendarSyncWriteReminders && (
+                <div
+                  data-calendar-duplicate-warning=""
+                  className="mb-2 rounded-md border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-xs text-orange-700 dark:text-orange-300"
+                >
+                  {t("settings.calendarSyncDuplicateWarning")}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-3">
+                <span className="text-xs text-muted-foreground">
+                  {calendarSyncStatus.syncing
+                    ? t("settings.calendarSyncSyncing")
+                    : calendarSyncStatus.error
+                      ? calendarSyncStatus.error
+                      : calendarSyncStatus.lastSyncedCount !== null
+                        ? t("settings.calendarSyncSyncedCount", {
+                            count: calendarSyncStatus.lastSyncedCount,
+                          })
+                        : t("settings.calendarSyncTitle")}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={calendarSyncPending || calendarSyncStatus.syncing}
+                    onClick={() => void handleSyncCalendarNow()}
+                  >
+                    <RefreshCw className="mr-1 size-3.5" />
+                    {t("settings.calendarSyncNow")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={calendarSyncPending || calendarSyncStatus.syncing}
+                    onClick={() => void handleClearSystemCalendar()}
+                  >
+                    <Trash2 className="mr-1 size-3.5" />
+                    {t("settings.calendarSyncClear")}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       )}
     </div>
   )
