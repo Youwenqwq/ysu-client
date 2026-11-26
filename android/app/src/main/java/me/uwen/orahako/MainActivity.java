@@ -19,5 +19,8 @@ public class MainActivity extends BridgeActivity {
         // HttpURLConnection must use only the explicit Cookie header from the JS jar.
         CookieHandler.setDefault(null);
         EdgeToEdge.enable(this);
+        // Replace SystemBars' late viewport-fit probe so the first frame already
+        // has its final viewport size.
+        WebViewInsets.install(getBridge());
     }
 }
