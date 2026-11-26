@@ -577,8 +577,8 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
           )}
         >
           <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
-            <div className="md:hidden">
-              {chrome.showBack && (
+            {chrome.showBack && (
+              <div className="md:hidden">
                 <button
                   type="button"
                   data-shell-back=""
@@ -591,8 +591,8 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
                 >
                   <ArrowLeft className="size-5" />
                 </button>
-              )}
-            </div>
+              </div>
+            )}
             <div className="hidden md:block">
               <SidebarTrigger
                 aria-label={t("shell.toggleSidebar")}
