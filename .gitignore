@@ -19,6 +19,7 @@
 /build
 /dist
 /packages/*/dist/
+/packages/*/*/dist/
 /packages/*/*.zip
 /plugins/**/dist/
 /plugins/**/*.zip

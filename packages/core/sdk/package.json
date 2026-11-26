@@ -1,11 +1,32 @@
 {
   "name": "@orahako/sdk",
   "version": "0.1.0",
-  "private": true,
+  "description": "Public API v1 contract and runtime SDK for Orahako plugins.",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Youwenqwq/ysu-client.git",
+    "directory": "packages/core/sdk"
+  },
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
   },
   "dependencies": {
     "@capacitor/core": "^8.3.4",

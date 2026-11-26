@@ -220,6 +220,9 @@ importers:
       '@orahako/bundle-ysu':
         specifier: workspace:*
         version: link:packages/bundle/ysu
+      '@orahako/cli':
+        specifier: workspace:*
+        version: link:packages/core/cli
       '@orahako/kernel':
         specifier: workspace:*
         version: link:packages/core/kernel
@@ -1045,6 +1048,40 @@ importers:
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@6.0.3))(vite@8.2.1(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/core/cli:
+    dependencies:
+      '@orahako/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+      '@tailwindcss/postcss':
+        specifier: ^4.3.0
+        version: 4.3.0
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
+      postcss:
+        specifier: 8.5.15
+        version: 8.5.15
+      tailwindcss:
+        specifier: ^4.3.0
+        version: 4.3.0
+      tw-animate-css:
+        specifier: ^1.4.0
+        version: 1.4.0
+    devDependencies:
+      '@orahako/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
 
   packages/core/kernel:
     dependencies:
