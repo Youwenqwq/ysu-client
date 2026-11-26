@@ -168,6 +168,81 @@ describe("@orahako/ui-updater", () => {
     await expect(unconfigured.checkForUpdate()).resolves.toMatchObject({ available: false })
   })
 
+  it("respects minApkVersionCode when choosing between Web OTA and APK updates on native", async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+
+    const service = new ConfiguredUpdateService({
+      releaseBaseUrl: "https://releases.example.test/latest",
+      currentVersion: "1.0.0",
+      native: {
+        isNative: true,
+        capabilities: {} as PluginNativeService["capabilities"],
+      },
+    })
+
+    // Installed build is 100; prerelease Web OTA requires minApkVersionCode 100 -> Web OTA is offered
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        webVersion: "1.0.0",
+        apkVersionCode: 100,
+        channels: {
+          stable: {
+            webVersion: "1.0.0",
+            apkVersionCode: 100,
+            apkDownloadUrl: "https://downloads.example.test/app-1.0.0.apk",
+          },
+          prerelease: {
+            webVersion: "1.1.0-rc.1",
+            webDownloadUrl: "https://downloads.example.test/dist-1.1.0-rc.1.zip",
+            minApkVersionCode: 100,
+            body: "Preview OTA",
+          },
+        },
+      })
+    )
+    await expect(service.checkForUpdate({ channel: "prerelease" })).resolves.toEqual({
+      available: true,
+      version: "1.1.0-rc.1",
+      downloadUrl: "https://downloads.example.test/dist-1.1.0-rc.1.zip",
+      body: "Preview OTA",
+      apkUpdateAvailable: false,
+      apkDownloadUrl: "",
+    })
+
+    // Prerelease Web OTA requires minApkVersionCode 110 > installed build 100 -> falls back to APK update
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        webVersion: "1.1.0",
+        apkVersionCode: 110,
+        apkDownloadUrl: "https://downloads.example.test/app-1.1.0.apk",
+        body: "Stable native",
+        channels: {
+          stable: {
+            webVersion: "1.1.0",
+            apkVersionCode: 110,
+            apkDownloadUrl: "https://downloads.example.test/app-1.1.0.apk",
+            body: "Stable native",
+          },
+          prerelease: {
+            webVersion: "1.2.0-rc.1",
+            webDownloadUrl: "https://downloads.example.test/dist-1.2.0-rc.1.zip",
+            minApkVersionCode: 110,
+            body: "Preview OTA",
+          },
+        },
+      })
+    )
+    await expect(service.checkForUpdate({ channel: "prerelease" })).resolves.toEqual({
+      available: false,
+      version: "1.1.0",
+      downloadUrl: "https://downloads.example.test/dist-1.2.0-rc.1.zip",
+      body: "Stable native",
+      apkUpdateAvailable: true,
+      apkDownloadUrl: "https://downloads.example.test/app-1.1.0.apk",
+    })
+  })
+
   it("notifies CapacitorUpdater on native startup, provides updater service, and contributes overlay/settings/about slots", async () => {
     vi.stubGlobal(
       "fetch",

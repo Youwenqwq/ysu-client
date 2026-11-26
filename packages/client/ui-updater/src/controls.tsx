@@ -96,12 +96,18 @@ export const UpdaterAboutSection: SlotComponent<UpdaterAboutSectionProps> = (pro
   const longPressHandlers = useLongPress(openMirrorDialog)
 
   const confirmMirror = () => {
-    if (dialogPreset === "__custom__") {
-      actions.setMirror(dialogCustomValue.trim())
-    } else {
-      actions.setMirror(dialogPreset === "__direct__" ? "" : dialogPreset)
-    }
+    const nextMirror =
+      dialogPreset === "__custom__"
+        ? dialogCustomValue.trim()
+        : dialogPreset === "__direct__"
+          ? ""
+          : dialogPreset
+    actions.setMirror(nextMirror)
     actions.setChannel(dialogChannel)
+    if (dialogChannel !== channel || nextMirror !== mirror) {
+      setCheckPhase("idle")
+      setErrorMsg("")
+    }
     setShowMirrorDialog(false)
   }
 
@@ -155,6 +161,11 @@ export const UpdaterAboutSection: SlotComponent<UpdaterAboutSectionProps> = (pro
     }
   }
 
+  const versionText =
+    channel === "prerelease"
+      ? `${t("versionLabel")} ${currentVersion} · ${t("channelPrerelease")}`
+      : `${t("versionLabel")} ${currentVersion}`
+
   if (!native && !showInstallRow) return null
 
   return (
@@ -204,9 +215,7 @@ export const UpdaterAboutSection: SlotComponent<UpdaterAboutSectionProps> = (pro
             >
               <CircleFadingArrowUp className="size-5 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-left text-sm">{t("checkUpdate")}</span>
-              <span className="text-xs text-muted-foreground">
-                {t("versionLabel")} {currentVersion}
-              </span>
+              <span className="text-xs text-muted-foreground">{versionText}</span>
             </button>
           )}
           {checkPhase === "checking" && (
@@ -218,15 +227,18 @@ export const UpdaterAboutSection: SlotComponent<UpdaterAboutSectionProps> = (pro
             </div>
           )}
           {checkPhase === "up-to-date" && (
-            <div className="flex items-center gap-3 py-3">
+            <button
+              type="button"
+              onClick={() => void handleCheck()}
+              {...longPressHandlers}
+              className="flex items-center gap-3 py-3 transition-colors active:bg-muted/60"
+            >
               <CheckCircle2 className="size-5 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-left text-sm text-muted-foreground">
                 {t("upToDateDesc")}
               </span>
-              <span className="text-xs text-muted-foreground">
-                {t("versionLabel")} {currentVersion}
-              </span>
-            </div>
+              <span className="text-xs text-muted-foreground">{versionText}</span>
+            </button>
           )}
           {checkPhase === "error" && (
             <div className="flex flex-col gap-2 py-3">

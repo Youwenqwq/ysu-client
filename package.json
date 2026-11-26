@@ -12,7 +12,7 @@
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "next typegen && tsc --noEmit && tsc -p tsconfig.base.json --noEmit",
     "test": "vitest run",
-    "verify-architecture": "node --experimental-transform-types scripts/verify-architecture.ts",
+    "verify-architecture": "node scripts/verify-architecture.ts",
     "build:packages": "tsx scripts/build-npm-packages.ts",
     "publish:packages": "pnpm run build:packages && pnpm -r --filter @orahako/sdk --filter @orahako/ui-primitives --filter @orahako/academic-sdk --filter @orahako/cli publish --access public --no-git-checks",
     "plugin": "tsx scripts/plugin.ts",

@@ -10,6 +10,7 @@ export interface UpdateManifestEntry {
   readonly webDownloadUrl?: string
   readonly apkVersionCode?: number
   readonly apkDownloadUrl?: string
+  readonly minApkVersionCode?: number
   readonly body?: string
 }
 

@@ -202,6 +202,12 @@ tasks.named('preBuild').configure {
     dependsOn tasks.named('verifyNativeComposition')
 }
 
+tasks.register('printReleaseVersion') {
+    doLast {
+        println("${android.defaultConfig.versionName} ${android.defaultConfig.versionCode}")
+    }
+}
+
 try {
     def servicesJSON = file('google-services.json')
     if (servicesJSON.text) {

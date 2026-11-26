@@ -86,6 +86,7 @@ function toTopLevelEntry(data: UpdateManifest): UpdateManifestEntry {
     ...(data.webDownloadUrl !== undefined ? { webDownloadUrl: data.webDownloadUrl } : {}),
     ...(data.apkVersionCode !== undefined ? { apkVersionCode: data.apkVersionCode } : {}),
     ...(data.apkDownloadUrl !== undefined ? { apkDownloadUrl: data.apkDownloadUrl } : {}),
+    ...(data.minApkVersionCode !== undefined ? { minApkVersionCode: data.minApkVersionCode } : {}),
     ...(data.body !== undefined ? { body: data.body } : {}),
   }
 }
@@ -215,7 +216,14 @@ export class ConfiguredUpdateService implements PluginUpdateService {
         : distZipUrl
 
       if (this.isNativePlatform()) {
-        const apkCandidate = await this.getApkUpdateCandidate(candidates)
+        const installedBuild = await this.getInstalledBuild()
+        const requiredApkCode = webUpdateCandidate
+          ? (webUpdateCandidate.minApkVersionCode ?? webUpdateCandidate.apkVersionCode ?? 0)
+          : Infinity
+        const apkCandidate =
+          installedBuild < requiredApkCode
+            ? this.getApkUpdateCandidate(candidates, installedBuild)
+            : undefined
         if (apkCandidate) {
           version = apkCandidate.webVersion
           body = apkCandidate.body ?? ""
@@ -344,11 +352,15 @@ export class ConfiguredUpdateService implements PluginUpdateService {
     }
   }
 
-  private async getApkUpdateCandidate(
-    candidates: readonly UpdateCandidate[]
-  ): Promise<UpdateCandidate | undefined> {
+  private async getInstalledBuild(): Promise<number> {
     const installed = await App.getInfo()
-    const installedBuild = Number(installed.build)
+    return Number(installed.build)
+  }
+
+  private getApkUpdateCandidate(
+    candidates: readonly UpdateCandidate[],
+    installedBuild: number
+  ): UpdateCandidate | undefined {
     const sorted = candidates
       .filter(
         (candidate) =>
