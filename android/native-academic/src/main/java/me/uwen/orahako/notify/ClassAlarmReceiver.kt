@@ -76,7 +76,29 @@ class ClassAlarmReceiver : BroadcastReceiver() {
                         }
                     }
                     else -> {
-                        if (!live && now < alarmTime) return
+                        // A delayed ordinary reminder is consumed but never reposted
+                        // once the item has started.
+                        if (now >= startAt) {
+                            if (!live) {
+                                val remaining = JSONArray()
+                                for (i in 0 until alarms.length()) {
+                                    val saved = alarms.getJSONObject(i)
+                                    if (saved.optString("alarmId") != alarmId) remaining.put(saved)
+                                }
+                                ClassReminderState.save(context, remaining.toString())
+                            }
+                            return
+                        }
+                        // If woken noticeably early, reschedule instead of dropping.
+                        if (now + 5_000L < alarmTime) {
+                            val pending = PendingIntent.getBroadcast(
+                                context, alarmId.hashCode(),
+                                ClassAlarmManager.alarmIntent(context, alarmId, alarmTime),
+                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                            )
+                            ClassAlarmScheduling.schedule(context, alarmTime, pending, asAlarmClock = live)
+                            return
+                        }
                         if (!live) {
                             val remaining = JSONArray()
                             for (i in 0 until alarms.length()) {
@@ -85,20 +107,8 @@ class ClassAlarmReceiver : BroadcastReceiver() {
                             }
                             ClassReminderState.save(context, remaining.toString())
                         }
-                        // A delayed ordinary reminder is consumed but never reposted
-                        // once class has started, matching the upstream receiver.
-                        if (now >= startAt) return
-                        if (now < alarmTime) {
-                            val pending = PendingIntent.getBroadcast(
-                                context, alarmId.hashCode(),
-                                ClassAlarmManager.alarmIntent(context, alarmId, alarmTime),
-                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                            )
-                            ClassAlarmScheduling.schedule(context, alarmTime, pending, asAlarmClock = true)
-                            return
-                        }
                         // Keep the receiver process eligible to run until the one-shot
-                        // waveform ends; no foreground disclosure is needed before class.
+                        // waveform ends; no foreground disclosure is needed before start.
                         if (ClassReminderService.sendReminder(context, alarm)) {
                             val pending = goAsync()
                             Handler(Looper.getMainLooper()).postDelayed({ pending.finish() }, 2_200L)

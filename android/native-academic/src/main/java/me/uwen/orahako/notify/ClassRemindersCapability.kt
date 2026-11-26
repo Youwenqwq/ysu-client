@@ -68,10 +68,8 @@ class ClassRemindersCapability(
             }
         }
 
-        /** Releases runtime delivery only; persisted alarms remain for reconciliation. */
-        override fun release() {
-            ClassReminderService.stop(host.context)
-        }
+        /** Temporary invoke leases must not stop an active Live Update foreground service. */
+        override fun release() = Unit
     }
 
     private fun schedule(payload: Map<String, Any?>, result: NativeInvokeResult) {

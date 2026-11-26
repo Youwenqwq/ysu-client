@@ -1,6 +1,8 @@
 import type { ClassPeriod, Course, CurrentWeek, Exam, TermCalendar } from "@orahako/academic-sdk"
+import type { ScheduleEntry } from "@orahako/sdk"
 
 import { getAcademicClock, resolveAcademicWeek } from "./academic-time"
+import { formatClockMinute } from "./schedule-entries"
 import { parseWeeks } from "./schedule-utils"
 import { DEFAULT_ACADEMIC_TIME_ZONE } from "./time"
 
@@ -13,6 +15,8 @@ export interface WidgetScheduleCourse {
   end_section: number
   start_time?: string
   end_time?: string
+  date?: string
+  category?: "course" | "personal" | "custom"
 }
 
 export interface WidgetWeekInfo {
@@ -52,14 +56,15 @@ export interface ExamWidgetSettings {
   syncReminderHours: number
 }
 
-/** Pure snapshot builder mapping provider courses and live academic week into widget JSON. */
+/** Pure snapshot builder mapping provider courses, personal schedule entries, and live academic week into widget JSON. */
 export function buildScheduleWidgetSnapshot(
   courses: readonly Course[],
   currentWeek: CurrentWeek | null,
   periods: readonly ClassPeriod[],
   calendar?: TermCalendar,
   now = new Date(),
-  timeZone: string = DEFAULT_ACADEMIC_TIME_ZONE
+  timeZone: string = DEFAULT_ACADEMIC_TIME_ZONE,
+  extraEntries: readonly ScheduleEntry[] = []
 ): ScheduleWidgetSnapshot {
   const periodMap = new Map(periods.map((period) => [period.section, period]))
 
@@ -77,6 +82,36 @@ export function buildScheduleWidgetSnapshot(
       end_time: endPeriod?.endTime,
     }
   })
+
+  for (const entry of extraEntries) {
+    if (entry.category === "exam") continue
+    const startSection = entry.sections?.startSection ?? 0
+    const endSection = entry.sections?.endSection ?? startSection
+    const startTime = entry.time
+      ? formatClockMinute(entry.time.startMinute)
+      : startSection > 0
+        ? periodMap.get(startSection)?.startTime
+        : undefined
+    const endTime = entry.time
+      ? formatClockMinute(entry.time.endMinute)
+      : endSection > 0
+        ? periodMap.get(endSection)?.endTime
+        : undefined
+    if (!startTime && startSection <= 0) continue
+
+    widgetCourses.push({
+      name: entry.title,
+      ...(entry.location ? { classroom: entry.location } : {}),
+      week_day: entry.weekDay,
+      week_list: entry.weekList ? [...entry.weekList] : [],
+      start_section: startSection,
+      end_section: endSection,
+      ...(startTime ? { start_time: startTime } : {}),
+      ...(endTime ? { end_time: endTime } : {}),
+      ...(entry.date ? { date: entry.date } : {}),
+      category: entry.category,
+    })
+  }
 
   const liveWeek = resolveAcademicWeek(
     currentWeek,

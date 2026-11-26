@@ -456,11 +456,16 @@ export const schedulePlugin = definePlugin({
         customizationsHydrated: customizationsStore.hydrated.getSnapshot(),
       })
 
+      const customItemById = new Map(
+        customizationsStore.source.getSnapshot().customItems.map((item) => [item.id, item])
+      )
+
       const baseEntries: ScheduleEntry[] = effective.courses.map((course, index) => {
         const startPeriod = periodMap.get(course.startSection)
         const endPeriod = periodMap.get(course.endSection)
         const startMin = startPeriod?.startMinute ?? parsePeriodClockMinutes(startPeriod?.startTime)
         const endMin = endPeriod?.endMinute ?? parsePeriodClockMinutes(endPeriod?.endTime)
+        const customItem = course.customItemId ? customItemById.get(course.customItemId) : undefined
         return {
           id:
             course.occurrenceId ||
@@ -485,7 +490,7 @@ export const schedulePlugin = definePlugin({
           ...(startMin !== undefined && endMin !== undefined && endMin > startMin
             ? { time: { startMinute: startMin, endMinute: endMin } }
             : {}),
-          remindable: true,
+          remindable: customItem ? customItem.remindable !== false : true,
           metadata: {
             ...(course.code ? { courseCode: course.code } : {}),
             ...(course.credit ? { credit: course.credit } : {}),
@@ -787,9 +792,9 @@ export const schedulePlugin = definePlugin({
     overview?.registerWidget(
       {
         id: COURSE_PROGRESS_WIDGET_ID,
-        title: "课程动态",
+        title: "日程动态",
         titleKey: "overview.courseProgress.title",
-        description: "有课时显示正在进行或下一节课程。",
+        description: "显示正在进行或即将开始的课程与日程。",
         descriptionKey: "overview.courseProgress.description",
         icon: Clock,
         region: "content",
@@ -806,9 +811,9 @@ export const schedulePlugin = definePlugin({
     overview?.registerWidget(
       {
         id: TODAY_COURSES_WIDGET_ID,
-        title: "今日课程",
+        title: "今日日程",
         titleKey: "overview.todayCourses.title",
-        description: "显示今天的课程与上课安排。",
+        description: "按时间顺序显示今天的课程与日程安排。",
         descriptionKey: "overview.todayCourses.description",
         icon: BookOpen,
         region: "content",
@@ -901,6 +906,7 @@ export const schedulePlugin = definePlugin({
             inject: (): ClassReminderSettingsInject => ({
               hooks: {
                 provider: providerStateSource,
+                scheduledAlarms: controller.scheduledAlarms,
               },
               pluginId: SCHEDULE_PLUGIN_ID,
               isNative: () => native.isNative,

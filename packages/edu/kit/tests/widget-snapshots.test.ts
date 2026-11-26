@@ -80,6 +80,56 @@ describe("schedule widget snapshots", () => {
       ).week
     ).toBeNull()
   })
+
+  it("includes personal single-date and recurring schedule entries while excluding exams", () => {
+    const snapshot = buildScheduleWidgetSnapshot(
+      courses,
+      currentWeek,
+      periods,
+      calendar,
+      new Date("2026-09-09T04:00:00Z"),
+      "Asia/Shanghai",
+      [
+        {
+          id: "custom:1",
+          sourceId: "personal",
+          sourcePluginId: "orahako.schedule",
+          category: "personal",
+          title: "社团例会",
+          location: "学生活动中心",
+          date: "2026-09-09",
+          weekDay: 3,
+          time: { startMinute: 19 * 60, endMinute: 20 * 60 + 30 },
+          remindable: true,
+        },
+        {
+          id: "exam:1",
+          sourceId: "exams",
+          sourcePluginId: "orahako.exams",
+          category: "exam",
+          title: "高数期末",
+          date: "2026-09-09",
+          weekDay: 3,
+          time: { startMinute: 9 * 60, endMinute: 11 * 60 },
+          remindable: false,
+        },
+      ]
+    )
+
+    expect(snapshot.courses).toHaveLength(2)
+    expect(snapshot.courses[1]).toEqual({
+      name: "社团例会",
+      classroom: "学生活动中心",
+      week_day: 3,
+      week_list: [],
+      start_section: 0,
+      end_section: 0,
+      start_time: "19:00",
+      end_time: "20:30",
+      date: "2026-09-09",
+      category: "personal",
+    })
+  })
 })
 
 describe("exam widget snapshots", () => {

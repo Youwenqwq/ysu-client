@@ -768,8 +768,8 @@ describe("scheduleSettingsStore & schedulePatchesStore validation and persistenc
 })
 
 describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
-  it("does not schedule a reminder whose trigger time has already passed", () => {
-    const now = new Date("2026-09-07T00:30:00Z") // 08:30 Asia/Shanghai, during the 08:00 class
+  it("retains reminders inside the pre-reminder window and supports includeOngoing for Live Update", () => {
+    const duringClass = new Date("2026-09-07T00:30:00Z") // 08:30 Asia/Shanghai, during 08:00-09:40 class
     expect(
       computeClassAlarms(
         [sampleCourses[0]!],
@@ -778,10 +778,41 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
         1,
         sampleCalendar,
         15,
-        now,
+        duringClass,
         "Asia/Shanghai"
       )
     ).toEqual([])
+
+    // Live Update retains ongoing classes so Android can start countdown immediately
+    expect(
+      computeClassAlarms(
+        [sampleCourses[0]!],
+        sampleWeek,
+        samplePeriods,
+        1,
+        sampleCalendar,
+        15,
+        duringClass,
+        "Asia/Shanghai",
+        [],
+        { includeOngoing: true }
+      )
+    ).toHaveLength(1)
+
+    // Inside pre-reminder window (07:50 for 08:00 class with 15min remind): retained for immediate delivery
+    const insideWindow = new Date("2026-09-06T23:50:00Z") // 07:50 Asia/Shanghai
+    expect(
+      computeClassAlarms(
+        [sampleCourses[0]!],
+        sampleWeek,
+        samplePeriods,
+        1,
+        sampleCalendar,
+        15,
+        insideWindow,
+        "Asia/Shanghai"
+      )
+    ).toHaveLength(1)
   })
 
   it("computes Shanghai-timezone alarms, merges conflicting courses, and handles geolocation lookup", async () => {
@@ -810,10 +841,12 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       {
         alarmId: "2026-09-07|1",
         alarmTime: Date.parse("2026-09-07T07:45:00+08:00"),
+        startAt: Date.parse("2026-09-07T08:00:00+08:00"),
         courseName: "高等数学 / 线性代数",
         classroom: "A101 / A102",
         startTime: "08:00",
         remindMinutes: 15,
+        category: "course",
         conflictCount: 2,
         endTime: "09:40",
         endAt: Date.parse("2026-09-07T09:40:00+08:00"),
@@ -1277,8 +1310,8 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       .pages.find((p) => p.pluginId === OVERVIEW_PLUGIN_ID && p.id === "index")!
     await dom.render(<ContributionOutlet entry={overviewPage} slots={slots} i18n={i18n} />)
     await vi.waitFor(() => {
-      expect(dom.container.textContent).toContain("下一节")
-      expect(dom.container.textContent).toContain("今日课程")
+      expect(dom.container.textContent).toContain("下一项")
+      expect(dom.container.textContent).toContain("今日日程")
       expect(dom.container.textContent).toContain("高等数学")
     })
 
@@ -1297,8 +1330,8 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     const expandedWidgetsHtml = renderToStaticMarkup(
       <ContributionOutlet entry={widgetsCategory} slots={slots} i18n={i18n} />
     )
-    expect(expandedWidgetsHtml).toContain("今日课表")
-    expect(expandedWidgetsHtml).toContain("明日课表")
+    expect(expandedWidgetsHtml).toContain("今日日程")
+    expect(expandedWidgetsHtml).toContain("明日日程")
     expect(expandedWidgetsHtml.match(/src="\/widgets\/schedule\.png"/g)).toHaveLength(2)
     expect(expandedWidgetsHtml).toContain("日程页小组件助手")
     expect(expandedWidgetsHtml).toContain("手动添加")
@@ -1309,7 +1342,8 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
     const reminderHtml = renderToStaticMarkup(
       <ContributionOutlet entry={reminderSlotEntry} slots={slots} i18n={i18n} />
     )
-    expect(reminderHtml).toContain("开启上课提醒")
+    expect(reminderHtml).toContain("开启日程提醒")
+    expect(reminderHtml).toContain("已预约提醒预览")
     expect(reminderHtml).toContain("提前提醒时间")
 
     // Disabling "schedule" channel via notifications store triggers onDisable -> cancels alarms & clears schedule/tomorrow widgets

@@ -63,6 +63,9 @@ export {
   formatMinuteRange,
   isScheduleEntryActiveOnDate,
   mapTimeRangeToSections,
+  resolveScheduleEntriesForDate,
+  resolveScheduleEntryTime,
+  type ResolvedScheduleEntry,
   type ScheduleOverlayBlock,
 } from "./schedule-entries"
 export {

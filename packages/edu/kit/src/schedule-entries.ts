@@ -1,8 +1,13 @@
 import type { ClassPeriod, CurrentWeek } from "@orahako/academic-sdk"
-import type { ScheduleEntry } from "@orahako/sdk"
+import type { ScheduleEntry, ScheduleEntryCategory } from "@orahako/sdk"
 
 import { scheduleDate } from "./schedule-patches"
 import { buildSectionTimeMap } from "./schedule-utils"
+
+export interface ResolvedScheduleEntry {
+  readonly entry: ScheduleEntry
+  readonly time: { readonly startMinute: number; readonly endMinute: number } | null
+}
 
 export interface ScheduleOverlayBlock {
   readonly entry: ScheduleEntry
@@ -228,6 +233,52 @@ export function isScheduleEntryActiveOnDate(
     return academicWeek !== undefined && entry.weekList.includes(academicWeek)
   }
   return true
+}
+
+export function resolveScheduleEntryTime(
+  entry: ScheduleEntry,
+  timeMap: Record<number, [number, number]>
+): { readonly startMinute: number; readonly endMinute: number } | null {
+  if (entry.time && entry.time.endMinute > entry.time.startMinute) {
+    return entry.time
+  }
+  if (entry.sections) {
+    const start = timeMap[entry.sections.startSection]
+    const end = timeMap[entry.sections.endSection]
+    if (start && end && end[1] > start[0]) {
+      return { startMinute: start[0], endMinute: end[1] }
+    }
+  }
+  return null
+}
+
+export function resolveScheduleEntriesForDate(
+  entries: readonly ScheduleEntry[],
+  date: string,
+  weekday: number,
+  academicWeek: number | undefined,
+  timeMap: Record<number, [number, number]>,
+  options: { readonly excludeCategories?: readonly ScheduleEntryCategory[] } = {}
+): ResolvedScheduleEntry[] {
+  const excluded = options.excludeCategories ? new Set(options.excludeCategories) : null
+  const matched: ResolvedScheduleEntry[] = []
+  for (const entry of entries) {
+    if (excluded?.has(entry.category)) continue
+    if (!isScheduleEntryActiveOnDate(entry, date, weekday, academicWeek)) continue
+    matched.push({
+      entry,
+      time: resolveScheduleEntryTime(entry, timeMap),
+    })
+  }
+  return matched.sort((a, b) => {
+    const aStart = a.time?.startMinute ?? Number.POSITIVE_INFINITY
+    const bStart = b.time?.startMinute ?? Number.POSITIVE_INFINITY
+    if (aStart !== bStart) return aStart - bStart
+    const aSec = a.entry.sections?.startSection ?? Number.POSITIVE_INFINITY
+    const bSec = b.entry.sections?.startSection ?? Number.POSITIVE_INFINITY
+    if (aSec !== bSec) return aSec - bSec
+    return a.entry.title.localeCompare(b.entry.title)
+  })
 }
 
 export function computeOverlayBlocks(

@@ -66,6 +66,7 @@ object ClassLiveUpdate {
     const val EXTRA_CLASSROOM = "classroom"
     const val EXTRA_REMIND = "remind_minutes"
     const val EXTRA_CONFLICT = "conflict_count"
+    const val EXTRA_CATEGORY = "category"
     const val EXTRA_ENDED_DEADLINE = "class_live_update_ended_deadline"
 
     fun notificationId(alarmId: String): Int = ("class:$alarmId").hashCode()
@@ -81,7 +82,8 @@ object ClassLiveUpdate {
         startAt: Long,
         remindMinutes: Int,
         conflictCount: Int = 1,
-        endAt: Long = 0L
+        endAt: Long = 0L,
+        category: String = "course",
     ): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) return false
         if (isEnded(context, alarmId)) return true
@@ -89,7 +91,7 @@ object ClassLiveUpdate {
             Log.d(TAG, "Deferring $alarmId until the active class ends")
             return false
         }
-        val extras = buildExtras(courseName, classroom, startAt, endAt, remindMinutes, conflictCount)
+        val extras = buildExtras(courseName, classroom, startAt, endAt, remindMinutes, conflictCount, category)
         updatePhase(context, alarmId, extras)
         if (startAt > System.currentTimeMillis()) {
             schedule(context, ACTION_CLASS_STARTED, alarmId, startAt, extras)
@@ -158,7 +160,8 @@ object ClassLiveUpdate {
                 startAt, // 你在看代码吗部长大人qwq
                 next.optInt("remindMinutes", 15),
                 next.optInt("conflictCount", 1),
-                next.optLong("endAt", 0L)
+                next.optLong("endAt", 0L),
+                next.optString("category", "course").ifBlank { "course" },
             )
             return
         }
@@ -168,7 +171,10 @@ object ClassLiveUpdate {
     private fun showEnded(context: Context, alarmId: String, extras: Bundle) {
         // 结束胶囊仍走同一推广模板；解除前台绑定后另设显式撤下边界。
         ClassReminderService.detachLiveNotification(alarmId)
-        val ended = context.getString(R.string.class_live_update_ended)
+        val isEvent = extras.getString(EXTRA_CATEGORY) == "event"
+        val ended = context.getString(
+            if (isEvent) R.string.event_live_update_ended else R.string.class_live_update_ended
+        )
         val deadline = System.currentTimeMillis() + ENDED_TIMEOUT_MS
         // 你真的在Review啊
         publish(
@@ -238,21 +244,33 @@ object ClassLiveUpdate {
         }
         val classroom = extras.getString(EXTRA_CLASSROOM).orEmpty()
         val conflictCount = extras.getInt(EXTRA_CONFLICT, 1)
+        val isEvent = extras.getString(EXTRA_CATEGORY) == "event"
         // qwq
         val courseName = extras.getString(EXTRA_COURSE).orEmpty()
         val room = cleanRoom(classroom).ifBlank {
-            courseName.ifBlank { context.getString(R.string.notify_fallback_alarm_course) }
+            courseName.ifBlank {
+                context.getString(
+                    if (isEvent) R.string.notify_fallback_alarm_event
+                    else R.string.notify_fallback_alarm_course
+                )
+            }
         }
 
         val text: String
         val progress: Int
         if (startAt > 0 && now >= startAt && endAt > startAt) {
             val left = ((endAt - now).coerceAtLeast(0L) + 59_999L) / 60_000L
-            text = context.getString(R.string.class_live_update_during, room, left.toInt())
+            text = context.getString(
+                if (isEvent) R.string.event_live_update_during else R.string.class_live_update_during,
+                room,
+                left.toInt(),
+            )
             val total = (endAt - startAt).coerceAtLeast(1L)
             progress = (((now - startAt) * 100) / total).toInt().coerceIn(0, 100)
         } else if (startAt > 0 && now >= startAt) {
-            text = context.getString(R.string.class_live_update_in_class)
+            text = context.getString(
+                if (isEvent) R.string.event_live_update_ongoing else R.string.class_live_update_in_class
+            )
             progress = 100
         } else {
             val window = NEXT_CLASS_WINDOW_MS
@@ -265,9 +283,18 @@ object ClassLiveUpdate {
                 }
                 append(
                     if (left <= 0) {
-                        context.getString(R.string.class_live_update_before_now, room)
+                        context.getString(
+                            if (isEvent) R.string.event_live_update_before_now
+                            else R.string.class_live_update_before_now,
+                            room,
+                        )
                     } else {
-                        context.getString(R.string.class_live_update_before, room, left)
+                        context.getString(
+                            if (isEvent) R.string.event_live_update_before
+                            else R.string.class_live_update_before,
+                            room,
+                            left,
+                        )
                     }
                 )
             }
@@ -420,7 +447,8 @@ object ClassLiveUpdate {
         startAt: Long,
         endAt: Long,
         remindMinutes: Int,
-        conflictCount: Int
+        conflictCount: Int,
+        category: String = "course",
     ): Bundle = Bundle().apply {
         putString(EXTRA_COURSE, courseName)
         putString(EXTRA_CLASSROOM, classroom)
@@ -428,6 +456,7 @@ object ClassLiveUpdate {
         putLong(EXTRA_END_AT, endAt)
         putInt(EXTRA_REMIND, remindMinutes)
         putInt(EXTRA_CONFLICT, conflictCount)
+        putString(EXTRA_CATEGORY, category)
     }
 
     /** 取消某个课次的阶段闹钟（开课/下课/刷新）。 */

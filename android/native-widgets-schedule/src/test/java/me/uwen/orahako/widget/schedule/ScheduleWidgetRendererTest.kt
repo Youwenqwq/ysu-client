@@ -104,4 +104,55 @@ class ScheduleWidgetRendererTest {
             ScheduleWidgetRenderer.coursesForDate(courses, day(2026, 9, 6), anchor),
         )
     }
+
+    @Test
+    fun personalDatedAndWeeklyEventsMergeChronologicallyWithCoursesAndSurviveMissingAnchor() {
+        val monday = day(2026, 9, 7)
+        val anchor = ScheduleWidgetRenderer.WidgetWeekInfo(1, 1, null, "2026-09-07", true, 16)
+        val items = listOf(
+            ScheduleWidgetRenderer.WidgetCourse(
+                name = "下午高数",
+                classroom = "A101",
+                weekDay = 1,
+                startSection = 5,
+                endSection = 6,
+                startTime = "14:00",
+                endTime = "15:40",
+                weeks = listOf(1),
+            ),
+            ScheduleWidgetRenderer.WidgetCourse(
+                name = "晨跑打卡",
+                classroom = "操场",
+                weekDay = 1,
+                startSection = 0,
+                endSection = 0,
+                startTime = "07:30",
+                endTime = "08:00",
+                weeks = emptyList(),
+                category = "personal",
+            ),
+            ScheduleWidgetRenderer.WidgetCourse(
+                name = "项目例会",
+                classroom = "线上",
+                weekDay = 1,
+                startSection = 0,
+                endSection = 0,
+                startTime = "10:00",
+                endTime = "11:00",
+                weeks = emptyList(),
+                date = "2026-09-07",
+                category = "personal",
+            ),
+        )
+
+        assertEquals(
+            listOf("晨跑打卡", "项目例会", "下午高数"),
+            ScheduleWidgetRenderer.coursesForDate(items, monday, anchor).map { it.name },
+        )
+        // Without an academic anchor, personal dated & weekly items still render while academic courses stay hidden.
+        assertEquals(
+            listOf("晨跑打卡", "项目例会"),
+            ScheduleWidgetRenderer.coursesForDate(items, monday, null).map { it.name },
+        )
+    }
 }

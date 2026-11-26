@@ -135,22 +135,43 @@ class ClassReminderService : Service() {
             return true
         }
 
+        internal fun claimReminderDelivery(
+            context: Context, id: String, start: Long, end: Long
+        ): Boolean {
+            val prefs = context.getSharedPreferences(DELIVERY_PREFS, Context.MODE_PRIVATE)
+            val key = "notify:$id:$start"
+            if (prefs.contains(key)) return false
+            val editor = prefs.edit()
+            val now = System.currentTimeMillis()
+            for ((savedKey, expiry) in prefs.all) {
+                if (expiry is Long && expiry < now) editor.remove(savedKey)
+            }
+            return editor.putLong(key, maxOf(end, start + 60_000L)).commit()
+        }
+
         /** ALU reminders start the same foreground timer used by class and handoff updates. */
         internal fun sendReminder(context: Context, alarm: JSONObject): Boolean {
             val id = alarm.getString("alarmId")
             val start = startAt(alarm)
             val expiry = expiryAt(alarm)
             val end = alarm.optLong("endAt")
+            val category = text(alarm, "category", "course")
+            val fallbackTitle = context.getString(
+                if (category == "event") R.string.notify_fallback_alarm_event
+                else R.string.notify_fallback_alarm_course
+            )
             val livePosted = ClassAlarmManager.supportsLiveUpdate(context, alarm) &&
                 ClassLiveUpdate.post(
                     context, id,
-                    text(alarm, "courseName", context.getString(R.string.notify_fallback_alarm_course)),
+                    text(alarm, "courseName", fallbackTitle),
                     text(alarm, "classroom"), text(alarm, "startTime"), start,
-                    alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end
+                    alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end,
+                    category,
                 )
             if (livePosted) {
                 ClassReminderService.start(context, alarm)
             } else {
+                if (!claimReminderDelivery(context, id, start, expiry)) return false
                 val parts = buildList {
                     val startTime = text(alarm, "startTime")
                     val classroom = text(alarm, "classroom")
@@ -158,9 +179,12 @@ class ClassReminderService : Service() {
                     if (classroom.isNotEmpty()) add(classroom)
                 }
                 val content = if (parts.isNotEmpty()) parts.joinToString(" · ")
-                    else context.getString(R.string.class_alarm_text, alarm.optInt("remindMinutes", 15))
+                    else context.getString(
+                        if (category == "event") R.string.event_alarm_text else R.string.class_alarm_text,
+                        alarm.optInt("remindMinutes", 15),
+                    )
                 val notification = ClassReminderNotifications.builder(context)
-                    .setContentTitle(text(alarm, "courseName", context.getString(R.string.notify_fallback_alarm_course)))
+                    .setContentTitle(text(alarm, "courseName", fallbackTitle))
                     .setContentText(content)
                     .build()
                 (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
@@ -259,18 +283,25 @@ class ClassReminderService : Service() {
         // Store before launch so an immediately due timer cannot finish before registration.
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
+                val category = text(alarm, "category", "course")
+                val fallbackTitle = getString(
+                    if (category == "event") R.string.notify_fallback_alarm_event
+                    else R.string.notify_fallback_alarm_course
+                )
                 val extras = ClassLiveUpdate.buildExtras(
-                    text(alarm, "courseName", getString(R.string.notify_fallback_alarm_course)),
+                    text(alarm, "courseName", fallbackTitle),
                     text(alarm, "classroom"), start, end,
-                    alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1)
+                    alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1),
+                    category,
                 )
                 // Start refreshing the first upcoming class as well as live handoffs.
                 if (live && System.currentTimeMillis() < start) {
                     ClassLiveUpdate.post(
                         this@ClassReminderService, id,
-                        text(alarm, "courseName", getString(R.string.notify_fallback_alarm_course)),
+                        text(alarm, "courseName", fallbackTitle),
                         text(alarm, "classroom"), text(alarm, "startTime"), start,
-                        alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end
+                        alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end,
+                        category,
                     )
                 }
                 while (System.currentTimeMillis() < start) {
@@ -286,9 +317,10 @@ class ClassReminderService : Service() {
                     if (!isCurrent(alarm) || System.currentTimeMillis() >= expiry) return@launch
                     if (live) ClassLiveUpdate.post(
                         this@ClassReminderService, id,
-                        text(alarm, "courseName", getString(R.string.notify_fallback_alarm_course)),
+                        text(alarm, "courseName", fallbackTitle),
                         text(alarm, "classroom"), text(alarm, "startTime"), start,
-                        alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end
+                        alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end,
+                        category,
                     )
                 }
                 if (!live) return@launch

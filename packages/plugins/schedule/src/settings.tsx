@@ -43,7 +43,7 @@ import {
   Switch,
   ToggleGroupItem,
 } from "@orahako/ui-primitives"
-import type { ScheduleWidgetId } from "./controller"
+import type { ClassAlarmConfig, ScheduleWidgetId } from "./controller"
 import type { ScheduleDictionary } from "./dictionary"
 import type { ScheduleSettingsStoreInstance } from "./stores"
 import { WidgetAssistantAvatar } from "./widget-discovery"
@@ -353,6 +353,7 @@ export const ScheduleWidgetAssistantSettings: SlotComponent<
 export interface ClassReminderSettingsInject {
   readonly hooks: {
     readonly provider: ObservableSource<ProviderRuntimeSnapshot>
+    readonly scheduledAlarms: ObservableSource<readonly ClassAlarmConfig[]>
   }
   readonly pluginId: string
   readonly isNative: () => boolean
@@ -370,10 +371,21 @@ export type ClassReminderSettingsProps = DerivedComponentProps<
   ClassReminderSettingsInject
 >
 
+function formatAlarmTimestamp(timestamp: number): string {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return ""
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  const hours = String(date.getHours()).padStart(2, "0")
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+  return `${month}-${day} ${hours}:${minutes}`
+}
+
 export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = (props) => {
   const { t, useStore, actions, checkExactAlarmPermission } = props
   const { setClassLiveUpdateEnabled } = actions
   const providerSnap = props.useProvider()
+  const scheduledAlarms = props.useScheduledAlarms()
   const classReminderEnabled = useStore((s) => s.classReminderEnabled)
   const classReminderMinutes = useStore((s) => s.classReminderMinutes)
   const classLiveUpdateEnabled = useStore((s) => s.classLiveUpdateEnabled)
@@ -539,6 +551,71 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
             unit={t("settings.days")}
             bordered
           />
+
+          <div className="border-t border-border">
+            <Accordion type="single" collapsible>
+              <AccordionItem value="preview" className="border-b-0">
+                <AccordionTrigger
+                  className="py-3 text-sm font-normal hover:no-underline"
+                  data-reminder-preview-trigger=""
+                >
+                  <span className="flex items-center gap-2">
+                    <span>{t("settings.classReminderPreviewTitle")}</span>
+                    <Badge variant="secondary" className="text-[11px]">
+                      {scheduledAlarms.length}
+                    </Badge>
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="pb-3" data-reminder-preview-content="">
+                  {scheduledAlarms.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t("settings.classReminderPreviewEmpty")}
+                    </p>
+                  ) : (
+                    <ul className="flex flex-col gap-2">
+                      {scheduledAlarms.slice(0, 10).map((alarm) => {
+                        const startAt =
+                          alarm.startAt ?? alarm.alarmTime + alarm.remindMinutes * 60_000
+                        const isEvent = alarm.category === "event"
+                        return (
+                          <li
+                            key={`${alarm.alarmId}-${alarm.alarmTime}`}
+                            className="flex items-start justify-between gap-2 rounded-md border bg-muted/30 px-2.5 py-2 text-xs"
+                          >
+                            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                                  {t(
+                                    isEvent
+                                      ? "settings.classReminderCategoryEvent"
+                                      : "settings.classReminderCategoryCourse"
+                                  )}
+                                </Badge>
+                                <span className="truncate font-medium">{alarm.courseName}</span>
+                              </div>
+                              <span className="text-muted-foreground">
+                                {[
+                                  `${formatAlarmTimestamp(startAt)}${alarm.endTime ? `-${alarm.endTime}` : ""}`,
+                                  alarm.classroom,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+                            </div>
+                            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+                              {t("settings.classReminderTriggerAt", {
+                                time: formatAlarmTimestamp(alarm.alarmTime),
+                              })}
+                            </span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
         </>
       )}
     </div>

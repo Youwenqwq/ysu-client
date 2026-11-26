@@ -32,6 +32,8 @@ class ScheduleWidgetRenderer(private val showTomorrow: Boolean) : NativeWidgetRe
         val startTime: String?,
         val endTime: String?,
         val weeks: List<Int> = emptyList(),
+        val date: String? = null,
+        val category: String? = null,
     )
 
     data class WidgetWeekInfo(
@@ -63,9 +65,12 @@ class ScheduleWidgetRenderer(private val showTomorrow: Boolean) : NativeWidgetRe
         )
         val showNextDaySchedule = settings?.optBoolean(SETTING_SHOW_NEXT_DAY, false) ?: false
 
-        // Only complete snapshots may claim a synced state; legacy caches that
-        // lack an academic anchor cannot be presented as a full schedule.
-        val hasSynced = state.hasSnapshot && cachedWeek != null
+        // Only complete snapshots may claim a synced state; personal dated/recurring
+        // schedule items can also render without an academic week anchor.
+        val hasPersonalItems = courses.any {
+            !it.date.isNullOrEmpty() || it.category == "personal" || it.category == "custom"
+        }
+        val hasSynced = state.hasSnapshot && (cachedWeek != null || hasPersonalItems)
         val today = schoolCalendar()
         val todayCourses = coursesForDate(courses, today, cachedWeek)
         val hasCoursesToday = !showTomorrow && todayCourses.isNotEmpty()
@@ -447,6 +452,8 @@ class ScheduleWidgetRenderer(private val showTomorrow: Boolean) : NativeWidgetRe
                     weeks = obj.optJSONArray("week_list")?.let { weeks ->
                         List(weeks.length()) { weeks.getInt(it) }
                     } ?: emptyList(),
+                    date = obj.optString("date").takeIf { it.isNotEmpty() },
+                    category = obj.optString("category").takeIf { it.isNotEmpty() },
                 )
             }
         } catch (_: Exception) {
@@ -480,6 +487,21 @@ class ScheduleWidgetRenderer(private val showTomorrow: Boolean) : NativeWidgetRe
         internal fun schoolCalendar(timeInMillis: Long = System.currentTimeMillis()): Calendar =
             Calendar.getInstance(schoolTimeZone).apply { this.timeInMillis = timeInMillis }
 
+        private fun formatIsoDate(day: Calendar): String = String.format(
+            Locale.ROOT,
+            "%04d-%02d-%02d",
+            day.get(Calendar.YEAR),
+            day.get(Calendar.MONTH) + 1,
+            day.get(Calendar.DAY_OF_MONTH),
+        )
+
+        private fun sortKeyMinutes(course: WidgetCourse): Int {
+            val explicit = course.startTime?.let(::parseTimeToMinutes)
+            if (explicit != null) return explicit
+            if (course.startSection > 0) return 8 * 60 + (course.startSection - 1) * 55
+            return Int.MAX_VALUE
+        }
+
         internal fun coursesForDate(
             courses: List<WidgetCourse>,
             target: Calendar,
@@ -487,12 +509,26 @@ class ScheduleWidgetRenderer(private val showTomorrow: Boolean) : NativeWidgetRe
         ): List<WidgetCourse> {
             val day = schoolCalendar(target.timeInMillis)
             val weekday = mapAndroidWeekday(day.get(Calendar.DAY_OF_WEEK))
-            val week = weekForDate(weekInfo, day) ?: return emptyList()
-            // Legacy caches contain only the anchor week's courses.
-            if (weekInfo?.fullSchedule != true && week != weekInfo?.week) return emptyList()
+            val targetDateIso = formatIsoDate(day)
+            val week = weekForDate(weekInfo, day)
+            val academicAllowed = week != null && (weekInfo?.fullSchedule == true || week == weekInfo?.week)
+
             return courses.filter { course ->
-                course.weekDay == weekday && (course.weeks.isEmpty() || week in course.weeks)
-            }.sortedBy { it.startSection }
+                if (!course.date.isNullOrEmpty()) {
+                    course.date == targetDateIso
+                } else if (
+                    (course.category == "personal" || course.category == "custom") &&
+                    course.weeks.isEmpty()
+                ) {
+                    course.weekDay == weekday
+                } else {
+                    academicAllowed &&
+                        course.weekDay == weekday &&
+                        (course.weeks.isEmpty() || week!! in course.weeks)
+                }
+            }.sortedWith(
+                compareBy<WidgetCourse>({ sortKeyMinutes(it) }, { it.startSection }, { it.name })
+            )
         }
 
         internal fun weekForDate(weekInfo: WidgetWeekInfo?, target: Calendar): Int? {

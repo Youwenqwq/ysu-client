@@ -18,6 +18,13 @@ internal fun liveUpdateEligible(
     endAt: Long,
 ): Boolean = enabled && sdkInt >= Build.VERSION_CODES.BAKLAVA && exactAlarmGranted && endAt > startAt
 
+internal fun alarmRetainedInSchedule(
+    live: Boolean,
+    startAt: Long,
+    expiresAt: Long,
+    now: Long,
+): Boolean = if (live) expiresAt > now else startAt > now
+
 object ClassAlarmManager {
     private const val TAG = "OrahakoClassAlarmManager"
 
@@ -50,9 +57,11 @@ object ClassAlarmManager {
                 Log.w(TAG, "Skipping duplicate class alarm: $alarmId")
                 continue
             }
-            // Only live classes need restoration after their reminder/start time.
-            // Ordinary reminders keep the upstream future-only snapshot contract.
-            if (if (supportsLiveUpdate(context, alarm)) expiresAt > now else alarmTime > now) {
+            val startAt = ClassReminderService.startAt(alarm)
+            val live = supportsLiveUpdate(context, alarm)
+            // Retain future reminders and items already inside their pre-reminder window
+            // (or ongoing for Live Update) so late edits/enables deliver immediately.
+            if (alarmRetainedInSchedule(live, startAt, expiresAt, now)) {
                 futureAlarms.put(alarm)
             }
         }
@@ -67,6 +76,12 @@ object ClassAlarmManager {
                 val alarmTime = alarm.getLong("alarmTime")
                 val startAt = ClassReminderService.startAt(alarm)
                 val live = supportsLiveUpdate(context, alarm)
+                // If an ordinary reminder is already inside its pre-reminder window,
+                // deliver immediately (deduplicated per alarmId+startAt).
+                if (!live && alarmTime <= now && now < startAt) {
+                    ClassReminderService.sendReminder(context, alarm)
+                    continue
+                }
                 // The reminder broadcast posts directly; only the separate start
                 // broadcast may create a live-countdown foreground service.
                 for (phase in 0..1) {
