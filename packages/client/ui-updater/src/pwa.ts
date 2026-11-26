@@ -100,12 +100,7 @@ function askBuildVersion(worker: ServiceWorker): Promise<string | null> {
 }
 
 function isProductionEnv(): boolean {
-  const proc: unknown = "process" in globalThis ? Reflect.get(globalThis, "process") : undefined
-  if (typeof proc !== "object" || proc === null || !("env" in proc)) return false
-  const env: unknown = proc.env
-  return (
-    typeof env === "object" && env !== null && "NODE_ENV" in env && env.NODE_ENV === "production"
-  )
+  return typeof process !== "undefined" && process.env.NODE_ENV === "production"
 }
 
 export function createPwaController({

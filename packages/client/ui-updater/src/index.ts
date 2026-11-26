@@ -80,6 +80,7 @@ export type UpdaterPluginConfig = {
   readonly mirrors?: readonly UpdateMirror[]
   readonly mirrorableOrigins?: readonly string[]
   readonly basePath?: string
+  readonly enableServiceWorker?: boolean
 }
 
 export const updaterPlugin = definePlugin<
@@ -122,6 +123,7 @@ export const updaterPlugin = definePlugin<
         items: { type: "string", minLength: 1 },
       },
       basePath: { type: "string" },
+      enableServiceWorker: { type: "boolean" },
     },
     additionalProperties: false,
   },
@@ -151,6 +153,9 @@ export const updaterPlugin = definePlugin<
       storage: ctx.storage.local,
       isNative: () => ctx.native.isNative,
       ...(config.basePath !== undefined ? { basePath: config.basePath } : {}),
+      ...(config.enableServiceWorker !== undefined
+        ? { enableServiceWorker: config.enableServiceWorker }
+        : {}),
       onUpdateAvailable: (available) => runtimeStore.actions.setPwaUpdateAvailable(available),
       onOfflineReady: () => toast.success(translator("offlineReady")),
     })

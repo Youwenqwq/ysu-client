@@ -27,6 +27,15 @@
       ]
     },
     {
+      "source": "/app/pwa-shell.pack",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
       "source": "/app/manifest.webmanifest",
       "headers": [
         {

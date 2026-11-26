@@ -308,4 +308,103 @@ describe("@orahako/ui-updater", () => {
     expect(await scoped.local.getItem("pwa-dismissed-update")).toBe("unknown")
     pwa.dispose()
   })
+
+  it("registers the PWA service worker when enableServiceWorker is explicitly enabled", async () => {
+    const register = vi.fn().mockResolvedValue({
+      waiting: null,
+      installing: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      update: vi.fn().mockResolvedValue(undefined),
+    })
+
+    const originalWindow = globalThis.window
+    const originalNavigator = globalThis.navigator
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        isSecureContext: true,
+        location: { origin: "https://ysu.welain.com" },
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    })
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        userAgent: "Mozilla/5.0",
+        serviceWorker: {
+          controller: null,
+          register,
+          getRegistration: vi.fn().mockResolvedValue(null),
+          ready: Promise.resolve({}),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        },
+      },
+    })
+
+    const webNativePlugin = definePlugin({
+      manifest: {
+        id: "test.web-native",
+        name: "Test Web Native",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "runtime",
+        entry: "index.js",
+        provides: ["native"],
+      },
+      apply(ctx) {
+        const nativeService: PluginNativeService = {
+          isNative: false,
+          capabilities: {
+            list: () => [],
+            has: () => false,
+            acquire: async () => async () => {},
+            invoke: (async () => undefined) as PluginNativeService["capabilities"]["invoke"],
+          },
+          saveImage: async () => ({ uri: "file:///img.png" }),
+          requestNotificationPermission: async () => false,
+          requestExactAlarmPermission: async () => false,
+          requestBatteryOptimizationExemption: async () => false,
+        }
+        ctx.set("native", nativeService)
+      },
+    })
+
+    const runtime = new PluginRuntime()
+    try {
+      runtime.register(slotRegistryPlugin, "builtin")
+      runtime.register(i18nRegistryPlugin, "builtin")
+      runtime.register(storageRuntimePlugin, "builtin")
+      runtime.register(webNativePlugin, "builtin")
+      runtime.register(updaterPlugin, "builtin", {
+        currentVersion: "0.15.0",
+        basePath: "/app",
+        enableServiceWorker: true,
+      })
+
+      for (const id of [
+        slotRegistryPlugin.manifest.id,
+        i18nRegistryPlugin.manifest.id,
+        storageRuntimePlugin.manifest.id,
+        webNativePlugin.manifest.id,
+        updaterPlugin.manifest.id,
+      ]) {
+        await runtime.startAndWait(id)
+      }
+
+      expect(register).toHaveBeenCalledWith("/app/sw.js", { updateViaCache: "none" })
+    } finally {
+      runtime.dispose()
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: originalWindow,
+      })
+      Object.defineProperty(globalThis, "navigator", {
+        configurable: true,
+        value: originalNavigator,
+      })
+    }
+  })
 })

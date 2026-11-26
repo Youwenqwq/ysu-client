@@ -50,6 +50,7 @@ const deployment: CompositionLayer = {
         mirrors: [{ label: "GitHub 直连", value: "" }],
         mirrorableOrigins: ["https://github.com"],
         basePath,
+        enableServiceWorker: process.env.NODE_ENV === "production",
       },
     },
     { id: "orahako.runtime.native-lifecycle", config: { deepLinkScheme } },
