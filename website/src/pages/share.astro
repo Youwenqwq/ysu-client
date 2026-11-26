@@ -1,0 +1,680 @@
+---
+import Layout from "../layouts/Layout.astro"
+---
+
+<Layout
+  title="日程分享 · 酸橙盒"
+  description="通过酸橙盒生成的只读日程快照"
+  robots="noindex, nofollow"
+>
+  <div class="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+    <div class="mx-auto flex max-w-6xl flex-col gap-4 px-3 py-5 sm:px-6 sm:py-8">
+      <!-- Header -->
+      <header
+        class="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+      >
+        <div class="min-w-0 space-y-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 id="share-title" class="truncate text-lg font-semibold tracking-tight sm:text-xl">
+              正在加载日程…
+            </h1>
+            <span
+              id="share-busy-badge"
+              class="hidden rounded-full bg-zinc-200/80 px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+            >
+              仅忙碌时段
+            </span>
+          </div>
+          <p id="share-meta" class="text-xs text-zinc-500 dark:text-zinc-400">
+            只读快照 · 正在从云端获取
+          </p>
+        </div>
+
+        <div id="week-controls" class="hidden flex-wrap items-center gap-1.5">
+          <button
+            id="btn-prev-week"
+            type="button"
+            class="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          >
+            上一周
+          </button>
+          <select
+            id="week-select"
+            aria-label="选择周次"
+            class="h-8 rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-800 outline-none focus:border-lime-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+          ></select>
+          <button
+            id="btn-current-week"
+            type="button"
+            class="hidden h-8 items-center justify-center rounded-lg bg-lime-500/15 px-2.5 text-xs font-medium text-lime-700 transition hover:bg-lime-500/25 dark:bg-lime-400/15 dark:text-lime-300 dark:hover:bg-lime-400/25"
+          >
+            本周
+          </button>
+          <button
+            id="btn-next-week"
+            type="button"
+            class="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          >
+            下一周
+          </button>
+        </div>
+      </header>
+
+      <!-- Loading state -->
+      <section
+        id="share-loading"
+        class="flex flex-col items-center justify-center gap-3 rounded-2xl border border-zinc-200/80 bg-white py-20 text-sm text-zinc-500 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
+      >
+        <div
+          class="h-7 w-7 animate-spin rounded-full border-2 border-zinc-300 border-t-lime-500 dark:border-zinc-700 dark:border-t-lime-400"
+        ></div>
+        <p>正在加载日程快照…</p>
+      </section>
+
+      <!-- Error / Expired state -->
+      <section
+        id="share-error"
+        class="hidden flex-col items-center justify-center gap-3 rounded-2xl border border-zinc-200/80 bg-white px-6 py-16 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <div
+          class="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-xl dark:bg-zinc-800"
+        >
+          🗓️
+        </div>
+        <h2 id="share-error-title" class="text-base font-semibold">链接已失效或不存在</h2>
+        <p id="share-error-desc" class="max-w-md text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+          该日程分享可能已超过有效期，或已被分享者主动撤销。
+        </p>
+        <a
+          href="/"
+          class="mt-2 inline-flex items-center rounded-lg bg-lime-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-lime-700 dark:bg-lime-500 dark:text-zinc-950 dark:hover:bg-lime-400"
+        >
+          了解酸橙盒
+        </a>
+      </section>
+
+      <!-- Main schedule content -->
+      <main id="share-main" class="hidden space-y-4">
+        <div
+          class="overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <div id="timetable-shell" class="min-w-[680px]">
+            <!-- Day headers -->
+            <div
+              id="timetable-header"
+              class="grid grid-cols-[3.5rem_repeat(7,minmax(0,1fr))] border-b border-zinc-200/80 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/80"
+            ></div>
+            <!-- Grid body -->
+            <div
+              id="timetable-body"
+              class="relative grid grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Extra non-section items for the selected week -->
+        <section
+          id="extra-items-section"
+          class="hidden rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <h2 class="mb-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            本周其他日程
+          </h2>
+          <div id="extra-items-list" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3"></div>
+        </section>
+      </main>
+
+      <!-- Footer -->
+      <footer
+        class="flex flex-wrap items-center justify-between gap-2 px-1 py-2 text-xs text-zinc-500 dark:text-zinc-400"
+      >
+        <span>只读日程分享 · 不包含任何账号信息</span>
+        <a
+          href="/"
+          class="font-medium text-lime-700 underline-offset-4 hover:underline dark:text-lime-400"
+        >
+          由 酸橙盒（Orahako）生成
+        </a>
+      </footer>
+    </div>
+
+    <!-- Detail modal -->
+    <div
+      id="detail-modal"
+      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        class="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0 space-y-1">
+            <span
+              id="detail-category"
+              class="inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            ></span>
+            <h3 id="detail-title" class="text-base font-semibold leading-snug"></h3>
+          </div>
+          <button
+            id="detail-close"
+            type="button"
+            class="rounded-lg p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            aria-label="关闭"
+          >
+            ✕
+          </button>
+        </div>
+        <dl id="detail-rows" class="mt-4 space-y-2 text-xs"></dl>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    interface SharedPeriod {
+      section: number
+      startTime: string
+      endTime: string
+    }
+
+    interface SharedItem {
+      title: string
+      location?: string
+      subtitle?: string
+      category: "course" | "event" | "exam" | "busy"
+      date?: string
+      weekDay: number
+      weekList?: number[]
+      startSection?: number
+      endSection?: number
+      startTime?: string
+      endTime?: string
+    }
+
+    interface SharedPayload {
+      version: 1
+      title: string
+      busyOnly: boolean
+      semester?: string
+      termStartDate?: string
+      totalWeeks: number
+      timeZone?: string
+      periods: SharedPeriod[]
+      items: SharedItem[]
+      createdAt: number
+    }
+
+    const WEEKDAY_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    const COURSE_PALETTES = [
+      "bg-lime-100/90 border-lime-300/90 text-lime-950 dark:bg-lime-950/60 dark:border-lime-700/70 dark:text-lime-100",
+      "bg-emerald-100/90 border-emerald-300/90 text-emerald-950 dark:bg-emerald-950/60 dark:border-emerald-700/70 dark:text-emerald-100",
+      "bg-teal-100/90 border-teal-300/90 text-teal-950 dark:bg-teal-950/60 dark:border-teal-700/70 dark:text-teal-100",
+      "bg-sky-100/90 border-sky-300/90 text-sky-950 dark:bg-sky-950/60 dark:border-sky-700/70 dark:text-sky-100",
+      "bg-indigo-100/90 border-indigo-300/90 text-indigo-950 dark:bg-indigo-950/60 dark:border-indigo-700/70 dark:text-indigo-100",
+      "bg-violet-100/90 border-violet-300/90 text-violet-950 dark:bg-violet-950/60 dark:border-violet-700/70 dark:text-violet-100",
+      "bg-rose-100/90 border-rose-300/90 text-rose-950 dark:bg-rose-950/60 dark:border-rose-700/70 dark:text-rose-100",
+      "bg-amber-100/90 border-amber-300/90 text-amber-950 dark:bg-amber-950/60 dark:border-amber-700/70 dark:text-amber-100",
+    ]
+    const BUSY_STYLE =
+      "bg-zinc-200/80 border-zinc-300/90 text-zinc-700 dark:bg-zinc-800/90 dark:border-zinc-700 dark:text-zinc-200"
+    const EXAM_STYLE =
+      "bg-amber-100/95 border-amber-400/90 text-amber-950 dark:bg-amber-950/70 dark:border-amber-600/80 dark:text-amber-100"
+    const EVENT_STYLE =
+      "bg-sky-100/95 border-sky-300/90 text-sky-950 dark:bg-sky-950/60 dark:border-sky-700/80 dark:text-sky-100"
+
+    const ROW_HEIGHT = 56
+
+    function hashString(input: string): number {
+      let hash = 0
+      for (let i = 0; i < input.length; i += 1) {
+        hash = (hash * 31 + input.charCodeAt(i)) | 0
+      }
+      return Math.abs(hash)
+    }
+
+    function parseIsoDate(iso: string): Date | null {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+      if (!m) return null
+      return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0)
+    }
+
+    function formatIsoDate(date: Date): string {
+      const y = date.getFullYear()
+      const m = String(date.getMonth() + 1).padStart(2, "0")
+      const d = String(date.getDate()).padStart(2, "0")
+      return `${y}-${m}-${d}`
+    }
+
+    function addDays(base: Date, days: number): Date {
+      const copy = new Date(base.getTime())
+      copy.setDate(copy.getDate() + days)
+      return copy
+    }
+
+    function computeCurrentWeek(termStartDate: string | undefined, totalWeeks: number): number {
+      if (!termStartDate) return 1
+      const start = parseIsoDate(termStartDate)
+      if (!start) return 1
+      const today = new Date()
+      const todayNoon = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0)
+      const diffDays = Math.floor((todayNoon.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
+      const week = Math.floor(diffDays / 7) + 1
+      return Math.min(Math.max(1, week), Math.max(1, totalWeeks))
+    }
+
+    function formatDateShort(ts: number): string {
+      const d = new Date(ts)
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, "0")
+      const day = String(d.getDate()).padStart(2, "0")
+      return `${y}-${m}-${day}`
+    }
+
+    function itemCardClass(item: SharedItem): string {
+      if (item.category === "busy") return BUSY_STYLE
+      if (item.category === "exam") return EXAM_STYLE
+      if (item.category === "event") return EVENT_STYLE
+      return COURSE_PALETTES[hashString(item.title) % COURSE_PALETTES.length]!
+    }
+
+    function categoryLabel(category: SharedItem["category"]): string {
+      if (category === "busy") return "忙碌时段"
+      if (category === "exam") return "考试"
+      if (category === "event") return "个人日程"
+      return "课程"
+    }
+
+    function itemAppliesToWeek(
+      item: SharedItem,
+      week: number,
+      weekStartIso: string | null,
+      weekEndIso: string | null
+    ): boolean {
+      if (item.date) {
+        if (!weekStartIso || !weekEndIso) return true
+        return item.date >= weekStartIso && item.date <= weekEndIso
+      }
+      if (Array.isArray(item.weekList) && item.weekList.length > 0) {
+        return item.weekList.includes(week)
+      }
+      return true
+    }
+
+    const titleEl = document.getElementById("share-title")!
+    const metaEl = document.getElementById("share-meta")!
+    const busyBadgeEl = document.getElementById("share-busy-badge")!
+    const weekControlsEl = document.getElementById("week-controls")!
+    const prevBtn = document.getElementById("btn-prev-week") as HTMLButtonElement
+    const nextBtn = document.getElementById("btn-next-week") as HTMLButtonElement
+    const currentWeekBtn = document.getElementById("btn-current-week") as HTMLButtonElement
+    const weekSelect = document.getElementById("week-select") as HTMLSelectElement
+    const loadingEl = document.getElementById("share-loading")!
+    const errorEl = document.getElementById("share-error")!
+    const errorTitleEl = document.getElementById("share-error-title")!
+    const errorDescEl = document.getElementById("share-error-desc")!
+    const mainEl = document.getElementById("share-main")!
+    const headerGridEl = document.getElementById("timetable-header")!
+    const bodyGridEl = document.getElementById("timetable-body")!
+    const extraSectionEl = document.getElementById("extra-items-section")!
+    const extraListEl = document.getElementById("extra-items-list")!
+
+    const detailModalEl = document.getElementById("detail-modal")!
+    const detailCloseEl = document.getElementById("detail-close")!
+    const detailCategoryEl = document.getElementById("detail-category")!
+    const detailTitleEl = document.getElementById("detail-title")!
+    const detailRowsEl = document.getElementById("detail-rows")!
+
+    function showError(title: string, desc: string): void {
+      loadingEl.classList.add("hidden")
+      mainEl.classList.add("hidden")
+      weekControlsEl.classList.add("hidden")
+      errorEl.classList.remove("hidden")
+      errorEl.classList.add("flex")
+      titleEl.textContent = "日程分享"
+      metaEl.textContent = "无法加载该链接"
+      errorTitleEl.textContent = title
+      errorDescEl.textContent = desc
+    }
+
+    function openDetail(item: SharedItem): void {
+      detailCategoryEl.textContent = categoryLabel(item.category)
+      detailTitleEl.textContent = item.title
+      detailRowsEl.replaceChildren()
+
+      const addRow = (label: string, value: string) => {
+        const row = document.createElement("div")
+        row.className = "flex items-start justify-between gap-3 border-t border-zinc-100 pt-2 dark:border-zinc-800"
+        const dt = document.createElement("dt")
+        dt.className = "shrink-0 text-zinc-500 dark:text-zinc-400"
+        dt.textContent = label
+        const dd = document.createElement("dd")
+        dd.className = "text-right font-medium text-zinc-900 dark:text-zinc-100"
+        dd.textContent = value
+        row.append(dt, dd)
+        detailRowsEl.append(row)
+      }
+
+      const dayLabel = WEEKDAY_LABELS[(item.weekDay - 1) % 7] ?? ""
+      const sectionLabel =
+        item.startSection && item.endSection
+          ? item.startSection === item.endSection
+            ? `第 ${item.startSection} 节`
+            : `第 ${item.startSection}-${item.endSection} 节`
+          : ""
+      const timeRange =
+        item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : ""
+      addRow(
+        "时间",
+        [item.date || dayLabel, sectionLabel, timeRange].filter(Boolean).join(" · ")
+      )
+      if (item.location) addRow("地点", item.location)
+      if (item.subtitle) addRow("备注 / 教师", item.subtitle)
+      if (item.weekList && item.weekList.length > 0) {
+        addRow("周次", `第 ${item.weekList.join("、")} 周`)
+      }
+
+      detailModalEl.classList.remove("hidden")
+      detailModalEl.classList.add("flex")
+    }
+
+    function closeDetail(): void {
+      detailModalEl.classList.add("hidden")
+      detailModalEl.classList.remove("flex")
+    }
+
+    detailCloseEl.addEventListener("click", closeDetail)
+    detailModalEl.addEventListener("click", (event) => {
+      if (event.target === detailModalEl) closeDetail()
+    })
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeDetail()
+    })
+
+    function renderWeek(payload: SharedPayload, week: number, currentWeek: number): void {
+      const periods =
+        payload.periods.length > 0
+          ? [...payload.periods].sort((a, b) => a.section - b.section)
+          : Array.from({ length: 12 }, (_, idx) => ({
+              section: idx + 1,
+              startTime: "",
+              endTime: "",
+            }))
+      const maxSection = Math.max(
+        periods.length,
+        ...periods.map((p) => p.section),
+        ...payload.items.map((i) => i.endSection ?? 0),
+        10
+      )
+      const periodBySection = new Map(periods.map((p) => [p.section, p]))
+
+      const termStart = payload.termStartDate ? parseIsoDate(payload.termStartDate) : null
+      const weekMonday = termStart ? addDays(termStart, (week - 1) * 7) : null
+      const weekStartIso = weekMonday ? formatIsoDate(weekMonday) : null
+      const weekEndIso = weekMonday ? formatIsoDate(addDays(weekMonday, 6)) : null
+      const todayIso = formatIsoDate(new Date())
+
+      // Render header row
+      headerGridEl.replaceChildren()
+      const corner = document.createElement("div")
+      corner.className =
+        "flex items-center justify-center border-r border-zinc-200/70 py-2.5 text-[11px] font-medium text-zinc-400 dark:border-zinc-800"
+      corner.textContent = `${week}周`
+      headerGridEl.append(corner)
+
+      for (let day = 1; day <= 7; day += 1) {
+        const cell = document.createElement("div")
+        const dayDate = weekMonday ? addDays(weekMonday, day - 1) : null
+        const dayIso = dayDate ? formatIsoDate(dayDate) : null
+        const isToday = dayIso === todayIso
+
+        cell.className =
+          "flex flex-col items-center justify-center border-r border-zinc-200/60 py-2 text-center last:border-r-0 dark:border-zinc-800/80" +
+          (isToday ? " bg-lime-500/10 dark:bg-lime-400/10" : "")
+
+        const label = document.createElement("span")
+        label.className =
+          "text-xs font-semibold " +
+          (isToday ? "text-lime-700 dark:text-lime-300" : "text-zinc-700 dark:text-zinc-200")
+        label.textContent = WEEKDAY_LABELS[day - 1]!
+        cell.append(label)
+
+        if (dayDate) {
+          const dateSpan = document.createElement("span")
+          dateSpan.className =
+            "mt-0.5 text-[10px] " +
+            (isToday
+              ? "font-medium text-lime-700 dark:text-lime-300"
+              : "text-zinc-400 dark:text-zinc-500")
+          dateSpan.textContent = `${dayDate.getMonth() + 1}/${dayDate.getDate()}`
+          cell.append(dateSpan)
+        }
+        headerGridEl.append(cell)
+      }
+
+      // Render grid body
+      bodyGridEl.replaceChildren()
+      const totalHeight = maxSection * ROW_HEIGHT
+
+      // Period sidebar column
+      const timeCol = document.createElement("div")
+      timeCol.className = "border-r border-zinc-200/70 dark:border-zinc-800"
+      for (let section = 1; section <= maxSection; section += 1) {
+        const period = periodBySection.get(section)
+        const cell = document.createElement("div")
+        cell.style.height = `${ROW_HEIGHT}px`
+        cell.className =
+          "flex flex-col items-center justify-center border-b border-zinc-100 px-1 text-center last:border-b-0 dark:border-zinc-800/70"
+
+        const num = document.createElement("span")
+        num.className = "text-xs font-semibold text-zinc-600 dark:text-zinc-300"
+        num.textContent = String(section)
+        cell.append(num)
+
+        if (period?.startTime) {
+          const time = document.createElement("span")
+          time.className = "text-[10px] leading-tight text-zinc-400 dark:text-zinc-500"
+          time.textContent = period.startTime
+          cell.append(time)
+        }
+        timeCol.append(cell)
+      }
+      bodyGridEl.append(timeCol)
+
+      // Active items for selected week
+      const weekItems = payload.items.filter((item) =>
+        itemAppliesToWeek(item, week, weekStartIso, weekEndIso)
+      )
+      const gridItems = weekItems.filter(
+        (item) =>
+          typeof item.startSection === "number" &&
+          typeof item.endSection === "number" &&
+          item.startSection >= 1 &&
+          item.endSection >= item.startSection
+      )
+      const extraItems = weekItems.filter(
+        (item) => !(typeof item.startSection === "number" && typeof item.endSection === "number")
+      )
+
+      // 7 day columns
+      for (let day = 1; day <= 7; day += 1) {
+        const dayDate = weekMonday ? addDays(weekMonday, day - 1) : null
+        const isToday = dayDate ? formatIsoDate(dayDate) === todayIso : false
+
+        const col = document.createElement("div")
+        col.style.height = `${totalHeight}px`
+        col.className =
+          "relative border-r border-zinc-100 last:border-r-0 dark:border-zinc-800/70" +
+          (isToday ? " bg-lime-500/[0.03] dark:bg-lime-400/[0.03]" : "")
+
+        // Horizontal slot dividers
+        for (let section = 1; section <= maxSection; section += 1) {
+          const line = document.createElement("div")
+          line.style.height = `${ROW_HEIGHT}px`
+          line.className = "border-b border-zinc-100/90 last:border-b-0 dark:border-zinc-800/60"
+          col.append(line)
+        }
+
+        // Render cards for this day
+        const dayItems = gridItems.filter((item) => item.weekDay === day)
+        for (const item of dayItems) {
+          const start = item.startSection!
+          const end = item.endSection!
+          const top = (start - 1) * ROW_HEIGHT + 2
+          const height = Math.max(ROW_HEIGHT - 4, (end - start + 1) * ROW_HEIGHT - 4)
+
+          const btn = document.createElement("button")
+          btn.type = "button"
+          btn.style.top = `${top}px`
+          btn.style.height = `${height}px`
+          btn.className =
+            "absolute inset-x-1 flex flex-col justify-start overflow-hidden rounded-xl border p-1.5 text-left transition hover:brightness-95 active:scale-[0.98] " +
+            itemCardClass(item)
+
+          const titleSpan = document.createElement("span")
+          titleSpan.className = "line-clamp-2 text-[11px] font-semibold leading-tight"
+          titleSpan.textContent = item.title
+          btn.append(titleSpan)
+
+          if (item.location) {
+            const locSpan = document.createElement("span")
+            locSpan.className = "mt-0.5 line-clamp-2 text-[10px] leading-tight opacity-80"
+            locSpan.textContent = item.location
+            btn.append(locSpan)
+          }
+
+          btn.addEventListener("click", () => openDetail(item))
+          col.append(btn)
+        }
+
+        bodyGridEl.append(col)
+      }
+
+      // Render extra items
+      extraListEl.replaceChildren()
+      if (extraItems.length > 0) {
+        extraSectionEl.classList.remove("hidden")
+        for (const item of extraItems) {
+          const card = document.createElement("button")
+          card.type = "button"
+          card.className =
+            "flex flex-col gap-0.5 rounded-xl border p-3 text-left transition hover:brightness-95 " +
+            itemCardClass(item)
+
+          const head = document.createElement("div")
+          head.className = "flex items-center justify-between gap-2"
+          const t = document.createElement("span")
+          t.className = "truncate text-xs font-semibold"
+          t.textContent = item.title
+          const time = document.createElement("span")
+          time.className = "shrink-0 text-[11px] opacity-80"
+          time.textContent =
+            item.startTime && item.endTime
+              ? `${item.date || WEEKDAY_LABELS[(item.weekDay - 1) % 7]} ${item.startTime}-${item.endTime}`
+              : item.date || WEEKDAY_LABELS[(item.weekDay - 1) % 7] || ""
+          head.append(t, time)
+          card.append(head)
+
+          if (item.location) {
+            const loc = document.createElement("span")
+            loc.className = "truncate text-[11px] opacity-80"
+            loc.textContent = item.location
+            card.append(loc)
+          }
+
+          card.addEventListener("click", () => openDetail(item))
+          extraListEl.append(card)
+        }
+      } else {
+        extraSectionEl.classList.add("hidden")
+      }
+
+      // Update week controls state
+      weekSelect.value = String(week)
+      prevBtn.disabled = week <= 1
+      nextBtn.disabled = week >= payload.totalWeeks
+      if (payload.termStartDate && week !== currentWeek) {
+        currentWeekBtn.classList.remove("hidden")
+        currentWeekBtn.classList.add("inline-flex")
+      } else {
+        currentWeekBtn.classList.add("hidden")
+        currentWeekBtn.classList.remove("inline-flex")
+      }
+    }
+
+    async function init(): Promise<void> {
+      const params = new URLSearchParams(window.location.search)
+      const shareId = (params.get("id") || "").trim()
+      if (!shareId) {
+        showError("缺少分享链接参数", "请确认你打开的是完整的酸橙盒日程分享链接。")
+        return
+      }
+
+      try {
+        const res = await fetch(`/api/share?id=${encodeURIComponent(shareId)}`)
+        if (res.status === 404 || res.status === 400) {
+          showError("链接已失效或不存在", "该日程分享可能已超过有效期，或已被分享者主动撤销。")
+          return
+        }
+        if (!res.ok) {
+          showError("加载失败", `服务端返回错误（HTTP ${res.status}），请稍后重试。`)
+          return
+        }
+
+        const data = (await res.json()) as {
+          payload?: SharedPayload
+          updatedAt?: number | null
+          expiresAt?: number | null
+        }
+        const payload = data.payload
+        if (!payload || payload.version !== 1 || !Array.isArray(payload.items)) {
+          showError("数据格式无效", "该分享快照已损坏或不受支持。")
+          return
+        }
+
+        document.title = `${payload.title} · 酸橙盒`
+        titleEl.textContent = payload.title
+        if (payload.busyOnly) {
+          busyBadgeEl.classList.remove("hidden")
+        }
+
+        const metaParts: string[] = ["只读快照"]
+        if (data.updatedAt) metaParts.push(`更新于 ${formatDateShort(data.updatedAt)}`)
+        if (data.expiresAt) metaParts.push(`有效期至 ${formatDateShort(data.expiresAt)}`)
+        metaEl.textContent = metaParts.join(" · ")
+
+        const totalWeeks = Math.max(1, payload.totalWeeks || 20)
+        const currentWeek = computeCurrentWeek(payload.termStartDate, totalWeeks)
+        let activeWeek = currentWeek
+
+        weekSelect.replaceChildren()
+        for (let w = 1; w <= totalWeeks; w += 1) {
+          const opt = document.createElement("option")
+          opt.value = String(w)
+          opt.textContent = w === currentWeek && payload.termStartDate ? `第 ${w} 周（本周）` : `第 ${w} 周`
+          weekSelect.append(opt)
+        }
+
+        const setWeek = (next: number) => {
+          activeWeek = Math.min(totalWeeks, Math.max(1, next))
+          renderWeek(payload, activeWeek, currentWeek)
+        }
+
+        prevBtn.addEventListener("click", () => setWeek(activeWeek - 1))
+        nextBtn.addEventListener("click", () => setWeek(activeWeek + 1))
+        currentWeekBtn.addEventListener("click", () => setWeek(currentWeek))
+        weekSelect.addEventListener("change", () => setWeek(Number(weekSelect.value)))
+
+        loadingEl.classList.add("hidden")
+        weekControlsEl.classList.remove("hidden")
+        weekControlsEl.classList.add("flex")
+        mainEl.classList.remove("hidden")
+
+        setWeek(currentWeek)
+      } catch {
+        showError("网络异常", "暂时无法连接到日程分享服务，请检查网络后重试。")
+      }
+    }
+
+    init()
+  </script>
+</Layout>

@@ -21,6 +21,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  Share2,
   SlidersHorizontal,
   Trash2,
   TriangleAlert,
@@ -29,6 +30,7 @@ import {
 import {
   buildCalendarSyncEvents,
   buildCourseColorMap,
+  buildSharedSchedulePayload,
   courseIdentity,
   DEFAULT_STANDALONE_PERIODS,
   getAcademicClock,
@@ -45,6 +47,7 @@ import {
   type ScheduleDrop,
   type ScheduleEmptyCellTarget,
   type ScheduleSelection,
+  type SharedSchedulePayload,
 } from "@orahako/academic-kit"
 import {
   hasSlice,
@@ -205,6 +208,17 @@ export interface SchedulePageInject {
   readonly deleteWebcalFeed?: () => Promise<void>
   readonly setWebcalIncludeExams?: (include: boolean) => void
   readonly setWebcalWriteReminders?: (write: boolean) => void
+  readonly shareViewerBaseUrl?: string
+  readonly publishScheduleShare?: (
+    payload: SharedSchedulePayload,
+    ttlSeconds: number,
+    rotate?: boolean
+  ) => Promise<{ readonly shareId: string; readonly expiresAt: number }>
+  readonly revokeScheduleShare?: () => Promise<void>
+  readonly setShareBusyOnly?: (busyOnly: boolean) => void
+  readonly setShareIncludePersonal?: (include: boolean) => void
+  readonly setShareIncludeExams?: (include: boolean) => void
+  readonly setShareTtlDays?: (days: number) => void
 }
 
 export type SchedulePageProps = DerivedComponentProps<
@@ -353,6 +367,8 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   const [calendarSyncPending, setCalendarSyncPending] = useState(false)
   const [webcalOpen, setWebcalOpen] = useState(false)
   const [webcalPending, setWebcalPending] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [sharePending, setSharePending] = useState(false)
   const lastCreateNonceRef = useRef(createRequestNonce)
 
   const activeProvider = providerSnap.provider
@@ -946,6 +962,67 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     }
   }
 
+  const shareUrl =
+    settings.shareId && props.shareViewerBaseUrl
+      ? `${props.shareViewerBaseUrl}?id=${encodeURIComponent(settings.shareId)}`
+      : null
+  const isShareExpired = Boolean(settings.shareExpiresAt && clockTick > settings.shareExpiresAt)
+
+  const handlePublishShare = async (): Promise<void> => {
+    if (!props.publishScheduleShare) return
+    const payload = buildSharedSchedulePayload({
+      courses,
+      extraEntries: overlayEntries,
+      periods,
+      currentWeek: currentWeek ?? snapshot,
+      calendar: termCalendar,
+      timeZone,
+      busyOnly: settings.shareBusyOnly,
+      includePersonal: settings.shareIncludePersonal,
+      includeExams: settings.shareIncludeExams,
+      examTitlePrefix: t("schedule.examTitlePrefix"),
+      busyLabel: t("schedule.shareBusyLabel"),
+      now: new Date(clockTick),
+    })
+    if (payload.items.length === 0) {
+      toast.info(t("schedule.exportIcsEmpty"))
+      return
+    }
+    setSharePending(true)
+    try {
+      const ttlSeconds = Math.max(1, settings.shareTtlDays) * 86400
+      await props.publishScheduleShare(payload, ttlSeconds, isShareExpired)
+      toast.success(t("schedule.shareUpdatedToast"))
+    } catch {
+      toast.error(t("schedule.shareFailedToast"))
+    } finally {
+      setSharePending(false)
+    }
+  }
+
+  const handleRevokeShare = async (): Promise<void> => {
+    if (!props.revokeScheduleShare) return
+    setSharePending(true)
+    try {
+      await props.revokeScheduleShare()
+      toast.success(t("schedule.shareRevokedToast"))
+    } catch {
+      toast.error(t("schedule.shareFailedToast"))
+    } finally {
+      setSharePending(false)
+    }
+  }
+
+  const handleCopyShareUrl = async (): Promise<void> => {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard?.writeText(shareUrl)
+      toast.success(t("schedule.shareCopied"))
+    } catch {
+      toast.error(t("schedule.shareFailedToast"))
+    }
+  }
+
   if (activeProvider && !supportsPlugin(activeProvider.supportedPlugins, props.pluginId)) {
     return null
   }
@@ -1162,6 +1239,23 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                   <Link2 className="mr-2 size-4" />
                   <span className="flex-1">{t("schedule.webcalSubscribe")}</span>
                   {settings.webcalEnabled && (
+                    <Badge variant="secondary" className="ml-2 text-[10px]">
+                      ON
+                    </Badge>
+                  )}
+                </DropdownMenuItem>
+              )}
+              {props.publishScheduleShare && (
+                <DropdownMenuItem
+                  disabled={courses.length === 0 && overlayEntries.length === 0}
+                  onSelect={() => {
+                    actions.setFilterDrawerOpen(false)
+                    setShareOpen(true)
+                  }}
+                >
+                  <Share2 className="mr-2 size-4" />
+                  <span className="flex-1">{t("schedule.shareSchedule")}</span>
+                  {settings.shareId && !isShareExpired && (
                     <Badge variant="secondary" className="ml-2 text-[10px]">
                       ON
                     </Badge>
@@ -1727,6 +1821,149 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 </Button>
               )}
               <Button type="button" onClick={() => setWebcalOpen(false)}>
+                {t("closeDialog")}
+              </Button>
+            </ResponsiveModalFooter>
+          </ResponsiveModalContent>
+        </ResponsiveModal>
+      )}
+
+      {props.publishScheduleShare && (
+        <ResponsiveModal open={shareOpen} onOpenChange={setShareOpen}>
+          <ResponsiveModalContent className="sm:max-w-md">
+            <ResponsiveModalHeader>
+              <ResponsiveModalTitle className="flex items-center gap-2">
+                <Share2 className="size-4 text-primary" />
+                {t("schedule.shareTitle")}
+              </ResponsiveModalTitle>
+              <ResponsiveModalDescription>{t("schedule.shareDesc")}</ResponsiveModalDescription>
+            </ResponsiveModalHeader>
+            <ResponsiveModalBody className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-sm">{t("schedule.shareBusyOnly")}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t("schedule.shareBusyOnlyHint")}
+                  </span>
+                </div>
+                <Switch
+                  checked={settings.shareBusyOnly}
+                  onCheckedChange={(checked) => props.setShareBusyOnly?.(checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                <span className="text-sm">{t("schedule.shareIncludePersonal")}</span>
+                <Switch
+                  checked={settings.shareIncludePersonal}
+                  onCheckedChange={(checked) => props.setShareIncludePersonal?.(checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                <span className="text-sm">{t("schedule.shareIncludeExams")}</span>
+                <Switch
+                  checked={settings.shareIncludeExams}
+                  onCheckedChange={(checked) => props.setShareIncludeExams?.(checked)}
+                />
+              </div>
+
+              <div className="flex flex-col gap-2 border-t border-border pt-3">
+                <span className="text-sm">{t("schedule.shareTtlLabel")}</span>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(
+                    [
+                      { days: 1, label: t("schedule.shareTtl1d") },
+                      { days: 7, label: t("schedule.shareTtl7d") },
+                      { days: 30, label: t("schedule.shareTtl30d") },
+                      { days: 180, label: t("schedule.shareTtl180d") },
+                    ] as const
+                  ).map((opt) => (
+                    <Button
+                      key={opt.days}
+                      type="button"
+                      size="sm"
+                      variant={settings.shareTtlDays === opt.days ? "default" : "outline"}
+                      onClick={() => props.setShareTtlDays?.(opt.days)}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {shareUrl ? (
+                <div className="flex flex-col gap-2 border-t border-border pt-3">
+                  <div className="rounded-md border bg-muted/40 px-2.5 py-2 font-mono text-[11px] break-all text-muted-foreground">
+                    {shareUrl}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={isShareExpired}
+                      onClick={() => void handleCopyShareUrl()}
+                    >
+                      <Copy className="mr-1.5 size-3.5" />
+                      {t("schedule.shareCopyLink")}
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                      <a href={shareUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="mr-1.5 size-3.5" />
+                        {t("schedule.shareOpenLink")}
+                      </a>
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <span className="text-xs text-muted-foreground">
+                      {isShareExpired
+                        ? t("schedule.shareExpired")
+                        : settings.shareExpiresAt
+                          ? t("schedule.shareExpiresAt", {
+                              date: new Date(settings.shareExpiresAt).toISOString().slice(0, 10),
+                            })
+                          : ""}
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={sharePending}
+                      onClick={() => void handlePublishShare()}
+                    >
+                      <RefreshCw className="mr-1 size-3.5" />
+                      {t("schedule.shareUpdateNow")}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  disabled={sharePending}
+                  onClick={() => void handlePublishShare()}
+                >
+                  <Share2 className="mr-1.5 size-4" />
+                  {t("schedule.shareGenerate")}
+                </Button>
+              )}
+
+              <p className="border-t border-border pt-2 text-xs leading-5 text-muted-foreground">
+                {t("schedule.sharePrivacyNote")}
+              </p>
+            </ResponsiveModalBody>
+            <ResponsiveModalFooter>
+              {settings.shareId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={sharePending}
+                  onClick={() => void handleRevokeShare()}
+                >
+                  <Trash2 className="mr-1.5 size-4" />
+                  {t("schedule.shareRevoke")}
+                </Button>
+              )}
+              <Button type="button" onClick={() => setShareOpen(false)}>
                 {t("closeDialog")}
               </Button>
             </ResponsiveModalFooter>

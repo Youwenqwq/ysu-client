@@ -45,6 +45,13 @@ export interface ScheduleSettingsState {
   readonly webcalWriteToken: string | null
   readonly webcalLastSyncedAt: number | null
   readonly webcalLastSyncedCount: number | null
+  readonly shareId: string | null
+  readonly shareWriteToken: string | null
+  readonly shareExpiresAt: number | null
+  readonly shareBusyOnly: boolean
+  readonly shareIncludePersonal: boolean
+  readonly shareIncludeExams: boolean
+  readonly shareTtlDays: number
 }
 
 function clampInt(value: number, min: number, max: number, fallback: number): number {
@@ -74,6 +81,13 @@ export const scheduleSettingsStore = defineStore({
     webcalWriteToken: null,
     webcalLastSyncedAt: null,
     webcalLastSyncedCount: null,
+    shareId: null,
+    shareWriteToken: null,
+    shareExpiresAt: null,
+    shareBusyOnly: false,
+    shareIncludePersonal: false,
+    shareIncludeExams: false,
+    shareTtlDays: 7,
   }),
   persist: {
     key: "schedule-settings",
@@ -195,6 +209,52 @@ export const scheduleSettingsStore = defineStore({
         webcalWriteToken: null,
         webcalLastSyncedCount: null,
         webcalLastSyncedAt: null,
+      }))
+    },
+    setShareBusyOnly(ctx, busyOnly: boolean) {
+      ctx.set((prev) =>
+        prev.shareBusyOnly === busyOnly ? prev : { ...prev, shareBusyOnly: busyOnly }
+      )
+    },
+    setShareIncludePersonal(ctx, includePersonal: boolean) {
+      ctx.set((prev) =>
+        prev.shareIncludePersonal === includePersonal
+          ? prev
+          : { ...prev, shareIncludePersonal: includePersonal }
+      )
+    },
+    setShareIncludeExams(ctx, includeExams: boolean) {
+      ctx.set((prev) =>
+        prev.shareIncludeExams === includeExams
+          ? prev
+          : { ...prev, shareIncludeExams: includeExams }
+      )
+    },
+    setShareTtlDays(ctx, ttlDays: number) {
+      const clamped = clampInt(ttlDays, 1, 180, 7)
+      ctx.set((prev) => (prev.shareTtlDays === clamped ? prev : { ...prev, shareTtlDays: clamped }))
+    },
+    setSharePublished(
+      ctx,
+      payload: {
+        readonly shareId: string
+        readonly writeToken: string
+        readonly expiresAt: number
+      }
+    ) {
+      ctx.set((prev) => ({
+        ...prev,
+        shareId: payload.shareId,
+        shareWriteToken: payload.writeToken,
+        shareExpiresAt: payload.expiresAt,
+      }))
+    },
+    clearShare(ctx) {
+      ctx.set((prev) => ({
+        ...prev,
+        shareId: null,
+        shareWriteToken: null,
+        shareExpiresAt: null,
       }))
     },
     reset(ctx) {

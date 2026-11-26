@@ -13,7 +13,11 @@ import {
   type SessionSnapshot,
   type TermCalendar,
 } from "@orahako/academic-sdk"
-import { createMinuteClockSource, createParameterizedQuerySource } from "@orahako/academic-kit"
+import {
+  createMinuteClockSource,
+  createParameterizedQuerySource,
+  type SharedSchedulePayload,
+} from "@orahako/academic-kit"
 import {
   createObservableSource,
   definePlugin,
@@ -245,6 +249,17 @@ function resolveCalendarFeedEndpoint(isNative: boolean): string {
     return `${window.location.origin}/api/calendar`
   }
   return "https://ysu.welain.com/api/calendar"
+}
+
+function resolveShareBaseOrigin(isNative: boolean): string {
+  if (
+    !isNative &&
+    typeof window !== "undefined" &&
+    (window.location.protocol === "https:" || window.location.protocol === "http:")
+  ) {
+    return window.location.origin
+  }
+  return "https://ysu.welain.com"
 }
 
 function detectLiveUpdateSupported(isNative: boolean): boolean {
@@ -844,6 +859,64 @@ export const schedulePlugin = definePlugin({
       settingsStore.actions.clearWebcal()
     }
 
+    const shareOrigin = resolveShareBaseOrigin(native.isNative)
+    const shareApiEndpoint = `${shareOrigin}/api/share`
+    const shareViewerBaseUrl = `${shareOrigin}/share`
+
+    const publishScheduleShare = async (
+      payload: SharedSchedulePayload,
+      ttlSeconds: number,
+      rotate = false
+    ): Promise<{ readonly shareId: string; readonly expiresAt: number }> => {
+      const current = settingsStore.source.getSnapshot()
+      if (rotate && current.shareId && current.shareWriteToken) {
+        await fetch(shareApiEndpoint, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            shareId: current.shareId,
+            writeToken: current.shareWriteToken,
+          }),
+        }).catch(() => {})
+      }
+      const shareId = !rotate && current.shareId ? current.shareId : generateWebcalToken()
+      const writeToken =
+        !rotate && current.shareWriteToken ? current.shareWriteToken : generateWebcalToken()
+
+      const response = await fetch(shareApiEndpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shareId, writeToken, ttlSeconds, payload }),
+      })
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "")
+        throw new Error(detail || `HTTP ${response.status}`)
+      }
+      const data = (await response.json().catch(() => null)) as { expiresAt?: number } | null
+      const expiresAt = data?.expiresAt ?? Date.now() + ttlSeconds * 1000
+      settingsStore.actions.setSharePublished({
+        shareId,
+        writeToken,
+        expiresAt,
+      })
+      return { shareId, expiresAt }
+    }
+
+    const revokeScheduleShare = async (): Promise<void> => {
+      const current = settingsStore.source.getSnapshot()
+      if (current.shareId && current.shareWriteToken) {
+        await fetch(shareApiEndpoint, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            shareId: current.shareId,
+            writeToken: current.shareWriteToken,
+          }),
+        }).catch(() => {})
+      }
+      settingsStore.actions.clearShare()
+    }
+
     ui.registerPage(
       {
         id: "index",
@@ -902,6 +975,15 @@ export const schedulePlugin = definePlugin({
             settingsStore.actions.setWebcalIncludeExams(include),
           setWebcalWriteReminders: (write: boolean) =>
             settingsStore.actions.setWebcalWriteReminders(write),
+          shareViewerBaseUrl,
+          publishScheduleShare,
+          revokeScheduleShare,
+          setShareBusyOnly: (busyOnly: boolean) => settingsStore.actions.setShareBusyOnly(busyOnly),
+          setShareIncludePersonal: (include: boolean) =>
+            settingsStore.actions.setShareIncludePersonal(include),
+          setShareIncludeExams: (include: boolean) =>
+            settingsStore.actions.setShareIncludeExams(include),
+          setShareTtlDays: (days: number) => settingsStore.actions.setShareTtlDays(days),
           ...(controller
             ? {
                 toggleCalendarSync: (enabled: boolean) =>

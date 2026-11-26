@@ -85,6 +85,13 @@ export {
   type OverviewScheduleSnapshot,
 } from "./overview-schedule"
 export {
+  buildSharedSchedulePayload,
+  type BuildSharedSchedulePayloadInput,
+  type SharedScheduleItem,
+  type SharedSchedulePayload,
+  type SharedSchedulePeriod,
+} from "./schedule-share"
+export {
   buildCalendarSyncEvents,
   serializeCalendarIcs,
   type BuildCalendarSyncEventsInput,
