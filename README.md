@@ -1,16 +1,19 @@
-<p align="center">
-  <img src="public/icon.svg" alt="Orahako" width="96" height="96" />
-</p>
+<div align="center">
+  <img src="public/icon.svg" alt="Orahako" width="88" height="88" />
+  <h1>酸橙盒 Orahako</h1>
+  <p>面向大学通用线上服务的第三方客户端，构建于 <strong>Cordis</strong> 插件架构之上</p>
+  <p>
+    <a href="PLUGIN_ARCHITECTURE.md">插件组合架构</a> ·
+    <a href="packages/core/sdk/README.md">API v1 SDK</a> ·
+    <a href="packages/core/cli/README.md">插件 CLI</a> ·
+    <a href="https://github.com/Youwenqwq/orahako/releases">下载 APK</a>
+  </p>
+</div>
 
-# 酸橙盒（Orahako）
+> [!NOTE]
+> 本项目处于 **0.x 开发者预览阶段**。API v1、清单格式、Slot、Provider 与运行时行为可能发生不兼容变更；插件作者应约束 `apiVersion` 与 `minAppVersion`。
 
-面向大学通用线上服务的第三方客户端，构建于 **Cordis** 插件架构之上。内核只负责组合、ZIP/Cordis 生命周期、恢复和通用 Native bridge；通用应用服务、可选教务运行时、燕大 Provider 与官方界面都由可替换插件提供。
-
-文档：[插件组合架构](PLUGIN_ARCHITECTURE.md) · [API v1 SDK](packages/core/sdk/README.md) · [插件 CLI](packages/core/cli/README.md)
-
-## 开发者预览
-
-本项目处于 0.x 开发阶段。API v1、清单格式、Slot、Provider 与运行时行为可能发生不兼容变更；插件作者应约束 `apiVersion` 与 `minAppVersion`。本项目与燕山大学官方无任何关联。
+内核只负责组合、ZIP / Cordis 生命周期、恢复和通用 Native bridge；通用应用服务、可选教务运行时、燕大 Provider 与官方界面都由可替换插件提供。
 
 ## 架构速览
 
