@@ -29,6 +29,7 @@ import {
   type PluginSlotRegistrySnapshot,
   type PluginUIRegistryService,
   type PluginUIServiceSnapshot,
+  type RenderPageOptions,
   type RenderSlotOptions,
   type RouteLocation,
   type SlotComponent,
@@ -565,12 +566,23 @@ function shellBoundaryKey(shell: PluginShellContribution): string {
   return `${shellQualifiedKey(shell)}:${shell.generation}`
 }
 
+const NOOP_RENDER_PAGE = (
+  _pluginId: string,
+  _pageId: string,
+  options?: RenderPageOptions
+): ReactNode => options?.fallback ?? null
+
 export interface ShellErrorBoundaryProps {
   readonly shell: PluginShellContribution
   readonly fallback?: PluginShellContribution
   readonly slots?: PluginSlotRegistryService
   readonly i18n?: PluginI18nRegistryService
   readonly selectShell: (id?: string) => void
+  readonly renderPage?: (
+    pluginId: string,
+    pageId: string,
+    options?: RenderPageOptions
+  ) => ReactNode
   readonly onFailure?: (error: Error) => void
   readonly recoveryMessage?: string
   readonly children?: ReactNode
@@ -619,6 +631,7 @@ export class ShellErrorBoundary extends Component<
           slots={this.props.slots}
           i18n={this.props.i18n}
           selectShell={this.props.selectShell}
+          renderPage={this.props.renderPage}
           recoveryMessage={this.props.recoveryMessage}
         >
           {this.props.children}
@@ -633,6 +646,7 @@ export class ShellErrorBoundary extends Component<
         owner={{
           children: this.props.children,
           selectShell: this.props.selectShell,
+          renderPage: this.props.renderPage ?? NOOP_RENDER_PAGE,
         }}
         slots={this.props.slots}
         i18n={this.props.i18n}
@@ -949,6 +963,45 @@ export function OrahakoApp({
     </style>
   ) : null
 
+  const isRuntimeLoading =
+    Boolean(host.runtime) &&
+    (runtimeStates.length === 0 || runtimeStates.some((entry) => isStartingPluginState(entry)))
+
+  const renderPage = useCallback(
+    (pluginId: string, pageId: string, options?: RenderPageOptions): ReactNode => {
+      void navRevision
+      const page =
+        ui?.findPage(pluginId, pageId) ??
+        uiSnapshot.pages.find(
+          (candidate) => candidate.pluginId === pluginId && candidate.id === pageId
+        )
+      if (!page || (navigation && !navigation.available(pluginId, pageId))) {
+        return (
+          options?.fallback ?? (
+            <PageStatusView
+              kind={isRuntimeLoading ? "loading" : "unavailable"}
+              locale={locale}
+              i18n={i18n}
+            />
+          )
+        )
+      }
+      return (
+        <ContributionOutlet
+          key={`${page.pluginId}:${page.id}:${page.generation}`}
+          entry={page}
+          owner={{}}
+          slots={slots}
+          i18n={i18n}
+          errorFallback={
+            options?.fallback ?? <PageStatusView kind="error" locale={locale} i18n={i18n} />
+          }
+        />
+      )
+    },
+    [i18n, isRuntimeLoading, locale, navRevision, navigation, slots, ui, uiSnapshot.pages]
+  )
+
   const rootContributions = slots ? slots.select("root") : []
   if (rootContributions.length > 0) {
     const rootEntry = rootContributions[0]!
@@ -993,10 +1046,6 @@ export function OrahakoApp({
       ? defaultShell
       : undefined
 
-  const isRuntimeLoading =
-    Boolean(host.runtime) &&
-    (runtimeStates.length === 0 || runtimeStates.some((entry) => isStartingPluginState(entry)))
-
   const resolvedChildren: ReactNode =
     children !== undefined ? (
       children
@@ -1027,6 +1076,7 @@ export function OrahakoApp({
         slots={slots}
         i18n={i18n}
         selectShell={selectShell}
+        renderPage={renderPage}
         recoveryMessage={host.bootstrapError}
         onFailure={() => {
           if (preferredShellId) {

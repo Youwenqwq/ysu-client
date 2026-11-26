@@ -1237,4 +1237,100 @@ describe("OrahakoApp root component (root slot, shell selection/fallback, Kernel
     await dom.unmount()
     host.dispose()
   })
+
+  it("allows multi-window shells to render multiple pages concurrently via renderPage with isolated error boundaries", async () => {
+    const dom = mountInteractiveDom()
+    activeUnmount = dom.unmount
+
+    const multiWindowShell = definePlugin({
+      manifest: {
+        id: "orahako.shell.multi",
+        name: "Multi Window Shell",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "shell",
+        entry: "index.js",
+      },
+      inject: ["ui"],
+      apply(ctx) {
+        ctx.ui.registerShell({ id: "multi", name: "Multi" }, ({ renderPage }) => (
+          <div data-shell="multi">
+            <div data-win="a">{renderPage("example.multi", "alpha")}</div>
+            <div data-win="b">{renderPage("example.multi", "beta")}</div>
+            <div data-win="c">
+              {renderPage("example.multi", "boom", { fallback: <span>WindowFallback</span> })}
+            </div>
+            <div data-win="missing">
+              {renderPage("example.multi", "missing", { fallback: <span>MissingFallback</span> })}
+            </div>
+          </div>
+        ))
+      },
+    })
+
+    const pagesPlugin = definePlugin({
+      manifest: {
+        id: "example.multi",
+        name: "Multi Pages",
+        version: "1.0.0",
+        apiVersion: PLUGIN_API_VERSION,
+        kind: "feature",
+        entry: "index.js",
+      },
+      inject: ["ui"],
+      apply(ctx) {
+        ctx.ui.registerPage({ id: "alpha" }, () => <span>AlphaWindow</span>)
+        ctx.ui.registerPage({ id: "beta" }, () => <span>BetaWindow</span>)
+        ctx.ui.registerPage({ id: "boom" }, () => {
+          throw new Error("window exploded")
+        })
+      },
+    })
+
+    const source: CompositionSource = {
+      appVersion: "0.16.0",
+      appBuild: "test-multi-window",
+      composition: {
+        id: "test.multi-window",
+        version: 1,
+        defaults: { shell: "orahako.shell.multi:multi" },
+        plugins: [
+          { id: "orahako.runtime.slots", protected: true },
+          { id: "orahako.runtime.ui", protected: true },
+          { id: "orahako.runtime.router", protected: true, config: { initialHref: "/" } },
+          { id: "orahako.runtime.navigation", protected: true },
+          { id: "orahako.shell.multi", protected: true },
+          { id: "example.multi" },
+        ],
+      },
+      plugins: [
+        slotRegistryPlugin,
+        uiRegistryPlugin,
+        routerRuntimePlugin,
+        navigationRuntimePlugin,
+        multiWindowShell,
+        pagesPlugin,
+      ],
+    }
+
+    const host = new PluginHost(source, { platformModules: {} })
+    await host.bootstrap()
+
+    const prevErr = console.error
+    console.error = () => {}
+    try {
+      await dom.render(<OrahakoApp host={host} />)
+    } finally {
+      console.error = prevErr
+    }
+
+    expect(dom.container.textContent).toContain("AlphaWindow")
+    expect(dom.container.textContent).toContain("BetaWindow")
+    expect(dom.container.textContent).toContain("WindowFallback")
+    expect(dom.container.textContent).toContain("MissingFallback")
+
+    activeUnmount = undefined
+    await dom.unmount()
+    host.dispose()
+  })
 })

@@ -110,10 +110,21 @@ export type PluginThemeContribution = PluginThemeDefinition & {
   readonly pluginId: string
 }
 
+export interface RenderPageOptions {
+  /** Fallback rendered when the page contribution throws or is unavailable. */
+  readonly fallback?: ReactNode
+}
+
 export interface ShellOwnerProps {
   readonly children?: ReactNode
   /** Select another registered shell; undefined restores the default shell. */
   selectShell(id?: string): void
+  /**
+   * Render any registered plugin page through the host's single UI renderer,
+   * with its own error boundary, scoped i18n, store, and inject share.
+   * Useful for multi-window or split-pane shells.
+   */
+  renderPage(pluginId: string, pageId: string, options?: RenderPageOptions): ReactNode
 }
 
 export interface ShellSpec<
