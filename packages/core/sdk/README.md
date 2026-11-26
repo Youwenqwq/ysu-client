@@ -33,7 +33,7 @@ The manifest must use `apiVersion: 1`:
   "apiVersion": 1,
   "kind": "feature",
   "entry": "dist/index.js",
-  "minAppVersion": "0.16.0",
+  "minAppVersion": "0.15.0",
   "inject": ["ui"],
   "providerIndependent": true
 }
@@ -86,7 +86,7 @@ export default definePlugin({
     apiVersion: PLUGIN_API_VERSION,
     kind: "feature",
     entry: "dist/index.js",
-    minAppVersion: "0.16.0",
+    minAppVersion: "0.15.0",
     inject: ["ui"],
     providerIndependent: true,
   },
