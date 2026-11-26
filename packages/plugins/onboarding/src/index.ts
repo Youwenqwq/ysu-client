@@ -1,3 +1,4 @@
+import type { PluginAnalyticsService } from "@orahako/ui-analytics"
 import {
   createObservableSource,
   definePlugin,
@@ -15,7 +16,11 @@ import {
   type OnboardingState,
   type OnboardingStoreInstance,
 } from "./store"
-import { OnboardingWizard, type OnboardingSchoolChoice } from "./wizard"
+import {
+  ONBOARDING_COMPLETING_EVENT,
+  OnboardingWizard,
+  type OnboardingSchoolChoice,
+} from "./wizard"
 
 export const ONBOARDING_PLUGIN_ID = "orahako.onboarding"
 const DEFAULT_MARKET_URL =
@@ -29,6 +34,7 @@ export interface OnboardingPluginConfig extends PluginConfig {
 }
 
 export {
+  ONBOARDING_COMPLETING_EVENT,
   onboardingDictionary,
   onboardingStore,
   OnboardingWizard,
@@ -130,7 +136,9 @@ export const onboardingPlugin = definePlugin({
     "native",
     "packageRuntime",
   ] as const,
+  optionalInject: ["analytics"] as const,
   apply(ctx, config: OnboardingPluginConfig = {}) {
+    const analytics: PluginAnalyticsService | undefined = ctx.analytics
     const { slots, i18n, storage, providers, provider, session, native, packageRuntime } = ctx
     i18n.register(onboardingDictionary)
     let disposed = false
@@ -227,6 +235,10 @@ export const onboardingPlugin = definePlugin({
             },
             retrySchoolDiscovery: () => {
               void discoverSchools()
+            },
+            hasAnalytics: () => Boolean(analytics?.endpoint),
+            setAnalyticsConsent: (enabled: boolean) => {
+              analytics?.setConsent(enabled)
             },
             isNative: () => native.isNative,
             hasProvider: (schoolId: string) => providers.hasProvider(schoolId),

@@ -41,7 +41,6 @@ import {
 import {
   ANALYTICS_PLUGIN_ID,
   analyticsPlugin,
-  AnalyticsPrompt,
   AnalyticsSettingsToggle,
   APP_LAUNCH_DEDUPE_KEY,
   ConfiguredAnalyticsService,
@@ -518,7 +517,7 @@ describe("@orahako/ui-analytics", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it("prompts on first run via shell.overlay, tracks launch on Agree & on consented reload, and toggles consent in settings.general via ContributionOutlet", async () => {
+  it("tracks launch via service.setConsent, persists consent on reload, and toggles consent in settings.general via ContributionOutlet", async () => {
     const dom = mountInteractiveDom()
     activeUnmount = dom.unmount
 
@@ -530,7 +529,6 @@ describe("@orahako/ui-analytics", () => {
     const localBackend = new MemoryKeyValueStorage()
     const secureBackend = new MemoryKeyValueStorage()
     const slots = new PluginSlotRegistry()
-    slots.declare({ name: "shell.overlay", kind: "list" })
     slots.declare({ name: "settings.general", kind: "list" })
     const i18n = new PluginI18nRegistry()
 
@@ -553,52 +551,33 @@ describe("@orahako/ui-analytics", () => {
 
       const service = runtime.context.get("analytics") as PluginAnalyticsService
       expect(service.endpoint).toBe("https://example.com/api/stats")
+      expect(service.consent.getSnapshot()).toBe(false)
 
-      const overlayEntry = slots.select("shell.overlay")[0]!
       const settingsEntry = slots.select("settings.general")[0]!
-      expect(overlayEntry.component).toBe(AnalyticsPrompt)
       expect(settingsEntry.component).toBe(AnalyticsSettingsToggle)
 
-      // No telemetry sent before user consents
+      // No telemetry sent before consent is recorded
       expect(fetchMock).not.toHaveBeenCalled()
 
       await dom.render(
-        <div>
-          <ContributionOutlet
-            entry={overlayEntry}
-            slots={slots}
-            i18n={i18n}
-            onError={(err) => {
-              throw err
-            }}
-          />
-          <ContributionOutlet
-            entry={settingsEntry}
-            slots={slots}
-            i18n={i18n}
-            onError={(err) => {
-              throw err
-            }}
-          />
-        </div>
+        <ContributionOutlet
+          entry={settingsEntry}
+          slots={slots}
+          i18n={i18n}
+          onError={(err) => {
+            throw err
+          }}
+        />
       )
-
-      // First-run AnalyticsPrompt is open in shell.overlay
-      expect(dom.bodyEl.textContent).toContain("是否参与匿名使用统计")
       expect(dom.container.textContent).toContain("参与匿名统计")
 
-      // Click Agree ("好的！") -> persists consent=true & promptVersion="3.0.0" and fires app-launch track!
-      const agreeBtn = dom.bodyEl.findAll(
-        (n) => n.tagName === "BUTTON" && n.textContent.includes("好的！")
-      )[0]!
-      expect(agreeBtn).toBeDefined()
-
+      // Onboarding records consent=true -> persists consent & fires app-launch track
       await act(async () => {
-        const onClick = findReactProps(agreeBtn).onClick as (() => void) | undefined
-        onClick?.()
+        service.setConsent(true)
         await Promise.resolve()
       })
 
+      expect(service.consent.getSnapshot()).toBe(true)
       expect(fetchMock).toHaveBeenCalledTimes(1)
       const [calledUrl, calledInit] = fetchMock.mock.calls[0]!
       expect(calledUrl).toBe("https://example.com/api/stats")
@@ -617,11 +596,11 @@ describe("@orahako/ui-analytics", () => {
         version: 1,
         state: {
           consent: true,
-          promptVersion: "3.0.0",
+          decided: true,
         },
       })
 
-      // Settings general toggle renders checked Switch ("data-checked") and toggles consent off when clicked
+      // Settings general toggle renders checked Switch and toggles consent off when clicked
       const staticSettingsHtml = renderToStaticMarkup(
         <ContributionOutlet entry={settingsEntry} slots={slots} i18n={i18n} />
       )
@@ -640,22 +619,22 @@ describe("@orahako/ui-analytics", () => {
       })
 
       expect(switchBtn.getAttribute("aria-checked")).toBe("false")
+      expect(service.consent.getSnapshot()).toBe(false)
       expect(
         JSON.parse(String(localBackend.data.get(`orahako-plugin:${ANALYTICS_PLUGIN_ID}:consent`)))
       ).toEqual({
         version: 1,
         state: {
           consent: false,
-          promptVersion: "3.0.0",
+          decided: true,
         },
       })
 
-      // Also verify startup launch tracking when promptVersion & consent=true are already persisted on boot
+      // Startup launch tracking fires automatically when decided & consent=true are persisted
       localBackend.data.set(
         `orahako-plugin:${ANALYTICS_PLUGIN_ID}:consent`,
-        JSON.stringify({ version: 1, state: { consent: true, promptVersion: "3.0.0" } })
+        JSON.stringify({ version: 1, state: { consent: true, decided: true } })
       )
-      // Clear dedupe key so a fresh day/launch sends telemetry
       localBackend.data.delete(
         `orahako-plugin:${ANALYTICS_PLUGIN_ID}:dedupe:${APP_LAUNCH_DEDUPE_KEY}`
       )
@@ -668,7 +647,7 @@ describe("@orahako/ui-analytics", () => {
       })
       expect(fetchMock).toHaveBeenCalledTimes(2)
 
-      // Verify Decline on fresh state sets consent=false & promptVersion without sending telemetry
+      // Recording consent=false on fresh state persists decision without sending telemetry
       localBackend.data.clear()
       await act(async () => {
         runtime.stop(analyticsPlugin.manifest.id)
@@ -676,14 +655,9 @@ describe("@orahako/ui-analytics", () => {
         await Promise.resolve()
         await Promise.resolve()
       })
-      const freshOverlay = slots.select("shell.overlay")[0]!
-      await dom.render(<ContributionOutlet entry={freshOverlay} slots={slots} i18n={i18n} />)
-      const declineBtn = dom.bodyEl.findAll(
-        (n) => n.tagName === "BUTTON" && n.textContent.includes("还是算了")
-      )[0]!
+      const freshService = runtime.context.get("analytics") as PluginAnalyticsService
       await act(async () => {
-        const onClick = findReactProps(declineBtn).onClick as (() => void) | undefined
-        onClick?.()
+        freshService.setConsent(false)
         await Promise.resolve()
       })
       expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -693,7 +667,7 @@ describe("@orahako/ui-analytics", () => {
         version: 1,
         state: {
           consent: false,
-          promptVersion: "3.0.0",
+          decided: true,
         },
       })
     } finally {

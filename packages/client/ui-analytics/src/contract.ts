@@ -1,3 +1,5 @@
+import type { ObservableSource } from "@orahako/sdk"
+
 export type AnalyticsTrackReason = "sent" | "disabled" | "duplicate" | "unavailable" | "failed"
 
 export interface AnalyticsTrackOptions {
@@ -14,6 +16,8 @@ export interface AnalyticsTrackResult {
 
 export interface PluginAnalyticsService {
   readonly endpoint: string | null
+  readonly consent: ObservableSource<boolean>
+  setConsent(enabled: boolean): void
   track(
     payload: Readonly<Record<string, unknown>>,
     options: AnalyticsTrackOptions

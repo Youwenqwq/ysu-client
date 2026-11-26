@@ -12,6 +12,7 @@ import type { PluginProfileService } from "@orahako/ui-profile"
 import {
   definePlugin,
   isCapacitor,
+  isTablet,
   PLUGIN_API_VERSION,
   type PluginConfig,
   type PluginPageContribution,
@@ -161,7 +162,7 @@ export const authUiPlugin = definePlugin({
     "session",
     "query",
   ] as const,
-  optionalInject: ["mfa", "profile"] as const,
+  optionalInject: ["profile"] as const,
   apply(ctx, config: AuthUiPluginConfig = {}) {
     const {
       ui,
@@ -174,7 +175,6 @@ export const authUiPlugin = definePlugin({
       provider,
       session,
       query,
-      mfa,
       profile,
     } = ctx
     i18n.register(authUiDictionary)
@@ -428,6 +428,8 @@ export const authUiPlugin = definePlugin({
             rememberHydrated: rememberStore.hydrated,
           },
           canRemember: config.canRemember ?? isCapacitor(),
+          isTablet: () =>
+            typeof window !== "undefined" && Boolean(window.screen) ? isTablet() : false,
           prepareProvider,
           setCredential: (input, remembered) => {
             checkedReadyGeneration = -1
@@ -442,7 +444,6 @@ export const authUiPlugin = definePlugin({
           },
           checkRateLimit: () => rateLimiter.checkRateLimit(),
           recordLoginAttempt: () => rateLimiter.recordLoginAttempt(),
-          showMfa: (request) => mfa?.show(request),
         }),
       },
       LoginPage

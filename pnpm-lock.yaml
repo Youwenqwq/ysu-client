@@ -2159,6 +2159,9 @@ importers:
       '@orahako/sdk':
         specifier: workspace:*
         version: link:../../core/sdk
+      '@orahako/ui-analytics':
+        specifier: workspace:*
+        version: link:../../client/ui-analytics
       '@orahako/ui-primitives':
         specifier: workspace:*
         version: link:../../core/ui-primitives

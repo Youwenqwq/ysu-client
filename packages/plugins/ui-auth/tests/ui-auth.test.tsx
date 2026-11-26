@@ -132,6 +132,11 @@ class MiniDomNode {
 
   addEventListener(): void {}
   removeEventListener(): void {}
+  closest(): MiniDomNode | null {
+    return null
+  }
+  blur(): void {}
+  focus(): void {}
 
   set textContent(value: string) {
     this.childNodes.length = 0
@@ -149,6 +154,7 @@ class MiniDomNode {
 function mountMiniDom() {
   const prevWindow = globalThis.window
   const prevDocument = globalThis.document
+  const prevHtmlElement = (globalThis as Record<string, unknown>).HTMLElement
   const prevAct = (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT
 
   const fakeWin = {
@@ -189,6 +195,7 @@ function mountMiniDom() {
   })
 
   ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
+  ;(globalThis as Record<string, unknown>).HTMLElement = MiniDomNode
   ;(globalThis as Record<string, unknown>).window = fakeWin
   ;(globalThis as Record<string, unknown>).document = docWithFactories
 
@@ -207,6 +214,7 @@ function mountMiniDom() {
         root.unmount()
       })
       ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = prevAct
+      ;(globalThis as Record<string, unknown>).HTMLElement = prevHtmlElement
       ;(globalThis as Record<string, unknown>).window = prevWindow
       ;(globalThis as Record<string, unknown>).document = prevDocument
     },
@@ -295,6 +303,12 @@ function setupAuthRuntime(options?: {
           Boolean(runtime.context.get("session")?.getSnapshot().isAuthenticated),
         getCaptchaUrl: () => "data:image/png;base64,AAAA",
         checkCaptchaNeeded: async (u) => u === "need-captcha",
+        requestMfaCode: async (input) => ({
+          method: input.method,
+          methodCode: "MC-INLINE-1",
+          mobileHint: "138****0000",
+          username: input.username,
+        }),
         submitMfaCode: async () => "mfa-ticket",
       },
       studentProfile: {
@@ -886,6 +900,155 @@ describe("@orahako/plugin-ui-auth startup observer, login gate & slot contributi
       expect(dom.container.textContent).toContain("李青橙")
       expect(dom.container.textContent).toContain("20260001")
     })
+    activeUnmount = undefined
+    await dom.unmount()
+    env.runtime.dispose()
+  })
+
+  it("transitions LoginPage inline into step 2 MFA verification and completes login without a modal", async () => {
+    const dom = mountMiniDom()
+    activeUnmount = dom.unmount
+
+    const env = setupAuthRuntime({ initialHref: "/?route=login" })
+    const slots = env.runtime.context.get("slots") as PluginSlotRegistry
+    const ui = env.runtime.context.get("ui")!
+    const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
+    const session = env.runtime.context.get("session")!
+    const router = env.runtime.context.get("router") as PluginRouterService
+
+    await vi.waitFor(() => expect(session.getSnapshot().hasHydrated).toBe(true))
+
+    const loginPage = ui
+      .getSnapshot()
+      .pages.find((p) => p.pluginId === AUTH_UI_PLUGIN_ID && p.id === "login")!
+    await dom.render(<ContributionOutlet entry={loginPage} slots={slots} i18n={i18n} />)
+
+    const findNodes = (
+      root: MiniDomNode,
+      predicate: (node: MiniDomNode) => boolean
+    ): MiniDomNode[] => {
+      const results: MiniDomNode[] = []
+      const visit = (node: MiniDomNode) => {
+        if (predicate(node)) results.push(node)
+        for (const child of node.childNodes) visit(child)
+      }
+      visit(root)
+      return results
+    }
+    const getReactProps = (node: MiniDomNode): Record<string, unknown> => {
+      for (const key of Object.keys(node)) {
+        if (key.startsWith("__reactProps$")) {
+          const val: unknown = Reflect.get(node, key)
+          if (typeof val === "object" && val !== null) return val as Record<string, unknown>
+        }
+      }
+      return {}
+    }
+
+    const usernameInput = findNodes(
+      dom.container,
+      (n) => getReactProps(n).id === "orahako-login-username"
+    )[0]!
+    const passwordInput = findNodes(
+      dom.container,
+      (n) => getReactProps(n).id === "orahako-login-password"
+    )[0]!
+    const credentialsForm = findNodes(dom.container, (n) => n.tagName === "FORM")[0]!
+
+    await act(async () => {
+      const onUserChange = getReactProps(usernameInput).onChange as
+        | ((e: { target: { value: string } }) => void)
+        | undefined
+      const onPassChange = getReactProps(passwordInput).onChange as
+        | ((e: { target: { value: string } }) => void)
+        | undefined
+      onUserChange?.({ target: { value: "20260001" } })
+      onPassChange?.({ target: { value: "mfa-pass" } })
+    })
+
+    await act(async () => {
+      const onSubmit = getReactProps(credentialsForm).onSubmit as
+        | ((e: { preventDefault(): void }) => void)
+        | undefined
+      onSubmit?.({ preventDefault() {} })
+    })
+
+    await vi.waitFor(() => {
+      expect(dom.container.textContent).toContain("二次验证")
+    })
+
+    // Back button returns to step 1 while preserving credentials
+    const backBtn = findNodes(
+      dom.container,
+      (n) => n.tagName === "BUTTON" && n.textContent.includes("返回修改账号")
+    )[0]!
+    await act(async () => {
+      const onClick = getReactProps(backBtn).onClick as (() => void) | undefined
+      onClick?.()
+    })
+    expect(dom.container.textContent).toContain("登录账号")
+
+    // Re-enter MFA step via form submit (advance clock past 60s rate-limit interval)
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 65_000)
+    const formAgain = findNodes(dom.container, (n) => n.tagName === "FORM")[0]!
+    await act(async () => {
+      const onSubmit = getReactProps(formAgain).onSubmit as
+        | ((e: { preventDefault(): void }) => void)
+        | undefined
+      onSubmit?.({ preventDefault() {} })
+    })
+    nowSpy.mockRestore()
+    await vi.waitFor(() => {
+      expect(dom.container.textContent).toContain("二次验证")
+    })
+
+    // Request MFA code inline
+    const requestBtn = findNodes(
+      dom.container,
+      (n) => n.tagName === "BUTTON" && n.textContent.includes("获取验证码")
+    )[0]!
+    await act(async () => {
+      const onClick = getReactProps(requestBtn).onClick as (() => void) | undefined
+      onClick?.()
+    })
+    await vi.waitFor(() => {
+      expect(dom.container.textContent).toContain("138****0000")
+    })
+
+    // Enter verification code and submit
+    const codeInput = findNodes(
+      dom.container,
+      (n) => getReactProps(n).id === "orahako-login-mfa-code"
+    )[0]!
+    const mfaForm = findNodes(dom.container, (n) => n.tagName === "FORM")[0]!
+
+    await act(async () => {
+      const onChange = getReactProps(codeInput).onChange as
+        | ((e: { target: { value: string } }) => void)
+        | undefined
+      onChange?.({ target: { value: "654321" } })
+    })
+
+    await act(async () => {
+      const onSubmit = getReactProps(mfaForm).onSubmit as
+        | ((e: { preventDefault(): void }) => void)
+        | undefined
+      onSubmit?.({ preventDefault() {} })
+    })
+
+    await vi.waitFor(() => {
+      expect(session.getSnapshot().isAuthenticated).toBe(true)
+      expect(session.getSnapshot().credential).toBe("mfa-ticket")
+      expect(dom.container.textContent).toContain("登录成功")
+    })
+
+    await vi.waitFor(
+      () => {
+        expect(router.current.getSnapshot().pageId).toBe("overview")
+      },
+      { timeout: 2500 }
+    )
+
     activeUnmount = undefined
     await dom.unmount()
     env.runtime.dispose()

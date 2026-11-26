@@ -16,10 +16,8 @@ export {
   type AnalyticsConsentStore,
 } from "./store"
 export {
-  AnalyticsPrompt,
   AnalyticsSettingsToggle,
-  type AnalyticsPromptInject,
-  type AnalyticsPromptProps,
+  type AnalyticsSettingsToggleInject,
   type AnalyticsSettingsToggleProps,
 } from "./components"
 export {

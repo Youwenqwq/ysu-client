@@ -15,7 +15,10 @@ export interface ConfiguredAnalyticsOptions {
   readonly fetchImpl?: typeof fetch
 }
 
-export class ConfiguredAnalyticsService implements PluginAnalyticsService {
+export class ConfiguredAnalyticsService implements Pick<
+  PluginAnalyticsService,
+  "endpoint" | "track"
+> {
   readonly endpoint: string | null
   private readonly storageKeyPrefix: string
   private readonly storage: Pick<PluginKeyValueStorage, "getItem" | "setItem"> | null

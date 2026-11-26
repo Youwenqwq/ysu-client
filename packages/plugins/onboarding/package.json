@@ -10,6 +10,7 @@
   "dependencies": {
     "@orahako/academic-sdk": "workspace:*",
     "@orahako/sdk": "workspace:*",
+    "@orahako/ui-analytics": "workspace:*",
     "@orahako/ui-primitives": "workspace:*",
     "lucide-react": "^1.17.0"
   },

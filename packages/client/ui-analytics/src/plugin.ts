@@ -5,8 +5,8 @@ import {
   PLUGIN_API_VERSION,
   type PluginConfig,
 } from "@orahako/sdk"
-import { blurActiveElement } from "@orahako/ui-primitives"
-import { AnalyticsPrompt, AnalyticsSettingsToggle, type AnalyticsPromptInject } from "./components"
+import { AnalyticsSettingsToggle, type AnalyticsSettingsToggleInject } from "./components"
+import type { PluginAnalyticsService } from "./contract"
 import { analyticsDictionary } from "./dictionary"
 import { ConfiguredAnalyticsService } from "./service"
 import { analyticsConsentStore } from "./store"
@@ -62,19 +62,19 @@ export const analyticsPlugin = definePlugin({
   inject: ["slots", "i18n", "storage"] as const,
   configSchema: analyticsConfigSchema,
   apply(ctx, config: AnalyticsPluginConfig) {
-    const service = new ConfiguredAnalyticsService({
+    const tracker = new ConfiguredAnalyticsService({
       endpoint: config.endpoint,
       storage: ctx.storage.local,
     })
     const consentStore = analyticsConsentStore.create(ctx.storage)
-    const promptOpenSource = createObservableSource<boolean>(false)
+    const consentSource = createObservableSource<boolean>(consentStore.source.getSnapshot().consent)
 
     let disposed = false
     let startupHandled = false
 
     const triggerLaunchTrack = () => {
       if (disposed) return
-      void service
+      void tracker
         .track(buildLaunchAnalyticsPayload(config.appVersion), {
           enabled: true,
           oncePerDay: true,
@@ -85,15 +85,27 @@ export const analyticsPlugin = definePlugin({
         })
     }
 
+    const setConsent = (enabled: boolean) => {
+      if (disposed) return
+      consentStore.actions.setConsent(enabled)
+      consentSource.set(enabled)
+      if (enabled) {
+        triggerLaunchTrack()
+      }
+    }
+
+    const unsubscribeConsent = consentStore.source.subscribe(() => {
+      if (disposed) return
+      consentSource.set(consentStore.source.getSnapshot().consent)
+    })
+
     const handleHydratedStartup = () => {
       if (disposed || startupHandled || !consentStore.hydrated.getSnapshot()) return
       startupHandled = true
 
-      const { consent, promptVersion } = consentStore.source.getSnapshot()
-      if (service.endpoint && !promptVersion) {
-        blurActiveElement()
-        promptOpenSource.set(true)
-      } else if (promptVersion && consent) {
+      const { consent, decided } = consentStore.source.getSnapshot()
+      consentSource.set(consent)
+      if (decided && consent) {
         triggerLaunchTrack()
       }
     }
@@ -101,45 +113,26 @@ export const analyticsPlugin = definePlugin({
     const unsubscribeHydrated = consentStore.hydrated.subscribe(handleHydratedStartup)
     handleHydratedStartup()
 
+    const service: PluginAnalyticsService = {
+      endpoint: tracker.endpoint,
+      consent: {
+        getSnapshot: consentSource.getSnapshot,
+        subscribe: consentSource.subscribe,
+      },
+      setConsent,
+      track: (payload, options) => tracker.track(payload, options),
+    }
+
     ctx.effect(() => () => {
       disposed = true
       unsubscribeHydrated()
-      promptOpenSource.set(false)
-      service.dispose()
+      unsubscribeConsent()
+      tracker.dispose()
       consentStore.dispose()
     })
 
     ctx.i18n.register(analyticsDictionary)
     ctx.set("analytics", service)
-
-    ctx.slots.inject("shell.overlay", () =>
-      ctx.slots.register(
-        {
-          id: "analytics-prompt",
-          slot: "shell.overlay",
-          dictionary: analyticsDictionary,
-          store: consentStore,
-          inject: (): AnalyticsPromptInject => ({
-            onAgree: () => {
-              consentStore.actions.recordPromptDecision(true, config.appVersion)
-              promptOpenSource.set(false)
-              triggerLaunchTrack()
-            },
-            onDecline: () => {
-              consentStore.actions.recordPromptDecision(false, config.appVersion)
-              promptOpenSource.set(false)
-            },
-            hooks: {
-              promptOpen: {
-                getSnapshot: promptOpenSource.getSnapshot,
-                subscribe: promptOpenSource.subscribe,
-              },
-            },
-          }),
-        },
-        AnalyticsPrompt
-      )
-    )
 
     ctx.slots.inject("settings.general", () =>
       ctx.slots.register(
@@ -148,6 +141,9 @@ export const analyticsPlugin = definePlugin({
           slot: "settings.general",
           dictionary: analyticsDictionary,
           store: consentStore,
+          inject: (): AnalyticsSettingsToggleInject => ({
+            onConsentChange: setConsent,
+          }),
         },
         AnalyticsSettingsToggle
       )

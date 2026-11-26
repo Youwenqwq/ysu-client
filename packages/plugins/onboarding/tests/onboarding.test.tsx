@@ -28,11 +28,7 @@ import {
   type PluginManifest,
   type PluginPackageRuntime,
 } from "@orahako/sdk"
-import {
-  ONBOARDING_PLUGIN_ID,
-  onboardingPlugin,
-  type OnboardingSchoolChoice,
-} from "../src"
+import { ONBOARDING_PLUGIN_ID, onboardingPlugin, type OnboardingSchoolChoice } from "../src"
 
 class MiniDomNode {
   readonly nodeType: number
@@ -113,6 +109,10 @@ class MiniDomNode {
     this.listeners.get(type)?.delete(fn)
   }
 
+  closest(): MiniDomNode | null {
+    return null
+  }
+
   set textContent(value: string) {
     this.childNodes.length = 0
     this.rawText = String(value)
@@ -129,6 +129,7 @@ class MiniDomNode {
 function mountMiniDom() {
   const prevWindow = globalThis.window
   const prevDocument = globalThis.document
+  const prevHtmlFormElement = (globalThis as Record<string, unknown>).HTMLFormElement
   const prevAct = (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT
 
   const fakeWin = {
@@ -162,6 +163,7 @@ function mountMiniDom() {
   })
 
   ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
+  ;(globalThis as Record<string, unknown>).HTMLFormElement = class {}
   ;(globalThis as Record<string, unknown>).window = fakeWin
   ;(globalThis as Record<string, unknown>).document = docWithFactories
 
@@ -180,6 +182,7 @@ function mountMiniDom() {
         root.unmount()
       })
       ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = prevAct
+      ;(globalThis as Record<string, unknown>).HTMLFormElement = prevHtmlFormElement
       ;(globalThis as Record<string, unknown>).window = prevWindow
       ;(globalThis as Record<string, unknown>).document = prevDocument
     },
@@ -219,10 +222,7 @@ function getReactProps(node: MiniDomNode): Record<string, unknown> {
   return {}
 }
 
-function findAll(
-  root: MiniDomNode,
-  predicate: (node: MiniDomNode) => boolean
-): MiniDomNode[] {
+function findAll(root: MiniDomNode, predicate: (node: MiniDomNode) => boolean): MiniDomNode[] {
   const matches: MiniDomNode[] = []
   const visit = (node: MiniDomNode) => {
     if (predicate(node)) matches.push(node)
@@ -316,6 +316,7 @@ function createOnboardingEnv(options: {
   fetch?: () => Promise<Response>
   registerOnlineProviders?: readonly string[]
   persisted?: Readonly<Record<string, string>>
+  analyticsEndpoint?: string
 }) {
   const dom = mountMiniDom()
   const localBackend = createMemoryStorage(options.persisted)
@@ -444,6 +445,19 @@ function createOnboardingEnv(options: {
     runtime.start(p.manifest.id)
   }
 
+  const setAnalyticsConsentSpy = vi.fn()
+  if (options.analyticsEndpoint) {
+    runtime.context.set("analytics", {
+      endpoint: options.analyticsEndpoint,
+      consent: {
+        getSnapshot: () => false,
+        subscribe: () => () => {},
+      },
+      setConsent: setAnalyticsConsentSpy,
+      track: async () => ({ tracked: false, reason: "disabled", date: null }),
+    })
+  }
+
   const fetchMock = options.fetch
     ? vi.fn(options.fetch)
     : vi.fn(async () => jsonResponse(options.index ?? marketIndex([])))
@@ -475,6 +489,7 @@ function createOnboardingEnv(options: {
     localBackend,
     fetchMock,
     applyPluginBundle,
+    setAnalyticsConsentSpy,
     slots,
     entry,
     injected,
@@ -489,7 +504,7 @@ function createOnboardingEnv(options: {
 }
 
 describe("@orahako/plugin-onboarding", () => {
-  it("starts offline with the first configured school and loads more schools only on demand", async () => {
+  it("shows the geometric welcome step first, then starts offline with the configured school and loads more schools on demand", async () => {
     const marketDeferred = Promise.withResolvers<Response>()
     const env = createOnboardingEnv({ fetch: () => marketDeferred.promise })
     activeUnmount = env.cleanup
@@ -503,14 +518,27 @@ describe("@orahako/plugin-onboarding", () => {
     const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
     await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
 
+    expect(env.dom.container.textContent).toContain("欢迎使用酸橙盒")
+    expect(env.dom.container.textContent).toContain("开始设置")
+    expect(
+      findAll(env.dom.container, (node) => node.attributes.has("data-onboarding-emblem"))
+    ).toHaveLength(1)
+    expect(env.fetchMock).not.toHaveBeenCalled()
+
+    await clickButton(env.dom.container, "开始设置")
+    expect(env.dom.container.textContent).toContain("开始之前")
+    expect(env.dom.container.textContent).toContain("01 / 03")
+    await clickButton(env.dom.container, "同意并继续")
+
     expect(env.dom.container.textContent).toContain("初次设置")
+    expect(env.dom.container.textContent).toContain("02 / 03")
     expect(env.dom.container.textContent).toContain("燕山大学")
-    expect(env.dom.container.textContent).toContain("更多学校")
+    expect(env.dom.container.textContent).toContain("探索更多学校")
     expect(env.dom.container.textContent).not.toContain(ZMU_NAME)
     expect(env.fetchMock).not.toHaveBeenCalled()
     expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(false)
 
-    await clickButton(env.dom.container, "更多学校")
+    await clickButton(env.dom.container, "探索更多学校")
     await vi.waitFor(() => expect(env.fetchMock).toHaveBeenCalledTimes(1))
     expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(true)
 
@@ -542,9 +570,7 @@ describe("@orahako/plugin-onboarding", () => {
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new Error("market offline"))
-      .mockResolvedValueOnce(
-        jsonResponse(marketIndex([providerPlugin("zmu.provider", ZMU_NAME)]))
-      )
+      .mockResolvedValueOnce(jsonResponse(marketIndex([providerPlugin("zmu.provider", ZMU_NAME)])))
     const env = createOnboardingEnv({ fetch: fetchMock })
     activeUnmount = env.cleanup
 
@@ -552,7 +578,9 @@ describe("@orahako/plugin-onboarding", () => {
     await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
     expect(env.fetchMock).not.toHaveBeenCalled()
 
-    await clickButton(env.dom.container, "更多学校")
+    await clickButton(env.dom.container, "开始设置")
+    await clickButton(env.dom.container, "同意并继续")
+    await clickButton(env.dom.container, "探索更多学校")
     await vi.waitFor(() => {
       expect(env.injected.hooks.schoolsError.getSnapshot()).toBe("market offline")
       expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(false)
@@ -583,10 +611,10 @@ describe("@orahako/plugin-onboarding", () => {
     const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
     await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
 
-    await clickButton(env.dom.container, "更多学校")
-    await vi.waitFor(() =>
-      expect(env.injected.hooks.schools.getSnapshot()).toHaveLength(3)
-    )
+    await clickButton(env.dom.container, "开始设置")
+    await clickButton(env.dom.container, "同意并继续")
+    await clickButton(env.dom.container, "探索更多学校")
+    await vi.waitFor(() => expect(env.injected.hooks.schools.getSnapshot()).toHaveLength(3))
     const schools = env.injected.hooks.schools.getSnapshot()
     const zmu = schools.find((school) => school.id === "zmu")!
     expect(schools.find((school) => school.id === "ghost")).toBeDefined()
@@ -617,13 +645,13 @@ describe("@orahako/plugin-onboarding", () => {
     await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
     expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(false)
 
-    await clickButton(env.dom.container, "更多学校")
+    await clickButton(env.dom.container, "开始设置")
+    await clickButton(env.dom.container, "同意并继续")
+    await clickButton(env.dom.container, "探索更多学校")
     expect(env.injected.hooks.schoolsLoading.getSnapshot()).toBe(true)
 
     env.disposeRuntime()
-    marketDeferred.resolve(
-      jsonResponse(marketIndex([providerPlugin("zmu.provider", ZMU_NAME)]))
-    )
+    marketDeferred.resolve(jsonResponse(marketIndex([providerPlugin("zmu.provider", ZMU_NAME)])))
     const tick = Promise.withResolvers<void>()
     setTimeout(tick.resolve, 0)
     await tick.promise
@@ -644,8 +672,10 @@ describe("@orahako/plugin-onboarding", () => {
 
     const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
     await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
+    await clickButton(env.dom.container, "开始设置")
+    await clickButton(env.dom.container, "同意并继续")
     expect(env.dom.container.textContent).toContain("初次设置")
-    expect(env.dom.container.textContent).toContain("选择学校")
+    expect(env.dom.container.textContent).toContain("选择你的学校")
     expect(env.fetchMock).not.toHaveBeenCalled()
 
     await clickButton(env.dom.container, "确认并继续")
@@ -655,9 +685,9 @@ describe("@orahako/plugin-onboarding", () => {
     expect(env.applyPluginBundle).not.toHaveBeenCalled()
     expect(env.storeInstance.source.getSnapshot().selectedSchoolId).toBe("ysu")
 
-    expect(env.dom.container.textContent).toContain("权限")
-    expect(env.dom.container.textContent).not.toContain("选择学校")
-    expect(env.dom.container.textContent).not.toContain("更多学校")
+    expect(env.dom.container.textContent).toContain("系统权限")
+    expect(env.dom.container.textContent).not.toContain("选择你的学校")
+    expect(env.dom.container.textContent).not.toContain("探索更多学校")
     expect(env.dom.container.textContent).not.toContain("返回")
 
     await expect(env.injected.requestNotificationPermission()).resolves.toBe(true)
@@ -677,7 +707,7 @@ describe("@orahako/plugin-onboarding", () => {
     })
   })
 
-  it("restores a confirmed-but-incomplete school from persistence without offering reselection", async () => {
+  it("restores a confirmed-but-incomplete school from persistence without offering welcome or reselection", async () => {
     const storageKey = formatPluginStorageKey(ONBOARDING_PLUGIN_ID, "onboarding")
     const env = createOnboardingEnv({
       persisted: {
@@ -698,10 +728,51 @@ describe("@orahako/plugin-onboarding", () => {
     const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
     await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
 
-    expect(env.dom.container.textContent).toContain("权限")
-    expect(env.dom.container.textContent).not.toContain("选择学校")
-    expect(env.dom.container.textContent).not.toContain("更多学校")
+    expect(env.dom.container.textContent).toContain("系统权限")
+    expect(env.dom.container.textContent).not.toContain("欢迎使用酸橙盒")
+    expect(env.dom.container.textContent).not.toContain("开始之前")
+    expect(env.dom.container.textContent).not.toContain("选择你的学校")
+    expect(env.dom.container.textContent).not.toContain("探索更多学校")
     expect(env.dom.container.textContent).not.toContain("确认并继续")
     expect(env.fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("enables anonymous analytics by default in Before You Begin and records user choice", async () => {
+    const env = createOnboardingEnv({
+      analyticsEndpoint: "https://example.com/api/stats",
+    })
+    activeUnmount = env.cleanup
+
+    await vi.waitFor(() => expect(env.storeInstance.hydrated.getSnapshot()).toBe(true))
+    await vi.waitFor(() =>
+      expect(env.runtime.context.get("session")?.getSnapshot().hasHydrated).toBe(true)
+    )
+
+    const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
+    await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
+
+    await clickButton(env.dom.container, "开始设置")
+    expect(env.dom.container.textContent).toContain("开始之前")
+    expect(env.dom.container.textContent).toContain("参与匿名统计")
+
+    const switchEl = findAll(
+      env.dom.container,
+      (node) => node.attributes.get("data-slot") === "switch"
+    )[0]!
+    expect(switchEl).toBeDefined()
+    expect(switchEl.attributes.get("aria-checked")).toBe("true")
+
+    // Toggle off before continuing -> records false
+    await act(async () => {
+      const onClick = getReactProps(switchEl).onClick as
+        | ((e: { stopPropagation(): void; isPropagationStopped(): boolean }) => void)
+        | undefined
+      onClick?.({ stopPropagation() {}, isPropagationStopped: () => false })
+    })
+    expect(switchEl.attributes.get("aria-checked")).toBe("false")
+
+    await clickButton(env.dom.container, "同意并继续")
+    expect(env.setAnalyticsConsentSpy).toHaveBeenCalledWith(false)
+    expect(env.dom.container.textContent).toContain("选择你的学校")
   })
 })
