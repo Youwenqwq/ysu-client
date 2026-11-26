@@ -108,7 +108,7 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 
 - **标题加粗**：描述改动了什么、带来了什么好处
 
-**Full Changelog**: https://github.com/Youwenqwq/ysu-client/compare/v{PREV}...v{CURR}
+**Full Changelog**: https://github.com/Youwenqwq/orahako/compare/v{PREV}...v{CURR}
 ```
 
 - 分类顺序固定为：新功能 → Bug 修复 → 改进；没有内容时省略该分类。
