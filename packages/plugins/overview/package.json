@@ -1,0 +1,43 @@
+{
+  "name": "@orahako/plugin-overview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@orahako/academic-kit": "workspace:*",
+    "@orahako/academic-sdk": "workspace:*",
+    "@orahako/sdk": "workspace:*",
+    "@orahako/ui-primitives": "workspace:*",
+    "@orahako/ui-profile": "workspace:*",
+    "lucide-react": "^1.17.0"
+  },
+  "peerDependencies": {
+    "@cordisjs/core": "^3.18.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@cordisjs/core": "3.18.1",
+    "@orahako/academic-runtime": "workspace:*",
+    "@orahako/kernel": "workspace:*",
+    "@orahako/runtime-http": "workspace:*",
+    "@orahako/runtime-i18n": "workspace:*",
+    "@orahako/runtime-router": "workspace:*",
+    "@orahako/runtime-settings": "workspace:*",
+    "@orahako/runtime-slots": "workspace:*",
+    "@orahako/runtime-storage": "workspace:*",
+    "@orahako/runtime-ui": "workspace:*",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

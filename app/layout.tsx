@@ -2,21 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { TooltipProvider } from "@/components/ui/tooltip"
-import { Toaster } from "@/components/ui/sonner"
-import { I18nProvider } from "@/lib/i18n/context"
-import { SDKProvider } from "@/components/sdk-provider"
-import { ActivationGate } from "@/components/activation-gate"
-import { MFAModal } from "@/components/mfa-modal"
-import { BackgroundImage } from "@/components/background-image"
-import { BackButtonHandler } from "@/components/back-button-handler"
-import { DeepLinkHandler } from "@/components/deep-link-handler"
-import { NotifyProvider } from "@/components/notify-provider"
-import { PwaRegister } from "@/components/pwa-register"
-import { PwaUpdatePrompt } from "@/components/pwa-update-prompt"
-import { ProviderProvider } from "@/providers/provider-context"
-import { cn } from "@/lib/utils"
+import { appIdentity } from "./composition/identity"
 
 const geist = Geist({
   subsets: ["latin"],
@@ -32,17 +18,20 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "燕大终端",
-    template: "%s · 燕大终端",
+    default: appIdentity.name,
+    template: `%s · ${appIdentity.name}`,
   },
-  description:
-    "YSU Terminal — a third-party shadcn/ui client for the Yanshan University academic system.",
-  applicationName: "燕大终端",
-  authors: [{ name: "ysu-client contributors" }],
-  keywords: ["燕大终端", "YSU Terminal", "燕山大学", "YSU", "教务系统"],
+  description: appIdentity.descriptionEn,
+  applicationName: appIdentity.name,
+  authors: [{ name: "orahako contributors" }],
+  keywords: [appIdentity.name, appIdentity.nameEn],
+  icons: {
+    icon: `${process.env.NEXT_PUBLIC_APP_BASE_PATH ?? ""}/icon.svg`,
+    apple: `${process.env.NEXT_PUBLIC_APP_BASE_PATH ?? ""}/icons/icon-192.png`,
+  },
   appleWebApp: {
     capable: true,
-    title: "燕大终端",
+    title: appIdentity.name,
     statusBarStyle: "default",
   },
 }
@@ -64,31 +53,9 @@ export default function RootLayout({
     <html
       lang="zh-CN"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", geist.variable)}
+      className={`antialiased font-sans ${fontMono.variable} ${geist.variable}`}
     >
-      <body>
-        <I18nProvider>
-          <PwaRegister />
-          <PwaUpdatePrompt />
-          <ThemeProvider>
-            <ProviderProvider>
-              <ActivationGate>
-                <SDKProvider>
-                  <TooltipProvider>
-                    <BackgroundImage />
-                    <BackButtonHandler />
-                    <DeepLinkHandler />
-                    <NotifyProvider />
-                    {children}
-                    <Toaster />
-                    <MFAModal />
-                  </TooltipProvider>
-                </SDKProvider>
-              </ActivationGate>
-            </ProviderProvider>
-          </ThemeProvider>
-        </I18nProvider>
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

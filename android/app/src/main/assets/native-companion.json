@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "capabilities": [
+    {
+      "id": "native.files@1",
+      "config": {
+        "apkDirectory": "orahako_apk_update",
+        "galleryDirectory": "skbird",
+        "fileNamePrefix": "skbird"
+      }
+    },
+    {
+      "id": "native.webview@1",
+      "config": {
+        "faqUrl": "https://orahako.welain.com/faq",
+        "minimumVersion": 111,
+        "fullVersion": 119
+      }
+    },
+    {
+      "id": "native.geolocation@1",
+      "config": {
+        "timeoutMillis": 15000,
+        "maximumAgeMillis": 0
+      }
+    },
+    {
+      "id": "notifications.core@1",
+      "config": {}
+    },
+    {
+      "id": "academic.polling@1",
+      "config": {
+        "minimumIntervalMinutes": 15,
+        "defaultIntervalMinutes": 60,
+        "workNamePrefix": "orahako_polling",
+        "tagPrefix": "orahako_polling",
+        "requiresNetwork": true
+      }
+    },
+    {
+      "id": "reminders.classes@1",
+      "config": {}
+    },
+    {
+      "id": "calendar.sync@1",
+      "config": {
+        "accountName": "Orahako",
+        "calendarDisplayName": "酸橙盒 · 日程"
+      }
+    },
+    {
+      "id": "widgets.generic@1",
+      "config": {}
+    },
+    {
+      "id": "widgets.schedule@1",
+      "config": {}
+    },
+    {
+      "id": "widgets.exam@1",
+      "config": {}
+    }
+  ]
+}

@@ -1,0 +1,321 @@
+import { describe, expect, it, vi } from "vitest"
+import {
+  createObservableSource,
+  createTranslator,
+  defineDictionary,
+  defineStore,
+  resolveContributionText,
+  type PluginKeyValueStorage,
+  type PluginLocale,
+  type PluginStorageService,
+} from "@orahako/sdk"
+
+function createMemoryStorage(): {
+  service: PluginStorageService
+  localMap: Map<string, string>
+  secureMap: Map<string, string>
+} {
+  const makeBackend = (map: Map<string, string>): PluginKeyValueStorage => ({
+    async getItem(key) {
+      return map.get(key) ?? null
+    },
+    async setItem(key, value) {
+      map.set(key, value)
+    },
+    async removeItem(key) {
+      map.delete(key)
+    },
+  })
+  const localMap = new Map<string, string>()
+  const secureMap = new Map<string, string>()
+  return {
+    service: {
+      local: makeBackend(localMap),
+      secure: makeBackend(secureMap),
+    },
+    localMap,
+    secureMap,
+  }
+}
+
+describe("createObservableSource", () => {
+  it("preserves referential stability and deduplicates equal updates", () => {
+    const source = createObservableSource({ count: 1 })
+    const getRef = source.getSnapshot
+    const subRef = source.subscribe
+    expect(source.getSnapshot).toBe(getRef)
+    expect(source.subscribe).toBe(subRef)
+
+    const initialSnap = source.getSnapshot()
+    const listener = vi.fn()
+    const unsub = source.subscribe(listener)
+
+    source.set(initialSnap)
+    expect(listener).not.toHaveBeenCalled()
+
+    source.set((prev) => ({ count: prev.count + 1 }))
+    expect(listener).toHaveBeenCalledOnce()
+    expect(source.getSnapshot()).toEqual({ count: 2 })
+
+    unsub()
+    source.set({ count: 3 })
+    expect(listener).toHaveBeenCalledOnce()
+  })
+})
+
+describe("defineStore", () => {
+  const counterStore = defineStore({
+    init: () => ({ count: 0, label: "initial" }),
+    persist: {
+      key: "counter-state",
+      mode: "local",
+      version: 2,
+      migrate: (raw, version) => {
+        if (version === 1 && typeof raw === "object" && raw !== null && "value" in raw) {
+          return { count: Number(raw.value), label: "migrated" }
+        }
+        return { count: 0, label: "fallback" }
+      },
+    },
+    actions: {
+      increment(ctx, step = 1): number {
+        ctx.set((state) => ({ ...state, count: state.count + step }))
+        return ctx.get().count
+      },
+      rename(ctx, label: string) {
+        ctx.set((state) => ({ ...state, label }))
+      },
+      clear(ctx) {
+        ctx.reset()
+      },
+    },
+  })
+
+  it("creates isolated instances without module-level singletons", () => {
+    const a = counterStore.create()
+    const b = counterStore.create()
+
+    expect(a.hydrated.getSnapshot()).toBe(true)
+    expect(a.actions.increment(5)).toBe(5)
+    expect(a.source.getSnapshot().count).toBe(5)
+    expect(b.source.getSnapshot().count).toBe(0)
+
+    a.actions.clear()
+    expect(a.source.getSnapshot()).toEqual({ count: 0, label: "initial" })
+    a.dispose()
+    b.dispose()
+  })
+
+  it("hydrates asynchronously, runs migrations, and persists updates", async () => {
+    const { service, localMap } = createMemoryStorage()
+    localMap.set("counter-state", JSON.stringify({ version: 1, state: { value: 42 } }))
+
+    const instance = counterStore.create(service)
+    expect(instance.hydrated.getSnapshot()).toBe(false)
+    expect(instance.source.getSnapshot()).toEqual({ count: 0, label: "initial" })
+
+    await vi.waitFor(() => expect(instance.hydrated.getSnapshot()).toBe(true))
+    expect(instance.source.getSnapshot()).toEqual({ count: 42, label: "migrated" })
+
+    instance.actions.increment(8)
+    await vi.waitFor(() => {
+      const saved = JSON.parse(localMap.get("counter-state")!)
+      expect(saved).toEqual({ version: 2, state: { count: 50, label: "migrated" } })
+    })
+    instance.dispose()
+  })
+
+  it("does not overwrite synchronous mutations made before hydration settles", async () => {
+    const { service, localMap } = createMemoryStorage()
+    localMap.set(
+      "counter-state",
+      JSON.stringify({ version: 2, state: { count: 99, label: "old" } })
+    )
+
+    const instance = counterStore.create(service)
+    instance.actions.rename("fresh")
+    await vi.waitFor(() => expect(instance.hydrated.getSnapshot()).toBe(true))
+    expect(instance.source.getSnapshot()).toEqual({ count: 0, label: "fresh" })
+    instance.dispose()
+  })
+
+  it("supports secure persistence mode and stops mutating after dispose", async () => {
+    const secretStore = defineStore({
+      init: () => ({ token: "" }),
+      persist: { key: "secret", mode: "secure" },
+      actions: {
+        setToken(ctx, token: string) {
+          ctx.set({ token })
+        },
+      },
+    })
+    const { service, localMap, secureMap } = createMemoryStorage()
+    const instance = secretStore.create(service)
+    await vi.waitFor(() => expect(instance.hydrated.getSnapshot()).toBe(true))
+
+    instance.actions.setToken("abc")
+    await vi.waitFor(() => expect(secureMap.has("secret")).toBe(true))
+    expect(localMap.size).toBe(0)
+
+    instance.dispose()
+    instance.actions.setToken("ignored")
+    expect(instance.source.getSnapshot().token).toBe("abc")
+  })
+
+  it("drains queued persistence writes after dispose but rejects new writes", async () => {
+    const drainStore = defineStore({
+      init: () => ({ count: 0 }),
+      persist: { key: "drain", mode: "local" },
+      actions: {
+        increment(ctx) {
+          ctx.set((state) => ({ count: state.count + 1 }))
+        },
+      },
+    })
+    const setItem = vi.fn(async (_key: string, _value: string) => {})
+    const createBackend = (): PluginKeyValueStorage => ({
+      async getItem() {
+        return null
+      },
+      setItem,
+      async removeItem() {},
+    })
+    const service: PluginStorageService = { local: createBackend(), secure: createBackend() }
+
+    const instance = drainStore.create(service)
+    await vi.waitFor(() => expect(instance.hydrated.getSnapshot()).toBe(true))
+
+    instance.actions.increment()
+    instance.dispose()
+
+    await vi.waitFor(() => expect(setItem).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(setItem.mock.calls[0]![1])).toEqual({ version: 1, state: { count: 1 } })
+
+    instance.actions.increment()
+    await Promise.resolve()
+    expect(setItem).toHaveBeenCalledTimes(1)
+    expect(instance.source.getSnapshot().count).toBe(1)
+  })
+})
+
+describe("defineDictionary & typed Translator", () => {
+  const dict = defineDictionary({
+    zh: {
+      title: "课程表",
+      summary: {
+        week: "第 {n} 周",
+      },
+    },
+    en: {
+      title: "Schedule",
+      summary: {
+        week: "Week {n}",
+      },
+    },
+  })
+
+  it("narrows dot-path translation keys and interpolates parameters", () => {
+    let locale: PluginLocale = "zh"
+    const t = createTranslator(dict, () => locale)
+
+    expect(t("title")).toBe("课程表")
+    expect(t("summary.week", { n: 6 })).toBe("第 6 周")
+
+    locale = "en"
+    expect(t("title")).toBe("Schedule")
+    expect(t("summary.week", { n: 6 })).toBe("Week 6")
+
+    // Compile-time check: invalid key must fail typecheck
+    if (false) {
+      // @ts-expect-error unknown key is rejected statically
+      t("summary.missing")
+    }
+  })
+
+  it("enforces matching en shape at compile time", () => {
+    if (false) {
+      defineDictionary({
+        zh: { a: "一", nested: { b: "二" } },
+        // @ts-expect-error missing nested.b in en
+        en: { a: "one", nested: {} },
+      })
+    }
+    expect(dict.zh.title).toBe("课程表")
+  })
+})
+
+describe("resolveContributionText", () => {
+  it("resolves the contributing plugin's namespace when no dictionary is present", () => {
+    const translations: Record<string, Record<string, string>> = {
+      "feature.card": { title: "Card Balance", desc: "Live balance" },
+      "orahako.overview": { title: "Overview" },
+    }
+    const translate = vi.fn((pluginId: string, key: string) => translations[pluginId]?.[key] ?? key)
+
+    expect(
+      resolveContributionText({
+        key: "title",
+        literal: "校园卡余额",
+        fallback: "balance-card",
+        locale: "en",
+        pluginId: "feature.card",
+        i18n: { translate },
+      })
+    ).toBe("Card Balance")
+
+    // The consumer's own namespace must never be used for the contribution.
+    expect(translate).toHaveBeenCalledWith("feature.card", "title", "en")
+    expect(translate).not.toHaveBeenCalledWith(
+      "orahako.overview",
+      expect.anything(),
+      expect.anything()
+    )
+  })
+
+  it("prefers the dictionary, then literal text, the key and the final fallback", () => {
+    const dictionary = defineDictionary({
+      zh: { title: "课程表" },
+      en: { title: "Schedule" },
+    })
+    const translate = vi.fn((_pluginId: string, key: string) => key)
+
+    expect(
+      resolveContributionText({
+        dictionary,
+        key: "title",
+        literal: "课表",
+        locale: "en",
+        pluginId: "feature.schedule",
+      })
+    ).toBe("Schedule")
+
+    expect(
+      resolveContributionText({
+        key: "missing",
+        literal: "课表",
+        locale: "zh",
+        pluginId: "feature.schedule",
+        i18n: { translate },
+      })
+    ).toBe("课表")
+
+    expect(
+      resolveContributionText({
+        key: "missing",
+        fallback: "widget-id",
+        locale: "zh",
+        pluginId: "feature.schedule",
+        i18n: { translate },
+      })
+    ).toBe("missing")
+
+    expect(
+      resolveContributionText({
+        fallback: "widget-id",
+        locale: "zh",
+        pluginId: "feature.schedule",
+        i18n: { translate },
+      })
+    ).toBe("widget-id")
+  })
+})

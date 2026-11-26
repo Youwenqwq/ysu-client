@@ -1,0 +1,38 @@
+// Exam home-screen widget companion: providers, countdown renderer, layouts and
+// the `widgets.exam` capability. The generic widget host (`:native-widgets`)
+// does not depend on this module.
+
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+def deepLinkScheme = (gradle.ext.find('orahakoDeepLinkScheme') ?: 'orahako').toString()
+def deepLinkHosts = gradle.ext.find('orahakoDeepLinkHosts') ?: [:]
+def examHost = (deepLinkHosts['exams'] ?: 'exams').toString()
+
+android {
+    namespace = "me.uwen.orahako.widget.exam"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        manifestPlaceholders = [
+            orahakoDeepLinkScheme  : deepLinkScheme,
+            orahakoDeepLinkHostExam: examHost,
+        ]
+        resValue "string", "orahako_widget_exam_host", examHost
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+dependencies {
+    implementation project(':native-core')
+    implementation project(':native-widgets')
+    implementation "androidx.core:core:$androidxCoreVersion"
+
+    testImplementation "junit:junit:$junitVersion"
+    testImplementation "org.json:json:20250517"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@orahako/bundle-ysu",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./identity": "./src/identity.json",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@orahako/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@orahako/kernel": "workspace:*",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

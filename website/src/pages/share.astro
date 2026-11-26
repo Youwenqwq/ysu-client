@@ -1,0 +1,1103 @@
+---
+import Layout from "../layouts/Layout.astro"
+---
+
+<Layout title="日程 · 酸橙盒" description="酸橙盒日程分享" robots="noindex, nofollow">
+  <div class="schedule-share-root min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+    <div class="mx-auto flex max-w-6xl flex-col gap-3 px-1.5 py-3 sm:px-4 sm:py-5 md:gap-4 md:px-6 md:py-6">
+      <!-- Compact Single-Row Toolbar (matches Schedule page) -->
+      <header class="flex items-center justify-between gap-2 px-1.5 sm:px-0">
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <h1 id="share-title" class="truncate text-sm font-semibold tracking-tight sm:text-base md:text-lg">
+            &nbsp;
+          </h1>
+        </div>
+
+        <div id="week-controls" class="hidden shrink-0 items-center gap-1">
+          <button
+            id="btn-prev-week"
+            type="button"
+            class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-2xs transition hover:bg-zinc-100 active:scale-95 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 sm:h-8 sm:w-8"
+            aria-label="Prev"
+          >
+            <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <select
+            id="week-select"
+            aria-label="Week"
+            class="h-7 max-w-[6.5rem] rounded-lg border border-zinc-200 bg-white px-1.5 text-xs font-medium text-zinc-800 shadow-2xs outline-none transition focus:border-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400 sm:h-8 sm:max-w-none sm:px-2"
+          ></select>
+          <button
+            id="btn-current-week"
+            type="button"
+            class="hidden h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-zinc-900 px-2 text-xs font-medium text-white transition hover:bg-zinc-800 active:scale-95 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 sm:h-8 sm:px-2.5"
+          ></button>
+          <button
+            id="btn-next-week"
+            type="button"
+            class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-2xs transition hover:bg-zinc-100 active:scale-95 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 sm:h-8 sm:w-8"
+            aria-label="Next"
+          >
+            <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Loading Skeleton -->
+      <section
+        id="share-loading"
+        class="flex flex-col gap-2 rounded-xl border border-zinc-200/80 bg-white p-3 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <div class="grid grid-cols-8 gap-1.5">
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+        </div>
+        <div class="h-[480px] animate-pulse rounded-lg bg-zinc-100/70 dark:bg-zinc-800/50"></div>
+      </section>
+
+      <!-- Error / Expired State -->
+      <section
+        id="share-error"
+        class="hidden flex-col items-center justify-center gap-2 rounded-xl border border-zinc-200/80 bg-white px-6 py-20 text-center shadow-2xs dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <h2 id="share-error-title" class="text-sm font-medium text-zinc-600 dark:text-zinc-300"></h2>
+      </section>
+
+      <!-- Schedule Grid (Mobile + Desktop adaptive, no horizontal scroll needed) -->
+      <main id="share-main" class="hidden touch-pan-y">
+        <div
+          id="schedule-card"
+          class="overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-2xs will-change-transform dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <div
+            id="timetable-header"
+            class="grid grid-cols-[2.75rem_repeat(7,minmax(0,1fr))] border-b border-zinc-200/80 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/80 md:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]"
+          ></div>
+          <div
+            id="timetable-body"
+            class="relative grid grid-cols-[2.75rem_repeat(7,minmax(0,1fr))] md:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]"
+          ></div>
+        </div>
+      </main>
+
+      <!-- Bottom-right attribution only -->
+      <footer class="flex justify-end px-1.5 pt-0.5 sm:px-0">
+        <a
+          id="share-attribution"
+          href="https://github.com/Youwenqwq/orahako"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-xs text-zinc-400 transition hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
+        >
+          由 酸橙盒 生成
+        </a>
+      </footer>
+    </div>
+
+    <!-- Detail Modal -->
+    <div
+      id="detail-modal"
+      class="share-modal-backdrop fixed inset-0 z-50 hidden items-end justify-center bg-black/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        id="detail-modal-card"
+        class="share-modal-card w-full max-w-sm rounded-t-2xl border border-zinc-200 bg-white p-5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 sm:rounded-2xl"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0 space-y-1">
+            <span
+              id="detail-category"
+              class="inline-block rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            ></span>
+            <h3 id="detail-title" class="text-base font-semibold leading-snug"></h3>
+          </div>
+          <button
+            id="detail-close"
+            type="button"
+            class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+        <dl id="detail-rows" class="mt-4 space-y-2 text-xs"></dl>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .schedule-share-root {
+      --schedule-1: oklch(0.88 0.06 148);
+      --schedule-2: oklch(0.94 0.03 153);
+      --schedule-3: oklch(0.95 0.06 99);
+      --schedule-4: oklch(0.93 0.04 60);
+      --schedule-5: oklch(0.88 0.06 11);
+      --schedule-6: oklch(0.88 0.05 308);
+      --schedule-7: oklch(0.88 0.05 254);
+      --schedule-8: oklch(0.88 0.06 241);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .schedule-share-root {
+        --schedule-1: oklch(0.26 0.08 148);
+        --schedule-2: oklch(0.35 0.04 153);
+        --schedule-3: oklch(0.36 0.07 99);
+        --schedule-4: oklch(0.34 0.04 60);
+        --schedule-5: oklch(0.26 0.08 11);
+        --schedule-6: oklch(0.31 0.06 308);
+        --schedule-7: oklch(0.31 0.06 254);
+        --schedule-8: oklch(0.25 0.09 241);
+      }
+    }
+
+    :global(.bg-schedule-1) { background-color: var(--schedule-1); }
+    :global(.bg-schedule-2) { background-color: var(--schedule-2); }
+    :global(.bg-schedule-3) { background-color: var(--schedule-3); }
+    :global(.bg-schedule-4) { background-color: var(--schedule-4); }
+    :global(.bg-schedule-5) { background-color: var(--schedule-5); }
+    :global(.bg-schedule-6) { background-color: var(--schedule-6); }
+    :global(.bg-schedule-7) { background-color: var(--schedule-7); }
+    :global(.bg-schedule-8) { background-color: var(--schedule-8); }
+
+    @keyframes share-fade-up {
+      from {
+        opacity: 0;
+        transform: translate3d(0, 8px, 0);
+      }
+      to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+      }
+    }
+
+    .share-enter {
+      animation: share-fade-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .share-modal-backdrop {
+      opacity: 0;
+      transition: opacity 180ms ease;
+    }
+
+    .share-modal-backdrop[data-open="true"] {
+      opacity: 1;
+    }
+
+    .share-modal-card {
+      transform: translate3d(0, 18px, 0) scale(0.98);
+      opacity: 0;
+      transition:
+        transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 180ms ease;
+    }
+
+    .share-modal-backdrop[data-open="true"] .share-modal-card {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 1;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .share-enter,
+      .share-modal-backdrop,
+      .share-modal-card {
+        animation: none;
+        transition: none;
+      }
+    }
+  </style>
+
+  <script>
+    interface SharedPeriod {
+      section: number
+      startTime: string
+      endTime: string
+    }
+
+    interface SharedItem {
+      title: string
+      location?: string
+      subtitle?: string
+      category: "course" | "event" | "exam" | "busy"
+      date?: string
+      weekDay: number
+      weekList?: number[]
+      startSection?: number
+      endSection?: number
+      startTime?: string
+      endTime?: string
+    }
+
+    interface SharedPayload {
+      version: 1
+      title: string
+      masked?: boolean
+      semester?: string
+      termStartDate?: string
+      totalWeeks: number
+      allowedWeeks?: number[]
+      timeZone?: string
+      periods: SharedPeriod[]
+      items: SharedItem[]
+      createdAt: number
+    }
+
+    type Locale = "zh" | "en"
+
+    function detectLocale(): Locale {
+      const langs =
+        Array.isArray(navigator.languages) && navigator.languages.length > 0
+          ? navigator.languages
+          : [navigator.language || "en"]
+      for (const lang of langs) {
+        if (typeof lang === "string" && lang.toLowerCase().startsWith("zh")) {
+          return "zh"
+        }
+      }
+      return "en"
+    }
+
+    const I18N = {
+      zh: {
+        brand: "酸橙盒",
+        attribution: "由 酸橙盒 生成",
+        scheduleSuffix: "日程",
+        defaultTitle: "日程",
+        thisWeek: "本周",
+        weekOption: (w: number, isCurrent: boolean) => (isCurrent ? `第${w}周 · 本周` : `第${w}周`),
+        weekdays: ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
+        weekdaysCompact: ["一", "二", "三", "四", "五", "六", "日"],
+        catCourse: "课程",
+        catExam: "考试",
+        catEvent: "日程",
+        catBusy: "忙碌",
+        rowTime: "时间",
+        rowLocation: "地点",
+        rowSubtitle: "教师 / 备注",
+        rowWeeks: "周次",
+        sectionSingle: (s: number) => `第 ${s} 节`,
+        sectionRange: (a: number, b: number) => `第 ${a}-${b} 节`,
+        weeksValue: (list: number[]) => `第 ${list.join("、")} 周`,
+        errUnavailable: "链接已失效或不存在",
+        errMissing: "链接无效",
+        errNetwork: "加载失败，请稍后重试",
+        prevAria: "上一周",
+        nextAria: "下一周",
+        closeAria: "关闭",
+      },
+      en: {
+        brand: "Orahako",
+        attribution: "Generated by Orahako",
+        scheduleSuffix: "Schedule",
+        defaultTitle: "Schedule",
+        thisWeek: "Now",
+        weekOption: (w: number, isCurrent: boolean) => (isCurrent ? `W${w} · Now` : `W${w}`),
+        weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        weekdaysCompact: ["M", "T", "W", "T", "F", "S", "S"],
+        catCourse: "Course",
+        catExam: "Exam",
+        catEvent: "Event",
+        catBusy: "Busy",
+        rowTime: "Time",
+        rowLocation: "Location",
+        rowSubtitle: "Teacher / Note",
+        rowWeeks: "Weeks",
+        sectionSingle: (s: number) => `Period ${s}`,
+        sectionRange: (a: number, b: number) => `Periods ${a}-${b}`,
+        weeksValue: (list: number[]) => `W${list.join(", ")}`,
+        errUnavailable: "Link expired or not found",
+        errMissing: "Invalid link",
+        errNetwork: "Failed to load",
+        prevAria: "Previous week",
+        nextAria: "Next week",
+        closeAria: "Close",
+      },
+    } as const
+
+    const locale = detectLocale()
+    const dict = I18N[locale]
+    document.documentElement.lang = locale === "zh" ? "zh-CN" : "en"
+
+    const COURSE_BG_CLASSES = [
+      "bg-schedule-1",
+      "bg-schedule-2",
+      "bg-schedule-3",
+      "bg-schedule-4",
+      "bg-schedule-5",
+      "bg-schedule-6",
+      "bg-schedule-7",
+      "bg-schedule-8",
+    ] as const
+
+    function hashIndex(key: string): number {
+      let hash = 0
+      for (let i = 0; i < key.length; i += 1) {
+        hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0
+      }
+      return (hash >>> 0) % COURSE_BG_CLASSES.length
+    }
+
+    function buildCourseColorMap(items: SharedItem[]): Map<string, number> {
+      const keys = new Set<string>()
+      for (const item of items) {
+        if (item.category === "course") keys.add(item.title)
+      }
+      const used = new Array<boolean>(COURSE_BG_CLASSES.length).fill(false)
+      const map = new Map<string, number>()
+      for (const key of [...keys].sort()) {
+        const preferred = hashIndex(key)
+        let index = used[preferred] ? -1 : preferred
+        if (index < 0) {
+          for (let i = 0; i < COURSE_BG_CLASSES.length; i += 1) {
+            if (!used[i]) {
+              index = i
+              break
+            }
+          }
+        }
+        if (index < 0) index = preferred
+        used[index] = true
+        map.set(key, index)
+      }
+      return map
+    }
+
+    function parseIsoDate(iso: string): Date | null {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+      if (!m) return null
+      return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0)
+    }
+
+    function formatIsoDate(date: Date): string {
+      const y = date.getFullYear()
+      const m = String(date.getMonth() + 1).padStart(2, "0")
+      const d = String(date.getDate()).padStart(2, "0")
+      return `${y}-${m}-${d}`
+    }
+
+    function addDays(base: Date, days: number): Date {
+      const copy = new Date(base.getTime())
+      copy.setDate(copy.getDate() + days)
+      return copy
+    }
+
+    function parseClockMinutes(time: string | undefined): number | null {
+      if (!time) return null
+      const m = /^(\d{1,2}):(\d{2})/.exec(time.trim())
+      if (!m) return null
+      const h = Number(m[1])
+      const min = Number(m[2])
+      if (h > 23 || min > 59) return null
+      return h * 60 + min
+    }
+
+    function computeCurrentWeek(termStartDate: string | undefined, totalWeeks: number): number {
+      if (!termStartDate) return 1
+      const start = parseIsoDate(termStartDate)
+      if (!start) return 1
+      const today = new Date()
+      const todayNoon = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0)
+      const diffDays = Math.floor((todayNoon.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
+      const week = Math.floor(diffDays / 7) + 1
+      return Math.min(Math.max(1, week), Math.max(1, totalWeeks))
+    }
+
+    function categoryLabel(category: SharedItem["category"]): string {
+      if (category === "busy") return dict.catBusy
+      if (category === "exam") return dict.catExam
+      if (category === "event") return dict.catEvent
+      return dict.catCourse
+    }
+
+    function itemAppliesToWeek(
+      item: SharedItem,
+      week: number,
+      weekStartIso: string | null,
+      weekEndIso: string | null
+    ): boolean {
+      if (item.date) {
+        if (!weekStartIso || !weekEndIso) return true
+        return item.date >= weekStartIso && item.date <= weekEndIso
+      }
+      if (Array.isArray(item.weekList) && item.weekList.length > 0) {
+        return item.weekList.includes(week)
+      }
+      return true
+    }
+
+    interface TimedPeriod {
+      section: number
+      startMin: number
+      endMin: number
+    }
+
+    function minuteToGridY(
+      minute: number,
+      timedPeriods: TimedPeriod[],
+      maxSection: number,
+      rowHeight: number
+    ): number {
+      if (timedPeriods.length === 0) {
+        const clamped = Math.min(22 * 60, Math.max(8 * 60, minute))
+        return ((clamped - 8 * 60) / (14 * 60)) * (maxSection * rowHeight)
+      }
+      const first = timedPeriods[0]!
+      if (minute <= first.startMin) {
+        return (first.section - 1) * rowHeight
+      }
+      for (let i = 0; i < timedPeriods.length; i += 1) {
+        const p = timedPeriods[i]!
+        const topY = (p.section - 1) * rowHeight
+        const bottomY = p.section * rowHeight
+        if (minute <= p.endMin) {
+          const span = Math.max(1, p.endMin - p.startMin)
+          const ratio = Math.min(1, Math.max(0, (minute - p.startMin) / span))
+          return topY + ratio * rowHeight
+        }
+        const next = timedPeriods[i + 1]
+        if (next && minute < next.startMin) {
+          const gap = Math.max(1, next.startMin - p.endMin)
+          const ratio = (minute - p.endMin) / gap
+          const nextTopY = (next.section - 1) * rowHeight
+          return bottomY + ratio * Math.max(0, nextTopY - bottomY)
+        }
+      }
+      const last = timedPeriods[timedPeriods.length - 1]!
+      return last.section * rowHeight
+    }
+
+    interface PositionedCard {
+      item: SharedItem
+      top: number
+      bottom: number
+      col: number
+      totalCols: number
+    }
+
+    function layoutDayCards(
+      items: SharedItem[],
+      timedPeriods: TimedPeriod[],
+      maxSection: number,
+      rowHeight: number
+    ): PositionedCard[] {
+      const totalHeight = maxSection * rowHeight
+      const raw: PositionedCard[] = []
+
+      for (const item of items) {
+        let top = 0
+        let bottom = rowHeight
+        if (
+          typeof item.startSection === "number" &&
+          typeof item.endSection === "number" &&
+          item.startSection >= 1 &&
+          item.endSection >= item.startSection
+        ) {
+          top = (item.startSection - 1) * rowHeight + 2
+          bottom = item.endSection * rowHeight - 2
+        } else {
+          const sMin = parseClockMinutes(item.startTime)
+          const eMin = parseClockMinutes(item.endTime)
+          if (sMin === null) continue
+          const effectiveEnd = eMin !== null && eMin > sMin ? eMin : sMin + 45
+          top = Math.max(2, minuteToGridY(sMin, timedPeriods, maxSection, rowHeight) + 2)
+          bottom = Math.min(
+            totalHeight - 2,
+            Math.max(
+              top + rowHeight * 0.72,
+              minuteToGridY(effectiveEnd, timedPeriods, maxSection, rowHeight) - 2
+            )
+          )
+        }
+        raw.push({ item, top, bottom, col: 0, totalCols: 1 })
+      }
+
+      raw.sort((a, b) => a.top - b.top || b.bottom - a.bottom)
+
+      let cluster: PositionedCard[] = []
+      let clusterMaxBottom = -1
+
+      const flushCluster = () => {
+        if (cluster.length === 0) return
+        const colEnds: number[] = []
+        for (const card of cluster) {
+          let assigned = -1
+          for (let c = 0; c < colEnds.length; c += 1) {
+            if (colEnds[c]! <= card.top + 1) {
+              assigned = c
+              break
+            }
+          }
+          if (assigned === -1) {
+            assigned = colEnds.length
+            colEnds.push(card.bottom)
+          } else {
+            colEnds[assigned] = card.bottom
+          }
+          card.col = assigned
+        }
+        const total = Math.max(1, colEnds.length)
+        for (const card of cluster) {
+          card.totalCols = total
+        }
+        cluster = []
+        clusterMaxBottom = -1
+      }
+
+      for (const card of raw) {
+        if (cluster.length > 0 && card.top >= clusterMaxBottom - 1) {
+          flushCluster()
+        }
+        cluster.push(card)
+        clusterMaxBottom = Math.max(clusterMaxBottom, card.bottom)
+      }
+      flushCluster()
+
+      return raw
+    }
+
+    const titleEl = document.getElementById("share-title")!
+    const weekControlsEl = document.getElementById("week-controls")!
+    const prevBtn = document.getElementById("btn-prev-week") as HTMLButtonElement
+    const nextBtn = document.getElementById("btn-next-week") as HTMLButtonElement
+    const currentWeekBtn = document.getElementById("btn-current-week") as HTMLButtonElement
+    const weekSelect = document.getElementById("week-select") as HTMLSelectElement
+    const loadingEl = document.getElementById("share-loading")!
+    const errorEl = document.getElementById("share-error")!
+    const errorTitleEl = document.getElementById("share-error-title")!
+    const mainEl = document.getElementById("share-main")!
+    const scheduleCardEl = document.getElementById("schedule-card")!
+    const headerGridEl = document.getElementById("timetable-header")!
+    const bodyGridEl = document.getElementById("timetable-body")!
+    const attributionEl = document.getElementById("share-attribution")!
+
+    let suppressCardClickUntil = 0
+
+    function displayItemTitle(item: SharedItem): string {
+      return item.category === "busy" ? dict.catBusy : item.title
+    }
+
+    const detailModalEl = document.getElementById("detail-modal")!
+    const detailCloseEl = document.getElementById("detail-close")!
+    const detailCategoryEl = document.getElementById("detail-category")!
+    const detailTitleEl = document.getElementById("detail-title")!
+    const detailRowsEl = document.getElementById("detail-rows")!
+
+    attributionEl.textContent = dict.attribution
+    currentWeekBtn.textContent = dict.thisWeek
+    prevBtn.setAttribute("aria-label", dict.prevAria)
+    nextBtn.setAttribute("aria-label", dict.nextAria)
+    detailCloseEl.setAttribute("aria-label", dict.closeAria)
+
+    function showError(message: string): void {
+      loadingEl.classList.add("hidden")
+      mainEl.classList.add("hidden")
+      weekControlsEl.classList.add("hidden")
+      errorEl.classList.remove("hidden")
+      errorEl.classList.add("flex")
+      titleEl.textContent = dict.defaultTitle
+      errorTitleEl.textContent = message
+    }
+
+    function openDetail(item: SharedItem): void {
+      if (Date.now() < suppressCardClickUntil) return
+      detailCategoryEl.textContent = categoryLabel(item.category)
+      detailTitleEl.textContent = displayItemTitle(item)
+      detailRowsEl.replaceChildren()
+
+      const addRow = (label: string, value: string) => {
+        const row = document.createElement("div")
+        row.className =
+          "flex items-start justify-between gap-3 border-t border-zinc-100 pt-2 dark:border-zinc-800"
+        const dt = document.createElement("dt")
+        dt.className = "shrink-0 text-zinc-500 dark:text-zinc-400"
+        dt.textContent = label
+        const dd = document.createElement("dd")
+        dd.className = "text-right font-medium text-zinc-900 dark:text-zinc-100"
+        dd.textContent = value
+        row.append(dt, dd)
+        detailRowsEl.append(row)
+      }
+
+      const dayLabel = dict.weekdays[(item.weekDay - 1) % 7] ?? ""
+      const sectionLabel =
+        item.startSection && item.endSection
+          ? item.startSection === item.endSection
+            ? dict.sectionSingle(item.startSection)
+            : dict.sectionRange(item.startSection, item.endSection)
+          : ""
+      const timeRange =
+        item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : ""
+      addRow(
+        dict.rowTime,
+        [item.date || dayLabel, sectionLabel, timeRange].filter(Boolean).join(" · ")
+      )
+      if (item.location) addRow(dict.rowLocation, item.location)
+      if (item.subtitle) addRow(dict.rowSubtitle, item.subtitle)
+      if (item.weekList && item.weekList.length > 0) {
+        addRow(dict.rowWeeks, dict.weeksValue(item.weekList))
+      }
+
+      detailModalEl.classList.remove("hidden")
+      detailModalEl.classList.add("flex")
+      requestAnimationFrame(() => {
+        detailModalEl.dataset.open = "true"
+      })
+    }
+
+    let modalCloseTimer: number | undefined
+    function closeDetail(): void {
+      detailModalEl.dataset.open = "false"
+      window.clearTimeout(modalCloseTimer)
+      modalCloseTimer = window.setTimeout(() => {
+        if (detailModalEl.dataset.open !== "true") {
+          detailModalEl.classList.add("hidden")
+          detailModalEl.classList.remove("flex")
+        }
+      }, 190)
+    }
+
+    detailCloseEl.addEventListener("click", closeDetail)
+    detailModalEl.addEventListener("click", (event) => {
+      if (event.target === detailModalEl) closeDetail()
+    })
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeDetail()
+    })
+
+    const mobileQuery = window.matchMedia("(max-width: 767px)")
+
+    function renderWeek(
+      payload: SharedPayload,
+      colorMap: Map<string, number>,
+      availableWeeks: number[],
+      week: number,
+      currentWeek: number
+    ): void {
+      const isMobile = mobileQuery.matches
+      const rowHeight = 56
+
+      const periods =
+        payload.periods.length > 0
+          ? [...payload.periods].sort((a, b) => a.section - b.section)
+          : Array.from({ length: 12 }, (_, idx) => ({
+              section: idx + 1,
+              startTime: "",
+              endTime: "",
+            }))
+      const maxSection = Math.max(
+        periods.length,
+        ...periods.map((p) => p.section),
+        ...payload.items.map((i) => i.endSection ?? 0),
+        10
+      )
+      const periodBySection = new Map(periods.map((p) => [p.section, p]))
+      const timedPeriods: TimedPeriod[] = periods
+        .map((p) => {
+          const s = parseClockMinutes(p.startTime)
+          const e = parseClockMinutes(p.endTime)
+          return s !== null && e !== null && e > s
+            ? { section: p.section, startMin: s, endMin: e }
+            : null
+        })
+        .filter((p): p is TimedPeriod => p !== null)
+
+      const termStart = payload.termStartDate ? parseIsoDate(payload.termStartDate) : null
+      const weekMonday = termStart ? addDays(termStart, (week - 1) * 7) : null
+      const weekStartIso = weekMonday ? formatIsoDate(weekMonday) : null
+      const weekEndIso = weekMonday ? formatIsoDate(addDays(weekMonday, 6)) : null
+      const todayIso = formatIsoDate(new Date())
+
+      // Header row
+      headerGridEl.replaceChildren()
+      const corner = document.createElement("div")
+      corner.className =
+        "flex items-center justify-center border-r border-zinc-200/70 py-2 text-[10px] font-medium text-zinc-400 dark:border-zinc-800 md:text-xs"
+      corner.textContent = weekMonday ? `${weekMonday.getMonth() + 1}月` : ""
+      if (locale === "en" && weekMonday) {
+        corner.textContent = weekMonday.toLocaleString("en-US", { month: "short" })
+      }
+      headerGridEl.append(corner)
+
+      for (let day = 1; day <= 7; day += 1) {
+        const cell = document.createElement("div")
+        const dayDate = weekMonday ? addDays(weekMonday, day - 1) : null
+        const dayIso = dayDate ? formatIsoDate(dayDate) : null
+        const isToday = dayIso === todayIso
+
+        cell.className =
+          "flex flex-col items-center justify-center border-r border-zinc-100 py-1.5 text-center last:border-r-0 dark:border-zinc-800/70 md:py-2" +
+          (isToday ? " bg-zinc-900/[0.06] dark:bg-zinc-100/[0.08]" : "")
+
+        const label = document.createElement("span")
+        label.className =
+          "text-[11px] font-medium md:text-xs " +
+          (isToday
+            ? "font-semibold text-zinc-950 dark:text-white"
+            : "text-zinc-600 dark:text-zinc-300")
+        label.textContent = isMobile ? dict.weekdaysCompact[day - 1]! : dict.weekdays[day - 1]!
+        cell.append(label)
+
+        if (dayDate) {
+          const dateSpan = document.createElement("span")
+          dateSpan.className =
+            "mt-0.5 text-[10px] " +
+            (isToday
+              ? "font-medium text-zinc-900 dark:text-zinc-100"
+              : "text-zinc-400 dark:text-zinc-500")
+          dateSpan.textContent = `${dayDate.getMonth() + 1}/${dayDate.getDate()}`
+          cell.append(dateSpan)
+        }
+        headerGridEl.append(cell)
+      }
+
+      // Grid body
+      bodyGridEl.replaceChildren()
+      const totalHeight = maxSection * rowHeight
+
+      // Period sidebar
+      const timeCol = document.createElement("div")
+      timeCol.className = "border-r border-zinc-200/70 dark:border-zinc-800"
+      for (let section = 1; section <= maxSection; section += 1) {
+        const period = periodBySection.get(section)
+        const cell = document.createElement("div")
+        cell.style.height = `${rowHeight}px`
+        cell.className =
+          "flex flex-col items-center justify-center border-b border-zinc-100 px-0.5 text-center last:border-b-0 dark:border-zinc-800/70 md:px-1"
+
+        const num = document.createElement("span")
+        num.className = "text-[11px] font-medium text-zinc-600 dark:text-zinc-300 md:text-xs"
+        num.textContent = String(section)
+        cell.append(num)
+
+        if (period?.startTime) {
+          const time = document.createElement("span")
+          time.className = "text-[9px] leading-tight text-zinc-400 dark:text-zinc-500 md:text-[10px]"
+          time.textContent = period.startTime
+          cell.append(time)
+        }
+        if (period?.endTime) {
+          const endTime = document.createElement("span")
+          endTime.className = "text-[9px] leading-tight text-zinc-400/80 dark:text-zinc-500/80 md:text-[10px]"
+          endTime.textContent = period.endTime
+          cell.append(endTime)
+        }
+        timeCol.append(cell)
+      }
+      bodyGridEl.append(timeCol)
+
+      // All week items (courses, exams, personal events) directly inside the timetable grid
+      const weekItems = payload.items.filter((item) =>
+        itemAppliesToWeek(item, week, weekStartIso, weekEndIso)
+      )
+
+      for (let day = 1; day <= 7; day += 1) {
+        const dayDate = weekMonday ? addDays(weekMonday, day - 1) : null
+        const isToday = dayDate ? formatIsoDate(dayDate) === todayIso : false
+
+        const col = document.createElement("div")
+        col.style.height = `${totalHeight}px`
+        col.className =
+          "relative border-r border-zinc-100 last:border-r-0 dark:border-zinc-800/60" +
+          (isToday ? " bg-zinc-900/[0.025] dark:bg-zinc-100/[0.03]" : "")
+
+        for (let section = 1; section <= maxSection; section += 1) {
+          const line = document.createElement("div")
+          line.style.height = `${rowHeight}px`
+          line.className = "border-b border-zinc-100/90 last:border-b-0 dark:border-zinc-800/50"
+          col.append(line)
+        }
+
+        const dayItems = weekItems.filter((item) => item.weekDay === day)
+        const positioned = layoutDayCards(dayItems, timedPeriods, maxSection, rowHeight)
+
+        for (const card of positioned) {
+          const { item, top, bottom, col: cardCol, totalCols } = card
+          const btn = document.createElement("button")
+          btn.type = "button"
+          btn.style.top = `${top}px`
+          btn.style.height = `${Math.max(30, bottom - top)}px`
+          const pad = isMobile ? 1.5 : 3
+          const widthPct = 100 / totalCols
+          btn.style.left = `calc(${cardCol * widthPct}% + ${pad}px)`
+          btn.style.width = `calc(${widthPct}% - ${pad * 2}px)`
+
+          let styleClass = ""
+          if (item.category === "busy") {
+            styleClass =
+              "bg-zinc-200/80 text-zinc-700 ring-1 ring-inset ring-zinc-300/80 dark:bg-zinc-800/85 dark:text-zinc-200 dark:ring-zinc-700/80"
+          } else if (item.category === "exam") {
+            styleClass =
+              "z-10 bg-amber-500/15 text-amber-950 ring-1 ring-inset ring-amber-500/50 dark:text-amber-100"
+          } else if (item.category === "event") {
+            styleClass =
+              "z-10 bg-indigo-500/12 text-indigo-950 ring-1 ring-inset ring-indigo-500/45 dark:text-indigo-100"
+          } else {
+            const idx = colorMap.get(item.title) ?? hashIndex(item.title)
+            styleClass = `${COURSE_BG_CLASSES[idx]} text-zinc-900 dark:text-zinc-100`
+          }
+
+          btn.className =
+            "absolute flex flex-col justify-start overflow-hidden rounded-lg p-1 text-left transition hover:brightness-95 active:scale-[0.98] md:rounded-xl md:p-1.5 " +
+            styleClass
+
+          const titleSpan = document.createElement("span")
+          titleSpan.className =
+            "line-clamp-3 break-words text-[10px] font-medium leading-[1.2] md:line-clamp-2 md:text-xs md:leading-snug " +
+            (item.category === "exam"
+              ? "text-amber-700 dark:text-amber-300"
+              : item.category === "event"
+                ? "text-indigo-700 dark:text-indigo-300"
+                : "")
+          titleSpan.textContent = displayItemTitle(item)
+          btn.append(titleSpan)
+
+          if (item.location) {
+            const locSpan = document.createElement("span")
+            locSpan.className =
+              "mt-0.5 line-clamp-2 break-words text-[9px] leading-tight opacity-75 md:text-[11px]"
+            locSpan.textContent = item.location
+            btn.append(locSpan)
+          } else if (
+            (item.category === "exam" || item.category === "event") &&
+            item.startTime &&
+            item.endTime
+          ) {
+            const timeSpan = document.createElement("span")
+            timeSpan.className = "mt-0.5 truncate text-[9px] leading-tight opacity-75 md:text-[11px]"
+            timeSpan.textContent = `${item.startTime}-${item.endTime}`
+            btn.append(timeSpan)
+          }
+
+          btn.addEventListener("click", () => openDetail(item))
+          col.append(btn)
+        }
+
+        bodyGridEl.append(col)
+      }
+
+      // Sync controls
+      const weekIdx = availableWeeks.indexOf(week)
+      weekSelect.value = String(week)
+      prevBtn.disabled = weekIdx <= 0
+      nextBtn.disabled = weekIdx < 0 || weekIdx >= availableWeeks.length - 1
+      const singleWeek = availableWeeks.length <= 1
+      prevBtn.classList.toggle("hidden", singleWeek)
+      nextBtn.classList.toggle("hidden", singleWeek)
+      if (payload.termStartDate && week !== currentWeek && availableWeeks.includes(currentWeek)) {
+        currentWeekBtn.classList.remove("hidden")
+        currentWeekBtn.classList.add("inline-flex")
+      } else {
+        currentWeekBtn.classList.add("hidden")
+        currentWeekBtn.classList.remove("inline-flex")
+      }
+    }
+
+    async function init(): Promise<void> {
+      const params = new URLSearchParams(window.location.search)
+      const shareId = (params.get("id") || "").trim()
+      if (!shareId) {
+        showError(dict.errMissing)
+        return
+      }
+
+      try {
+        const res = await fetch(`/api/share?id=${encodeURIComponent(shareId)}`)
+        if (res.status === 404 || res.status === 400) {
+          showError(dict.errUnavailable)
+          return
+        }
+        if (!res.ok) {
+          showError(dict.errNetwork)
+          return
+        }
+
+        const data = (await res.json()) as {
+          payload?: SharedPayload
+        }
+        const payload = data.payload
+        if (!payload || payload.version !== 1 || !Array.isArray(payload.items)) {
+          showError(dict.errUnavailable)
+          return
+        }
+
+        const displayTitle = payload.semester
+          ? `${payload.semester} ${dict.scheduleSuffix}`
+          : dict.defaultTitle
+        document.title = `${displayTitle} · ${dict.brand}`
+        titleEl.textContent = displayTitle
+
+        const colorMap = buildCourseColorMap(payload.items)
+        const totalWeeks = Math.max(1, payload.totalWeeks || 20)
+        const availableWeeks =
+          Array.isArray(payload.allowedWeeks) && payload.allowedWeeks.length > 0
+            ? [...new Set(payload.allowedWeeks.filter((w) => Number.isInteger(w) && w >= 1))].sort(
+                (a, b) => a - b
+              )
+            : Array.from({ length: totalWeeks }, (_, idx) => idx + 1)
+        const currentWeek = computeCurrentWeek(payload.termStartDate, totalWeeks)
+        let activeWeek = availableWeeks.includes(currentWeek)
+          ? currentWeek
+          : (availableWeeks[0] ?? 1)
+
+        weekSelect.replaceChildren()
+        for (const w of availableWeeks) {
+          const opt = document.createElement("option")
+          opt.value = String(w)
+          opt.textContent = dict.weekOption(w, Boolean(payload.termStartDate && w === currentWeek))
+          weekSelect.append(opt)
+        }
+        weekSelect.disabled = availableWeeks.length <= 1
+
+        const animateWeekTransition = (dir: -1 | 0 | 1) => {
+          if (dir === 0) return
+          scheduleCardEl.style.transition = "none"
+          scheduleCardEl.style.transform = `translate3d(${dir * 22}px, 0, 0)`
+          scheduleCardEl.style.opacity = "0.72"
+          void scheduleCardEl.offsetWidth
+          scheduleCardEl.style.transition =
+            "transform 230ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease"
+          scheduleCardEl.style.transform = "translate3d(0, 0, 0)"
+          scheduleCardEl.style.opacity = "1"
+        }
+
+        const setWeek = (next: number, animateDir: -1 | 0 | 1 = 0) => {
+          const target = availableWeeks.includes(next) ? next : (availableWeeks[0] ?? 1)
+          const prev = activeWeek
+          activeWeek = target
+          renderWeek(payload, colorMap, availableWeeks, activeWeek, currentWeek)
+          if (animateDir !== 0 && target !== prev) {
+            animateWeekTransition(animateDir)
+          }
+        }
+
+        const stepWeek = (delta: -1 | 1) => {
+          const idx = availableWeeks.indexOf(activeWeek)
+          const nextIdx = idx + delta
+          if (nextIdx >= 0 && nextIdx < availableWeeks.length) {
+            setWeek(availableWeeks[nextIdx]!, delta)
+          }
+        }
+
+        prevBtn.addEventListener("click", () => stepWeek(-1))
+        nextBtn.addEventListener("click", () => stepWeek(1))
+        currentWeekBtn.addEventListener("click", () =>
+          setWeek(currentWeek, currentWeek > activeWeek ? 1 : currentWeek < activeWeek ? -1 : 0)
+        )
+        weekSelect.addEventListener("change", () => {
+          const next = Number(weekSelect.value)
+          setWeek(next, next > activeWeek ? 1 : next < activeWeek ? -1 : 0)
+        })
+        mobileQuery.addEventListener("change", () =>
+          renderWeek(payload, colorMap, availableWeeks, activeWeek, currentWeek)
+        )
+
+        // Mobile horizontal swipe gesture to switch weeks
+        let touchState: {
+          startX: number
+          startY: number
+          startTime: number
+          dx: number
+          locked: "x" | "y" | null
+        } | null = null
+
+        const resetCardTransform = (animate: boolean) => {
+          scheduleCardEl.style.transition = animate
+            ? "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease"
+            : "none"
+          scheduleCardEl.style.transform = "translate3d(0, 0, 0)"
+          scheduleCardEl.style.opacity = "1"
+        }
+
+        mainEl.addEventListener(
+          "touchstart",
+          (event) => {
+            if (event.touches.length !== 1 || availableWeeks.length <= 1) return
+            const t = event.touches[0]!
+            touchState = {
+              startX: t.clientX,
+              startY: t.clientY,
+              startTime: Date.now(),
+              dx: 0,
+              locked: null,
+            }
+            scheduleCardEl.style.transition = "none"
+          },
+          { passive: true }
+        )
+
+        mainEl.addEventListener(
+          "touchmove",
+          (event) => {
+            if (!touchState || event.touches.length !== 1) return
+            const t = event.touches[0]!
+            const dx = t.clientX - touchState.startX
+            const dy = t.clientY - touchState.startY
+            if (!touchState.locked) {
+              if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return
+              touchState.locked = Math.abs(dx) > Math.abs(dy) * 1.2 ? "x" : "y"
+            }
+            if (touchState.locked !== "x") return
+
+            touchState.dx = dx
+            const idx = availableWeeks.indexOf(activeWeek)
+            const atEdge =
+              (dx > 0 && idx <= 0) || (dx < 0 && idx >= availableWeeks.length - 1)
+            const visualDx = atEdge ? dx * 0.22 : dx * 0.55
+            const width = scheduleCardEl.clientWidth || 360
+            const fade = atEdge ? 1 : Math.max(0.82, 1 - (Math.abs(dx) / width) * 0.28)
+            scheduleCardEl.style.transform = `translate3d(${visualDx}px, 0, 0)`
+            scheduleCardEl.style.opacity = String(fade)
+          },
+          { passive: true }
+        )
+
+        const finishSwipe = () => {
+          if (!touchState) return
+          const state = touchState
+          touchState = null
+          if (state.locked !== "x") return
+
+          suppressCardClickUntil = Date.now() + 350
+          const elapsed = Math.max(1, Date.now() - state.startTime)
+          const velocity = Math.abs(state.dx) / elapsed
+          const width = scheduleCardEl.clientWidth || 360
+          const triggered = Math.abs(state.dx) >= width * 0.2 || velocity >= 0.35
+          const idx = availableWeeks.indexOf(activeWeek)
+
+          if (triggered && state.dx < 0 && idx < availableWeeks.length - 1) {
+            setWeek(availableWeeks[idx + 1]!, 1)
+          } else if (triggered && state.dx > 0 && idx > 0) {
+            setWeek(availableWeeks[idx - 1]!, -1)
+          } else {
+            resetCardTransform(true)
+          }
+        }
+
+        mainEl.addEventListener("touchend", finishSwipe, { passive: true })
+        mainEl.addEventListener("touchcancel", () => {
+          touchState = null
+          resetCardTransform(true)
+        })
+
+        loadingEl.classList.add("hidden")
+        weekControlsEl.classList.remove("hidden")
+        weekControlsEl.classList.add("flex")
+        mainEl.classList.remove("hidden")
+        mainEl.classList.add("share-enter")
+
+        setWeek(activeWeek)
+      } catch {
+        showError(dict.errNetwork)
+      }
+    }
+
+    init()
+  </script>
+</Layout>

@@ -7,6 +7,7 @@
  *
  * 协议：
  *   请求  GET/POST /api/proxy?url=<encodeURIComponent(上游完整 URL)>
+ *         或 /api/proxy + x-proxy-target（含凭据时使用，避免进入请求日志）
  *   头部映射（客户端 → 上游）：
  *     x-proxy-cookie  → Cookie      （客户端 JS cookie jar 序列化）
  *     x-proxy-ua      → User-Agent
@@ -46,6 +47,7 @@ const ALLOWED_HOSTS = new Set([
   'lp.open.weixin.qq.com',
   'uis.nbu.edu.cn',
   'ehall.nbu.edu.cn',
+  'jwxt.zmu.edu.cn',
   'api.app.zanao.com',
   'b1.cdn.zanao.com',
   'b2.cdn.zanao.com',
@@ -57,12 +59,14 @@ const ALLOWED_HOSTS = new Set([
   'epay.ysu.edu.cn',
   // ehall 一卡通（余额查询，只读）
   'ehall.ysu.edu.cn',
+  // Perlica 社区插件（账号与车辆服务）
+  'client3.uqbike.cn',
 ]);
 
 // 允许发起浏览器跨域调用的 Origin（同源请求无 Origin 头，不受限）。
-// 生产站点 ysu.welain.com；localhost:3000 为本地开发调试。
+// 生产站点 orahako.welain.com；localhost:3000 为本地开发调试。
 const ALLOWED_ORIGINS = new Set([
-  'https://ysu.welain.com',
+  'https://orahako.welain.com',
   'http://localhost:3000',
 ]);
 
@@ -95,10 +99,13 @@ const SKIP_REQUEST_HEADERS = new Set([
   'x-proxy-ua',
   'x-proxy-referer',
   'x-proxy-origin',
+  'x-proxy-target',
   'x-activation', // 激活凭证仅用于代理鉴权，不透传上游
+  'if-modified-since', // 代理响应禁止条件缓存，避免静态目标（如 jwmobile/index）返回 304
+  'if-none-match',
 ]);
 
-// 不透传给客户端的上游响应头（body 已由运行时解压，编码/长度头必须丢弃）
+// 不透传给客户端的上游响应头（body 已由运行时解压，编码/长度/缓存校验头必须丢弃）
 const SKIP_RESPONSE_HEADERS = new Set([
   'set-cookie', // 走 x-proxy-set-cookie
   'content-encoding',
@@ -107,6 +114,11 @@ const SKIP_RESPONSE_HEADERS = new Set([
   'connection',
   'keep-alive',
   'proxy-authenticate',
+  'cache-control',
+  'expires',
+  'pragma',
+  'etag',
+  'last-modified',
 ]);
 
 const HEADER_VALUE_MAX = 3500; // 边缘函数头部 value 上限 4095B，留余量分片
@@ -181,7 +193,7 @@ function preflightResponse(origin) {
       ...corsHeaders(origin),
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers':
-        'Content-Type, X-Requested-With, X-Proxy-Cookie, X-Proxy-Ua, X-Proxy-Referer, X-Proxy-Origin, X-Activation',
+        'Content-Type, X-Requested-With, X-Proxy-Cookie, X-Proxy-Ua, X-Proxy-Referer, X-Proxy-Origin, X-Proxy-Target, X-Proxy-Manual-Redirect, X-Activation',
       'Access-Control-Max-Age': '86400',
     },
   });
@@ -217,9 +229,9 @@ export async function onRequest({ request, env }) {
   }
 
   const reqUrl = new URL(request.url);
-  const targetRaw = reqUrl.searchParams.get('url');
+  const targetRaw = request.headers.get('x-proxy-target') || reqUrl.searchParams.get('url');
   if (!targetRaw) {
-    return errorResponse(400, 'missing "url" query parameter', origin);
+    return errorResponse(400, 'missing proxy target', origin);
   }
 
   let target;
@@ -313,6 +325,7 @@ export async function onRequest({ request, env }) {
   }
 
   headers.set('x-proxy-status', String(upstream.status));
+  headers.set('Cache-Control', 'no-store');
   if (origin) {
     headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Access-Control-Expose-Headers', '*');

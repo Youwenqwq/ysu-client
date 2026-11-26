@@ -1,0 +1,38 @@
+import { defineBundle } from "@orahako/sdk"
+
+export const platformBundle = defineBundle({
+  id: "orahako.bundle.platform",
+  defaults: { shell: "orahako.shell:default" },
+  nativeCapabilities: [
+    "native.files@1",
+    "native.webview@1",
+    "notifications.core@1",
+    "widgets.generic@1",
+  ],
+  plugins: [
+    { id: "orahako.runtime.slots", protected: true },
+    { id: "orahako.runtime.ui", protected: true },
+    { id: "orahako.runtime.i18n", protected: true },
+    { id: "orahako.runtime.storage", protected: true },
+    { id: "orahako.runtime.appearance", protected: true },
+    { id: "orahako.runtime.router", protected: true },
+    { id: "orahako.runtime.navigation", protected: true },
+    { id: "orahako.runtime.settings", protected: true },
+    { id: "orahako.runtime.http", protected: true },
+    { id: "orahako.runtime.native", protected: true },
+    { id: "orahako.runtime.native-lifecycle", protected: true },
+    { id: "orahako.runtime.widgets", protected: true },
+    { id: "orahako.runtime.assets", protected: true },
+    { id: "orahako.runtime.installer", protected: true },
+    { id: "orahako.theme.default" },
+    { id: "orahako.shell", protected: true },
+    { id: "orahako.settings", protected: true },
+    { id: "orahako.profile", protected: true },
+    { id: "orahako.plugin-manager", protected: true },
+    { id: "orahako.mfa", protected: true },
+    { id: "orahako.updater", protected: true },
+    { id: "orahako.announcement", protected: true },
+    { id: "orahako.analytics", protected: true },
+    { id: "orahako.network-activity" },
+  ],
+})

@@ -13,7 +13,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     // Generated / build artifacts
-    "dist/**",
+    "**/dist/**",
     "android/app/build/**",
     "android/app/src/main/assets/public/**",
     // Separate project
@@ -32,6 +32,10 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/no-empty-object-type": [
+        "error",
+        { allowInterfaces: "with-single-extends" },
       ],
     },
   },

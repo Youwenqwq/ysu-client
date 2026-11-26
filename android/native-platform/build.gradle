@@ -1,0 +1,28 @@
+// Platform capabilities: APK/gallery files, WebView advisory and geolocation.
+// Owns the FileProvider and the storage/install/camera/location permissions.
+
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+android {
+    namespace = "me.uwen.orahako.nativebridge.capabilities"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+dependencies {
+    implementation project(':native-core')
+    implementation "androidx.core:core:$androidxCoreVersion"
+    implementation "com.google.android.material:material:$materialVersion"
+
+    testImplementation "junit:junit:$junitVersion"
+    testImplementation "org.json:json:20250517"
+}

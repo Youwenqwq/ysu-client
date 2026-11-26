@@ -1,0 +1,1091 @@
+import { Context } from "@cordisjs/core"
+import {
+  Component,
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react"
+import {
+  parseRouteLocation,
+  pluginPageHref,
+  resolveDictionaryMessage,
+  type AppComposition,
+  type ChildrenSpec,
+  type DefinedDictionary,
+  type DictionaryMessages,
+  type ObservableSource,
+  type PluginI18nRegistryService,
+  type PluginHostPreferenceSnapshot,
+  type PluginLocale,
+  type PluginNavigationService,
+  type PluginPageContribution,
+  type PluginRouterService,
+  type PluginShellContribution,
+  type PluginSlotRegistryService,
+  type PluginSlotRegistrySnapshot,
+  type PluginUIRegistryService,
+  type PluginUIServiceSnapshot,
+  type RenderPageOptions,
+  type RenderSlotOptions,
+  type RouteLocation,
+  type SlotComponent,
+  type SlotKind,
+  type SlotName,
+  type StoreInstance,
+} from "@orahako/sdk"
+
+const SOURCE_HOOK_CACHE = new WeakMap<
+  ObservableSource<never>,
+  <R>(selector?: (value: never) => R) => R
+>()
+
+const EMPTY_SLOT_SNAPSHOT: PluginSlotRegistrySnapshot = {
+  declarations: [],
+  contributions: [],
+}
+
+const EMPTY_UI_SNAPSHOT: PluginUIServiceSnapshot = {
+  pages: [],
+  navigation: [],
+  themes: [],
+  shells: [],
+}
+
+const NOOP_UNSUBSCRIBE = () => {}
+const NOOP_SUBSCRIBE = () => NOOP_UNSUBSCRIBE
+
+const STATIC_EMPTY_SLOTS_SOURCE: ObservableSource<PluginSlotRegistrySnapshot> = {
+  getSnapshot: () => EMPTY_SLOT_SNAPSHOT,
+  subscribe: NOOP_SUBSCRIBE,
+}
+
+const STATIC_EMPTY_UI_SOURCE: ObservableSource<PluginUIServiceSnapshot> = {
+  getSnapshot: () => EMPTY_UI_SNAPSHOT,
+  subscribe: NOOP_SUBSCRIBE,
+}
+
+const STATIC_LOCALE_SOURCE: ObservableSource<PluginLocale> = {
+  getSnapshot: () => "zh",
+  subscribe: NOOP_SUBSCRIBE,
+}
+
+const STATIC_ZERO_SOURCE: ObservableSource<number> = {
+  getSnapshot: () => 0,
+  subscribe: NOOP_SUBSCRIBE,
+}
+
+const STATIC_EMPTY_ARRAY_SOURCE: ObservableSource<readonly unknown[]> = {
+  getSnapshot: () => [],
+  subscribe: NOOP_SUBSCRIBE,
+}
+
+const STATIC_EMPTY_PREFERENCE_SNAPSHOT: PluginHostPreferenceSnapshot = {}
+
+const STATIC_EMPTY_PREFERENCE_SOURCE: ObservableSource<PluginHostPreferenceSnapshot> = {
+  getSnapshot: () => STATIC_EMPTY_PREFERENCE_SNAPSHOT,
+  subscribe: NOOP_SUBSCRIBE,
+}
+
+/**
+ * Subscribes a React component to a framework-agnostic `ObservableSource`.
+ * `UIRenderer` is the sole module in the system invoking `useSyncExternalStore`.
+ */
+export function useObservable<T>(source: ObservableSource<T>): T
+export function useObservable<T, R>(source: ObservableSource<T>, selector: (value: T) => R): R
+export function useObservable<T, R = T>(
+  source: ObservableSource<T>,
+  selector?: (value: T) => R
+): T | R
+export function useObservable<T, R = T>(
+  source: ObservableSource<T>,
+  selector?: (value: T) => R
+): T | R {
+  const getSelectedSnapshot = useMemo<() => T | R>(() => {
+    if (!selector) return source.getSnapshot
+    let initialized = false
+    let prevRaw!: T
+    let prevSelected!: R
+    return (): R => {
+      const raw = source.getSnapshot()
+      if (initialized && Object.is(raw, prevRaw)) {
+        return prevSelected
+      }
+      const selected = selector(raw)
+      if (initialized && Object.is(selected, prevSelected)) {
+        prevRaw = raw
+        return prevSelected
+      }
+      initialized = true
+      prevRaw = raw
+      prevSelected = selected
+      return selected
+    }
+  }, [source, selector])
+
+  return useSyncExternalStore(source.subscribe, getSelectedSnapshot, getSelectedSnapshot)
+}
+
+/**
+ * Returns a referentially stable selector hook `useX(selector?)` bound to a
+ * specific `ObservableSource` instance.
+ */
+export function createObservableHook<T>(
+  source: ObservableSource<T>
+): <R = T>(selector?: (value: T) => R) => R {
+  const key = source as ObservableSource<never>
+  const existing = SOURCE_HOOK_CACHE.get(key)
+  if (existing) {
+    return existing as <R = T>(selector?: (value: T) => R) => R
+  }
+  const useBoundSource = <R = T,>(selector?: (value: T) => R): R =>
+    useObservable(source, selector) as R
+  SOURCE_HOOK_CACHE.set(key, useBoundSource as <R>(selector?: (value: never) => R) => R)
+  return useBoundSource
+}
+
+function isObservableSource<T = unknown>(value: unknown): value is ObservableSource<T> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "getSnapshot" in value &&
+    typeof value.getSnapshot === "function" &&
+    "subscribe" in value &&
+    typeof value.subscribe === "function"
+  )
+}
+
+function isStoreInstance(
+  value: unknown
+): value is StoreInstance<unknown, Record<string, (...args: never[]) => unknown>> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "source" in value &&
+    isObservableSource(value.source) &&
+    "actions" in value &&
+    typeof value.actions === "object" &&
+    value.actions !== null
+  )
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isDictionaryMessages(value: unknown): value is DictionaryMessages {
+  return isPlainObject(value)
+}
+
+function isDefinedDictionary(value: unknown): value is DefinedDictionary {
+  return isPlainObject(value) && isDictionaryMessages(value.zh) && isDictionaryMessages(value.en)
+}
+
+function interpolateFallback(
+  template: string,
+  params?: Readonly<Record<string, string | number>>
+): string {
+  if (!params) return template
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match
+  )
+}
+
+function isChainSlotKind(kind: SlotKind): boolean {
+  return kind === "chain"
+}
+
+function capitalizeHookName(name: string): string {
+  if (name.length === 0) return "use"
+  return `use${name[0]!.toUpperCase()}${name.slice(1)}`
+}
+
+const FALLBACK_INJECT_CONTEXT = new Context()
+
+function projectInjectResult(
+  injectFn: ((ctx: Context) => unknown) | undefined
+): Record<string, unknown> {
+  if (!injectFn) return {}
+  const raw = injectFn(FALLBACK_INJECT_CONTEXT)
+  if (!isPlainObject(raw)) return {}
+
+  const projected: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (key === "hooks") continue
+    projected[key] = value
+  }
+  if ("hooks" in raw && isPlainObject(raw.hooks)) {
+    for (const [hookKey, source] of Object.entries(raw.hooks)) {
+      if (isObservableSource(source)) {
+        projected[capitalizeHookName(hookKey)] = createObservableHook(source)
+      }
+    }
+  }
+  return projected
+}
+
+/**
+ * Structural union satisfied by `SlotContribution`, `PluginShellContribution`,
+ * `PluginPageContribution`, `PluginSettingsCategory`, and `OverviewWidgetContribution`.
+ */
+export interface RenderableContribution {
+  readonly id: string
+  readonly pluginId: string
+  readonly dictionary?: unknown
+  readonly children?: ChildrenSpec
+  readonly store?: unknown
+  readonly inject?: (ctx: Context) => unknown
+  readonly component: SlotComponent<never>
+  readonly generation?: number
+}
+
+export interface ContributionOutletProps<Owner extends object = Record<string, never>> {
+  readonly entry: RenderableContribution
+  readonly owner?: Owner
+  readonly slots?: PluginSlotRegistryService
+  readonly i18n?: PluginI18nRegistryService
+  readonly errorFallback?: ReactNode
+  readonly onError?: (error: Error) => void
+}
+
+interface ContributionBoundaryProps {
+  readonly resetKey: string
+  readonly fallback: ReactNode
+  readonly onError?: (error: Error) => void
+  readonly children: ReactNode
+}
+
+interface ContributionBoundaryState {
+  readonly failedKey: string | null
+}
+
+class ContributionErrorBoundary extends Component<
+  ContributionBoundaryProps,
+  ContributionBoundaryState
+> {
+  state: ContributionBoundaryState = { failedKey: null }
+
+  static getDerivedStateFromError(): Partial<ContributionBoundaryState> {
+    return { failedKey: "__failed__" }
+  }
+
+  static getDerivedStateFromProps(
+    props: ContributionBoundaryProps,
+    state: ContributionBoundaryState
+  ): Partial<ContributionBoundaryState> | null {
+    if (
+      state.failedKey !== null &&
+      state.failedKey !== "__failed__" &&
+      state.failedKey !== props.resetKey
+    ) {
+      return { failedKey: null }
+    }
+    return null
+  }
+
+  componentDidCatch(error: Error): void {
+    this.setState({ failedKey: this.props.resetKey })
+    this.props.onError?.(error)
+  }
+
+  render(): ReactNode {
+    if (this.state.failedKey === "__failed__" || this.state.failedKey === this.props.resetKey) {
+      return this.props.fallback
+    }
+    return this.props.children
+  }
+}
+
+function ContributionBody<Owner extends object>({
+  entry,
+  owner,
+  slots,
+  i18n,
+}: {
+  readonly entry: RenderableContribution
+  readonly owner?: Owner
+  readonly slots?: PluginSlotRegistryService
+  readonly i18n?: PluginI18nRegistryService
+}): ReactNode {
+  const hasChildrenSpec = Boolean(entry.children && Object.keys(entry.children).length > 0)
+  const slotsSnapshot = useObservable(
+    hasChildrenSpec && slots ? slots.state : STATIC_EMPTY_SLOTS_SOURCE
+  )
+  const locale = useObservable(i18n ? i18n.locale : STATIC_LOCALE_SOURCE)
+
+  const i18nRevisionSource = useMemo<ObservableSource<number>>(
+    () =>
+      i18n
+        ? {
+            getSnapshot: i18n.getSnapshot,
+            subscribe: i18n.subscribe,
+          }
+        : STATIC_ZERO_SOURCE,
+    [i18n]
+  )
+  const i18nRevision = useObservable(i18nRevisionSource)
+
+  const t = useMemo(() => {
+    void i18nRevision
+    return (key: string, params?: Readonly<Record<string, string | number>>): string => {
+      const mutableParams = params ? ({ ...params } as Record<string, string | number>) : undefined
+      if (isDefinedDictionary(entry.dictionary)) {
+        const primary = locale === "en" ? entry.dictionary.en : entry.dictionary.zh
+        const fallback = locale === "en" ? entry.dictionary.zh : entry.dictionary.en
+        const resolved =
+          resolveDictionaryMessage(primary, key, params) ??
+          resolveDictionaryMessage(fallback, key, params)
+        if (resolved !== undefined) return resolved
+      } else if (isDictionaryMessages(entry.dictionary)) {
+        const resolved = resolveDictionaryMessage(entry.dictionary, key, params)
+        if (resolved !== undefined) return resolved
+      }
+      if (i18n) {
+        return i18n.translate(entry.pluginId, key, locale, mutableParams)
+      }
+      return interpolateFallback(key, params)
+    }
+  }, [entry.dictionary, entry.pluginId, i18n, locale, i18nRevision])
+
+  const { allowedNonChain, allowedChain } = useMemo(() => {
+    const nonChain = new Set<string>()
+    const chain = new Set<string>()
+    for (const [slotName, childSpec] of Object.entries(entry.children ?? {})) {
+      if (!childSpec) continue
+      if (isChainSlotKind(childSpec.kind)) {
+        chain.add(slotName)
+      } else {
+        nonChain.add(slotName)
+      }
+    }
+    return { allowedNonChain: nonChain, allowedChain: chain }
+  }, [entry.children])
+
+  const renderSlot = useCallback(
+    (
+      slotName: SlotName,
+      childOwner?: Record<string, unknown>,
+      options?: RenderSlotOptions
+    ): ReactNode => {
+      if (allowedChain.has(slotName)) {
+        throw new Error(
+          `Slot "${slotName}" is a chain slot; "${entry.pluginId}" (${entry.id}) must use renderSlotChain`
+        )
+      }
+      if (!allowedNonChain.has(slotName)) {
+        throw new Error(
+          `Contribution "${entry.pluginId}:${entry.id}" is not authorized to render slot "${slotName}"`
+        )
+      }
+      if (!slots) {
+        throw new Error(`Slot registry is unavailable while rendering slot "${slotName}"`)
+      }
+      void slotsSnapshot
+      const isDeclared = slots.getSnapshot().declarations.some((decl) => decl.name === slotName)
+      if (!isDeclared) {
+        throw new Error(`Plugin slot is not declared: ${slotName}`)
+      }
+      const fallback = options?.fallback ?? null
+      const matched = slots.select(slotName, options?.key)
+      if (matched.length === 0) return fallback
+      if (matched.length === 1) {
+        const single = matched[0]!
+        return (
+          <ContributionOutlet
+            key={`${single.pluginId}:${single.id}:${single.generation}`}
+            entry={single}
+            owner={childOwner}
+            slots={slots}
+            i18n={i18n}
+            errorFallback={fallback}
+          />
+        )
+      }
+      return matched.map((item) => (
+        <ContributionOutlet
+          key={`${item.pluginId}:${item.id}:${item.generation}`}
+          entry={item}
+          owner={childOwner}
+          slots={slots}
+          i18n={i18n}
+        />
+      ))
+    },
+    [allowedChain, allowedNonChain, entry.id, entry.pluginId, i18n, slots, slotsSnapshot]
+  )
+
+  const renderSlotChain = useCallback(
+    (slotName: SlotName, ...rest: unknown[]): ReactNode => {
+      if (allowedNonChain.has(slotName)) {
+        throw new Error(
+          `Slot "${slotName}" is not a chain slot; "${entry.pluginId}" (${entry.id}) must use renderSlot`
+        )
+      }
+      if (!allowedChain.has(slotName)) {
+        throw new Error(
+          `Contribution "${entry.pluginId}:${entry.id}" is not authorized to render chain slot "${slotName}"`
+        )
+      }
+      if (!slots) {
+        throw new Error(`Slot registry is unavailable while rendering chain slot "${slotName}"`)
+      }
+      void slotsSnapshot
+      const isDeclared = slots.getSnapshot().declarations.some((decl) => decl.name === slotName)
+      if (!isDeclared) {
+        throw new Error(`Plugin slot is not declared: ${slotName}`)
+      }
+
+      let ownerFields: Record<string, unknown> = {}
+      let innerChildren: ReactNode = null
+      if (rest.length <= 1) {
+        innerChildren = rest[0] as ReactNode
+      } else {
+        if (isPlainObject(rest[0])) {
+          ownerFields = rest[0]
+        }
+        innerChildren = rest[1] as ReactNode
+      }
+
+      const matched = slots.select(slotName)
+      if (matched.length === 0) return innerChildren
+
+      return matched.reduceRight<ReactNode>((accumulated, item) => {
+        const chainOwner = {
+          ...ownerFields,
+          children: accumulated,
+        }
+        return (
+          <ContributionOutlet
+            key={`${item.pluginId}:${item.id}:${item.generation}`}
+            entry={item}
+            owner={chainOwner}
+            slots={slots}
+            i18n={i18n}
+            errorFallback={accumulated}
+          />
+        )
+      }, innerChildren)
+    },
+    [allowedChain, allowedNonChain, entry.id, entry.pluginId, i18n, slots, slotsSnapshot]
+  )
+
+  const storeShare = useMemo<Record<string, unknown>>(() => {
+    if (!isStoreInstance(entry.store)) return {}
+    return {
+      useStore: createObservableHook(entry.store.source),
+      actions: entry.store.actions,
+    }
+  }, [entry.store])
+
+  const injectShare = useMemo<Record<string, unknown>>(
+    () => projectInjectResult(entry.inject),
+    [entry.inject]
+  )
+
+  const synthesizedProps: Record<string, unknown> = {
+    ...(owner ?? {}),
+    locale,
+    t,
+    renderSlot,
+    renderSlotChain,
+    ...storeShare,
+    ...injectShare,
+  }
+
+  const TargetComponent = entry.component as (props: Record<string, unknown>) => ReactNode
+  return <TargetComponent {...synthesizedProps} />
+}
+
+export function ContributionOutlet<Owner extends object = Record<string, never>>({
+  entry,
+  owner,
+  slots,
+  i18n,
+  errorFallback = null,
+  onError,
+}: ContributionOutletProps<Owner>): ReactNode {
+  const resetKey = `${entry.pluginId}:${entry.id}:${entry.generation ?? 0}`
+  return (
+    <ContributionErrorBoundary resetKey={resetKey} fallback={errorFallback} onError={onError}>
+      <ContributionBody key={resetKey} entry={entry} owner={owner} slots={slots} i18n={i18n} />
+    </ContributionErrorBoundary>
+  )
+}
+
+export interface KernelRecoveryProps {
+  readonly title?: string
+  readonly message?: string
+  readonly reloadLabel?: string
+  readonly onReload?: () => void
+}
+
+export function KernelRecovery({
+  title = "应用界面未能加载",
+  message = "没有可用的应用 Shell。请重新加载，或清除站点数据后重试。",
+  reloadLabel = "重新加载",
+  onReload,
+}: KernelRecoveryProps): ReactNode {
+  const handleReload = () => {
+    if (onReload) {
+      onReload()
+      return
+    }
+    if (typeof window !== "undefined" && typeof window.location?.reload === "function") {
+      window.location.reload()
+    }
+  }
+
+  return (
+    <main
+      data-kernel-recovery=""
+      className="flex min-h-svh items-center justify-center bg-background p-6 text-foreground"
+    >
+      <div className="w-full max-w-md space-y-4 text-center">
+        <h1 className="text-lg font-semibold">{title}</h1>
+        <p className="text-sm text-muted-foreground">{message}</p>
+        <button
+          type="button"
+          className="rounded-md border border-border px-4 py-2 text-sm"
+          onClick={handleReload}
+        >
+          {reloadLabel}
+        </button>
+      </div>
+    </main>
+  )
+}
+
+function shellQualifiedKey(shell: PluginShellContribution): string {
+  return `${shell.pluginId}:${shell.id}`
+}
+
+function shellBoundaryKey(shell: PluginShellContribution): string {
+  return `${shellQualifiedKey(shell)}:${shell.generation}`
+}
+
+const NOOP_RENDER_PAGE = (
+  _pluginId: string,
+  _pageId: string,
+  options?: RenderPageOptions
+): ReactNode => options?.fallback ?? null
+
+export interface ShellErrorBoundaryProps {
+  readonly shell: PluginShellContribution
+  readonly fallback?: PluginShellContribution
+  readonly slots?: PluginSlotRegistryService
+  readonly i18n?: PluginI18nRegistryService
+  readonly selectShell: (id?: string) => void
+  readonly renderPage?: (
+    pluginId: string,
+    pageId: string,
+    options?: RenderPageOptions
+  ) => ReactNode
+  readonly onFailure?: (error: Error) => void
+  readonly recoveryMessage?: string
+  readonly children?: ReactNode
+}
+
+interface ShellErrorBoundaryState {
+  readonly failedKey: string | null
+}
+
+export class ShellErrorBoundary extends Component<
+  ShellErrorBoundaryProps,
+  ShellErrorBoundaryState
+> {
+  state: ShellErrorBoundaryState = { failedKey: null }
+
+  static getDerivedStateFromError(): Partial<ShellErrorBoundaryState> {
+    return { failedKey: "__failed__" }
+  }
+
+  static getDerivedStateFromProps(
+    props: ShellErrorBoundaryProps,
+    state: ShellErrorBoundaryState
+  ): Partial<ShellErrorBoundaryState> | null {
+    const key = shellBoundaryKey(props.shell)
+    if (state.failedKey !== null && state.failedKey !== "__failed__" && state.failedKey !== key) {
+      return { failedKey: null }
+    }
+    return null
+  }
+
+  componentDidCatch(error: Error): void {
+    this.setState({ failedKey: shellBoundaryKey(this.props.shell) })
+    this.props.onFailure?.(error)
+  }
+
+  render(): ReactNode {
+    const key = shellBoundaryKey(this.props.shell)
+    if (this.state.failedKey === "__failed__" || this.state.failedKey === key) {
+      if (!this.props.fallback) {
+        return <KernelRecovery message={this.props.recoveryMessage} />
+      }
+      return (
+        <ShellErrorBoundary
+          key={shellBoundaryKey(this.props.fallback)}
+          shell={this.props.fallback}
+          slots={this.props.slots}
+          i18n={this.props.i18n}
+          selectShell={this.props.selectShell}
+          renderPage={this.props.renderPage}
+          recoveryMessage={this.props.recoveryMessage}
+        >
+          {this.props.children}
+        </ShellErrorBoundary>
+      )
+    }
+
+    return (
+      <ContributionBody
+        key={key}
+        entry={this.props.shell}
+        owner={{
+          children: this.props.children,
+          selectShell: this.props.selectShell,
+          renderPage: this.props.renderPage ?? NOOP_RENDER_PAGE,
+        }}
+        slots={this.props.slots}
+        i18n={this.props.i18n}
+      />
+    )
+  }
+}
+
+const ROOT_ROUTE_LOCATION: RouteLocation = parseRouteLocation("/")
+
+const STATIC_ROOT_LOCATION_SOURCE: ObservableSource<RouteLocation> = {
+  getSnapshot: () => ROOT_ROUTE_LOCATION,
+  subscribe: NOOP_SUBSCRIBE,
+}
+
+function isPluginRouterService(value: unknown): value is PluginRouterService {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "current" in value &&
+    isObservableSource(value.current) &&
+    "replace" in value &&
+    typeof value.replace === "function" &&
+    "push" in value &&
+    typeof value.push === "function"
+  )
+}
+
+function isPluginNavigationService(value: unknown): value is PluginNavigationService {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "state" in value &&
+    isObservableSource(value.state) &&
+    "resolve" in value &&
+    typeof value.resolve === "function" &&
+    "landing" in value &&
+    typeof value.landing === "function"
+  )
+}
+
+function isStartingPluginState(entry: unknown): boolean {
+  return (
+    typeof entry === "object" && entry !== null && "status" in entry && entry.status === "starting"
+  )
+}
+
+type PageStatusKind = "loading" | "unavailable" | "error"
+
+const PAGE_STATUS_MESSAGES: Readonly<
+  Record<
+    PluginLocale,
+    Readonly<Record<PageStatusKind, { readonly title: string; readonly description: string }>>
+  >
+> = {
+  zh: {
+    loading: {
+      title: "正在加载插件页面",
+      description: "正在准备插件与界面内容…",
+    },
+    unavailable: {
+      title: "插件页面不可用",
+      description: "对应插件尚未安装、已停用，或该页面不存在。",
+    },
+    error: {
+      title: "插件页面运行失败",
+      description: "该页面渲染时发生异常，请重试或返回其他页面。",
+    },
+  },
+  en: {
+    loading: {
+      title: "Loading plugin page",
+      description: "Preparing plugins and page content…",
+    },
+    unavailable: {
+      title: "Plugin page unavailable",
+      description: "The plugin is not installed, disabled, or this page does not exist.",
+    },
+    error: {
+      title: "Plugin page failed",
+      description: "An unexpected error occurred while rendering this page.",
+    },
+  },
+}
+
+function PageStatusView({
+  kind,
+  locale,
+  i18n,
+}: {
+  readonly kind: PageStatusKind
+  readonly locale: PluginLocale
+  readonly i18n?: PluginI18nRegistryService
+}): ReactNode {
+  const defaults = PAGE_STATUS_MESSAGES[locale === "en" ? "en" : "zh"][kind]
+  const titleKey = `host.page.${kind}.title`
+  const descKey = `host.page.${kind}.description`
+  const resolvedTitle = i18n ? i18n.translate("", titleKey, locale) : titleKey
+  const resolvedDesc = i18n ? i18n.translate("", descKey, locale) : descKey
+
+  return (
+    <div
+      data-slot="page-status"
+      data-page-status={kind}
+      className="flex min-h-64 flex-col items-center justify-center gap-2 p-6 text-center"
+    >
+      <h2 className="text-base font-semibold text-foreground">
+        {resolvedTitle !== titleKey ? resolvedTitle : defaults.title}
+      </h2>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        {resolvedDesc !== descKey ? resolvedDesc : defaults.description}
+      </p>
+    </div>
+  )
+}
+
+export interface OrahakoHostPreferencesLike {
+  readonly state?: ObservableSource<PluginHostPreferenceSnapshot>
+  getActiveShell(): string | undefined
+  setActiveShell(shellId: string | undefined): void
+  getActiveTheme?(): string | undefined
+  setActiveTheme?(themeId: string | undefined): void
+  getStartupPage?(): string | undefined
+}
+
+export interface OrahakoHostLike {
+  readonly composition: AppComposition
+  readonly preferences?: OrahakoHostPreferencesLike
+  readonly runtime?: {
+    readonly state: ObservableSource<readonly unknown[]>
+    readonly context?: {
+      get(name: string): unknown
+    }
+  }
+  readonly ui?: PluginUIRegistryService
+  readonly slots?: PluginSlotRegistryService
+  readonly i18n?: PluginI18nRegistryService
+  readonly router?: PluginRouterService
+  readonly navigation?: PluginNavigationService
+  readonly bootstrapError?: string
+}
+
+export interface OrahakoAppProps {
+  readonly host: OrahakoHostLike
+  readonly children?: ReactNode
+  readonly activeShell?: string
+  readonly onSelectShell?: (shellId: string | undefined) => void
+}
+
+export function OrahakoApp({
+  host,
+  children,
+  activeShell: controlledShell,
+  onSelectShell,
+}: OrahakoAppProps): ReactNode {
+  const runtimeStates = useObservable(host.runtime?.state ?? STATIC_EMPTY_ARRAY_SOURCE)
+
+  const slots = host.slots
+  const ui = host.ui
+  const i18n = host.i18n
+
+  const runtimeRouterCandidate = host.runtime?.context?.get("router")
+  const router =
+    host.router ??
+    (isPluginRouterService(runtimeRouterCandidate) ? runtimeRouterCandidate : undefined)
+
+  const runtimeNavigationCandidate = host.runtime?.context?.get("navigation")
+  const navigation =
+    host.navigation ??
+    (isPluginNavigationService(runtimeNavigationCandidate) ? runtimeNavigationCandidate : undefined)
+
+  const slotsSnapshot = useObservable(slots ? slots.state : STATIC_EMPTY_SLOTS_SOURCE)
+  const uiSnapshot = useObservable(ui ? ui.state : STATIC_EMPTY_UI_SOURCE)
+  const routeLocation = useObservable(router ? router.current : STATIC_ROOT_LOCATION_SOURCE)
+  const navRevision = useObservable(navigation ? navigation.state : STATIC_ZERO_SOURCE)
+  const locale = useObservable(i18n ? i18n.locale : STATIC_LOCALE_SOURCE)
+  const i18nRevisionSource = useMemo<ObservableSource<number>>(
+    () =>
+      i18n
+        ? {
+            getSnapshot: i18n.getSnapshot,
+            subscribe: i18n.subscribe,
+          }
+        : STATIC_ZERO_SOURCE,
+    [i18n]
+  )
+  const i18nRevision = useObservable(i18nRevisionSource)
+  void slotsSnapshot
+  void navRevision
+  void i18nRevision
+
+  const preferences = host.preferences
+  const preferenceState = preferences?.state
+  const preferenceSnapshot = useObservable(
+    preferenceState ?? STATIC_EMPTY_PREFERENCE_SOURCE
+  )
+
+  const [memoryShell, setMemoryShell] = useState<string | undefined>(() =>
+    preferences?.getActiveShell()
+  )
+
+  const selectShell = useCallback(
+    (shellId?: string) => {
+      preferences?.setActiveShell(shellId)
+      if (!preferenceState) setMemoryShell(shellId)
+      onSelectShell?.(shellId)
+    },
+    [preferenceState, preferences, onSelectShell]
+  )
+
+  const preferredShellId =
+    controlledShell !== undefined
+      ? controlledShell
+      : preferenceState
+        ? preferenceSnapshot.activeShell
+        : (preferences?.getActiveShell() ?? memoryShell)
+
+  const defaultLanding =
+    (preferenceState
+      ? preferenceSnapshot.startupPage
+      : preferences?.getStartupPage?.()) ??
+    host.composition.defaults.landing ??
+    ""
+
+  const activePage = useMemo<PluginPageContribution | undefined>(() => {
+    if (children !== undefined) return undefined
+    void navRevision
+    const pages = uiSnapshot.pages
+    const lookupPage = (pluginId: string, pageId: string): PluginPageContribution | undefined =>
+      ui?.findPage(pluginId, pageId) ??
+      pages.find((candidate) => candidate.pluginId === pluginId && candidate.id === pageId)
+
+    if (routeLocation.route) {
+      if (navigation) {
+        const target = navigation.resolve(routeLocation.route)
+        return target ? lookupPage(target.pluginId, target.pageId) : undefined
+      }
+      return pages.find((candidate) => candidate.route === routeLocation.route)
+    }
+
+    if (routeLocation.pluginId) {
+      const pageId = routeLocation.pageId ?? "index"
+      if (navigation && !navigation.available(routeLocation.pluginId, pageId)) return undefined
+      return lookupPage(routeLocation.pluginId, pageId)
+    }
+
+    if (navigation) {
+      const target =
+        (defaultLanding ? navigation.resolve(defaultLanding) : undefined) ?? navigation.primary()
+      return target ? lookupPage(target.pluginId, target.pageId) : undefined
+    }
+
+    return undefined
+  }, [
+    children,
+    defaultLanding,
+    navRevision,
+    navigation,
+    routeLocation.pageId,
+    routeLocation.pluginId,
+    routeLocation.route,
+    ui,
+    uiSnapshot.pages,
+  ])
+
+  useEffect(() => {
+    if (children !== undefined || !router) return
+
+    if (routeLocation.route && activePage) {
+      const canonicalHref = pluginPageHref(activePage.pluginId, activePage.id, routeLocation.params)
+      const currentSnap = router.current.getSnapshot()
+      if (parseRouteLocation(router.href(canonicalHref)).href !== currentSnap.href) {
+        router.replace(canonicalHref)
+      }
+      return
+    }
+
+    if (!routeLocation.route && !routeLocation.pluginId && navigation) {
+      const currentSnap = router.current.getSnapshot()
+      if (currentSnap.route || currentSnap.pluginId) return
+      const landingHref = navigation.landing(defaultLanding)
+      if (!landingHref) return
+      const nextParsed = parseRouteLocation(router.href(landingHref))
+      if (nextParsed.href !== currentSnap.href) {
+        router.replace(landingHref)
+      }
+    }
+  }, [
+    activePage,
+    children,
+    defaultLanding,
+    navRevision,
+    navigation,
+    routeLocation.params,
+    routeLocation.pluginId,
+    routeLocation.route,
+    router,
+  ])
+
+  const activeThemeEntry = useMemo(() => {
+    const requestedTheme = preferenceState
+      ? preferenceSnapshot.activeTheme
+      : preferences?.getActiveTheme?.()
+    if (!requestedTheme) return undefined
+    const matched = uiSnapshot.themes.find(
+      (item) => `${item.pluginId}:${item.id}` === requestedTheme || item.id === requestedTheme
+    )
+    return matched && matched.css.trim().length > 0 ? matched : undefined
+  }, [preferenceSnapshot.activeTheme, preferenceState, preferences, uiSnapshot.themes])
+
+  const themeElement = activeThemeEntry ? (
+    <style data-plugin-theme={`${activeThemeEntry.pluginId}:${activeThemeEntry.id}`}>
+      {activeThemeEntry.css}
+    </style>
+  ) : null
+
+  const isRuntimeLoading =
+    Boolean(host.runtime) &&
+    (runtimeStates.length === 0 || runtimeStates.some((entry) => isStartingPluginState(entry)))
+
+  const renderPage = useCallback(
+    (pluginId: string, pageId: string, options?: RenderPageOptions): ReactNode => {
+      void navRevision
+      const page =
+        ui?.findPage(pluginId, pageId) ??
+        uiSnapshot.pages.find(
+          (candidate) => candidate.pluginId === pluginId && candidate.id === pageId
+        )
+      if (!page || (navigation && !navigation.available(pluginId, pageId))) {
+        return (
+          options?.fallback ?? (
+            <PageStatusView
+              kind={isRuntimeLoading ? "loading" : "unavailable"}
+              locale={locale}
+              i18n={i18n}
+            />
+          )
+        )
+      }
+      return (
+        <ContributionOutlet
+          key={`${page.pluginId}:${page.id}:${page.generation}`}
+          entry={page}
+          owner={{}}
+          slots={slots}
+          i18n={i18n}
+          errorFallback={
+            options?.fallback ?? <PageStatusView kind="error" locale={locale} i18n={i18n} />
+          }
+        />
+      )
+    },
+    [i18n, isRuntimeLoading, locale, navRevision, navigation, slots, ui, uiSnapshot.pages]
+  )
+
+  const rootContributions = slots ? slots.select("root") : []
+  if (rootContributions.length > 0) {
+    const rootEntry = rootContributions[0]!
+    return (
+      <Fragment>
+        {themeElement}
+        <ContributionOutlet
+          key={`${rootEntry.pluginId}:${rootEntry.id}:${rootEntry.generation}`}
+          entry={rootEntry}
+          owner={{}}
+          slots={slots}
+          i18n={i18n}
+          errorFallback={<KernelRecovery message={host.bootstrapError} />}
+        />
+      </Fragment>
+    )
+  }
+
+  const shells = uiSnapshot.shells
+  const defaultShell =
+    shells.find((item) => shellQualifiedKey(item) === host.composition.defaults.shell) ?? shells[0]
+  const selectedShell = preferredShellId
+    ? shells.find(
+        (item) => shellQualifiedKey(item) === preferredShellId || item.id === preferredShellId
+      )
+    : undefined
+  const activeShellEntry = selectedShell ?? defaultShell
+
+  if (!activeShellEntry) {
+    return (
+      <Fragment>
+        {themeElement}
+        <KernelRecovery message={host.bootstrapError} />
+      </Fragment>
+    )
+  }
+
+  const fallbackShell =
+    selectedShell &&
+    defaultShell &&
+    shellQualifiedKey(selectedShell) !== shellQualifiedKey(defaultShell)
+      ? defaultShell
+      : undefined
+
+  const resolvedChildren: ReactNode =
+    children !== undefined ? (
+      children
+    ) : activePage ? (
+      <ContributionOutlet
+        key={`${activePage.pluginId}:${activePage.id}:${activePage.generation}`}
+        entry={activePage}
+        owner={{}}
+        slots={slots}
+        i18n={i18n}
+        errorFallback={<PageStatusView kind="error" locale={locale} i18n={i18n} />}
+      />
+    ) : (
+      <PageStatusView
+        kind={isRuntimeLoading ? "loading" : "unavailable"}
+        locale={locale}
+        i18n={i18n}
+      />
+    )
+
+  return (
+    <Fragment>
+      {themeElement}
+      <ShellErrorBoundary
+        key={shellBoundaryKey(activeShellEntry)}
+        shell={activeShellEntry}
+        fallback={fallbackShell}
+        slots={slots}
+        i18n={i18n}
+        selectShell={selectShell}
+        renderPage={renderPage}
+        recoveryMessage={host.bootstrapError}
+        onFailure={() => {
+          if (preferredShellId) {
+            selectShell(undefined)
+          }
+        }}
+      >
+        {resolvedChildren}
+      </ShellErrorBoundary>
+    </Fragment>
+  )
+}

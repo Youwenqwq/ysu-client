@@ -1,0 +1,44 @@
+// Academic capabilities that are not school specific: notification channel and
+// permission mechanics, the generic WorkManager polling scheduler and the class
+// reminder alarms / foreground Live Update service.
+
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+// Host identity comes from the build composition; nothing here names the app
+// activity or a concrete deep-link scheme.
+def deepLinkScheme = (gradle.ext.find('orahakoDeepLinkScheme') ?: 'orahako').toString()
+def deepLinkHosts = gradle.ext.find('orahakoDeepLinkHosts') ?: [:]
+def scheduleHost = (deepLinkHosts['schedule'] ?: 'schedule').toString()
+
+android {
+    namespace = "me.uwen.orahako.notify"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        manifestPlaceholders = [
+            orahakoDeepLinkScheme    : deepLinkScheme,
+            orahakoDeepLinkHostSchedule: scheduleHost,
+        ]
+        resValue "string", "orahako_academic_host_schedule", scheduleHost
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+}
+
+dependencies {
+    implementation project(':native-core')
+    implementation "androidx.core:core:$androidxCoreVersion"
+    implementation "androidx.work:work-runtime-ktx:2.11.2"
+
+    testImplementation "junit:junit:$junitVersion"
+    testImplementation "org.json:json:20250517"
+}

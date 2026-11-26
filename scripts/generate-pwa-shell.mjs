@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -7,7 +7,6 @@ import { gzipSync } from "node:zlib";
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const distDir = join(repoRoot, "dist");
 const outputFile = join(distDir, "pwa-shell.pack");
-const excludedSegments = new Set(["_next", "_not-found", "404"]);
 
 const contentTypes = new Map([
   [".html", "text/html"],
@@ -30,11 +29,7 @@ function toPosix(path) {
   return path.split(sep).join("/");
 }
 
-function isExcluded(segments) {
-  return segments.some((segment) => excludedSegments.has(segment));
-}
-
-// key: scope-relative URL ("./dashboard/grades/"); file: absolute path in dist
+// The worker looks up scope-relative paths without their query strings.
 const entries = new Map();
 
 function addEntry(key, file) {
@@ -43,43 +38,29 @@ function addEntry(key, file) {
   }
 }
 
-function walk(directory) {
-  for (const entry of readdirSync(directory)) {
-    const path = join(directory, entry);
-    const stat = statSync(path);
-    if (stat.isDirectory()) {
-      walk(path);
-      continue;
-    }
-
-    const relativePath = toPosix(relative(distDir, path));
-    const segments = relativePath.split("/");
-    if (segments[0] === "_next" && segments[1] === "static") {
-      addEntry(`./${relativePath}`, path);
-      continue;
-    }
-    if (isExcluded(segments)) continue;
-
-    if (entry === "index.html") {
-      const route = relativePath === "index.html"
-        ? "./"
-        : `./${relativePath.slice(0, -"index.html".length)}`;
-      addEntry(route, path);
-      continue;
-    }
-
-    if (entry === "index.txt" || entry.startsWith("__next")) {
-      addEntry(`./${relativePath}`, path);
-    }
+function collectStaticAssets(directory) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) collectStaticAssets(path);
+    else if (entry.isFile()) addEntry(`./${toPosix(relative(distDir, path))}`, path);
   }
 }
 
-walk(distDir);
+const rootDocument = join(distDir, "index.html");
+if (!existsSync(rootDocument)) throw new Error("Missing root document: dist/index.html");
+addEntry("./", rootDocument);
+collectStaticAssets(join(distDir, "_next", "static"));
 
-// Fixed shell assets that live outside routes and _next/static.
+for (const entry of readdirSync(distDir, { withFileTypes: true })) {
+  if (entry.isFile() && (entry.name === "index.txt" || entry.name.startsWith("__next"))) {
+    addEntry(`./${entry.name}`, join(distDir, entry.name));
+  }
+}
+
+// Fixed shell assets outside the exported document and Next's static assets.
 for (const fixed of [
   "manifest.webmanifest",
-  "favicon.ico",
+  "icon.svg",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "icons/icon-maskable-192.png",
@@ -92,7 +73,7 @@ for (const fixed of [
 }
 
 // Pack layout, gzipped as a whole:
-//   [4B magic "YSPK"][u32le version=1][u32le headerLength][header JSON][body]
+//   [4B magic "OHPK"][u32le version=1][u32le headerLength][header JSON][body]
 // header JSON: { "files": [{ "p": key, "o": offset, "l": length, "t": contentType }] }
 // offsets are relative to the start of the body.
 const files = [];
@@ -107,7 +88,7 @@ for (const [key, file] of [...entries.entries()].sort(([a], [b]) => a.localeComp
 
 const header = Buffer.from(JSON.stringify({ files }), "utf8");
 const head = Buffer.alloc(12);
-head.write("YSPK", 0, "ascii");
+head.write("OHPK", 0, "ascii");
 head.writeUInt32LE(1, 4);
 head.writeUInt32LE(header.length, 8);
 const payload = Buffer.concat([head, header, ...chunks]);

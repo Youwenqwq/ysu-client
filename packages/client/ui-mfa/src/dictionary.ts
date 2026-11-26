@@ -1,0 +1,68 @@
+import { defineDictionary } from "@orahako/sdk"
+
+export const mfaDictionary = defineDictionary({
+  zh: {
+    login: {
+      mfaTitle: "请输入 MFA 验证码",
+      mfaMethod: "MFA 方式",
+      mfaMethodCpdaily: "今日校园",
+      mfaMethodSms: "短信",
+      mfaMethodWechat: "微信",
+      mfaRequest: "获取验证码",
+      mfaRequesting: "发送中...",
+      mfaResend: "已发送 ({seconds}s)",
+      mfaSent: "验证码已发送至",
+      mfaSentCpdailyApp: "今日校园 App",
+      mfaCodeLabel: "验证码",
+      mfaCodePlaceholder: "请输入验证码",
+      mfaVerify: "验证",
+      mfaWechatOpen: "获取二维码",
+      mfaWechatOpening: "正在获取二维码...",
+      mfaWechatWaiting: "请使用其他设备微信扫码",
+      mfaWechatScanned: "已扫码，请在微信中确认登录",
+      mfaWechatConfirmed: "微信认证成功",
+      mfaWechatFailed: "微信认证失败",
+      mfaWechatExpired: "二维码已失效，请重新获取",
+      mfaWechatRetry: "重新获取",
+      back: "返回",
+      errorMfaRequestFailed: "获取验证码失败",
+      errorMfaWechatFailed: "微信认证失败，请重试",
+    },
+    autoLogin: {
+      mfaDescription: "请输入验证码完成登录",
+    },
+  },
+  en: {
+    login: {
+      mfaTitle: "MFA Verification",
+      mfaMethod: "MFA Method",
+      mfaMethodCpdaily: "Cpdaily",
+      mfaMethodSms: "SMS",
+      mfaMethodWechat: "WeChat",
+      mfaRequest: "Request Code",
+      mfaRequesting: "Sending...",
+      mfaResend: "Sent ({seconds}s)",
+      mfaSent: "Code sent to",
+      mfaSentCpdailyApp: "Cpdaily App",
+      mfaCodeLabel: "Code",
+      mfaCodePlaceholder: "Enter verification code",
+      mfaVerify: "Verify",
+      mfaWechatOpen: "Get QR Code",
+      mfaWechatOpening: "Loading QR code...",
+      mfaWechatWaiting: "Scan with WeChat on another device",
+      mfaWechatScanned: "Scanned. Confirm in WeChat",
+      mfaWechatConfirmed: "WeChat verified",
+      mfaWechatFailed: "WeChat verification failed",
+      mfaWechatExpired: "QR code expired. Get a new one",
+      mfaWechatRetry: "Reload",
+      back: "Back",
+      errorMfaRequestFailed: "Failed to request MFA code",
+      errorMfaWechatFailed: "WeChat verification failed, please retry",
+    },
+    autoLogin: {
+      mfaDescription: "Enter the verification code to complete login",
+    },
+  },
+})
+
+export type MfaDictionary = typeof mfaDictionary

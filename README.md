@@ -1,74 +1,76 @@
-<p align="center">
-  <img src="public/icon.svg" width="128" height="128" alt="燕大终端图标" />
-</p>
+<div align="center">
+  <img src="public/icon.svg" alt="Orahako" width="88" height="88" />
+  <h1>酸橙盒 Orahako</h1>
+  <p>面向大学通用线上服务的第三方客户端，构建于 <strong>Cordis</strong> 插件架构之上</p>
+  <p>
+    <a href="PLUGIN_ARCHITECTURE.md">插件组合架构</a> ·
+    <a href="packages/core/sdk/README.md">API v1 SDK</a> ·
+    <a href="packages/core/cli/README.md">插件 CLI</a> ·
+    <a href="https://github.com/Youwenqwq/orahako/releases">下载 APK</a>
+  </p>
+</div>
 
-<h1 align="center">燕大终端</h1>
+> [!NOTE]
+> 本项目处于 **0.x 开发者预览阶段**。API v1、清单格式、Slot、Provider 与运行时行为可能发生不兼容变更；插件作者应约束 `apiVersion` 与 `minAppVersion`。
 
-<p align="center">
-  <a href="README.zh-CN.md">详细文档（中文）</a> · <a href="README.en.md">English</a>
-</p>
+内核只负责组合、ZIP / Cordis 生命周期、恢复和通用 Native bridge；通用应用服务、可选教务运行时、燕大 Provider 与官方界面都由可替换插件提供。
 
-<p align="center">
-  燕山大学教务系统第三方 Android 客户端
-</p>
+## 架构速览
 
----
+API v1 将通用契约与内核、运行时服务、教务能力、客户端 UI、业务插件和应用组合分别放在 `packages/{core,runtime,edu,client,plugins,bundle}`。`app/layout.tsx`、`app/page.tsx` 与 `app/manifest.ts` 提供静态根入口；运行时页面由 `ctx.router` 通过根路径查询参数定位，例如 `/?route=schedule`。
 
-> 本项目为 **第三方客户端，与燕山大学官方无任何关联。** 仅供个人学习交流，代码**完全由 AI 进行编写**，
-> 人工仅进行了基本设计调试与粗略审计，使用即默认了解并接受相关风险，请勿用于侵犯他人权益或违反学校规定的场景。
+默认应用按 `platform → academic → ysu` 叠加三个 Bundle。非教务应用只需平台 Bundle，不依赖 Provider、会话或教务查询；燕大组合在教务 Bundle 之上加入燕大 Provider 与应用配置。
 
-## 这是什么
+## 功能与安装
 
-燕大终端是一个 Android 应用，可以让你更方便地使用燕山大学教务系统。设计初衷是解决第三方课表需手动更新，
-而今日校园 App 加载又过于缓慢，导致信息查询低效率的问题。
+官方 composition 可提供成绩与 GPA、日程、考试与补考、学生信息、培养方案、评教、校园服务、通知、桌面小组件和扩展 Shell。功能是否出现由当前 Provider 的能力切片与 `supportedPlugins` 决定；教务运行时是可选组合。
 
-本项目实现了以下功能：
+从 [GitHub Releases](https://github.com/Youwenqwq/orahako/releases) 下载最新 APK。Web 端是同一代码库的静态导出 PWA；原生端通过 Capacitor 打包，支持 OTA 热更新与外壳版本检测。应用内插件管理器可以安装市场包或可信来源的本地 ZIP。插件与应用同权，可访问凭据、会话、网络与 Native 能力，请只安装可信来源。
 
-- **登录**：CAS 统一认证，支持验证码和 MFA 多因素验证，记住登录状态；
-  内置登录速率限制保护，防止频繁登录触发风控
-- **查成绩**：按学期筛选，查看统计、分布和排名；支持学期 GPA 计算与学位课程标识
-- **看课表**：合并理论课与实验课，按周切换，桌面和移动端双布局；
-  实时高亮当前课程，支持课程活动签到 / 签退，支持手动调课。
-- **查考试**：按学期查看考试安排
-- **看绩点**：学分和绩点一目了然
-- **培养方案**：查看课程完成情况和学业预警
-- **评教**：支持学生评教功能，评教支持批量一键自动填写最高分
-- **劳动平台**: 劳动记录和劳动时长
-- **双创平台**: 双创学分，认定记录，竞赛库等
-- **综合测评**: 综测成绩和指标明细查询
-- **全校课表**: 查询全校课表和空教室
-- **费用查询**: 空调用量，一卡通余额和缴费查询
-- **上课通知**：可按完整课表和未来周次生成提醒；Android 16+ 且允许精确闹钟后可启用**Android Live Update**显示课前、上课及连堂状态，课前倒计时会在后台自动更新；强震动可独立开启.
-- **成绩/考试监听**：支持以最低 15 分钟的间隔监听教务系统，提醒新增成绩和考试安排变化
-- **桌面小组件**：提供今日 / 明日课表与考试小组件，可从日程页助手或设置页样式指南添加
+官方外部插件源码维护于 [`Youwenqwq/orahako-official-plugins`](https://github.com/Youwenqwq/orahako-official-plugins)，官方市场索引与 ZIP 由 [`Youwenqwq/orahako-plugin-registry`](https://github.com/Youwenqwq/orahako-plugin-registry) 通过 GitHub Raw 分发。
 
-应用通过 Capacitor 打包为 Android WebView 壳应用，支持 OTA 热更新与 APK 外壳版本检测。
+### 数据与兼容性
 
-## 数据来源与安全性
+原生端直接访问学校系统；Web 端经同源 EdgeOne 边缘函数按域名白名单转发。官方插件不提供集中存储教务数据的业务后端。Android 的教务凭据使用系统安全存储；Web 没有同等安全存储保证。
 
-燕大终端 App 的所有业务逻辑**均在本地实现**，从官方教务系统获取数据并保存在本地，中间不经过任何其他服务器。
-登录之后的凭据数据存储在本地，凭据通过系统安全存储（Android Keystore / iOS Keychain）加密保存。
+Android 要求 7.0（API 24）及以上，系统 WebView 至少为 Chromium 111；Web 端要求 Chromium 内核高于 119。
 
-为保证教务系统数据不受意外修改，本项目除学生评教外，均仅实现了数据查询功能。
+## 开发与验证
 
-## 安装
+```sh
+pnpm install
+pnpm run dev
+pnpm run typecheck
+pnpm run lint
+pnpm run test
+pnpm run verify-architecture
+pnpm run build
+pnpm run build:packages
+pnpm plugin pack <plugin-directory> [output.zip]
+```
 
-从 [GitHub Releases](https://github.com/Youwenqwq/ysu-client/releases) 下载最新的 APK 安装包。
+外部包的 API v1 清单、共享模块 `PLATFORM_MODULES`、独立仓库使用 `@orahako/sdk` 与 `@orahako/cli` 打包及发布流程见 [SDK 指南](packages/core/sdk/README.md) 与 [CLI 文档](packages/core/cli/README.md)。公共 npm 包（`@orahako/sdk`、`@orahako/ui-primitives`、`@orahako/academic-sdk`、`@orahako/cli`）由 `pnpm run build:packages` 构建，并通过 `pnpm run publish:packages` 发布。
 
-> 如遇网络故障，可在应用内配置 GitHub 代理镜像。设置入口会在出现网络故障时弹出。
+Android 组合验证：
 
-## 兼容性
+```sh
+pnpm run build
+npx cap sync
+cd android && ./gradlew verifyNativeComposition testDebugUnitTest
+```
 
-应用运行在系统 WebView 中。如遇渲染异常，请检查 WebView 版本是否过低——
-**最低要求 Chromium v111**。可通过 Play Store 等方式更新 Android System WebView。
+发布入口：
 
-## 相关项目
+```sh
+pnpm run release
+```
 
-业务逻辑参考以下项目实现：
+发布由 GitHub Actions 构建 `dist.zip`、签名 APK 与 `version.json`。文档不表示已完成线上部署或真机验收；Android WebView、通知、闹钟、后台轮询、widget 和真实学校账号仍需单独验收。
 
+## 相关项目与协议
+
+- [orahako-official-plugins](https://github.com/Youwenqwq/orahako-official-plugins) — 官方外部插件源码仓库
+- [orahako-plugin-registry](https://github.com/Youwenqwq/orahako-plugin-registry) — 官方插件市场索引与 ZIP 分发仓库
 - [ysu-sdk](https://github.com/Youwenqwq/ysu-sdk) — 教务系统 SDK
-- [ysu-api](https://github.com/Youwenqwq/ysu-api) — 教务系统 API 服务
-
-## 协议
 
 本项目源代码按 [GPL-3.0 协议](LICENSE) 开放。

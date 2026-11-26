@@ -3,16 +3,16 @@ const scopeUrl = new URL(self.registration.scope);
 const scopePath = scopeUrl.pathname.endsWith("/")
   ? scopeUrl.pathname
   : `${scopeUrl.pathname}/`;
-const cachePrefix = `ysu-app-shell:${scopePath}:`;
+const cachePrefix = `orahako-app-shell:${scopePath}:`;
 const cacheName = `${cachePrefix}${version}`;
 
 const appShellUrl = new URL("./", scopeUrl).href;
 const shellPackUrl = new URL("./pwa-shell.pack", scopeUrl).href;
-const packMagic = [0x59, 0x53, 0x50, 0x4b]; // "YSPK"
+const packMagic = [0x4f, 0x48, 0x50, 0x4b]; // "OHPK"
 const packVersion = 1;
 
 // The shell ships as a single gzipped pack (see scripts/generate-pwa-shell.mjs):
-//   [4B magic "YSPK"][u32le version][u32le headerLength][header JSON][body]
+//   [4B magic "OHPK"][u32le version][u32le headerLength][header JSON][body]
 // Fetching one file instead of hundreds keeps the CDN's anti-bot challenge out
 // of the precache path, and makes install all-or-nothing: any failure rejects
 // and the worker never activates with a partial shell.

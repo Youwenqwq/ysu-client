@@ -1,5 +1,5 @@
 # dependencies
-/node_modules
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -18,6 +18,11 @@
 # production
 /build
 /dist
+/packages/*/dist/
+/packages/*/*/dist/
+/packages/*/*.zip
+/plugins/**/dist/
+/plugins/**/*.zip
 
 /android/*
 !/android/build.gradle
@@ -39,7 +44,29 @@
 !/android/app/src/
 /android/app/src/*
 !/android/app/src/main/
+!/android/app/src/test/
+!/android/app/src/androidTest/
 /android/app/src/main/assets/public/
+
+# Native capability modules: the auditable composition list, the generic core,
+# the official composition and the selected companions.
+!/android/nativeComposition.gradle
+!/android/native-core/
+!/android/native-official/
+!/android/native-platform/
+!/android/native-academic/
+!/android/native-widgets/
+!/android/native-widgets-schedule/
+!/android/native-widgets-exam/
+!/android/native-ysu/
+/android/native-core/build/
+/android/native-official/build/
+/android/native-platform/build/
+/android/native-academic/build/
+/android/native-widgets/build/
+/android/native-widgets-schedule/build/
+/android/native-widgets-exam/build/
+/android/native-ysu/build/
 
 # misc
 .DS_Store
@@ -94,6 +121,3 @@ website/.edgeone/
 /Could
 /Failed
 /Toolchain
-
-# Should be ignored test file
-lib/fees/meter/client.test.ts

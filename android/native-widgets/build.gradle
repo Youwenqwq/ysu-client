@@ -1,0 +1,29 @@
+// Generic home-screen widget host: declaration contract, declarative store,
+// controller and the `widgets.generic` capability. It never names an official
+// schedule/exam widget; companion modules contribute declarations and renderers
+// through `NativeWidgetCompositionModule`.
+
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+android {
+    namespace = "me.uwen.orahako.widget"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+dependencies {
+    implementation project(':native-core')
+    implementation "androidx.core:core:$androidxCoreVersion"
+
+    testImplementation "junit:junit:$junitVersion"
+    testImplementation "org.json:json:20250517"
+}

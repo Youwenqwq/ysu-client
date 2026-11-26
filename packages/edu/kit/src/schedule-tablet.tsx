@@ -1,0 +1,580 @@
+import { useMemo, useState } from "react"
+import type { AcademicScheduleRules, ClassPeriod, Course, CurrentWeek } from "@orahako/academic-sdk"
+import type { ScheduleEntry } from "@orahako/sdk"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  cn,
+} from "@orahako/ui-primitives"
+import { CalendarOff, Layers } from "lucide-react"
+
+import { courseBgClass, type CourseColorMap } from "./course-color"
+import type { ExamBlock } from "./exam-blocks"
+import { formatExamTime } from "./exam-utils"
+import {
+  computeOverlayBlocks,
+  computeWeekIsoDates,
+  type ScheduleOverlayBlock,
+} from "./schedule-entries"
+import { scheduleDate, scheduleOccurrence } from "./schedule-patches"
+import {
+  buildSectionTimeMap,
+  computeMergedBlocks,
+  computeWeekDateLabels,
+  courseEndSection,
+  courseStartSection,
+  isCourseCurrent,
+  periodEndTime,
+  periodStartTime,
+  type ScheduleBlock,
+} from "./schedule-utils"
+import {
+  DEFAULT_SCHEDULE_EDITOR_STATE,
+  SCHEDULE_DAYS,
+  ScheduleCourseAdjustedIndicator,
+  ScheduleDayAdjustedIndicator,
+  ScheduleDayHandle,
+  ScheduleDayLabel,
+  ScheduleGridTraces,
+  ScheduleOnlineBadge,
+  SchedulePatchedLabel,
+  computeScheduleGridRows,
+  courseHasScheduleTrace,
+  type ScheduleEditorState,
+  type ScheduleEmptyCellTarget,
+  type ScheduleLabels,
+} from "./schedule-view-shared"
+
+export interface ScheduleTabletProps {
+  courses: readonly Course[]
+  colorMap: CourseColorMap
+  examBlocks?: readonly ExamBlock[]
+  overlayEntries?: readonly ScheduleEntry[]
+  periods: readonly ClassPeriod[]
+  currentWeekday: number
+  currentWeek: CurrentWeek | null
+  /** Cached dated anchor for browsing labels, never used for current-day highlights. */
+  weekAnchor: CurrentWeek | null
+  selectedWeek: number
+  termStartDate?: string
+  nowMinutes: number
+  labels: ScheduleLabels
+  editor?: ScheduleEditorState
+  /** School timezone and break rows from the provider's timetable slice. */
+  scheduleRules?: AcademicScheduleRules
+  /** Keep the interactive grid visible even when a week has no courses or overlays. */
+  showGridWhenEmpty?: boolean
+  onCourseTap?: (course: Course, week: number) => void
+  onEntryTap?: (entry: ScheduleEntry) => void
+  onEmptyCellTap?: (cell: ScheduleEmptyCellTarget) => void
+}
+
+const NO_EXAM_BLOCKS: readonly ExamBlock[] = []
+const NO_OVERLAY_ENTRIES: readonly ScheduleEntry[] = []
+
+function overlayBlockClass(block: ScheduleOverlayBlock): string {
+  if (block.entry.category === "exam") {
+    return "bg-amber-500/15 ring-1 ring-inset ring-amber-500/50"
+  }
+  if (block.entry.category === "personal") {
+    return "bg-indigo-500/12 ring-1 ring-inset ring-indigo-500/45"
+  }
+  return "bg-emerald-500/12 ring-1 ring-inset ring-emerald-500/45"
+}
+
+function overlayTagClass(block: ScheduleOverlayBlock): string {
+  if (block.entry.category === "exam") {
+    return "text-amber-600 dark:text-amber-400"
+  }
+  if (block.entry.category === "personal") {
+    return "text-indigo-600 dark:text-indigo-400"
+  }
+  return "text-emerald-600 dark:text-emerald-400"
+}
+
+export function ScheduleTablet({
+  courses,
+  colorMap,
+  examBlocks = NO_EXAM_BLOCKS,
+  overlayEntries = NO_OVERLAY_ENTRIES,
+  periods,
+  currentWeekday,
+  currentWeek,
+  weekAnchor,
+  selectedWeek,
+  termStartDate,
+  nowMinutes,
+  labels,
+  editor = DEFAULT_SCHEDULE_EDITOR_STATE,
+  scheduleRules,
+  showGridWhenEmpty = false,
+  onCourseTap,
+  onEntryTap,
+  onEmptyCellTap,
+}: ScheduleTabletProps) {
+  const weekIsoDates = useMemo(
+    () => computeWeekIsoDates(weekAnchor, selectedWeek, termStartDate ?? editor.termStartDate),
+    [weekAnchor, selectedWeek, termStartDate, editor.termStartDate]
+  )
+  const dateForDay = (day: number) =>
+    editor.termStartDate
+      ? scheduleDate(editor.termStartDate, selectedWeek, day)
+      : weekIsoDates?.[day - 1]
+  const hasTraces =
+    editor.editing &&
+    editor.traces.some((trace) => SCHEDULE_DAYS.some((day) => dateForDay(day) === trace.date))
+  const [overlapDialog, setOverlapDialog] = useState<{
+    day: number
+    section: number
+    courses: Course[]
+  } | null>(null)
+  const [examDialog, setExamDialog] = useState<ExamBlock | null>(null)
+
+  const isCurrentWeek = currentWeek?.week === selectedWeek
+  const timeMap = useMemo(() => buildSectionTimeMap(periods), [periods])
+  const weekDates = useMemo(
+    () => computeWeekDateLabels(weekAnchor, selectedWeek, termStartDate),
+    [weekAnchor, selectedWeek, termStartDate]
+  )
+
+  const isBlockCurrent = (block: ScheduleBlock): boolean => {
+    if (!isCurrentWeek || block.day !== currentWeek?.weekday) return false
+    if (block.courses.length !== 1) return false
+    const first = block.courses[0]
+    return !!first && isCourseCurrent(first, nowMinutes, timeMap)
+  }
+
+  const { sectionToRow, totalRows, lunchRow, dinnerRow } = useMemo(
+    () => computeScheduleGridRows(periods, scheduleRules),
+    [periods, scheduleRules]
+  )
+
+  const gridTemplateRows = useMemo(() => {
+    const sizes: string[] = ["auto"]
+    for (let r = 2; r <= totalRows; r++) {
+      if (r === lunchRow || r === dinnerRow) {
+        sizes.push("18px")
+      } else {
+        sizes.push("minmax(52px, 1fr)")
+      }
+    }
+    return sizes.join(" ")
+  }, [totalRows, lunchRow, dinnerRow])
+
+  const mergedBlocks = useMemo(() => computeMergedBlocks(courses, periods), [courses, periods])
+  const overlayBlocks = useMemo(
+    () => computeOverlayBlocks(overlayEntries, periods, weekAnchor, selectedWeek, termStartDate),
+    [overlayEntries, periods, weekAnchor, selectedWeek, termStartDate]
+  )
+
+  function openCourse(course: Course) {
+    if (editor.editing && !editor.enabled) return
+    if (editor.selectCourse?.(course)) return
+    const occurrence = scheduleOccurrence(course)
+    const sourceWeek = occurrence?.source.week ?? selectedWeek
+    onCourseTap?.(course, sourceWeek)
+  }
+
+  function blockStyle(block: { day: number; start: number; end: number }) {
+    const startRow = sectionToRow.get(block.start)
+    const endRow = sectionToRow.get(block.end)
+    if (!startRow || !endRow) return { display: "none" as const }
+    return {
+      gridRow: `${startRow} / ${endRow + 1}`,
+      gridColumn: `${block.day + 1}`,
+    }
+  }
+
+  if (
+    !showGridWhenEmpty &&
+    courses.length === 0 &&
+    examBlocks.length === 0 &&
+    overlayBlocks.length === 0 &&
+    !editor.editing &&
+    !hasTraces
+  ) {
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <CalendarOff />
+          </EmptyMedia>
+          <EmptyTitle>{labels.noData}</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
+    )
+  }
+
+  return (
+    <>
+      <div className="overflow-auto">
+        <div
+          className="grid w-full"
+          data-schedule-grid={selectedWeek}
+          style={{
+            gridTemplateColumns: "minmax(48px, 0.4fr) repeat(7, minmax(0, 1fr))",
+            gridTemplateRows,
+          }}
+        >
+          <div className="border-r border-b border-border" />
+
+          {SCHEDULE_DAYS.map((d, idx) => (
+            <div
+              key={d}
+              className={cn(
+                "relative flex flex-col items-center justify-center gap-0.5 border-b border-border py-1.5 text-[10px] font-medium",
+                idx < 6 && "border-r",
+                isCurrentWeek && d === currentWeekday
+                  ? "bg-primary/5 text-primary"
+                  : "text-muted-foreground"
+              )}
+            >
+              <ScheduleDayLabel day={d} weekdayShort={labels.weekdayShort} />
+              {weekDates[d - 1] && (
+                <span className="text-[9px] opacity-70">{weekDates[d - 1]}</span>
+              )}
+              <ScheduleDayHandle
+                week={selectedWeek}
+                day={d}
+                editor={editor}
+                editorLabels={labels.editor}
+              />
+              <ScheduleDayAdjustedIndicator
+                week={selectedWeek}
+                day={d}
+                editor={editor}
+                editorLabels={labels.editor}
+              />
+            </div>
+          ))}
+
+          {periods.map((p) => {
+            const row = sectionToRow.get(p.section)
+            if (!row) return null
+            return (
+              <div
+                key={p.section}
+                className="flex flex-col items-center justify-center gap-0.5 border-r border-b border-border py-1 text-[9px] leading-tight text-muted-foreground"
+                style={{ gridRow: row, gridColumn: 1 }}
+              >
+                <span className="text-xs font-semibold text-foreground">{p.section}</span>
+                {periodStartTime(p) && <span>{periodStartTime(p)}</span>}
+                {periodEndTime(p) && <span>{periodEndTime(p)}</span>}
+              </div>
+            )
+          })}
+
+          {lunchRow !== null && (
+            <div
+              className="flex items-center justify-center border-b border-border bg-muted/40 text-[9px] font-medium text-muted-foreground"
+              style={{ gridRow: lunchRow, gridColumn: "1 / -1" }}
+            >
+              {labels.lunchBreak}
+            </div>
+          )}
+
+          {dinnerRow !== null && (
+            <div
+              className="flex items-center justify-center border-b border-border bg-muted/40 text-[9px] font-medium text-muted-foreground"
+              style={{ gridRow: dinnerRow, gridColumn: "1 / -1" }}
+            >
+              {labels.dinnerBreak}
+            </div>
+          )}
+
+          {SCHEDULE_DAYS.flatMap((d) =>
+            periods.map((p) => {
+              const row = sectionToRow.get(p.section)
+              if (!row) return null
+              const cellDate = dateForDay(d)
+              return (
+                <div
+                  key={`cell-${d}-${p.section}`}
+                  data-schedule-date={cellDate}
+                  data-schedule-section={p.section}
+                  onClick={
+                    onEmptyCellTap && !editor.editing
+                      ? () =>
+                          onEmptyCellTap({
+                            week: selectedWeek,
+                            day: d,
+                            section: p.section,
+                            ...(cellDate ? { date: cellDate } : {}),
+                          })
+                      : undefined
+                  }
+                  className={cn(
+                    "border-b border-border",
+                    d < 7 && "border-r",
+                    isCurrentWeek && d === currentWeekday && "bg-primary/5",
+                    onEmptyCellTap && !editor.editing && "cursor-pointer hover:bg-accent/30"
+                  )}
+                  style={{ gridRow: row, gridColumn: d + 1 }}
+                />
+              )
+            })
+          )}
+
+          {mergedBlocks.map((block, idx) => {
+            if (block.courses.length === 1) {
+              const c = block.courses[0]!
+              const occurrenceId = editor.enabled ? scheduleOccurrence(c)?.occurrenceId : undefined
+              const isBeingDragged = Boolean(
+                occurrenceId && editor.draggingOccurrenceIds?.has(occurrenceId)
+              )
+              return (
+                <button
+                  key={`block-${idx}`}
+                  type="button"
+                  draggable={false}
+                  data-schedule-course={occurrenceId}
+                  className={cn(
+                    "relative z-10 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1.5 text-left transition-[opacity,transform] active:opacity-60",
+                    courseBgClass(colorMap, c),
+                    editor.editing && courseHasScheduleTrace(c, editor.traces) && "pb-7",
+                    isBlockCurrent(block) && "ring-1 ring-primary",
+                    occurrenceId &&
+                      "cursor-grab touch-none ring-1 ring-primary/30 active:cursor-grabbing",
+                    isBeingDragged && "scale-[0.97] opacity-35 ring-2 ring-primary/60"
+                  )}
+                  style={blockStyle(block)}
+                  onClick={() => openCourse(c)}
+                >
+                  <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">
+                    <ScheduleOnlineBadge course={c} label={labels.onlineTag} />
+                    {c.name}
+                  </span>
+                  {c.classroom && (
+                    <span className="line-clamp-1 text-[9px] leading-tight text-foreground/70">
+                      {c.classroom}
+                    </span>
+                  )}
+                  {c.teacher && (
+                    <span className="line-clamp-1 text-[9px] leading-tight text-foreground/60">
+                      {c.teacher}
+                    </span>
+                  )}
+                  <ScheduleCourseAdjustedIndicator
+                    course={c}
+                    editor={editor}
+                    editorLabels={labels.editor}
+                  />
+                </button>
+              )
+            }
+            return (
+              <button
+                key={`block-${idx}`}
+                type="button"
+                className={cn(
+                  "relative z-10 m-0.5 flex flex-col items-center justify-center gap-0.5 rounded-md bg-accent p-1 text-center transition-opacity active:opacity-60",
+                  editor.editing &&
+                    block.courses.some((course) => courseHasScheduleTrace(course, editor.traces)) &&
+                    "pb-7"
+                )}
+                style={blockStyle(block)}
+                onClick={() =>
+                  setOverlapDialog({
+                    day: block.day,
+                    section: block.start,
+                    courses: block.courses,
+                  })
+                }
+              >
+                <Layers className="size-3 text-muted-foreground" />
+                <span className="text-xs font-semibold text-foreground">
+                  {block.courses.length}
+                </span>
+                <span className="text-[9px] text-muted-foreground">{labels.overlap}</span>
+              </button>
+            )
+          })}
+          <ScheduleGridTraces
+            week={selectedWeek}
+            sectionToRow={sectionToRow}
+            editor={editor}
+            editorLabels={labels.editor}
+          />
+          {examBlocks.map((block, idx) => (
+            <button
+              key={`exam-${idx}`}
+              type="button"
+              className="relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md bg-amber-500/15 p-1.5 text-left ring-1 ring-amber-500/50 transition-opacity ring-inset active:opacity-60"
+              style={blockStyle(block)}
+              onClick={(e) => {
+                e.currentTarget.blur()
+                setExamDialog(block)
+              }}
+            >
+              <span className="line-clamp-1 text-[9px] leading-tight font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
+                {labels.examTag}
+              </span>
+              <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">
+                {block.exam.name}
+              </span>
+              {block.exam.examLocation && (
+                <span className="line-clamp-2 text-[9px] leading-tight text-foreground/70">
+                  {block.exam.examLocation}
+                </span>
+              )}
+            </button>
+          ))}
+          {overlayBlocks.map((block) => {
+            const tag =
+              block.entry.badge ||
+              (block.entry.category === "exam"
+                ? labels.examTag
+                : block.entry.deliveryMode === "online"
+                  ? labels.onlineTag
+                  : labels.personalTag)
+            return (
+              <button
+                key={`overlay-${block.entry.id}`}
+                type="button"
+                data-schedule-entry={block.entry.id}
+                className={cn(
+                  "relative z-20 m-0.5 flex flex-col gap-0.5 overflow-hidden rounded-md p-1.5 text-left transition-opacity active:opacity-60",
+                  overlayBlockClass(block)
+                )}
+                style={blockStyle(block)}
+                onClick={(e) => {
+                  e.currentTarget.blur()
+                  onEntryTap?.(block.entry)
+                }}
+              >
+                {(tag || block.timeLabel) && (
+                  <span
+                    className={cn(
+                      "line-clamp-1 text-[9px] leading-tight font-semibold tracking-wide",
+                      overlayTagClass(block)
+                    )}
+                  >
+                    {[tag, block.timeLabel].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+                <span className="line-clamp-3 text-[11px] leading-tight font-medium text-foreground">
+                  {block.entry.title}
+                </span>
+                {block.entry.location && (
+                  <span className="line-clamp-2 text-[9px] leading-tight text-foreground/70">
+                    {block.entry.location}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <Dialog open={!!examDialog} onOpenChange={(v) => !v && setExamDialog(null)}>
+        <DialogContent closeLabel={labels.closeDialog}>
+          <DialogHeader>
+            <DialogTitle>{examDialog?.exam.name}</DialogTitle>
+            <DialogDescription className={examDialog?.exam.examName ? undefined : "sr-only"}>
+              {examDialog?.exam.examName || examDialog?.exam.name || ""}
+            </DialogDescription>
+          </DialogHeader>
+          {examDialog && (
+            <div className="flex flex-col gap-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{labels.examTime}</span>
+                <span>{formatExamTime(examDialog.exam)}</span>
+              </div>
+              {examDialog.exam.examLocation && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{labels.examLocation}</span>
+                  <span>{examDialog.exam.examLocation}</span>
+                </div>
+              )}
+              {examDialog.exam.seatNumber && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{labels.examSeat}</span>
+                  <span>{examDialog.exam.seatNumber}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!overlapDialog} onOpenChange={(v) => !v && setOverlapDialog(null)}>
+        <DialogContent closeLabel={labels.closeDialog}>
+          <DialogHeader>
+            <DialogTitle>
+              {overlapDialog &&
+                labels.overlapDialogTitle({
+                  weekday: labels.weekdayNames[overlapDialog.day - 1] ?? "",
+                  section: overlapDialog.section,
+                })}
+            </DialogTitle>
+            <DialogDescription>
+              {overlapDialog
+                ? labels.overlapCourses({
+                    count: overlapDialog.courses.length,
+                  })
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            {overlapDialog?.courses.map((c, i) => {
+              const metaItems = [
+                labels.weeks && c.weeks ? `${labels.weeks}: ${c.weeks}` : c.weeks,
+                labels.sections
+                  ? `${labels.sections}: ${courseStartSection(c)}-${courseEndSection(c)}`
+                  : `${courseStartSection(c)}-${courseEndSection(c)}`,
+              ].filter(Boolean)
+              return (
+                <Card
+                  key={i}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      setOverlapDialog(null)
+                      openCourse(c)
+                    }
+                  }}
+                  className="cursor-pointer transition-colors hover:bg-accent/50"
+                  onClick={() => {
+                    setOverlapDialog(null)
+                    openCourse(c)
+                  }}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">
+                      <SchedulePatchedLabel
+                        course={c}
+                        editor={editor}
+                        editorLabels={labels.editor}
+                      />
+                      {c.name}
+                    </CardTitle>
+                    <CardDescription>
+                      {[c.teacher, c.classroom].filter(Boolean).join(" · ")}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground">
+                    {metaItems.join(" · ")}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}

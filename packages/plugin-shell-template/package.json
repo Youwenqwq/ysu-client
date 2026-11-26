@@ -1,0 +1,12 @@
+{
+  "name": "@orahako/plugin-shell-template",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cordisjs/core": "3.18.1",
+    "@orahako/sdk": "workspace:*",
+    "@orahako/ui-primitives": "workspace:*",
+    "react": "^19.2.6"
+  }
+}

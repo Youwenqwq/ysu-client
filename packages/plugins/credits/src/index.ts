@@ -1,0 +1,124 @@
+import { Lightbulb } from "lucide-react"
+import { definePlugin, PLUGIN_API_VERSION, type PluginManifest } from "@orahako/sdk"
+import {
+  createCreditsController,
+  type CreditsController,
+  type CreditsControllerOptions,
+  type CreditsTab,
+  type CreditsUiState,
+  type CreditsUiStoreInstance,
+} from "./controller"
+import { creditsDictionary, type CreditsDictionary } from "./dictionary"
+import { CreditsHeaderActions, type CreditsHeaderActionsInject } from "./header-actions"
+import { CreditsPage, type CreditsPageInject, type CreditsPageProps } from "./page"
+import "./slots"
+
+export const CREDITS_PLUGIN_ID = "orahako.credits"
+
+const ONE_HOUR_TTL_MS = 1000 * 60 * 60
+const SIX_HOUR_TTL_MS = 1000 * 60 * 60 * 6
+const DEFAULT_TTL_MS = 1000 * 60 * 60 * 24
+
+export type {
+  CreditsController,
+  CreditsControllerOptions,
+  CreditsDictionary,
+  CreditsPageInject,
+  CreditsPageProps,
+  CreditsTab,
+  CreditsUiState,
+  CreditsUiStoreInstance,
+}
+
+const creditsManifest: PluginManifest = {
+  id: CREDITS_PLUGIN_ID,
+  name: "双创学分",
+  version: "1.0.0",
+  apiVersion: PLUGIN_API_VERSION,
+  kind: "feature",
+  entry: "index.js",
+  description: "创新创业学分汇总、申报记录、认定记录与竞赛活动库查询",
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"],
+}
+
+export const creditsPlugin = definePlugin({
+  manifest: creditsManifest,
+  inject: ["ui", "slots", "router", "i18n", "provider", "session", "query"] as const,
+  apply(ctx) {
+    const { ui, slots, router, i18n, provider, session, query } = ctx
+    i18n.register(creditsDictionary)
+
+    query.registerPolicy("credit-summary", { ttl: SIX_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("credit-batches", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("credit-declarations", { ttl: ONE_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("credit-records", { ttl: SIX_HOUR_TTL_MS, persist: true })
+    query.registerPolicy("credit-competitions", { ttl: DEFAULT_TTL_MS, persist: true })
+    query.registerPolicy("credit-library-activities", { ttl: DEFAULT_TTL_MS, persist: true })
+
+    const controller = createCreditsController({
+      provider,
+      session,
+      query,
+    })
+
+    slots.inject("shell.header.actions", () =>
+      slots.register(
+        {
+          id: "credits-header-actions",
+          slot: "shell.header.actions",
+          dictionary: creditsDictionary,
+          store: controller.uiStore,
+          inject: (): CreditsHeaderActionsInject => ({
+            hooks: {
+              location: router.current,
+              provider: provider.state,
+              batches: controller.batchesSource,
+            },
+            pluginId: CREDITS_PLUGIN_ID,
+          }),
+        },
+        CreditsHeaderActions
+      )
+    )
+
+    ui.registerPage(
+      {
+        id: "index",
+        route: "credits",
+        title: "双创学分",
+        titleKey: "credits.title",
+        capability: "credits",
+        dictionary: creditsDictionary,
+        store: controller.uiStore,
+        inject: (): CreditsPageInject => ({
+          hooks: {
+            summary: controller.summarySource,
+            batches: controller.batchesSource,
+            declarations: controller.declarationsSource,
+            records: controller.recordsSource,
+            competitions: controller.competitionsSource,
+            activities: controller.activitiesSource,
+          },
+        }),
+      },
+      CreditsPage
+    )
+
+    ui.registerNavigation({
+      id: "credits",
+      title: "双创学分",
+      titleKey: "credits.nav",
+      page: "index",
+      icon: Lightbulb,
+      group: "platform",
+      order: 20,
+      capability: "credits",
+    })
+
+    ctx.effect(() => () => {
+      controller.dispose()
+    })
+  },
+})
+
+export default creditsPlugin

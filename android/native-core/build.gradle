@@ -1,0 +1,39 @@
+// Generic native bridge: capability contract, registry, host interfaces,
+// companion config parsing, the mounted Capacitor plugin and the reconciler
+// receiver. This module never names an official capability.
+
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+// Deep-link scheme selected by the host build composition. The value becomes a
+// string resource, so no generic module hardcodes the host identity.
+def deepLinkScheme = (gradle.ext.find('orahakoDeepLinkScheme') ?: 'orahako').toString()
+
+android {
+    namespace = "me.uwen.orahako.nativebridge"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        resValue "string", "orahako_native_deep_link_scheme", deepLinkScheme
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    defaultConfig {
+        consumerProguardFiles 'consumer-rules.pro'
+    }
+}
+
+dependencies {
+    api project(':capacitor-android')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.core:core:$androidxCoreVersion"
+    implementation "androidx.fragment:fragment:$androidxFragmentVersion"
+
+    testImplementation "junit:junit:$junitVersion"
+    testImplementation "org.json:json:20250517"
+}

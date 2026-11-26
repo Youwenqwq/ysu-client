@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification channels and settings shared by every publisher. -->
+    <string name="notify_errors_channel_name">通知服务状态</string>
+    <string name="notify_errors_channel_desc">后台检查异常提示，默认无声音和震动</string>
+
+    <!-- Notify: schedule alarm -->
+    <string name="class_alarm_channel_name">日程提醒</string>
+    <string name="class_alarm_channel_desc">课前与日程开始前提醒通知</string>
+    <string name="class_live_channel_name">日程实时倒计时</string>
+    <string name="class_live_channel_desc">课前与进行中的实时倒计时通知（Android Live Update）</string>
+    <string name="class_alarm_text">%1$d分钟后上课</string>
+    <string name="event_alarm_text">%1$d分钟后开始</string>
+    <string name="class_timer_error_title">日程准点计时不可用</string>
+    <string name="class_timer_error_text">系统禁止启动日程计时服务，或计时服务发生异常，无法保证准点提醒。请打开应用检查通知、精确闹钟及后台运行权限。</string>
+    <string name="class_live_update_short">%1$d分钟</string>
+    <string name="class_live_update_before_now">%1$s · 即将上课</string>
+    <string name="class_live_update_before">%1$s · 还有 %2$d 分钟上课</string>
+    <string name="class_live_update_during">%1$s · 还有 %2$d 分钟下课</string>
+    <string name="class_live_update_in_class">正在上课</string>
+    <string name="class_live_update_ended">已下课</string>
+    <string name="class_live_update_soon">即将上课</string>
+    <string name="event_live_update_before_now">%1$s · 即将开始</string>
+    <string name="event_live_update_before">%1$s · 还有 %2$d 分钟开始</string>
+    <string name="event_live_update_during">%1$s · 还有 %2$d 分钟结束</string>
+    <string name="event_live_update_ongoing">正在进行</string>
+    <string name="event_live_update_ended">已结束</string>
+    <string name="class_live_update_capsule">%1$d分钟</string>
+    <string name="class_live_update_conflict">%1$d 项日程时间冲突</string>
+    <string name="class_live_update_started">正在上课</string>
+    <string name="class_live_update_started_at">正在上课 · %1$s</string>
+    <string name="notify_fallback_alarm_course">课程</string>
+    <string name="notify_fallback_alarm_event">日程</string>
+</resources>

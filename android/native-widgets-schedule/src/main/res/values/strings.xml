@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_name">今日日程</string>
+    <string name="widget_description">显示今日课程与日程安排</string>
+    <string name="widget_tomorrow_name">明日日程</string>
+    <string name="widget_tomorrow_description">固定显示明天的课程与日程安排，支持跨周</string>
+    <string name="widget_tomorrow_short">明日</string>
+    <string name="widget_tomorrow_header">明日 %1$s</string>
+    <string name="widget_tomorrow_empty">明日无日程</string>
+    <string name="widget_tomorrow_courses">%d项日程</string>
+    <string name="widget_remaining_courses">还有%d项日程</string>
+    <string name="widget_week_number">第%d周</string>
+    <string name="widget_section_format">第%1$d-%2$d节</string>
+    <string name="widget_empty_sync">打开 App 同步日程</string>
+    <string name="widget_empty_no_courses">今天没有日程哦</string>
+    <string name="widget_empty_all_done">今天日程已全部结束</string>
+</resources>
