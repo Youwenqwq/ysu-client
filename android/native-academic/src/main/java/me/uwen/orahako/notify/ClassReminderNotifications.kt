@@ -1,5 +1,6 @@
 package me.uwen.orahako.notify
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -8,19 +9,19 @@ import me.uwen.orahako.nativebridge.NativeHostApp
 import me.uwen.orahako.nativebridge.capabilities.notifications.NotificationChannelSpec
 import me.uwen.orahako.nativebridge.capabilities.notifications.NotificationChannels
 
-/** Deep link that class reminders and Live Updates open. */
+/** Deep link that schedule reminders and Live Updates open. */
 internal fun scheduleDeepLink(context: Context): android.net.Uri =
     NativeHostApp.deepLink(context, context.getString(R.string.orahako_academic_host_schedule))
 
 /**
- * Notification presentation owned by `reminders.classes`: the class reminder
+ * Notification presentation owned by `reminders.classes`: the schedule reminder
  * channel, the Live Update channel and the timer-failure error channel.
  */
 internal object ClassReminderNotifications {
 
-    const val REMINDER_CHANNEL_ID = "orahako_classes_v2"
-    const val LIVE_CHANNEL_ID = "orahako_classes_live_v1"
-    const val ERROR_CHANNEL_ID = "orahako_errors_v2"
+    const val REMINDER_CHANNEL_ID = "orahako_schedule_reminders"
+    const val LIVE_CHANNEL_ID = "orahako_schedule_live"
+    const val ERROR_CHANNEL_ID = "orahako_errors"
 
     fun ensureChannels(context: Context) {
         NotificationChannels.ensure(
@@ -30,18 +31,20 @@ internal object ClassReminderNotifications {
                 name = context.getString(R.string.class_alarm_channel_name),
                 description = context.getString(R.string.class_alarm_channel_desc),
                 importance = NotificationManager.IMPORTANCE_HIGH,
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC,
             ),
         )
         NotificationChannels.ensure(
             context,
             NotificationChannelSpec(
                 id = LIVE_CHANNEL_ID,
-                name = context.getString(R.string.class_alarm_channel_name),
-                description = context.getString(R.string.class_alarm_channel_desc),
-                importance = NotificationManager.IMPORTANCE_LOW,
+                name = context.getString(R.string.class_live_channel_name),
+                description = context.getString(R.string.class_live_channel_desc),
+                importance = NotificationManager.IMPORTANCE_DEFAULT,
                 sound = false,
                 vibration = false,
                 showBadge = false,
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC,
             ),
         )
         NotificationChannels.ensure(
@@ -60,11 +63,12 @@ internal object ClassReminderNotifications {
     fun builder(context: Context): NotificationCompat.Builder {
         ensureChannels(context)
         return NotificationCompat.Builder(context, REMINDER_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_stat_class)
             .setContentIntent(openScheduleIntent(context))
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
     }
 

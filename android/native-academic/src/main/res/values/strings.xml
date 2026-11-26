@@ -7,6 +7,8 @@
     <!-- Notify: schedule alarm -->
     <string name="class_alarm_channel_name">日程提醒</string>
     <string name="class_alarm_channel_desc">课前与日程开始前提醒通知</string>
+    <string name="class_live_channel_name">日程实时倒计时</string>
+    <string name="class_live_channel_desc">课前与进行中的实时倒计时通知（Android Live Update）</string>
     <string name="class_alarm_text">%1$d分钟后上课</string>
     <string name="event_alarm_text">%1$d分钟后开始</string>
     <string name="class_timer_error_title">日程准点计时不可用</string>

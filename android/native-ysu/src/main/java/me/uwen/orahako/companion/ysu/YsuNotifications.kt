@@ -22,28 +22,28 @@ enum class YsuNotificationKind(
     internal val importance: Int,
 ) {
     GRADES(
-        "orahako_grades_v2",
+        "orahako_grades",
         R.string.notify_grades_channel_name,
         R.string.notify_grades_channel_desc,
         R.string.orahako_ysu_host_grades,
         NotificationManager.IMPORTANCE_HIGH,
     ),
     EXAMS(
-        "orahako_exams_v2",
+        "orahako_exams",
         R.string.notify_exams_channel_name,
         R.string.notify_exams_channel_desc,
         R.string.orahako_ysu_host_exams,
         NotificationManager.IMPORTANCE_HIGH,
     ),
     AUTH(
-        "orahako_auth_v2",
+        "orahako_auth",
         R.string.notify_auth_channel_name,
         R.string.notify_auth_channel_desc,
         R.string.orahako_ysu_host_settings,
         NotificationManager.IMPORTANCE_DEFAULT,
     ),
     ERRORS(
-        "orahako_errors_v2",
+        "orahako_errors",
         AcademicR.string.notify_errors_channel_name,
         AcademicR.string.notify_errors_channel_desc,
         R.string.orahako_ysu_host_settings,

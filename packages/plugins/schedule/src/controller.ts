@@ -468,6 +468,16 @@ export class ClassReminderAndWidgetController {
     return result?.granted === true
   }
 
+  async openNotificationSettings(): Promise<boolean> {
+    if (!this.native.isNative) return false
+    if (!(await this.capabilityAvailable(NOTIFICATIONS_CORE_CAPABILITY))) return false
+    const result = await this.native.capabilities.invoke<{ opened?: boolean }>(
+      NOTIFICATIONS_CORE_CAPABILITY,
+      "openNotificationSettings"
+    )
+    return result?.opened === true
+  }
+
   async setClassReminderEnabled(enabled: boolean): Promise<boolean> {
     if (this.disposed) return false
     if (enabled && !this.isFeatureSupported()) {

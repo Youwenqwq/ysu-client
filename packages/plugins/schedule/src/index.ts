@@ -914,6 +914,7 @@ export const schedulePlugin = definePlugin({
               toggleClassReminder: (enabled) => controller.setClassReminderEnabled(enabled),
               requestExactAlarmPermission: () => native.requestExactAlarmPermission(),
               checkExactAlarmPermission,
+              openNotificationSettings: () => controller.openNotificationSettings(),
             }),
           },
           ClassReminderSettings

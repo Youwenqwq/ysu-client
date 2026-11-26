@@ -107,6 +107,9 @@ export interface OnboardingWizardInject {
   readonly isNative: () => boolean
   readonly hasProvider: (schoolId: string) => boolean
   readonly activateSchoolChoice: (school: OnboardingSchoolChoice) => Promise<void>
+  readonly checkNotificationPermission?: () => Promise<boolean>
+  readonly checkExactAlarmPermission?: () => Promise<boolean>
+  readonly checkBatteryOptimization?: () => Promise<boolean>
   readonly requestNotificationPermission: () => Promise<boolean>
   readonly requestExactAlarmPermission: () => Promise<boolean>
   readonly requestBatteryOptimizationExemption: () => Promise<boolean>
@@ -152,13 +155,91 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
     }
   }, [])
 
-  if (!storeHydrated || !session.hasHydrated || completed) return null
-
-  // A persisted school choice means the user already confirmed it; never unlock it again.
+  const {
+    checkNotificationPermission,
+    checkExactAlarmPermission,
+    checkBatteryOptimization,
+    isNative,
+  } = props
+  const visible = storeHydrated && session.hasHydrated && !completed
   const schoolLocked = storedSchoolId !== null
   const showSchoolStep = !schoolLocked && step === "school"
+  const onPermissionsStep = visible && !showSchoolStep
+  const native = isNative()
+
+  useEffect(() => {
+    if (!onPermissionsStep || !native) return
+    let disposed = false
+    let listener: { remove(): void | Promise<void> } | undefined
+
+    const refreshPermissions = (): void => {
+      const checks: Array<readonly [string, (() => Promise<boolean>) | undefined]> = [
+        ["notifications", checkNotificationPermission],
+        ["exactAlarm", checkExactAlarmPermission],
+        ["battery", checkBatteryOptimization],
+      ]
+      for (const [key, check] of checks) {
+        if (!check) continue
+        void check()
+          .then((granted) => {
+            if (disposed || !granted) return
+            setPermissionResults((current) =>
+              current[key] === true ? current : { ...current, [key]: true }
+            )
+          })
+          .catch(() => {})
+      }
+    }
+
+    const onReturnToApp = (): void => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return
+      refreshPermissions()
+    }
+
+    refreshPermissions()
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+      window.addEventListener("focus", onReturnToApp)
+    }
+    if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+      document.addEventListener("visibilitychange", onReturnToApp)
+    }
+    void import("@capacitor/app")
+      .then(({ App }) =>
+        App.addListener("appStateChange", ({ isActive }) => {
+          if (isActive) refreshPermissions()
+        })
+      )
+      .then((handle) => {
+        if (disposed) {
+          void handle.remove()
+        } else {
+          listener = handle
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      disposed = true
+      if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
+        window.removeEventListener("focus", onReturnToApp)
+      }
+      if (typeof document !== "undefined" && typeof document.removeEventListener === "function") {
+        document.removeEventListener("visibilitychange", onReturnToApp)
+      }
+      void listener?.remove()
+    }
+  }, [
+    checkBatteryOptimization,
+    checkExactAlarmPermission,
+    checkNotificationPermission,
+    native,
+    onPermissionsStep,
+  ])
+
+  if (!visible) return null
+
+  // A persisted school choice means the user already confirmed it; never unlock it again.
   const activeSchoolId = selectedSchoolId || schools[0]?.id || ""
-  const native = props.isNative()
   const totalSteps = 2
   const currentStepNumber = showSchoolStep ? 1 : 2
   const progressPercent = (currentStepNumber / totalSteps) * 100

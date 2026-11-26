@@ -210,6 +210,19 @@ export class AcademicPollingController {
     return result.ignored === true
   }
 
+  async checkExactAlarmPermission(): Promise<boolean | null> {
+    if (!this.native.isNative) return null
+    const result = await this.callNotifications<{ granted?: boolean }>("checkExactAlarmPermission")
+    if (!result) return null
+    return result.granted === true
+  }
+
+  async openNotificationSettings(): Promise<boolean> {
+    if (!this.native.isNative) return false
+    const result = await this.callNotifications<{ opened?: boolean }>("openNotificationSettings")
+    return result?.opened === true
+  }
+
   async inspect(): Promise<Record<string, unknown> | null> {
     const handlerId = this.resolveHandlerId() ?? this.lastBoundHandlerId
     if (!handlerId) return null

@@ -361,6 +361,7 @@ export interface ClassReminderSettingsInject {
   readonly toggleClassReminder: (enabled: boolean) => Promise<boolean>
   readonly requestExactAlarmPermission: () => Promise<boolean>
   readonly checkExactAlarmPermission: () => Promise<boolean>
+  readonly openNotificationSettings?: () => Promise<boolean>
 }
 
 export type ClassReminderSettingsProps = DerivedComponentProps<
@@ -394,6 +395,7 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
 
   const [notificationPermissionPending, setNotificationPermissionPending] = useState(false)
   const [liveUpdatePermissionPending, setLiveUpdatePermissionPending] = useState(false)
+  const [exactAlarmGranted, setExactAlarmGranted] = useState<boolean | null>(null)
   const awaitingExactAlarmPermission = useRef(false)
 
   const activeProvider = providerSnap.provider
@@ -406,12 +408,14 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
 
   useEffect(() => {
     if (!visible) return
-    if (typeof window === "undefined" || typeof document === "undefined") return
+    let disposed = false
+    let listener: { remove(): void | Promise<void> } | undefined
 
-    const onReturnToApp = (): void => {
-      if (document.visibilityState === "hidden" || !awaitingExactAlarmPermission.current) return
+    const refreshExactAlarm = (): void => {
       void checkExactAlarmPermission()
         .then((granted) => {
+          if (disposed) return
+          setExactAlarmGranted(granted)
           if (granted && awaitingExactAlarmPermission.current) {
             awaitingExactAlarmPermission.current = false
             setClassLiveUpdateEnabled(true)
@@ -420,19 +424,42 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
         .catch(() => {})
     }
 
-    if (typeof window.addEventListener === "function") {
+    const onReturnToApp = (): void => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return
+      refreshExactAlarm()
+    }
+
+    refreshExactAlarm()
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
       window.addEventListener("focus", onReturnToApp)
     }
-    if (typeof document.addEventListener === "function") {
+    if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
       document.addEventListener("visibilitychange", onReturnToApp)
     }
+    void import("@capacitor/app")
+      .then(({ App }) =>
+        App.addListener("appStateChange", ({ isActive }) => {
+          if (isActive) refreshExactAlarm()
+        })
+      )
+      .then((handle) => {
+        if (disposed) {
+          void handle.remove()
+        } else {
+          listener = handle
+        }
+      })
+      .catch(() => {})
+
     return () => {
-      if (typeof window.removeEventListener === "function") {
+      disposed = true
+      if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
         window.removeEventListener("focus", onReturnToApp)
       }
-      if (typeof document.removeEventListener === "function") {
+      if (typeof document !== "undefined" && typeof document.removeEventListener === "function") {
         document.removeEventListener("visibilitychange", onReturnToApp)
       }
+      void listener?.remove()
     }
   }, [checkExactAlarmPermission, setClassLiveUpdateEnabled, visible])
 
@@ -444,7 +471,33 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
     try {
       const ok = await props.toggleClassReminder(enabled)
       if (!ok && enabled) {
-        toast.error(t("settings.notificationPermissionDenied"))
+        if (props.openNotificationSettings) {
+          toast.error(t("settings.notificationPermissionDenied"), {
+            action: {
+              label: t("settings.notificationOpenSettings"),
+              onClick: () => {
+                void props.openNotificationSettings?.()
+              },
+            },
+          })
+        } else {
+          toast.error(t("settings.notificationPermissionDenied"))
+        }
+        return
+      }
+      if (ok && enabled) {
+        const exactGranted = await checkExactAlarmPermission().catch(() => true)
+        setExactAlarmGranted(exactGranted)
+        if (!exactGranted) {
+          toast.info(t("settings.classReminderExactAlarmHint"), {
+            action: {
+              label: t("settings.classReminderExactAlarmAction"),
+              onClick: () => {
+                void props.requestExactAlarmPermission()
+              },
+            },
+          })
+        }
       }
     } catch {
       toast.error(t("settings.notificationSyncFailed"))
@@ -499,6 +552,24 @@ export const ClassReminderSettings: SlotComponent<ClassReminderSettingsProps> = 
 
       {classReminderEnabled && (
         <>
+          {exactAlarmGranted === false && (
+            <div
+              data-exact-alarm-warning=""
+              className="flex items-center justify-between gap-2 border-t border-border py-2.5 text-xs text-orange-600 dark:text-orange-400"
+            >
+              <span className="min-w-0 flex-1">{t("settings.classReminderExactAlarmHint")}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 px-2 text-xs"
+                onClick={() => void props.requestExactAlarmPermission()}
+              >
+                {t("settings.classReminderExactAlarmAction")}
+              </Button>
+            </div>
+          )}
+
           <div className="flex items-center gap-3 border-t border-border py-3">
             <Radio className="size-5 shrink-0 text-muted-foreground" />
             <label

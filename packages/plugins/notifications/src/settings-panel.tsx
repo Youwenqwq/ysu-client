@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import {
+  AlarmClock,
   Battery,
   Bell,
   CalendarClock,
@@ -57,6 +58,9 @@ export interface NotificationSettingsInject {
   readonly isNative: () => boolean
   readonly checkBatteryOptimization: () => Promise<boolean | null>
   readonly requestBatteryOptimizationExemption: () => Promise<boolean>
+  readonly checkExactAlarmPermission?: () => Promise<boolean | null>
+  readonly requestExactAlarmPermission?: () => Promise<boolean>
+  readonly openNotificationSettings?: () => Promise<boolean>
   readonly requestNotificationPermission: () => Promise<boolean>
   readonly togglePollingEnabled: (enabled: boolean) => Promise<boolean>
 }
@@ -82,6 +86,7 @@ export const NotificationSettingsPanel: SlotComponent<NotificationSettingsPanelP
 
   const [permissionPending, setPermissionPending] = useState(false)
   const [batteryIgnored, setBatteryIgnored] = useState<boolean | null>(null)
+  const [exactAlarmGranted, setExactAlarmGranted] = useState<boolean | null>(null)
   const [autoStartDialogOpen, setAutoStartDialogOpen] = useState(false)
 
   const native = props.isNative()
@@ -104,25 +109,43 @@ export const NotificationSettingsPanel: SlotComponent<NotificationSettingsPanelP
     .filter((item) => item.active && item.participatesInPolling)
     .map((item) => item.channel.id)
 
-  const { checkBatteryOptimization } = props
+  const { checkBatteryOptimization, checkExactAlarmPermission } = props
   useEffect(() => {
     if (!native) return
     let disposed = false
     let listener: { remove(): void | Promise<void> } | undefined
 
-    const refreshBattery = () => {
+    const refreshSystemPermissions = () => {
       void checkBatteryOptimization()
         .then((ignored) => {
           if (!disposed) setBatteryIgnored(ignored)
         })
         .catch(() => {})
+      if (checkExactAlarmPermission) {
+        void checkExactAlarmPermission()
+          .then((granted) => {
+            if (!disposed) setExactAlarmGranted(granted)
+          })
+          .catch(() => {})
+      }
     }
 
-    refreshBattery()
+    const onReturnToApp = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return
+      refreshSystemPermissions()
+    }
+
+    refreshSystemPermissions()
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+      window.addEventListener("focus", onReturnToApp)
+    }
+    if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+      document.addEventListener("visibilitychange", onReturnToApp)
+    }
     void import("@capacitor/app")
       .then(({ App }) =>
         App.addListener("appStateChange", ({ isActive }) => {
-          if (isActive) refreshBattery()
+          if (isActive) refreshSystemPermissions()
         })
       )
       .then((handle) => {
@@ -136,9 +159,15 @@ export const NotificationSettingsPanel: SlotComponent<NotificationSettingsPanelP
 
     return () => {
       disposed = true
+      if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
+        window.removeEventListener("focus", onReturnToApp)
+      }
+      if (typeof document !== "undefined" && typeof document.removeEventListener === "function") {
+        document.removeEventListener("visibilitychange", onReturnToApp)
+      }
       void listener?.remove()
     }
-  }, [native, checkBatteryOptimization])
+  }, [native, checkBatteryOptimization, checkExactAlarmPermission])
 
   if (!visible) {
     return (
@@ -151,6 +180,21 @@ export const NotificationSettingsPanel: SlotComponent<NotificationSettingsPanelP
     )
   }
 
+  const showPermissionDeniedToast = () => {
+    if (props.openNotificationSettings) {
+      toast.error(t("permissions.permissionDenied"), {
+        action: {
+          label: t("permissions.openSettings"),
+          onClick: () => {
+            void props.openNotificationSettings?.()
+          },
+        },
+      })
+      return
+    }
+    toast.error(t("permissions.permissionDenied"))
+  }
+
   async function handleToggle(nextEnabled: boolean) {
     setPermissionPending(true)
     try {
@@ -159,12 +203,12 @@ export const NotificationSettingsPanel: SlotComponent<NotificationSettingsPanelP
         return
       }
       if (!(await props.requestNotificationPermission())) {
-        toast.error(t("permissions.permissionDenied"))
+        showPermissionDeniedToast()
         return
       }
       const applied = await props.togglePollingEnabled(true)
       if (!applied) {
-        toast.error(t("permissions.permissionDenied"))
+        showPermissionDeniedToast()
       }
     } catch {
       toast.error(t("permissions.syncFailed"))
@@ -183,6 +227,36 @@ export const NotificationSettingsPanel: SlotComponent<NotificationSettingsPanelP
                 {t("permissions.sectionTitle")}
               </h3>
 
+              {props.requestExactAlarmPermission && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void props.requestExactAlarmPermission?.().then((granted) => {
+                      setExactAlarmGranted(granted)
+                    })
+                  }}
+                  className="flex items-center gap-3 py-3 text-left transition-colors active:bg-muted/60"
+                >
+                  <AlarmClock className="size-5 shrink-0 text-muted-foreground" />
+                  <div className="flex flex-1 flex-col">
+                    <span className="text-sm">{t("permissions.exactAlarmTitle")}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {t("permissions.exactAlarmDesc")}
+                    </span>
+                  </div>
+                  {exactAlarmGranted !== null && (
+                    <span
+                      className={`text-xs ${exactAlarmGranted ? "text-green-600" : "text-orange-500"}`}
+                    >
+                      {exactAlarmGranted
+                        ? t("permissions.exactAlarmGranted")
+                        : t("permissions.exactAlarmNotGranted")}
+                    </span>
+                  )}
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => {
@@ -190,7 +264,7 @@ export const NotificationSettingsPanel: SlotComponent<NotificationSettingsPanelP
                     setBatteryIgnored(ignored)
                   })
                 }}
-                className="flex items-center gap-3 py-3 text-left transition-colors active:bg-muted/60"
+                className={`flex items-center gap-3 py-3 text-left transition-colors active:bg-muted/60 ${props.requestExactAlarmPermission ? "border-t border-border" : ""}`}
               >
                 <Battery className="size-5 shrink-0 translate-x-0.5 text-muted-foreground" />
                 <div className="flex flex-1 flex-col">

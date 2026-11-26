@@ -12,6 +12,10 @@ export const notificationsDictionary = defineDictionary({
     },
     permissions: {
       sectionTitle: "系统权限",
+      exactAlarmTitle: "精确闹钟",
+      exactAlarmDesc: "允许“闹钟和提醒”以确保日程提醒与实时倒计时准点触发",
+      exactAlarmGranted: "已允许",
+      exactAlarmNotGranted: "未允许",
       batteryTitle: "电池优化",
       batteryDesc: "关闭电池优化以确保后台通知正常工作",
       batteryIgnored: "已关闭",
@@ -22,6 +26,7 @@ export const notificationsDictionary = defineDictionary({
       autoStartDialogContent:
         "部分系统会限制后台应用的闹钟和网络，导致提醒不准时。请在系统设置里允许本应用自启动、后台运行，并关闭电池优化。不同品牌手机的路径可能不同，通常在 设置 → 应用 → 自启动管理 中。",
       ok: "知道了",
+      openSettings: "去设置",
       permissionDenied: "请在系统设置中允许通知后再开启",
       syncFailed: "通知设置同步失败，请重试",
     },
@@ -68,6 +73,10 @@ export const notificationsDictionary = defineDictionary({
     },
     permissions: {
       sectionTitle: "System Permissions",
+      exactAlarmTitle: "Exact Alarms",
+      exactAlarmDesc: 'Allow "Alarms & reminders" for on-time schedule reminders and Live Updates',
+      exactAlarmGranted: "Allowed",
+      exactAlarmNotGranted: "Not allowed",
       batteryTitle: "Battery Optimization",
       batteryDesc: "Disable battery optimization to ensure background notifications work",
       batteryIgnored: "Disabled",
@@ -78,6 +87,7 @@ export const notificationsDictionary = defineDictionary({
       autoStartDialogContent:
         "Some systems restrict alarms and network access for background apps. Allow auto-start and background running, and disable battery optimization for this app in Settings → Apps → Auto-start management.",
       ok: "Got it",
+      openSettings: "Settings",
       permissionDenied: "Allow notifications in system settings before enabling this option.",
       syncFailed: "Could not sync notification settings. Please try again.",
     },

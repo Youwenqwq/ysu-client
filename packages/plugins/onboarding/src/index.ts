@@ -192,6 +192,23 @@ export const onboardingPlugin = definePlugin({
       void provider.initialize().catch(() => {})
     }
 
+    const checkNativePermission = async (
+      method: "checkPermissions" | "checkExactAlarmPermission" | "checkBatteryOptimization",
+      field: "granted" | "ignored"
+    ): Promise<boolean> => {
+      if (!native.isNative) return false
+      if (!native.capabilities.has("notifications.core@1")) return false
+      try {
+        const result = await native.capabilities.invoke<Record<string, unknown>>(
+          "notifications.core@1",
+          method
+        )
+        return result?.[field] === true
+      } catch {
+        return false
+      }
+    }
+
     slots.inject("shell.overlay", () =>
       slots.register(
         {
@@ -214,6 +231,11 @@ export const onboardingPlugin = definePlugin({
             isNative: () => native.isNative,
             hasProvider: (schoolId: string) => providers.hasProvider(schoolId),
             activateSchoolChoice,
+            checkNotificationPermission: () => checkNativePermission("checkPermissions", "granted"),
+            checkExactAlarmPermission: () =>
+              checkNativePermission("checkExactAlarmPermission", "granted"),
+            checkBatteryOptimization: () =>
+              checkNativePermission("checkBatteryOptimization", "ignored"),
             requestNotificationPermission: () => native.requestNotificationPermission(),
             requestExactAlarmPermission: () => native.requestExactAlarmPermission(),
             requestBatteryOptimizationExemption: () => native.requestBatteryOptimizationExemption(),

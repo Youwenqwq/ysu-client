@@ -301,10 +301,13 @@ export const scheduleDictionary = defineDictionary({
       widgetShowNextDay: "小组件无日程时显示下一日",
       widgetShowNextDayDesc: "当天无安排时自动显示下一有日程日的安排",
       notificationPermissionDenied: "请在系统设置中允许通知后再开启",
+      notificationOpenSettings: "去设置",
       notificationSyncFailed: "通知设置同步失败，请重试",
       classReminderTitle: "日程提醒",
       classReminderEnabled: "开启日程提醒",
       classReminderHint: "覆盖教务课程、自建课程与个人日程；需至少每隔一个预约周期打开 App 刷新",
+      classReminderExactAlarmHint: "未授予“闹钟和提醒”精确闹钟权限，系统可能延迟推送提醒",
+      classReminderExactAlarmAction: "去授权",
       classReminderMinutes: "提前提醒时间",
       classLiveUpdateEnabled: "使用 Android Live Update 显示实时倒计时",
       classLiveUpdateExactAlarmRequired:
@@ -666,11 +669,15 @@ export const scheduleDictionary = defineDictionary({
       widgetShowNextDayDesc: "Show next active day's schedule when today is empty",
       notificationPermissionDenied:
         "Allow notifications in system settings before enabling this option.",
+      notificationOpenSettings: "Settings",
       notificationSyncFailed: "Could not sync notification settings. Please try again.",
       classReminderTitle: "Schedule Reminder",
       classReminderEnabled: "Enable schedule reminder",
       classReminderHint:
         "Covers courses and personal events; open the app at least once per cycle to refresh",
+      classReminderExactAlarmHint:
+        'Without "Alarms & reminders" permission, reminders may be delayed by the system',
+      classReminderExactAlarmAction: "Allow",
       classReminderMinutes: "Reminder time",
       classLiveUpdateEnabled: "Use Android Live Update for live countdowns",
       classLiveUpdateExactAlarmRequired:

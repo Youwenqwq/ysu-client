@@ -20,25 +20,29 @@ data class NotificationChannelSpec(
     val sound: Boolean = true,
     val vibration: Boolean = true,
     val showBadge: Boolean = true,
+    val lockscreenVisibility: Int? = null,
 )
 
 object NotificationChannels {
 
     /**
-     * Creates the channel when it does not exist yet. Existing channels are
-     * never recreated: the user owns their sound, vibration and importance.
+     * Creates the channel when it does not exist yet, or updates its localized
+     * name/description while preserving user-modified importance, sound and vibration.
      *
      * @return true when the channel was created by this call.
      */
     fun ensure(context: Context, spec: NotificationChannelSpec): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
         val manager = context.getSystemService(NotificationManager::class.java) ?: return false
-        if (manager.getNotificationChannel(spec.id) != null) return false
+        val created = manager.getNotificationChannel(spec.id) == null
 
         val channel = NotificationChannel(spec.id, spec.name, spec.importance).apply {
             description = spec.description
             enableVibration(spec.vibration)
             setShowBadge(spec.showBadge)
+            if (spec.lockscreenVisibility != null) {
+                lockscreenVisibility = spec.lockscreenVisibility
+            }
             if (spec.sound) {
                 setSound(
                     Settings.System.DEFAULT_NOTIFICATION_URI,
@@ -52,6 +56,6 @@ object NotificationChannels {
             }
         }
         manager.createNotificationChannel(channel)
-        return true
+        return created
     }
 }
