@@ -38,6 +38,13 @@ export interface ScheduleSettingsState {
   readonly calendarSyncEnabled: boolean
   readonly calendarSyncIncludeExams: boolean
   readonly calendarSyncWriteReminders: boolean
+  readonly webcalEnabled: boolean
+  readonly webcalIncludeExams: boolean
+  readonly webcalWriteReminders: boolean
+  readonly webcalReadToken: string | null
+  readonly webcalWriteToken: string | null
+  readonly webcalLastSyncedAt: number | null
+  readonly webcalLastSyncedCount: number | null
 }
 
 function clampInt(value: number, min: number, max: number, fallback: number): number {
@@ -60,6 +67,13 @@ export const scheduleSettingsStore = defineStore({
     calendarSyncEnabled: false,
     calendarSyncIncludeExams: true,
     calendarSyncWriteReminders: false,
+    webcalEnabled: false,
+    webcalIncludeExams: true,
+    webcalWriteReminders: true,
+    webcalReadToken: null,
+    webcalWriteToken: null,
+    webcalLastSyncedAt: null,
+    webcalLastSyncedCount: null,
   }),
   persist: {
     key: "schedule-settings",
@@ -140,6 +154,48 @@ export const scheduleSettingsStore = defineStore({
           ? prev
           : { ...prev, calendarSyncWriteReminders: writeReminders }
       )
+    },
+    setWebcalIncludeExams(ctx, includeExams: boolean) {
+      ctx.set((prev) =>
+        prev.webcalIncludeExams === includeExams
+          ? prev
+          : { ...prev, webcalIncludeExams: includeExams }
+      )
+    },
+    setWebcalWriteReminders(ctx, writeReminders: boolean) {
+      ctx.set((prev) =>
+        prev.webcalWriteReminders === writeReminders
+          ? prev
+          : { ...prev, webcalWriteReminders: writeReminders }
+      )
+    },
+    setWebcalPublished(
+      ctx,
+      payload: {
+        readonly readToken: string
+        readonly writeToken: string
+        readonly count: number
+        readonly syncedAt: number
+      }
+    ) {
+      ctx.set((prev) => ({
+        ...prev,
+        webcalEnabled: true,
+        webcalReadToken: payload.readToken,
+        webcalWriteToken: payload.writeToken,
+        webcalLastSyncedCount: payload.count,
+        webcalLastSyncedAt: payload.syncedAt,
+      }))
+    },
+    clearWebcal(ctx) {
+      ctx.set((prev) => ({
+        ...prev,
+        webcalEnabled: false,
+        webcalReadToken: null,
+        webcalWriteToken: null,
+        webcalLastSyncedCount: null,
+        webcalLastSyncedAt: null,
+      }))
     },
     reset(ctx) {
       ctx.reset()

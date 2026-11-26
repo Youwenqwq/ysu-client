@@ -226,6 +226,27 @@ function parsePeriodClockMinutes(timeStr: string | undefined): number | undefine
   return hours < 24 && minutes < 60 ? hours * 60 + minutes : undefined
 }
 
+function generateWebcalToken(): string {
+  const bytes = new Uint8Array(24)
+  crypto.getRandomValues(bytes)
+  let binary = ""
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]!)
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")
+}
+
+function resolveCalendarFeedEndpoint(isNative: boolean): string {
+  if (
+    !isNative &&
+    typeof window !== "undefined" &&
+    (window.location.protocol === "https:" || window.location.protocol === "http:")
+  ) {
+    return `${window.location.origin}/api/calendar`
+  }
+  return "https://ysu.welain.com/api/calendar"
+}
+
 function detectLiveUpdateSupported(isNative: boolean): boolean {
   if (!isNative) return false
   if (typeof navigator === "undefined" || typeof navigator.userAgent !== "string") {
@@ -767,6 +788,62 @@ export const schedulePlugin = definePlugin({
       return { fileName, savedToDownloads: true, shared: false }
     }
 
+    const calendarFeedEndpoint = resolveCalendarFeedEndpoint(native.isNative)
+
+    const publishWebcalFeed = async (
+      ics: string,
+      count: number,
+      rotate = false
+    ): Promise<{ readonly readToken: string; readonly count: number }> => {
+      const current = settingsStore.source.getSnapshot()
+      if (rotate && current.webcalReadToken && current.webcalWriteToken) {
+        await fetch(calendarFeedEndpoint, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            readToken: current.webcalReadToken,
+            writeToken: current.webcalWriteToken,
+          }),
+        }).catch(() => {})
+      }
+      const readToken =
+        !rotate && current.webcalReadToken ? current.webcalReadToken : generateWebcalToken()
+      const writeToken =
+        !rotate && current.webcalWriteToken ? current.webcalWriteToken : generateWebcalToken()
+
+      const response = await fetch(calendarFeedEndpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ readToken, writeToken, ics }),
+      })
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "")
+        throw new Error(detail || `HTTP ${response.status}`)
+      }
+      settingsStore.actions.setWebcalPublished({
+        readToken,
+        writeToken,
+        count,
+        syncedAt: Date.now(),
+      })
+      return { readToken, count }
+    }
+
+    const deleteWebcalFeed = async (): Promise<void> => {
+      const current = settingsStore.source.getSnapshot()
+      if (current.webcalReadToken && current.webcalWriteToken) {
+        await fetch(calendarFeedEndpoint, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            readToken: current.webcalReadToken,
+            writeToken: current.webcalWriteToken,
+          }),
+        }).catch(() => {})
+      }
+      settingsStore.actions.clearWebcal()
+    }
+
     ui.registerPage(
       {
         id: "index",
@@ -818,6 +895,13 @@ export const schedulePlugin = definePlugin({
           openWidgetsSettings,
           openNotificationsSettings,
           exportIcsFile,
+          calendarFeedEndpoint,
+          publishWebcalFeed,
+          deleteWebcalFeed,
+          setWebcalIncludeExams: (include: boolean) =>
+            settingsStore.actions.setWebcalIncludeExams(include),
+          setWebcalWriteReminders: (write: boolean) =>
+            settingsStore.actions.setWebcalWriteReminders(write),
           ...(controller
             ? {
                 toggleCalendarSync: (enabled: boolean) =>

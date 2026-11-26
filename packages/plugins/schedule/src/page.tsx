@@ -8,14 +8,18 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Download,
+  ExternalLink,
   Eye,
   Grid3x2,
   Grid3x3,
   History,
+  Link2,
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   SlidersHorizontal,
   Trash2,
@@ -192,6 +196,15 @@ export interface SchedulePageInject {
   readonly setCalendarSyncWriteReminders?: (write: boolean) => void
   readonly syncCalendarNow?: () => Promise<void>
   readonly clearSystemCalendar?: () => Promise<void>
+  readonly calendarFeedEndpoint?: string
+  readonly publishWebcalFeed?: (
+    ics: string,
+    count: number,
+    rotate?: boolean
+  ) => Promise<{ readonly readToken: string; readonly count: number }>
+  readonly deleteWebcalFeed?: () => Promise<void>
+  readonly setWebcalIncludeExams?: (include: boolean) => void
+  readonly setWebcalWriteReminders?: (write: boolean) => void
 }
 
 export type SchedulePageProps = DerivedComponentProps<
@@ -338,6 +351,8 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   const [detailEntry, setDetailEntry] = useState<ScheduleEntry | null>(null)
   const [calendarSyncOpen, setCalendarSyncOpen] = useState(false)
   const [calendarSyncPending, setCalendarSyncPending] = useState(false)
+  const [webcalOpen, setWebcalOpen] = useState(false)
+  const [webcalPending, setWebcalPending] = useState(false)
   const lastCreateNonceRef = useRef(createRequestNonce)
 
   const activeProvider = providerSnap.provider
@@ -856,6 +871,81 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     }
   }
 
+  const buildWebcalIcsPayload = (includeExams: boolean, writeReminders: boolean) => {
+    const events = buildCalendarSyncEvents({
+      courses,
+      extraEntries: overlayEntries,
+      periods,
+      currentWeek: currentWeek ?? snapshot,
+      calendar: termCalendar,
+      timeZone,
+      now: new Date(clockTick),
+      includeExams,
+      examTitlePrefix: t("schedule.examTitlePrefix"),
+      remindMinutes: writeReminders ? settings.classReminderMinutes : undefined,
+    })
+    const calendarLabel = semester ? `酸橙盒 · ${semester}` : "酸橙盒 · 日程"
+    const ics = serializeCalendarIcs(events, {
+      calendarName: calendarLabel,
+      now: new Date(clockTick),
+    })
+    return { ics, count: events.length }
+  }
+
+  const handlePublishWebcal = async (rotate = false): Promise<void> => {
+    if (!props.publishWebcalFeed) return
+    const { ics, count } = buildWebcalIcsPayload(
+      settings.webcalIncludeExams,
+      settings.webcalWriteReminders
+    )
+    if (count === 0) {
+      toast.info(t("schedule.exportIcsEmpty"))
+      return
+    }
+    setWebcalPending(true)
+    try {
+      await props.publishWebcalFeed(ics, count, rotate)
+      toast.success(
+        rotate ? t("schedule.webcalRotatedToast") : t("schedule.webcalUpdatedToast", { count })
+      )
+    } catch {
+      toast.error(t("schedule.webcalFailedToast"))
+    } finally {
+      setWebcalPending(false)
+    }
+  }
+
+  const handleDeleteWebcal = async (): Promise<void> => {
+    if (!props.deleteWebcalFeed) return
+    setWebcalPending(true)
+    try {
+      await props.deleteWebcalFeed()
+      toast.success(t("schedule.webcalClearedToast"))
+    } catch {
+      toast.error(t("schedule.webcalFailedToast"))
+    } finally {
+      setWebcalPending(false)
+    }
+  }
+
+  const webcalHttpsUrl =
+    settings.webcalReadToken && props.calendarFeedEndpoint
+      ? `${props.calendarFeedEndpoint}?token=${encodeURIComponent(settings.webcalReadToken)}`
+      : null
+  const webcalSchemeUrl = webcalHttpsUrl
+    ? webcalHttpsUrl.replace(/^https?:\/\//i, "webcal://")
+    : null
+
+  const handleCopyWebcalUrl = async (): Promise<void> => {
+    if (!webcalSchemeUrl) return
+    try {
+      await navigator.clipboard?.writeText(webcalSchemeUrl)
+      toast.success(t("schedule.webcalCopied"))
+    } catch {
+      toast.error(t("schedule.webcalFailedToast"))
+    }
+  }
+
   if (activeProvider && !supportsPlugin(activeProvider.supportedPlugins, props.pluginId)) {
     return null
   }
@@ -1056,6 +1146,22 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                   <CalendarSync className="mr-2 size-4" />
                   <span className="flex-1">{t("schedule.syncSystemCalendar")}</span>
                   {settings.calendarSyncEnabled && (
+                    <Badge variant="secondary" className="ml-2 text-[10px]">
+                      ON
+                    </Badge>
+                  )}
+                </DropdownMenuItem>
+              )}
+              {props.publishWebcalFeed && (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    actions.setFilterDrawerOpen(false)
+                    setWebcalOpen(true)
+                  }}
+                >
+                  <Link2 className="mr-2 size-4" />
+                  <span className="flex-1">{t("schedule.webcalSubscribe")}</span>
+                  {settings.webcalEnabled && (
                     <Badge variant="secondary" className="ml-2 text-[10px]">
                       ON
                     </Badge>
@@ -1497,6 +1603,130 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 </Button>
               )}
               <Button type="button" onClick={() => setCalendarSyncOpen(false)}>
+                {t("closeDialog")}
+              </Button>
+            </ResponsiveModalFooter>
+          </ResponsiveModalContent>
+        </ResponsiveModal>
+      )}
+
+      {props.publishWebcalFeed && (
+        <ResponsiveModal open={webcalOpen} onOpenChange={setWebcalOpen}>
+          <ResponsiveModalContent className="sm:max-w-md">
+            <ResponsiveModalHeader>
+              <ResponsiveModalTitle className="flex items-center gap-2">
+                <Link2 className="size-4 text-primary" />
+                {t("schedule.webcalTitle")}
+              </ResponsiveModalTitle>
+              <ResponsiveModalDescription>{t("schedule.webcalDesc")}</ResponsiveModalDescription>
+            </ResponsiveModalHeader>
+            <ResponsiveModalBody className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2 text-sm">
+                  <Calendar className="size-4 text-muted-foreground" />
+                  {t("settings.calendarSyncIncludeExams")}
+                </span>
+                <Switch
+                  checked={settings.webcalIncludeExams}
+                  onCheckedChange={(checked) => props.setWebcalIncludeExams?.(checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-sm">{t("settings.calendarSyncWriteReminders")}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t("settings.calendarSyncWriteRemindersHint")}
+                  </span>
+                </div>
+                <Switch
+                  checked={settings.webcalWriteReminders}
+                  onCheckedChange={(checked) => props.setWebcalWriteReminders?.(checked)}
+                />
+              </div>
+
+              {webcalSchemeUrl ? (
+                <div className="flex flex-col gap-2 border-t border-border pt-3">
+                  <div className="rounded-md border bg-muted/40 px-2.5 py-2 font-mono text-[11px] break-all text-muted-foreground">
+                    {webcalSchemeUrl}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button asChild size="sm">
+                      <a href={webcalSchemeUrl}>
+                        <ExternalLink className="mr-1.5 size-3.5" />
+                        {t("schedule.webcalOpenApp")}
+                      </a>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleCopyWebcalUrl()}
+                    >
+                      <Copy className="mr-1.5 size-3.5" />
+                      {t("schedule.webcalCopyLink")}
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <span className="text-xs text-muted-foreground">
+                      {settings.webcalLastSyncedCount !== null
+                        ? t("settings.calendarSyncSyncedCount", {
+                            count: settings.webcalLastSyncedCount,
+                          })
+                        : ""}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={webcalPending}
+                        onClick={() => void handlePublishWebcal(false)}
+                      >
+                        <RefreshCw className="mr-1 size-3.5" />
+                        {t("schedule.webcalUpdateNow")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={webcalPending}
+                        onClick={() => void handlePublishWebcal(true)}
+                      >
+                        <RotateCcw className="mr-1 size-3.5" />
+                        {t("schedule.webcalRotateLink")}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  disabled={webcalPending}
+                  onClick={() => void handlePublishWebcal(false)}
+                >
+                  <Link2 className="mr-1.5 size-4" />
+                  {t("schedule.webcalEnable")}
+                </Button>
+              )}
+
+              <p className="border-t border-border pt-2 text-xs leading-5 text-muted-foreground">
+                {t("schedule.webcalPrivacyNote")}
+              </p>
+            </ResponsiveModalBody>
+            <ResponsiveModalFooter>
+              {settings.webcalEnabled && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={webcalPending}
+                  onClick={() => void handleDeleteWebcal()}
+                >
+                  <Trash2 className="mr-1.5 size-4" />
+                  {t("schedule.webcalClear")}
+                </Button>
+              )}
+              <Button type="button" onClick={() => setWebcalOpen(false)}>
                 {t("closeDialog")}
               </Button>
             </ResponsiveModalFooter>
