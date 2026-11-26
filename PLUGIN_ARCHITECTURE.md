@@ -2,7 +2,7 @@
 
 Orahako 是由 Cordis 插件组合成的应用，而不是由固定 Next.js 页面控制的功能集合。内核负责 composition、插件生命周期、外部 ZIP、恢复和通用 Native bridge；服务、界面、Provider 与业务功能都由可替换包提供。插件与应用同权，不构成安全沙箱。
 
-本文描述 API v1 当前契约。非 API v1（其他 `apiVersion`）的市场 ZIP 不兼容且会被拒绝，必须迁移源码并重新打包发布；没有迁移、降级或兼容加载路径。
+本文描述 API v1 当前契约，内核仅加载 `apiVersion: 1` 的插件包。
 
 ## 包拓扑与依赖边界
 
@@ -66,15 +66,15 @@ Activation 只由 `scripts/deploy-website.sh` 的 `APP_DEPLOYMENT=edgeone-pwa` �
 
 `schedule` 服务向外暴露合并调课补丁、课程覆写、自定义日程与外部源后的统一 `allEntries`、`calendar` 与 `refresh()`；其余教务数据统一由 `provider`、`session` 与 `query` 底座按身份共享缓存提供，不额外为每个业务 UI 插件包装重复的数据服务。定制 Shell 或 `root` 界面插件可以按需消费这些服务自绘核心界面，并在冷门或系统页面回退渲染 `props.children`。
 
-教务运行时是可选服务：Provider 通过 `ctx.providers.registerProvider(schoolId, factory)` 注册；`SchoolProvider` 以正交 `AcademicSliceMap` 组合认证和业务切片，不恢复单体 Provider。`reset()` / `logout()` 只用于用户显式操作；热替换和宿主退出调用本地 `dispose()`，新实例初始化前等待旧实例释放，旧实例不得再清理共享 Query、凭据或 Native 状态。`SchoolProvider.timeZone` 声明学校时区，`timetable.scheduleRules` 声明作息分界，通用教务算法不固定学校时区。Provider 的能力声明与 `supportedPlugins` 同时决定查询、页面、导航和功能插件是否可用。查询数据 record 可按身份共享，但每个插件的 descriptor、enabled 和订阅生命周期相互隔离；TTL/persist 策略由功能插件通过 `query.registerPolicy` 在自己的作用域注册，不在运行时枚举业务功能。官方组合只内置并默认选择 YSU；初始化向导仅在用户打开“更多学校”时从当前市场的 `provider` 类别发现其他学校，约定插件 ID 为 `<schoolId>.provider`，选择时安装该插件并验证对应 Provider 已注册，不在部署配置中枚举社区学校。学校确认后是固定应用身份，登录、账号和 App 内插件市场不提供切校或 Provider 安装入口；Provider 市场条目只服务于初始化向导。
+教务运行时是可选服务：Provider 通过 `ctx.providers.registerProvider(schoolId, factory)` 注册；`SchoolProvider` 以正交 `AcademicSliceMap` 组合认证和业务切片。`reset()` / `logout()` 只用于用户显式操作；热替换和宿主退出调用本地 `dispose()`，新实例初始化前等待旧实例释放，旧实例不得再清理共享 Query、凭据或 Native 状态。`SchoolProvider.timeZone` 声明学校时区，`timetable.scheduleRules` 声明作息分界，通用教务算法不固定学校时区。Provider 的能力声明与 `supportedPlugins` 同时决定查询、页面、导航和功能插件是否可用。查询数据 record 可按身份共享，但每个插件的 descriptor、enabled 和订阅生命周期相互隔离；TTL/persist 策略由功能插件通过 `query.registerPolicy` 在自己的作用域注册，不在运行时枚举业务功能。官方组合只内置并默认选择 YSU；初始化向导仅在用户打开“更多学校”时从当前市场的 `provider` 类别发现其他学校，约定插件 ID 为 `<schoolId>.provider`，选择时安装该插件并验证对应 Provider 已注册，不在部署配置中枚举社区学校。学校确认后是固定应用身份，登录、账号和 App 内插件市场不提供切校或 Provider 安装入口；Provider 市场条目只服务于初始化向导。
 
 ## Slot、UI 与四份派生 Props
 
 `root`（`single`）是唯一预置 Slot。其他 Slot 由插件扩展 `SlotMap` 并在运行时声明；`children` 只授权当前组件渲染所声明的子 Slot。用 `slots.inject` 等待可选 Slot，并在声明撤销时清理贡献。`single` 与 `keyed` 选最低优先级，同一目标同优先级会报错；`list` 与 `chain` 按 `order` 排列。普通贡献仍遵守单声明者原则；替代 Shell 可对已预声明的公共 `shell.*` Slot 使用 `declareChildren: false`，取得渲染授权而不重复声明。
 
-宿主偏好中的 Shell、主题与启动页选择共享同一份 Observable 状态，插件管理器、设置页和 `OrahakoApp` 通过它同步切换。主题 CSS 只由宿主按 `activeTheme` 注入；空值表示默认主题。启动页只保存宿主的 `startupPage`，未设置时回退 `composition.defaults.landing`；Shell 和设置 Store 不再维护第二份状态。
+宿主偏好中的 Shell、主题与启动页选择共享同一份 Observable 状态，插件管理器、设置页和 `OrahakoApp` 通过它同步切换。主题 CSS 只由宿主按 `activeTheme` 注入；空值表示默认主题。启动页只保存宿主的 `startupPage`，未设置时回退 `composition.defaults.landing`；Shell 和设置 Store 不维护第二份状态。
 
-页面、Shell、设置和 Slot 组件都用注册点声明 `children`、`store`、`inject`，不得读取 `ctx`、业务 React Context、`useSyncExternalStore` 或直接 `useSWR`。贡献的 `inject` 是无参闭包，只捕获 `apply` 中显式声明的服务，不再接收完整 Cordis `Context`。语义路由经 `navigation.resolve()`，显式 `?plugin=&page=` 经 `navigation.available()`；两者共享同一能力和 Provider 门禁。唯一 `ui-renderer` 自动派生：
+页面、Shell、设置和 Slot 组件都用注册点声明 `children`、`store`、`inject`，不得读取 `ctx`、业务 React Context、`useSyncExternalStore` 或直接 `useSWR`。贡献的 `inject` 是无参闭包，只捕获 `apply` 中显式声明的服务，不接收完整 Cordis `Context`。语义路由经 `navigation.resolve()`，显式 `?plugin=&page=` 经 `navigation.available()`；两者共享同一能力和 Provider 门禁。唯一 `ui-renderer` 自动派生：
 
 1. **Runtime Share**：owner、作用域类型化 `t`、`locale`。
 2. **Child Render Share**：仅当前 `children` 声明授权的 `renderSlot` / `renderSlotChain`。
@@ -85,9 +85,9 @@ Activation 只由 `scripts/deploy-website.sh` 的 `APP_DEPLOYMENT=edgeone-pwa` �
 
 ## 作用域 Store 与词典
 
-`defineStore` 是工厂，不创建模块级单例；插件在 `apply` 内以 `store.create(ctx.storage)` 创建实例。持久化键由宿主变为 `orahako-plugin:<plugin-id>:<key>`，插件不得拼全局 `STORAGE_KEYS` 或恢复上帝单例 settings store。只把 selector 和绑定 action 暴露给组件。
+`defineStore` 是工厂，不创建模块级单例；插件在 `apply` 内以 `store.create(ctx.storage)` 创建实例。持久化键由宿主变为 `orahako-plugin:<plugin-id>:<key>`，插件不得拼接全局存储键或使用全局设置单例。只把 selector 和绑定 action 暴露给组件。
 
-每个插件通过 `defineDictionary({ zh, en })` 持有自己的类型化词典，点路径 Key 在中英文形状间静态检查。词典随插件作用域注册和释放；不要恢复集中式巨型 `dict.ts`。
+每个插件通过 `defineDictionary({ zh, en })` 持有自己的类型化词典，点路径 Key 在中英文形状间静态检查。词典随插件作用域注册和释放；不维护集中式全局词典。
 
 ## HTTP 管道与 Native 边界
 
@@ -99,7 +99,7 @@ ZIP 不能新增原生模块或权限。新增能力需同步 Kotlin 工厂、�
 
 ## 外部 ZIP 与 API v1 市场
 
-外部 ZIP 使用 API v1 清单，仅能导入包内相对模块与 [`PLATFORM_MODULES`](packages/core/sdk/src/manifest.ts) 共享的模块实例。动态导入也必须是静态字符串或无插值模板字符串；计算表达式和 glob 会被拒绝。包格式、SDK 示例、独立仓库打包（`@orahako/cli` 的 `orahako pack`）与宿主演练打包（`pnpm plugin pack <plugin-directory> [output.zip]`）及发布字段见 [SDK 指南](packages/core/sdk/README.md) 与 [CLI 文档](packages/core/cli/README.md)。其他 API 版本的 ZIP 必须迁移并重新发布。官方外部插件源码维护于 `Youwenqwq/orahako-official-plugins`，市场索引和 ZIP 均由 `Youwenqwq/orahako-plugin-registry` 的 `main` 分支通过 `raw.githubusercontent.com` 分发，主仓库和 EdgeOne 不保存市场副本。
+外部 ZIP 使用 API v1 清单，仅能导入包内相对模块与 [`PLATFORM_MODULES`](packages/core/sdk/src/manifest.ts) 共享的模块实例。动态导入也必须是静态字符串或无插值模板字符串；计算表达式和 glob 会被拒绝。包格式、SDK 示例、独立仓库打包（`@orahako/cli` 的 `orahako pack`）与宿主演练打包（`pnpm plugin pack <plugin-directory> [output.zip]`）及发布字段见 [SDK 指南](packages/core/sdk/README.md) 与 [CLI 文档](packages/core/cli/README.md)。官方外部插件源码维护于 `Youwenqwq/orahako-official-plugins`，市场索引和 ZIP 均由 `Youwenqwq/orahako-plugin-registry` 的 `main` 分支通过 `raw.githubusercontent.com` 分发，主仓库和 EdgeOne 不保存市场副本。
 
 ## 安装、恢复与信任
 

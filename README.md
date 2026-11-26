@@ -27,7 +27,7 @@ API v1 将通用契约与内核、运行时服务、教务能力、客户端 UI�
 
 从 [GitHub Releases](https://github.com/Youwenqwq/orahako/releases) 下载最新 APK。Web 端是同一代码库的静态导出 PWA；原生端通过 Capacitor 打包，支持 OTA 热更新与外壳版本检测。应用内插件管理器可以安装市场包或可信来源的本地 ZIP。插件与应用同权，可访问凭据、会话、网络与 Native 能力，请只安装可信来源。
 
-API v1 不兼容旧市场 ZIP。其他 API 版本的插件须迁移源码、重新打包并发布，不能直接加载。官方外部插件源码维护于 [`Youwenqwq/orahako-official-plugins`](https://github.com/Youwenqwq/orahako-official-plugins)，官方市场索引与 ZIP 由 [`Youwenqwq/orahako-plugin-registry`](https://github.com/Youwenqwq/orahako-plugin-registry) 通过 GitHub Raw 分发，不再依赖 EdgeOne 插件接口。
+官方外部插件源码维护于 [`Youwenqwq/orahako-official-plugins`](https://github.com/Youwenqwq/orahako-official-plugins)，官方市场索引与 ZIP 由 [`Youwenqwq/orahako-plugin-registry`](https://github.com/Youwenqwq/orahako-plugin-registry) 通过 GitHub Raw 分发。
 
 ### 数据与兼容性
 

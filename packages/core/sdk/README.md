@@ -60,9 +60,7 @@ file, 32 MiB total uncompressed, 512 files and 64 KiB for `manifest.json`.
   `native.geolocation@1`. Installation checks the composition allowlist;
   the ability to call the capability still depends on the host build and permissions.
 
-ZIPs with any other API version cannot load on API v1. Migrate the source to the
-v1 contracts, rebuild the ZIP and republish it with an API v1 release entry.
-Changing the number alone does not migrate the plugin.
+ZIPs with any `apiVersion` other than `1` are rejected by the kernel.
 
 ## Defining a plugin
 
