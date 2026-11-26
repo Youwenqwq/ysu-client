@@ -235,21 +235,11 @@ export function WidgetDiscovery({
     if (!open) return
     if (typeof document === "undefined" || typeof document.addEventListener !== "function") return
 
-    const onPointerDown = (event: PointerEvent): void => {
-      const target = event.target
-      if (target instanceof Node && !rootRef.current?.contains(target)) {
-        setOpen(false)
-      }
-    }
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") setOpen(false)
     }
-    document.addEventListener("pointerdown", onPointerDown)
     document.addEventListener("keydown", onKeyDown)
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown)
-      document.removeEventListener("keydown", onKeyDown)
-    }
+    return () => document.removeEventListener("keydown", onKeyDown)
   }, [open])
 
   const clearLongPressTimer = useCallback((): void => {
@@ -459,174 +449,184 @@ export function WidgetDiscovery({
   const placement = bubbleLayout?.placement ?? "top"
 
   const assistant = (
-    <div
-      ref={rootRef}
-      data-widget-discovery=""
-      style={rootStyle}
-      className="fixed right-4 bottom-4 z-40 md:right-6 md:bottom-6"
-    >
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            ref={bubbleRef}
-            id="widget-discovery-bubble"
-            role="dialog"
-            aria-label={t("desktopWidgets.title")}
-            initial={{ opacity: 0, scale: 0.72, y: placement === "top" ? 14 : -14 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.82, y: placement === "top" ? 8 : -8 }}
-            transition={{ type: "spring", stiffness: 420, damping: 24 }}
-            style={{
-              left: bubbleLayout?.left ?? 16,
-              top: bubbleLayout?.top ?? (placement === "bottom" ? 16 : undefined),
-              bottom: bubbleLayout?.bottom ?? (placement === "top" ? 88 : undefined),
-              width: bubbleLayout?.width ?? 320,
-              transformOrigin: `${(bubbleLayout?.tailX ?? 24) + 6}px ${placement === "top" ? "100%" : "0%"}`,
-            }}
-            className="fixed max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-popover p-4 text-popover-foreground shadow-xl"
-          >
-            <p className="text-sm leading-6">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.span
-                  key={`${messageKey}-${interactionCount}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.16 }}
-                  className="inline"
-                >
-                  {translateAssistantMessage(t, messageKey, interactionCount)}
-                </motion.span>
-              </AnimatePresence>
-              {messageKey === "discover" && (
-                <>
+    <>
+      {open && (
+        <div
+          aria-hidden="true"
+          data-widget-discovery-backdrop=""
+          className="fixed inset-0 z-40"
+          onClick={() => setOpen(false)}
+        />
+      )}
+      <div
+        ref={rootRef}
+        data-widget-discovery=""
+        style={rootStyle}
+        className={cn("fixed right-4 bottom-4 md:right-6 md:bottom-6", open ? "z-50" : "z-40")}
+      >
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              ref={bubbleRef}
+              id="widget-discovery-bubble"
+              role="dialog"
+              aria-label={t("desktopWidgets.title")}
+              initial={{ opacity: 0, scale: 0.72, y: placement === "top" ? 14 : -14 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.82, y: placement === "top" ? 8 : -8 }}
+              transition={{ type: "spring", stiffness: 420, damping: 24 }}
+              style={{
+                left: bubbleLayout?.left ?? 16,
+                top: bubbleLayout?.top ?? (placement === "bottom" ? 16 : undefined),
+                bottom: bubbleLayout?.bottom ?? (placement === "top" ? 88 : undefined),
+                width: bubbleLayout?.width ?? 320,
+                transformOrigin: `${(bubbleLayout?.tailX ?? 24) + 6}px ${placement === "top" ? "100%" : "0%"}`,
+              }}
+              className="fixed max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-popover p-4 text-popover-foreground shadow-xl"
+            >
+              <p className="text-sm leading-6">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={`${messageKey}-${interactionCount}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.16 }}
+                    className="inline"
+                  >
+                    {translateAssistantMessage(t, messageKey, interactionCount)}
+                  </motion.span>
+                </AnimatePresence>
+                {messageKey === "discover" && (
+                  <>
+                    <button
+                      type="button"
+                      data-widget-discovery-add=""
+                      disabled={adding}
+                      onClick={() => void addScheduleWidget()}
+                      className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-60"
+                    >
+                      {adding ? t("desktopWidgets.adding") : t("desktopWidgets.assistantAdd")}
+                    </button>
+                    {t("desktopWidgets.assistantMoreBefore")}
+                    <a
+                      href={widgetsSettingsHref}
+                      onClick={handleSettingsLinkClick}
+                      className="font-medium text-primary underline underline-offset-4"
+                    >
+                      {t("desktopWidgets.assistantMoreLink")}
+                    </a>
+                    {t("desktopWidgets.assistantMoreAfter")}
+                  </>
+                )}
+                {messageKey === "tipCalendarSync" && onOpenCalendarSync && (
                   <button
                     type="button"
-                    data-widget-discovery-add=""
-                    disabled={adding}
-                    onClick={() => void addScheduleWidget()}
-                    className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-60"
+                    onClick={() => {
+                      setOpen(false)
+                      onOpenCalendarSync()
+                    }}
+                    className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
                   >
-                    {adding ? t("desktopWidgets.adding") : t("desktopWidgets.assistantAdd")}
+                    {t("desktopWidgets.assistantActionSync")}
                   </button>
-                  {t("desktopWidgets.assistantMoreBefore")}
-                  <a
-                    href={widgetsSettingsHref}
-                    onClick={handleSettingsLinkClick}
-                    className="font-medium text-primary underline underline-offset-4"
+                )}
+                {messageKey === "tipReminders" && onOpenRemindersSettings && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      onOpenRemindersSettings()
+                    }}
+                    className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
                   >
-                    {t("desktopWidgets.assistantMoreLink")}
-                  </a>
-                  {t("desktopWidgets.assistantMoreAfter")}
-                </>
-              )}
-              {messageKey === "tipCalendarSync" && onOpenCalendarSync && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false)
-                    onOpenCalendarSync()
-                  }}
-                  className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
-                >
-                  {t("desktopWidgets.assistantActionSync")}
-                </button>
-              )}
-              {messageKey === "tipReminders" && onOpenRemindersSettings && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false)
-                    onOpenRemindersSettings()
-                  }}
-                  className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
-                >
-                  {t("desktopWidgets.assistantActionReminders")}
-                </button>
-              )}
-              {messageKey === "tipExportIcs" && onExportIcs && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false)
-                    onExportIcs()
-                  }}
-                  className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
-                >
-                  {t("desktopWidgets.assistantActionExport")}
-                </button>
-              )}
-              {messageKey === "tipQuickAdd" && onQuickAdd && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false)
-                    onQuickAdd()
-                  }}
-                  className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
-                >
-                  {t("desktopWidgets.assistantActionQuickAdd")}
-                </button>
-              )}
-            </p>
-            {messageKey !== "farewell" && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                {t("desktopWidgets.assistantHideHint")}
+                    {t("desktopWidgets.assistantActionReminders")}
+                  </button>
+                )}
+                {messageKey === "tipExportIcs" && onExportIcs && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      onExportIcs()
+                    }}
+                    className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
+                  >
+                    {t("desktopWidgets.assistantActionExport")}
+                  </button>
+                )}
+                {messageKey === "tipQuickAdd" && onQuickAdd && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      onQuickAdd()
+                    }}
+                    className="mx-1 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/20"
+                  >
+                    {t("desktopWidgets.assistantActionQuickAdd")}
+                  </button>
+                )}
               </p>
-            )}
-            <span
-              style={{
-                left: bubbleLayout?.tailX ?? 24,
-                ...(placement === "top" ? { bottom: -6 } : { top: -6 }),
-              }}
-              className={cn(
-                "absolute size-3 rotate-45 border-border bg-popover",
-                placement === "top" ? "border-r border-b" : "border-t border-l"
+              {messageKey !== "farewell" && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("desktopWidgets.assistantHideHint")}
+                </p>
               )}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <span
+                style={{
+                  left: bubbleLayout?.tailX ?? 24,
+                  ...(placement === "top" ? { bottom: -6 } : { top: -6 }),
+                }}
+                className={cn(
+                  "absolute size-3 rotate-45 border-border bg-popover",
+                  placement === "top" ? "border-r border-b" : "border-t border-l"
+                )}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      <motion.button
-        ref={buttonRef}
-        type="button"
-        data-widget-discovery-trigger=""
-        disabled={departing}
-        aria-label={t("desktopWidgets.assistantLabel")}
-        aria-expanded={open}
-        aria-controls="widget-discovery-bubble"
-        title={t("desktopWidgets.assistantHideHint")}
-        initial={{ opacity: 0, scale: 0, rotate: -14 }}
-        animate={
-          departing
-            ? {
-                opacity: [1, 1, 1, 0.85, 0],
-                scale: [1, 1.22, 0.92, 0.62, 0],
-                rotate: [0, -16, 18, -28, -48],
-                x: [0, -12, 12, 36, 96],
-                y: [0, 2, -10, 10, 52],
-              }
-            : { opacity: 1, scale: 1, rotate: 0 }
-        }
-        whileHover={departing ? undefined : { scale: 1.08, rotate: -4 }}
-        whileTap={departing ? undefined : { scale: 0.82 }}
-        transition={
-          departing
-            ? { duration: 1.05, ease: "easeInOut" }
-            : { type: "spring", stiffness: 360, damping: 16 }
-        }
-        onClick={onClick}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerCancel}
-        onContextMenu={(event) => event.preventDefault()}
-        className="block size-14 cursor-grab touch-none rounded-full select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none active:cursor-grabbing md:size-16"
-      >
-        <WidgetAssistantAvatar src={assistantSrc} className="size-full drop-shadow-md" />
-      </motion.button>
-    </div>
+        <motion.button
+          ref={buttonRef}
+          type="button"
+          data-widget-discovery-trigger=""
+          disabled={departing}
+          aria-label={t("desktopWidgets.assistantLabel")}
+          aria-expanded={open}
+          aria-controls="widget-discovery-bubble"
+          title={t("desktopWidgets.assistantHideHint")}
+          initial={{ opacity: 0, scale: 0, rotate: -14 }}
+          animate={
+            departing
+              ? {
+                  opacity: [1, 1, 1, 0.85, 0],
+                  scale: [1, 1.22, 0.92, 0.62, 0],
+                  rotate: [0, -16, 18, -28, -48],
+                  x: [0, -12, 12, 36, 96],
+                  y: [0, 2, -10, 10, 52],
+                }
+              : { opacity: 1, scale: 1, rotate: 0 }
+          }
+          whileHover={departing ? undefined : { scale: 1.08, rotate: -4 }}
+          whileTap={departing ? undefined : { scale: 0.82 }}
+          transition={
+            departing
+              ? { duration: 1.05, ease: "easeInOut" }
+              : { type: "spring", stiffness: 360, damping: 16 }
+          }
+          onClick={onClick}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
+          onContextMenu={(event) => event.preventDefault()}
+          className="block size-14 cursor-grab touch-none rounded-full select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none active:cursor-grabbing md:size-16"
+        >
+          <WidgetAssistantAvatar src={assistantSrc} className="size-full drop-shadow-md" />
+        </motion.button>
+      </div>
+    </>
   )
 
   return typeof document === "undefined" ? null : createPortal(assistant, document.body)
