@@ -29,11 +29,11 @@ describe("EdgeOne /api/calendar Edge Function", () => {
     const env = { CALENDAR_KV: kv }
 
     const putRes = await onRequest({
-      request: new Request("https://ysu.welain.com/api/calendar", {
+      request: new Request("https://orahako.welain.com/api/calendar", {
         method: "PUT",
         headers: {
           "content-type": "application/json",
-          origin: "https://ysu.welain.com",
+          origin: "https://orahako.welain.com",
         },
         body: JSON.stringify({ readToken, writeToken, ics: sampleIcs }),
       }),
@@ -42,7 +42,7 @@ describe("EdgeOne /api/calendar Edge Function", () => {
     expect(putRes.status).toBe(200)
 
     const getRes = await onRequest({
-      request: new Request(`https://ysu.welain.com/api/calendar?token=${readToken}`, {
+      request: new Request(`https://orahako.welain.com/api/calendar?token=${readToken}`, {
         method: "GET",
       }),
       env,
@@ -52,11 +52,11 @@ describe("EdgeOne /api/calendar Edge Function", () => {
     expect(await getRes.text()).toBe(sampleIcs)
 
     const badPutRes = await onRequest({
-      request: new Request("https://ysu.welain.com/api/calendar", {
+      request: new Request("https://orahako.welain.com/api/calendar", {
         method: "PUT",
         headers: {
           "content-type": "application/json",
-          origin: "https://ysu.welain.com",
+          origin: "https://orahako.welain.com",
         },
         body: JSON.stringify({
           readToken,
@@ -69,11 +69,11 @@ describe("EdgeOne /api/calendar Edge Function", () => {
     expect(badPutRes.status).toBe(403)
 
     const delRes = await onRequest({
-      request: new Request("https://ysu.welain.com/api/calendar", {
+      request: new Request("https://orahako.welain.com/api/calendar", {
         method: "DELETE",
         headers: {
           "content-type": "application/json",
-          origin: "https://ysu.welain.com",
+          origin: "https://orahako.welain.com",
         },
         body: JSON.stringify({ readToken, writeToken }),
       }),
@@ -82,7 +82,7 @@ describe("EdgeOne /api/calendar Edge Function", () => {
     expect(delRes.status).toBe(200)
 
     const missingRes = await onRequest({
-      request: new Request(`https://ysu.welain.com/api/calendar?token=${readToken}`, {
+      request: new Request(`https://orahako.welain.com/api/calendar?token=${readToken}`, {
         method: "GET",
       }),
       env,

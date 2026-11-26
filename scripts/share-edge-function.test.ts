@@ -48,11 +48,11 @@ describe("EdgeOne /api/share Edge Function", () => {
     const env = { CALENDAR_KV: kv }
 
     const putRes = await onRequest({
-      request: new Request("https://ysu.welain.com/api/share", {
+      request: new Request("https://orahako.welain.com/api/share", {
         method: "PUT",
         headers: {
           "content-type": "application/json",
-          origin: "https://ysu.welain.com",
+          origin: "https://orahako.welain.com",
         },
         body: JSON.stringify({
           shareId,
@@ -69,7 +69,7 @@ describe("EdgeOne /api/share Edge Function", () => {
     expect(putBody.expiresAt - putBody.updatedAt).toBe(86400 * 7 * 1000)
 
     const getRes = await onRequest({
-      request: new Request(`https://ysu.welain.com/api/share?id=${shareId}`, {
+      request: new Request(`https://orahako.welain.com/api/share?id=${shareId}`, {
         method: "GET",
       }),
       env,
@@ -81,11 +81,11 @@ describe("EdgeOne /api/share Edge Function", () => {
     expect(getBody.payload.items).toHaveLength(1)
 
     const badPutRes = await onRequest({
-      request: new Request("https://ysu.welain.com/api/share", {
+      request: new Request("https://orahako.welain.com/api/share", {
         method: "PUT",
         headers: {
           "content-type": "application/json",
-          origin: "https://ysu.welain.com",
+          origin: "https://orahako.welain.com",
         },
         body: JSON.stringify({
           shareId,
@@ -98,11 +98,11 @@ describe("EdgeOne /api/share Edge Function", () => {
     expect(badPutRes.status).toBe(403)
 
     const oversizedRes = await onRequest({
-      request: new Request("https://ysu.welain.com/api/share", {
+      request: new Request("https://orahako.welain.com/api/share", {
         method: "PUT",
         headers: {
           "content-type": "application/json",
-          origin: "https://ysu.welain.com",
+          origin: "https://orahako.welain.com",
         },
         body: JSON.stringify({
           shareId: "oversizedId1234567890",
@@ -118,11 +118,11 @@ describe("EdgeOne /api/share Edge Function", () => {
     expect(oversizedRes.status).toBe(413)
 
     const delRes = await onRequest({
-      request: new Request("https://ysu.welain.com/api/share", {
+      request: new Request("https://orahako.welain.com/api/share", {
         method: "DELETE",
         headers: {
           "content-type": "application/json",
-          origin: "https://ysu.welain.com",
+          origin: "https://orahako.welain.com",
         },
         body: JSON.stringify({ shareId, writeToken }),
       }),
@@ -131,7 +131,7 @@ describe("EdgeOne /api/share Edge Function", () => {
     expect(delRes.status).toBe(200)
 
     const missingRes = await onRequest({
-      request: new Request(`https://ysu.welain.com/api/share?id=${shareId}`, {
+      request: new Request(`https://orahako.welain.com/api/share?id=${shareId}`, {
         method: "GET",
       }),
       env,

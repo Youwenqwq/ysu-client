@@ -16,7 +16,7 @@
 
 // 允许发起浏览器跨域调用的 Origin（同源请求无 Origin 头，不受限）。
 const ALLOWED_ORIGINS = new Set([
-  'https://ysu.welain.com',
+  'https://orahako.welain.com',
   'http://localhost:3000',
 ]);
 

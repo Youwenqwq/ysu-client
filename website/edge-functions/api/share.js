@@ -25,7 +25,7 @@ const MAX_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days max
 const DEFAULT_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 const ALLOWED_ORIGINS = new Set([
-  'https://ysu.welain.com',
+  'https://orahako.welain.com',
   'http://localhost:3000',
   'http://localhost:4321',
   'capacitor://localhost',

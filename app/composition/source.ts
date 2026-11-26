@@ -36,11 +36,11 @@ const deployment: CompositionLayer = {
     { id: "orahako.runtime.navigation", config: { fallbackHref: "/" } },
     {
       id: "orahako.analytics",
-      config: { endpoint: "https://ysu.welain.com/api/stats", appVersion },
+      config: { endpoint: "https://orahako.welain.com/api/stats", appVersion },
     },
     {
       id: "orahako.announcement",
-      config: { endpoint: "https://ysu.welain.com/updates/announcement.json" },
+      config: { endpoint: "https://orahako.welain.com/updates/announcement.json" },
     },
     {
       id: "orahako.updater",

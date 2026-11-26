@@ -1,4 +1,4 @@
-const baseUrl = process.argv[2] || 'https://ysu.welain.com';
+const baseUrl = process.argv[2] || 'https://orahako.welain.com';
 
 const results = [];
 

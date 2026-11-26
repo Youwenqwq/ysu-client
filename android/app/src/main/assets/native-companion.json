@@ -12,7 +12,7 @@
     {
       "id": "native.webview@1",
       "config": {
-        "faqUrl": "https://ysu.welain.com/faq",
+        "faqUrl": "https://orahako.welain.com/faq",
         "minimumVersion": 111,
         "fullVersion": 119
       }

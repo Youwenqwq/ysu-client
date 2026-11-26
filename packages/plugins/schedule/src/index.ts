@@ -250,7 +250,7 @@ function resolveCalendarFeedEndpoint(isNative: boolean): string {
   ) {
     return `${window.location.origin}/api/calendar`
   }
-  return "https://ysu.welain.com/api/calendar"
+  return "https://orahako.welain.com/api/calendar"
 }
 
 function resolveShareBaseOrigin(isNative: boolean): string {
@@ -261,7 +261,7 @@ function resolveShareBaseOrigin(isNative: boolean): string {
   ) {
     return window.location.origin
   }
-  return "https://ysu.welain.com"
+  return "https://orahako.welain.com"
 }
 
 function detectLiveUpdateSupported(isNative: boolean): boolean {

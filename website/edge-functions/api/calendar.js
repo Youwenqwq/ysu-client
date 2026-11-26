@@ -22,7 +22,7 @@ const MAX_ICS_BYTES = 256 * 1024; // 256 KB
 const CALENDAR_TTL_SECONDS = 60 * 60 * 24 * 180; // 180 days
 
 const ALLOWED_ORIGINS = new Set([
-  'https://ysu.welain.com',
+  'https://orahako.welain.com',
   'http://localhost:3000',
   'capacitor://localhost',
   'http://localhost',

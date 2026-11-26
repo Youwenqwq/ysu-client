@@ -51,7 +51,7 @@ class BundledNativeCompanionConfigTest {
         assertEquals("skbird", file.config["fileNamePrefix"])
 
         val webview = config.entries[1]
-        assertEquals("https://ysu.welain.com/faq", webview.config["faqUrl"])
+        assertEquals("https://orahako.welain.com/faq", webview.config["faqUrl"])
         assertEquals(111, webview.config["minimumVersion"])
         assertEquals(119, webview.config["fullVersion"])
 

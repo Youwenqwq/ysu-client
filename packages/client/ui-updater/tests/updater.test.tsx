@@ -324,7 +324,7 @@ describe("@orahako/ui-updater", () => {
       configurable: true,
       value: {
         isSecureContext: true,
-        location: { origin: "https://ysu.welain.com" },
+        location: { origin: "https://orahako.welain.com" },
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
       },

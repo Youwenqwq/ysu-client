@@ -59,11 +59,11 @@ describe("official composition", () => {
     })
     expect(configs.get("orahako.runtime.navigation")).toEqual({ fallbackHref: "/" })
     expect(configs.get("orahako.analytics")).toMatchObject({
-      endpoint: "https://ysu.welain.com/api/stats",
+      endpoint: "https://orahako.welain.com/api/stats",
       appVersion: officialCompositionSource.appVersion,
     })
     expect(configs.get("orahako.announcement")).toEqual({
-      endpoint: "https://ysu.welain.com/updates/announcement.json",
+      endpoint: "https://orahako.welain.com/updates/announcement.json",
     })
     expect(configs.get("orahako.profile")).toMatchObject({
       appName: appIdentity.name,
