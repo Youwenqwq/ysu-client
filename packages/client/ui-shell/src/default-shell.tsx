@@ -435,7 +435,7 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
   }, [locale, location, navRevision, props, startupPage, uiSnapshot])
 
   const mainRef = useRef<HTMLElement>(null)
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (typeof window !== "undefined") {
       window.scrollTo?.(0, 0)
     }
