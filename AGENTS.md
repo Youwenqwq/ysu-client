@@ -70,14 +70,14 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 ### ZIP、市场与构建产物
 
 - 外部 ZIP 清单必须是 API v1，包内 ESM 只能引用包内相对路径与 SDK `PLATFORM_MODULES` 列出的裸说明符。打包器处理其他依赖与插件 Tailwind utilities；不让宿主扫描外部插件源码。外部 ZIP 与宿主同权，API 版本和模块约束不是安全沙箱。
-- 非 API v1 市场 ZIP 不兼容，必须迁移源码、重新打包并发布。公开索引为 `https://raw.githubusercontent.com/Youwenqwq/orahako-plugin-registry/main/dist/plugins.json`，ZIP 也保存在该仓库 `dist/plugins/<id>/<version>.zip`；索引版本、平台、能力、最低应用版本（如声明）、`sha256` 和 `size` 必须与资产一致。不要在主仓库恢复市场边缘函数或 ZIP 副本。
+- 非 API v1 市场 ZIP 不兼容，必须迁移源码、重新打包并发布。官方外部插件源码维护在 `Youwenqwq/orahako-official-plugins`；公开索引为 `https://raw.githubusercontent.com/Youwenqwq/orahako-plugin-registry/main/dist/plugins.json`，ZIP 也保存在该仓库 `dist/plugins/<id>/<version>.zip`；索引版本、平台、能力、最低应用版本（如声明）、`sha256` 和 `size` 必须与资产一致。不要在主仓库恢复市场边缘函数或 ZIP 副本。
 - Web 代理位于 `website/edge-functions/api/proxy.js`，新增学校域名需同步部署端白名单。`scripts/deploy-website.sh` 以 `APP_BASE_PATH=/app` 构建静态应用并部署；不要提交 `dist/`、插件打包中间产物或 `website/public/app/`。
 
 ### Android 与验证
 
 - JS 使用 scoped `ctx.native` / `ctx.widgets`；Android bridge 提供 `describe` / `acquire` / `release` / `invoke` 和能力事件。ZIP 不能新增原生模块或权限。`android/nativeComposition.gradle` 选 provider、companion 和 deep-link 配置。app 只依赖 `:native-core` 与所选 provider，不直接导入官方 provider 或 widget；`:native-widgets` 可不带 schedule/exam companion。
 - 新原生能力要同步 Kotlin 工厂、`android/app/src/main/assets/native-companion.json`、所属模块 manifest、composition 允许列表与插件清单。通用模块使用 `${applicationId}.MainActivity` 和 deep-link 占位符；换应用身份时同步静态入口、Capacitor 配置和 Android 资源、应用 ID 与 deep-link 配置。
-- 修改实现先跑受影响的 `pnpm run test` 用例；合入前运行 `typecheck`、`lint`、全量 `test`、`verify-architecture`、`build` 及外部 v3 ZIP 打包。涉及 Android 时再验 `verifyNativeComposition testDebugUnitTest`；构建检查不代替 WebView、原生通知、闹钟、后台轮询、widget 与真实账号验收。
+- 修改实现先跑受影响的 `pnpm run test` 用例；合入前运行 `typecheck`、`lint`、全量 `test`、`verify-architecture`、`build` 及外部 API v1 ZIP 打包。涉及 Android 时再验 `verifyNativeComposition testDebugUnitTest`；构建检查不代替 WebView、原生通知、闹钟、后台轮询、widget 与真实账号验收。
 
 ## 发布
 

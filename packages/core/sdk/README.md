@@ -281,7 +281,8 @@ native capabilities before selecting the highest matching SemVer. To publish to
 followed by `pnpm run validate` in the registry repository, then commit the
 updated `plugins/<id>.json`, generated `dist/plugins.json`, and
 `dist/plugins/<id>/<version>.zip`. The app reads both index and ZIPs from that
-repository's `main` branch through GitHub Raw.
+repository's `main` branch through GitHub Raw. Official external plugin sources
+(maintained separately from the host app) live in `Youwenqwq/orahako-official-plugins`.
 
 ## Verification
 

@@ -2,7 +2,7 @@
 
 Orahako 是由 Cordis 插件组合成的应用，而不是由固定 Next.js 页面控制的功能集合。内核负责 composition、插件生命周期、外部 ZIP、恢复和通用 Native bridge；服务、界面、Provider 与业务功能都由可替换包提供。插件与应用同权，不构成安全沙箱。
 
-本文描述 API v1 当前契约。API v2 市场 ZIP 不兼容且会被拒绝，必须重新发布；没有迁移、降级或兼容加载路径。
+本文描述 API v1 当前契约。非 API v1（其他 `apiVersion`）的市场 ZIP 不兼容且会被拒绝，必须迁移源码并重新打包发布；没有迁移、降级或兼容加载路径。
 
 ## 包拓扑与依赖边界
 
@@ -11,10 +11,11 @@ API v1 Workspace 包位于 `packages/<group>/<package>`，各自拥有 `tsconfig
 ```text
 app/                              静态根入口：layout.tsx、page.tsx、manifest.ts
 packages/core/sdk                 @orahako/sdk：API、清单、SlotMap、Bundle、市场协议
+packages/core/cli                 @orahako/cli：独立插件打包器与 CLI
 packages/core/kernel              @orahako/kernel：PluginHost、ZIP、IndexedDB、恢复
-packages/core/ui-primitives       无状态 UI 原语
+packages/core/ui-primitives       @orahako/ui-primitives：无状态 UI 原语
 packages/runtime/{slots,router,ui,i18n,settings,storage,http,native,packages}
-packages/edu/{sdk,runtime,kit}    可选教务契约、运行时和无 React 算法
+packages/edu/{sdk,runtime,kit}    @orahako/academic-sdk 及可选教务运行时和无 React 算法
 packages/client/*                 Shell、设置、资料、管理器、激活、更新、主题等
 packages/plugins/*                Provider、横切插件和自治业务插件
 packages/bundle/{platform,academic,ysu}
@@ -98,7 +99,7 @@ ZIP 不能新增原生模块或权限。新增能力需同步 Kotlin 工厂、�
 
 ## 外部 ZIP 与 API v1 市场
 
-外部 ZIP 使用 API v1 清单，仅能导入包内相对模块与 [`PLATFORM_MODULES`](packages/core/sdk/src/manifest.ts) 共享的模块实例。动态导入也必须是静态字符串或无插值模板字符串；计算表达式和 glob 会被拒绝。包格式、SDK 示例、`pnpm plugin pack <plugin-directory> [output.zip]` 及发布字段见 [SDK 指南](packages/core/sdk/README.md)。其他 API 版本的 ZIP 必须重新发布。市场索引和 ZIP 均由 `Youwenqwq/orahako-plugin-registry` 的 `main` 分支通过 `raw.githubusercontent.com` 分发，主仓库和 EdgeOne 不保存市场副本。
+外部 ZIP 使用 API v1 清单，仅能导入包内相对模块与 [`PLATFORM_MODULES`](packages/core/sdk/src/manifest.ts) 共享的模块实例。动态导入也必须是静态字符串或无插值模板字符串；计算表达式和 glob 会被拒绝。包格式、SDK 示例、独立仓库打包（`@orahako/cli` 的 `orahako pack`）与宿主演练打包（`pnpm plugin pack <plugin-directory> [output.zip]`）及发布字段见 [SDK 指南](packages/core/sdk/README.md) 与 [CLI 文档](packages/core/cli/README.md)。其他 API 版本的 ZIP 必须迁移并重新发布。官方外部插件源码维护于 `Youwenqwq/orahako-official-plugins`，市场索引和 ZIP 均由 `Youwenqwq/orahako-plugin-registry` 的 `main` 分支通过 `raw.githubusercontent.com` 分发，主仓库和 EdgeOne 不保存市场副本。
 
 ## 安装、恢复与信任
 
@@ -119,4 +120,4 @@ npx cap sync
 cd android && ./gradlew verifyNativeComposition testDebugUnitTest
 ```
 
-架构门禁检查包导出、tsconfig、导入与组件边界。验证还应覆盖非教务组合启动、根路由与深链、外部功能/替代 Shell ZIP 的安装与停用，以及 API v2 ZIP 的拒绝行为。Gradle 检查不代替真机 WebView、通知、闹钟、后台轮询、widget 与真实账号验收。
+架构门禁检查包导出、tsconfig、导入与组件边界。验证还应覆盖非教务组合启动、根路由与深链、外部功能/替代 Shell ZIP 的安装与停用，以及非 API v1 ZIP 的拒绝行为。Gradle 检查不代替真机 WebView、通知、闹钟、后台轮询、widget 与真实账号验收。
