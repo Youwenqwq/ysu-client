@@ -1,601 +1,173 @@
 ---
 import Layout from "../layouts/Layout.astro"
-import { flightSilhouette } from "../../../app/composition/boot-silhouettes"
-
-const SPEED_LINES = [
-  { left: "79.17%", top: "16.11%", width: "13.33%", delay: "-0.2s", duration: "0.9s" },
-  { left: "87.5%", top: "33.89%", width: "8.75%", delay: "-0.55s", duration: "0.8s" },
-  { left: "77.08%", top: "62.22%", width: "15.83%", delay: "-0.75s", duration: "1.1s" },
-  { left: "91.67%", top: "79.44%", width: "10%", delay: "-0.35s", duration: "0.85s" },
-  { left: "83.33%", top: "90.56%", width: "12.92%", delay: "-0.6s", duration: "1s" },
-]
-
-const SPARKLES = [
-  { left: "24.17%", top: "56.94%", width: "4.17%", delay: "-0.3s" },
-  { left: "31.88%", top: "69.17%", width: "2.92%", delay: "-0.8s" },
-  { left: "20%", top: "45.28%", width: "2.92%", delay: "-0.55s" },
-]
 ---
 
-<Layout title="ORAHAKO · Schedule" description="ORAHAKO Schedule" robots="noindex, nofollow">
-  <div class="ba-page min-h-screen">
-    <div class="mx-auto flex max-w-6xl flex-col gap-5 px-3 py-5 sm:px-6 sm:py-8">
-      <!-- Top Editorial Bar -->
-      <header class="ba-frame ba-header relative flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
-        <span class="ba-corner ba-corner-tl" aria-hidden="true"></span>
-        <span class="ba-corner ba-corner-br" aria-hidden="true"></span>
-
-        <div class="flex min-w-0 items-center gap-3.5">
-          <!-- Miniature Bad Apple cinema badge -->
-          <a
-            href="/"
-            class="ba-emblem shrink-0"
-            aria-label="ORAHAKO"
-            title="ORAHAKO"
-          >
-            <svg class="h-full w-full" viewBox="0 0 480 360" aria-hidden="true">
-              <g transform="translate(0 35)">
-                <path d={flightSilhouette} fill="currentColor" fill-rule="evenodd" />
-              </g>
-            </svg>
-          </a>
-
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="ba-wordmark">ORAHAKO</span>
-              <span id="share-masked-tag" class="ba-pill hidden"></span>
-              <span id="share-exp-tag" class="ba-mono-meta hidden"></span>
-            </div>
-            <h1 id="share-title" class="mt-1 truncate text-lg font-semibold tracking-tight sm:text-xl">
-              &nbsp;
-            </h1>
-          </div>
+<Layout title="日程 · 酸橙盒" description="酸橙盒日程分享" robots="noindex, nofollow">
+  <div class="schedule-share-root min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+    <div class="mx-auto flex max-w-6xl flex-col gap-3 px-1.5 py-3 sm:px-4 sm:py-5 md:gap-4 md:px-6 md:py-6">
+      <!-- Compact Toolbar (matches Schedule page) -->
+      <header class="flex flex-wrap items-center justify-between gap-2 px-1.5 sm:px-0">
+        <div class="flex min-w-0 items-center gap-2">
+          <h1 id="share-title" class="truncate text-base font-semibold tracking-tight md:text-lg">
+            &nbsp;
+          </h1>
+          <span
+            id="share-masked-badge"
+            class="hidden shrink-0 rounded-full bg-zinc-200/80 px-2 py-0.5 text-[11px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+          ></span>
         </div>
 
-        <!-- Week Controls -->
-        <div id="week-controls" class="hidden flex-wrap items-center gap-1.5">
-          <button id="btn-prev-week" type="button" class="ba-btn ba-btn-icon" aria-label="Prev">
-            ←
+        <div id="week-controls" class="hidden items-center gap-1">
+          <button
+            id="btn-prev-week"
+            type="button"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-2xs transition hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            aria-label="Prev"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           </button>
-          <select id="week-select" class="ba-select" aria-label="Week"></select>
-          <button id="btn-current-week" type="button" class="ba-btn ba-btn-inverted hidden"></button>
-          <button id="btn-next-week" type="button" class="ba-btn ba-btn-icon" aria-label="Next">
-            →
+          <select
+            id="week-select"
+            aria-label="Week"
+            class="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-800 shadow-2xs outline-none focus:border-lime-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+          ></select>
+          <button
+            id="btn-current-week"
+            type="button"
+            class="hidden h-8 items-center justify-center rounded-lg bg-lime-500/15 px-2.5 text-xs font-medium text-lime-700 transition hover:bg-lime-500/25 dark:bg-lime-400/15 dark:text-lime-300 dark:hover:bg-lime-400/25"
+          ></button>
+          <button
+            id="btn-next-week"
+            type="button"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-2xs transition hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            aria-label="Next"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
           </button>
         </div>
       </header>
 
-      <!-- Bad Apple Loading Stage -->
-      <section id="share-loading" class="ba-stage-wrap">
-        <div class="ba-stage-box">
-          <div class="ba-stage" aria-hidden="true">
-            <span class="ba-stage-corner ba-stage-corner-top"></span>
-            <span class="ba-stage-corner ba-stage-corner-bottom"></span>
-            <div class="ba-artwork">
-              {SPEED_LINES.map((line) => (
-                <div
-                  class="ba-speed-track"
-                  style={`animation-delay:${line.delay};animation-duration:${line.duration}`}
-                >
-                  <span
-                    class="ba-speed-bar"
-                    style={`left:${line.left};top:${line.top};width:${line.width}`}
-                  />
-                </div>
-              ))}
-              {SPARKLES.map((sparkle) => (
-                <div
-                  class="ba-sparkle"
-                  style={`left:${sparkle.left};top:${sparkle.top};width:${sparkle.width};animation-delay:${sparkle.delay}`}
-                >
-                  <svg class="block h-full w-full" viewBox="0 0 20 20">
-                    <path d="m10 0 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="currentColor" />
-                  </svg>
-                </div>
-              ))}
-              <div class="ba-flyer">
-                <svg class="block h-full w-full" viewBox="0 0 480 360">
-                  <g transform="translate(0 35)">
-                    <path d={flightSilhouette} fill="currentColor" fill-rule="evenodd" />
-                  </g>
-                </svg>
-              </div>
-            </div>
-            <span class="ba-frame-num">∞</span>
-          </div>
-          <div class="ba-stage-caption">
-            <strong>ORAHAKO</strong>
-            <span id="loading-label">LOADING</span>
-          </div>
+      <!-- Loading Skeleton -->
+      <section
+        id="share-loading"
+        class="flex flex-col gap-2 rounded-xl border border-zinc-200/80 bg-white p-3 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <div class="grid grid-cols-8 gap-1.5">
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
+          <div class="h-8 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800"></div>
         </div>
+        <div class="h-[480px] animate-pulse rounded-lg bg-zinc-100/70 dark:bg-zinc-800/50"></div>
       </section>
 
-      <!-- Error / Expired Stage -->
-      <section id="share-error" class="ba-stage-wrap hidden">
-        <div class="ba-stage-box">
-          <div class="ba-stage ba-stage-static" aria-hidden="true">
-            <span class="ba-stage-corner ba-stage-corner-top"></span>
-            <span class="ba-stage-corner ba-stage-corner-bottom"></span>
-            <div class="ba-artwork">
-              <div class="ba-flyer ba-flyer-still">
-                <svg class="block h-full w-full opacity-35" viewBox="0 0 480 360">
-                  <g transform="translate(0 35)">
-                    <path d={flightSilhouette} fill="currentColor" fill-rule="evenodd" />
-                  </g>
-                </svg>
-              </div>
-            </div>
-            <span class="ba-frame-num">404</span>
-          </div>
-          <div class="ba-stage-caption">
-            <strong id="share-error-title">404</strong>
-            <a id="share-error-home" href="/" class="ba-link">ORAHAKO</a>
-          </div>
-        </div>
+      <!-- Error / Expired State -->
+      <section
+        id="share-error"
+        class="hidden flex-col items-center justify-center gap-2 rounded-xl border border-zinc-200/80 bg-white px-6 py-20 text-center shadow-2xs dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <h2 id="share-error-title" class="text-sm font-medium text-zinc-600 dark:text-zinc-300"></h2>
       </section>
 
-      <!-- Timetable Grid -->
+      <!-- Schedule Grid (Mobile + Desktop adaptive, no horizontal scroll needed) -->
       <main id="share-main" class="hidden">
-        <div class="ba-frame relative overflow-hidden">
-          <span class="ba-corner ba-corner-tl" aria-hidden="true"></span>
-          <span class="ba-corner ba-corner-br" aria-hidden="true"></span>
-          <div class="overflow-x-auto">
-            <div id="timetable-shell" class="min-w-[680px]">
-              <div
-                id="timetable-header"
-                class="ba-grid-header grid grid-cols-[3.75rem_repeat(7,minmax(0,1fr))]"
-              ></div>
-              <div
-                id="timetable-body"
-                class="relative grid grid-cols-[3.75rem_repeat(7,minmax(0,1fr))]"
-              ></div>
-            </div>
-          </div>
+        <div
+          class="overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-2xs dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <div
+            id="timetable-header"
+            class="grid grid-cols-[2rem_repeat(7,minmax(0,1fr))] border-b border-zinc-200/80 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/80 md:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]"
+          ></div>
+          <div
+            id="timetable-body"
+            class="relative grid grid-cols-[2rem_repeat(7,minmax(0,1fr))] md:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]"
+          ></div>
         </div>
       </main>
 
-      <!-- Minimal Footer -->
-      <footer class="flex items-center justify-between px-1 py-1 text-[11px] tracking-widest uppercase opacity-55">
-        <span id="footer-frame" class="font-mono">∞</span>
-        <a href="/" class="font-mono font-semibold tracking-[0.2em] transition hover:opacity-100">
-          ORAHAKO
+      <!-- Bottom-right attribution only -->
+      <footer class="flex justify-end px-1.5 pt-0.5 sm:px-0">
+        <a
+          id="share-attribution"
+          href="https://github.com/Youwenqwq/ysu-client"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-xs text-zinc-400 transition hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
+        >
+          由 酸橙盒 生成
         </a>
       </footer>
     </div>
 
     <!-- Detail Modal -->
-    <div id="detail-modal" class="ba-modal-backdrop hidden" role="dialog" aria-modal="true">
-      <div class="ba-modal relative">
-        <span class="ba-corner ba-corner-tl" aria-hidden="true"></span>
-        <span class="ba-corner ba-corner-br" aria-hidden="true"></span>
+    <div
+      id="detail-modal"
+      class="fixed inset-0 z-50 hidden items-end justify-center bg-black/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        class="w-full max-w-sm rounded-t-2xl border border-zinc-200 bg-white p-5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 sm:rounded-2xl"
+      >
         <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0 space-y-1.5">
-            <span id="detail-category" class="ba-pill"></span>
+          <div class="min-w-0 space-y-1">
+            <span
+              id="detail-category"
+              class="inline-block rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            ></span>
             <h3 id="detail-title" class="text-base font-semibold leading-snug"></h3>
           </div>
-          <button id="detail-close" type="button" class="ba-btn ba-btn-icon" aria-label="Close">
+          <button
+            id="detail-close"
+            type="button"
+            class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            aria-label="Close"
+          >
             ✕
           </button>
         </div>
-        <dl id="detail-rows" class="mt-4 space-y-2.5 text-xs"></dl>
+        <dl id="detail-rows" class="mt-4 space-y-2 text-xs"></dl>
       </div>
     </div>
   </div>
 
   <style>
-    .ba-page {
-      --paper: #ffffff;
-      --ink: #0a0a0a;
-      --ink-soft: rgba(10, 10, 10, 0.58);
-      --ink-faint: rgba(10, 10, 10, 0.12);
-      --ink-hairline: rgba(10, 10, 10, 0.07);
-      --surface-subtle: rgba(10, 10, 10, 0.03);
-      --card-bg: #ffffff;
-      --card-border: rgba(10, 10, 10, 0.22);
-      --hatch-a: rgba(10, 10, 10, 0.08);
-      --hatch-b: rgba(10, 10, 10, 0.02);
-
-      color: var(--ink);
-      background-color: var(--paper);
-      background-image: radial-gradient(var(--ink-faint) 1px, transparent 1px);
-      background-size: 20px 20px;
+    .schedule-share-root {
+      --schedule-1: oklch(0.88 0.06 148);
+      --schedule-2: oklch(0.94 0.03 153);
+      --schedule-3: oklch(0.95 0.06 99);
+      --schedule-4: oklch(0.93 0.04 60);
+      --schedule-5: oklch(0.88 0.06 11);
+      --schedule-6: oklch(0.88 0.05 308);
+      --schedule-7: oklch(0.88 0.05 254);
+      --schedule-8: oklch(0.88 0.06 241);
     }
 
     @media (prefers-color-scheme: dark) {
-      .ba-page {
-        --paper: #0a0a0a;
-        --ink: #ffffff;
-        --ink-soft: rgba(255, 255, 255, 0.62);
-        --ink-faint: rgba(255, 255, 255, 0.16);
-        --ink-hairline: rgba(255, 255, 255, 0.08);
-        --surface-subtle: rgba(255, 255, 255, 0.04);
-        --card-bg: #111111;
-        --card-border: rgba(255, 255, 255, 0.24);
-        --hatch-a: rgba(255, 255, 255, 0.11);
-        --hatch-b: rgba(255, 255, 255, 0.03);
+      .schedule-share-root {
+        --schedule-1: oklch(0.26 0.08 148);
+        --schedule-2: oklch(0.35 0.04 153);
+        --schedule-3: oklch(0.36 0.07 99);
+        --schedule-4: oklch(0.34 0.04 60);
+        --schedule-5: oklch(0.26 0.08 11);
+        --schedule-6: oklch(0.31 0.06 308);
+        --schedule-7: oklch(0.31 0.06 254);
+        --schedule-8: oklch(0.25 0.09 241);
       }
     }
 
-    .ba-frame {
-      background: var(--paper);
-      border: 1px solid var(--ink-faint);
-      box-shadow: 0 1px 0 var(--ink-hairline);
-    }
-
-    .ba-corner {
-      position: absolute;
-      z-index: 2;
-      width: 12px;
-      height: 12px;
-      border-color: var(--ink);
-      border-style: solid;
-      pointer-events: none;
-      opacity: 0.7;
-    }
-
-    .ba-corner-tl {
-      top: -1px;
-      left: -1px;
-      border-width: 1.5px 0 0 1.5px;
-    }
-
-    .ba-corner-br {
-      right: -1px;
-      bottom: -1px;
-      border-width: 0 1.5px 1.5px 0;
-    }
-
-    .ba-emblem {
-      display: block;
-      width: 52px;
-      aspect-ratio: 4 / 3;
-      overflow: hidden;
-      background: #0a0a0a;
-      color: #ffffff;
-      border: 1px solid var(--ink);
-      transition: transform 150ms ease;
-    }
-
-    .ba-emblem:hover {
-      transform: scale(1.04);
-    }
-
-    .ba-wordmark {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.22em;
-      line-height: 1;
-    }
-
-    .ba-mono-meta {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 10px;
-      letter-spacing: 0.1em;
-      color: var(--ink-soft);
-    }
-
-    .ba-pill {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 7px;
-      border: 1px solid var(--ink);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      line-height: 1.3;
-    }
-
-    .ba-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      height: 32px;
-      padding: 0 10px;
-      border: 1px solid var(--ink-faint);
-      background: var(--paper);
-      color: var(--ink);
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
-    }
-
-    .ba-btn:hover:not(:disabled) {
-      border-color: var(--ink);
-      background: var(--ink);
-      color: var(--paper);
-    }
-
-    .ba-btn:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-
-    .ba-btn-icon {
-      width: 32px;
-      padding: 0;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    }
-
-    .ba-btn-inverted {
-      border-color: var(--ink);
-      background: var(--ink);
-      color: var(--paper);
-    }
-
-    .ba-btn-inverted:hover:not(:disabled) {
-      opacity: 0.85;
-    }
-
-    .ba-select {
-      height: 32px;
-      padding: 0 10px;
-      border: 1px solid var(--ink-faint);
-      background: var(--paper);
-      color: var(--ink);
-      font-size: 12px;
-      font-weight: 500;
-      outline: none;
-      cursor: pointer;
-    }
-
-    .ba-select:focus {
-      border-color: var(--ink);
-    }
-
-    .ba-grid-header {
-      border-bottom: 1px solid var(--ink-faint);
-      background: var(--surface-subtle);
-    }
-
-    /* Bad Apple Stage (matches BootSplash) */
-    .ba-stage-wrap {
-      display: grid;
-      place-items: center;
-      padding: 64px 16px;
-    }
-
-    .ba-stage-box {
-      width: min(72vw, 240px);
-    }
-
-    .ba-stage {
-      position: relative;
-      aspect-ratio: 4 / 3;
-      overflow: hidden;
-      color: #ffffff;
-      background: #0a0a0a;
-      border: 1px solid var(--ink);
-    }
-
-    .ba-artwork {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    .ba-flyer {
-      position: absolute;
-      inset: 0;
-      animation: ba-flight-float 1.6s ease-in-out infinite;
-    }
-
-    .ba-flyer-still {
-      animation: none;
-    }
-
-    .ba-speed-track {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      animation: ba-speed-line 0.9s linear infinite;
-    }
-
-    .ba-speed-bar {
-      position: absolute;
-      height: 1.5px;
-      border-radius: 999px;
-      background: currentColor;
-      transform: translateY(-50%);
-    }
-
-    .ba-sparkle {
-      position: absolute;
-      aspect-ratio: 1;
-      opacity: 0;
-      animation: ba-sparkle-trail 1.2s ease-in-out infinite;
-    }
-
-    .ba-stage-corner {
-      position: absolute;
-      z-index: 1;
-      width: 16px;
-      height: 16px;
-      border-color: currentColor;
-      border-style: solid;
-      pointer-events: none;
-    }
-
-    .ba-stage-corner-top {
-      top: 10px;
-      left: 10px;
-      border-width: 1px 0 0 1px;
-    }
-
-    .ba-stage-corner-bottom {
-      right: 10px;
-      bottom: 10px;
-      border-width: 0 1px 1px 0;
-    }
-
-    .ba-frame-num {
-      position: absolute;
-      right: 12px;
-      top: 10px;
-      z-index: 1;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 9px;
-      line-height: 1;
-      letter-spacing: 0.14em;
-    }
-
-    .ba-stage-caption {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-      margin-top: 12px;
-    }
-
-    .ba-stage-caption strong {
-      font-size: 13px;
-      letter-spacing: 0.18em;
-    }
-
-    .ba-stage-caption span,
-    .ba-link {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 10px;
-      letter-spacing: 0.1em;
-      color: var(--ink-soft);
-      text-decoration: none;
-    }
-
-    .ba-link:hover {
-      color: var(--ink);
-      text-decoration: underline;
-    }
-
-    /* Timetable cards */
-    :global(.ba-card) {
-      position: absolute;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      overflow: hidden;
-      padding: 5px 6px;
-      text-align: left;
-      cursor: pointer;
-      transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
-    }
-
-    :global(.ba-card:hover) {
-      z-index: 20;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
-    }
-
-    :global(.ba-card-course) {
-      background: var(--card-bg);
-      color: var(--ink);
-      border: 1px solid var(--card-border);
-      border-left-width: 3px;
-    }
-
-    :global(.ba-card-exam) {
-      background: var(--ink);
-      color: var(--paper);
-      border: 1px solid var(--ink);
-      z-index: 12;
-    }
-
-    :global(.ba-card-event) {
-      background: var(--paper);
-      color: var(--ink);
-      border: 1px dashed var(--ink);
-      z-index: 10;
-    }
-
-    :global(.ba-card-busy) {
-      background: repeating-linear-gradient(
-        -45deg,
-        var(--hatch-a),
-        var(--hatch-a) 5px,
-        var(--hatch-b) 5px,
-        var(--hatch-b) 10px
-      );
-      color: var(--ink);
-      border: 1px solid var(--card-border);
-    }
-
-    /* Detail Modal */
-    .ba-modal-backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: 50;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-      background: rgba(0, 0, 0, 0.56);
-      backdrop-filter: blur(4px);
-    }
-
-    .ba-modal-backdrop.hidden {
-      display: none;
-    }
-
-    .ba-modal {
-      width: 100%;
-      max-width: 360px;
-      padding: 20px;
-      background: var(--paper);
-      color: var(--ink);
-      border: 1px solid var(--ink);
-      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
-    }
-
-    @keyframes ba-flight-float {
-      0%,
-      100% {
-        transform: translate3d(-1.67%, 1.11%, 0) rotate(-1deg);
-      }
-      50% {
-        transform: translate3d(2.08%, -1.67%, 0) rotate(1deg);
-      }
-    }
-
-    @keyframes ba-speed-line {
-      0% {
-        opacity: 0;
-        transform: translate3d(25%, 0, 0);
-      }
-      15%,
-      75% {
-        opacity: 0.65;
-      }
-      100% {
-        opacity: 0;
-        transform: translate3d(-108.33%, 0, 0);
-      }
-    }
-
-    @keyframes ba-sparkle-trail {
-      0%,
-      100% {
-        opacity: 0;
-        transform: translate3d(6px, -4px, 0) scale(0.4);
-      }
-      35% {
-        opacity: 0.9;
-      }
-      70% {
-        opacity: 0.45;
-        transform: translate3d(-5px, 4px, 0) scale(1);
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .ba-flyer,
-      .ba-speed-track,
-      .ba-sparkle {
-        animation: none;
-      }
-    }
+    :global(.bg-schedule-1) { background-color: var(--schedule-1); }
+    :global(.bg-schedule-2) { background-color: var(--schedule-2); }
+    :global(.bg-schedule-3) { background-color: var(--schedule-3); }
+    :global(.bg-schedule-4) { background-color: var(--schedule-4); }
+    :global(.bg-schedule-5) { background-color: var(--schedule-5); }
+    :global(.bg-schedule-6) { background-color: var(--schedule-6); }
+    :global(.bg-schedule-7) { background-color: var(--schedule-7); }
+    :global(.bg-schedule-8) { background-color: var(--schedule-8); }
   </style>
 
   <script>
@@ -649,14 +221,16 @@ const SPARKLES = [
 
     const I18N = {
       zh: {
+        brand: "酸橙盒",
+        attribution: "由 酸橙盒 生成",
         scheduleSuffix: "日程",
         defaultTitle: "日程",
         maskedTag: "隐私遮罩",
         thisWeek: "本周",
         weekOption: (w: number, isCurrent: boolean) =>
-          isCurrent ? `第 ${w} 周 · 本周` : `第 ${w} 周`,
-        weekCorner: (w: number) => `W${String(w).padStart(2, "0")}`,
+          isCurrent ? `第 ${w} 周（本周）` : `第 ${w} 周`,
         weekdays: ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
+        weekdaysCompact: ["一", "二", "三", "四", "五", "六", "日"],
         catCourse: "课程",
         catExam: "考试",
         catEvent: "日程",
@@ -668,24 +242,24 @@ const SPARKLES = [
         sectionSingle: (s: number) => `第 ${s} 节`,
         sectionRange: (a: number, b: number) => `第 ${a}-${b} 节`,
         weeksValue: (list: number[]) => `第 ${list.join("、")} 周`,
-        expPrefix: "EXP",
-        loading: "LOADING",
-        errUnavailable: "链接已失效",
+        errUnavailable: "链接已失效或不存在",
         errMissing: "链接无效",
-        errNetwork: "网络异常",
+        errNetwork: "加载失败，请稍后重试",
         prevAria: "上一周",
         nextAria: "下一周",
         closeAria: "关闭",
       },
       en: {
+        brand: "Orahako",
+        attribution: "Generated by Orahako",
         scheduleSuffix: "Schedule",
         defaultTitle: "Schedule",
-        maskedTag: "MASKED",
-        thisWeek: "Today",
+        maskedTag: "Masked",
+        thisWeek: "This week",
         weekOption: (w: number, isCurrent: boolean) =>
-          isCurrent ? `Week ${w} · Now` : `Week ${w}`,
-        weekCorner: (w: number) => `W${String(w).padStart(2, "0")}`,
-        weekdays: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
+          isCurrent ? `Week ${w} (Now)` : `Week ${w}`,
+        weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        weekdaysCompact: ["M", "T", "W", "T", "F", "S", "S"],
         catCourse: "Course",
         catExam: "Exam",
         catEvent: "Event",
@@ -697,11 +271,9 @@ const SPARKLES = [
         sectionSingle: (s: number) => `Period ${s}`,
         sectionRange: (a: number, b: number) => `Periods ${a}-${b}`,
         weeksValue: (list: number[]) => `W${list.join(", ")}`,
-        expPrefix: "EXP",
-        loading: "LOADING",
-        errUnavailable: "LINK EXPIRED",
-        errMissing: "INVALID LINK",
-        errNetwork: "NETWORK ERROR",
+        errUnavailable: "Link expired or not found",
+        errMissing: "Invalid link",
+        errNetwork: "Failed to load",
         prevAria: "Previous week",
         nextAria: "Next week",
         closeAria: "Close",
@@ -712,36 +284,48 @@ const SPARKLES = [
     const dict = I18N[locale]
     document.documentElement.lang = locale === "zh" ? "zh-CN" : "en"
 
-    // Subtle distinct left-border accents for courses while preserving the Bad Apple chiaroscuro frame
-    const COURSE_ACCENTS = [
-      "#0a0a0a",
-      "#4d7c0f",
-      "#0f766e",
-      "#1d4ed8",
-      "#6d28d9",
-      "#be123c",
-      "#b45309",
-      "#374151",
-    ]
-    const COURSE_ACCENTS_DARK = [
-      "#ffffff",
-      "#a3e635",
-      "#2dd4bf",
-      "#60a5fa",
-      "#a78bfa",
-      "#fb7185",
-      "#fbbf24",
-      "#9ca3af",
-    ]
+    const COURSE_BG_CLASSES = [
+      "bg-schedule-1",
+      "bg-schedule-2",
+      "bg-schedule-3",
+      "bg-schedule-4",
+      "bg-schedule-5",
+      "bg-schedule-6",
+      "bg-schedule-7",
+      "bg-schedule-8",
+    ] as const
 
-    const ROW_HEIGHT = 56
-
-    function hashString(input: string): number {
+    function hashIndex(key: string): number {
       let hash = 0
-      for (let i = 0; i < input.length; i += 1) {
-        hash = (hash * 31 + input.charCodeAt(i)) | 0
+      for (let i = 0; i < key.length; i += 1) {
+        hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0
       }
-      return Math.abs(hash)
+      return (hash >>> 0) % COURSE_BG_CLASSES.length
+    }
+
+    function buildCourseColorMap(items: SharedItem[]): Map<string, number> {
+      const keys = new Set<string>()
+      for (const item of items) {
+        if (item.category === "course") keys.add(item.title)
+      }
+      const used = new Array<boolean>(COURSE_BG_CLASSES.length).fill(false)
+      const map = new Map<string, number>()
+      for (const key of [...keys].sort()) {
+        const preferred = hashIndex(key)
+        let index = used[preferred] ? -1 : preferred
+        if (index < 0) {
+          for (let i = 0; i < COURSE_BG_CLASSES.length; i += 1) {
+            if (!used[i]) {
+              index = i
+              break
+            }
+          }
+        }
+        if (index < 0) index = preferred
+        used[index] = true
+        map.set(key, index)
+      }
+      return map
     }
 
     function parseIsoDate(iso: string): Date | null {
@@ -784,14 +368,6 @@ const SPARKLES = [
       return Math.min(Math.max(1, week), Math.max(1, totalWeeks))
     }
 
-    function formatDateShort(ts: number): string {
-      const d = new Date(ts)
-      const y = d.getFullYear()
-      const m = String(d.getMonth() + 1).padStart(2, "0")
-      const day = String(d.getDate()).padStart(2, "0")
-      return `${y}-${m}-${day}`
-    }
-
     function categoryLabel(category: SharedItem["category"]): string {
       if (category === "busy") return dict.catBusy
       if (category === "exam") return dict.catExam
@@ -821,35 +397,39 @@ const SPARKLES = [
       endMin: number
     }
 
-    /** Maps a clock minute onto vertical pixel position in the period grid. */
-    function minuteToGridY(minute: number, timedPeriods: TimedPeriod[], maxSection: number): number {
+    function minuteToGridY(
+      minute: number,
+      timedPeriods: TimedPeriod[],
+      maxSection: number,
+      rowHeight: number
+    ): number {
       if (timedPeriods.length === 0) {
         const clamped = Math.min(22 * 60, Math.max(8 * 60, minute))
-        return ((clamped - 8 * 60) / (14 * 60)) * (maxSection * ROW_HEIGHT)
+        return ((clamped - 8 * 60) / (14 * 60)) * (maxSection * rowHeight)
       }
       const first = timedPeriods[0]!
       if (minute <= first.startMin) {
-        return (first.section - 1) * ROW_HEIGHT
+        return (first.section - 1) * rowHeight
       }
       for (let i = 0; i < timedPeriods.length; i += 1) {
         const p = timedPeriods[i]!
-        const topY = (p.section - 1) * ROW_HEIGHT
-        const bottomY = p.section * ROW_HEIGHT
+        const topY = (p.section - 1) * rowHeight
+        const bottomY = p.section * rowHeight
         if (minute <= p.endMin) {
           const span = Math.max(1, p.endMin - p.startMin)
           const ratio = Math.min(1, Math.max(0, (minute - p.startMin) / span))
-          return topY + ratio * ROW_HEIGHT
+          return topY + ratio * rowHeight
         }
         const next = timedPeriods[i + 1]
         if (next && minute < next.startMin) {
           const gap = Math.max(1, next.startMin - p.endMin)
           const ratio = (minute - p.endMin) / gap
-          const nextTopY = (next.section - 1) * ROW_HEIGHT
+          const nextTopY = (next.section - 1) * rowHeight
           return bottomY + ratio * Math.max(0, nextTopY - bottomY)
         }
       }
       const last = timedPeriods[timedPeriods.length - 1]!
-      return last.section * ROW_HEIGHT
+      return last.section * rowHeight
     }
 
     interface PositionedCard {
@@ -863,31 +443,35 @@ const SPARKLES = [
     function layoutDayCards(
       items: SharedItem[],
       timedPeriods: TimedPeriod[],
-      maxSection: number
+      maxSection: number,
+      rowHeight: number
     ): PositionedCard[] {
-      const totalHeight = maxSection * ROW_HEIGHT
+      const totalHeight = maxSection * rowHeight
       const raw: PositionedCard[] = []
 
       for (const item of items) {
         let top = 0
-        let bottom = ROW_HEIGHT
+        let bottom = rowHeight
         if (
           typeof item.startSection === "number" &&
           typeof item.endSection === "number" &&
           item.startSection >= 1 &&
           item.endSection >= item.startSection
         ) {
-          top = (item.startSection - 1) * ROW_HEIGHT + 2
-          bottom = item.endSection * ROW_HEIGHT - 2
+          top = (item.startSection - 1) * rowHeight + 2
+          bottom = item.endSection * rowHeight - 2
         } else {
           const sMin = parseClockMinutes(item.startTime)
           const eMin = parseClockMinutes(item.endTime)
           if (sMin === null) continue
           const effectiveEnd = eMin !== null && eMin > sMin ? eMin : sMin + 45
-          top = Math.max(2, minuteToGridY(sMin, timedPeriods, maxSection) + 2)
+          top = Math.max(2, minuteToGridY(sMin, timedPeriods, maxSection, rowHeight) + 2)
           bottom = Math.min(
             totalHeight - 2,
-            Math.max(top + ROW_HEIGHT * 0.72, minuteToGridY(effectiveEnd, timedPeriods, maxSection) - 2)
+            Math.max(
+              top + rowHeight * 0.72,
+              minuteToGridY(effectiveEnd, timedPeriods, maxSection, rowHeight) - 2
+            )
           )
         }
         raw.push({ item, top, bottom, col: 0, totalCols: 1 })
@@ -895,7 +479,6 @@ const SPARKLES = [
 
       raw.sort((a, b) => a.top - b.top || b.bottom - a.bottom)
 
-      // Assign side-by-side columns for overlapping cards within clusters
       let cluster: PositionedCard[] = []
       let clusterMaxBottom = -1
 
@@ -939,21 +522,19 @@ const SPARKLES = [
     }
 
     const titleEl = document.getElementById("share-title")!
-    const maskedTagEl = document.getElementById("share-masked-tag")!
-    const expTagEl = document.getElementById("share-exp-tag")!
+    const maskedBadgeEl = document.getElementById("share-masked-badge")!
     const weekControlsEl = document.getElementById("week-controls")!
     const prevBtn = document.getElementById("btn-prev-week") as HTMLButtonElement
     const nextBtn = document.getElementById("btn-next-week") as HTMLButtonElement
     const currentWeekBtn = document.getElementById("btn-current-week") as HTMLButtonElement
     const weekSelect = document.getElementById("week-select") as HTMLSelectElement
     const loadingEl = document.getElementById("share-loading")!
-    const loadingLabelEl = document.getElementById("loading-label")!
     const errorEl = document.getElementById("share-error")!
     const errorTitleEl = document.getElementById("share-error-title")!
     const mainEl = document.getElementById("share-main")!
     const headerGridEl = document.getElementById("timetable-header")!
     const bodyGridEl = document.getElementById("timetable-body")!
-    const footerFrameEl = document.getElementById("footer-frame")!
+    const attributionEl = document.getElementById("share-attribution")!
 
     const detailModalEl = document.getElementById("detail-modal")!
     const detailCloseEl = document.getElementById("detail-close")!
@@ -961,19 +542,20 @@ const SPARKLES = [
     const detailTitleEl = document.getElementById("detail-title")!
     const detailRowsEl = document.getElementById("detail-rows")!
 
-    loadingLabelEl.textContent = dict.loading
+    attributionEl.textContent = dict.attribution
     currentWeekBtn.textContent = dict.thisWeek
     prevBtn.setAttribute("aria-label", dict.prevAria)
     nextBtn.setAttribute("aria-label", dict.nextAria)
     detailCloseEl.setAttribute("aria-label", dict.closeAria)
 
-    function showError(label: string): void {
+    function showError(message: string): void {
       loadingEl.classList.add("hidden")
       mainEl.classList.add("hidden")
       weekControlsEl.classList.add("hidden")
       errorEl.classList.remove("hidden")
+      errorEl.classList.add("flex")
       titleEl.textContent = dict.defaultTitle
-      errorTitleEl.textContent = label
+      errorTitleEl.textContent = message
     }
 
     function openDetail(item: SharedItem): void {
@@ -983,14 +565,13 @@ const SPARKLES = [
 
       const addRow = (label: string, value: string) => {
         const row = document.createElement("div")
-        row.className = "flex items-start justify-between gap-3 pt-2"
-        row.style.borderTop = "1px solid var(--ink-hairline)"
+        row.className =
+          "flex items-start justify-between gap-3 border-t border-zinc-100 pt-2 dark:border-zinc-800"
         const dt = document.createElement("dt")
-        dt.className = "shrink-0"
-        dt.style.color = "var(--ink-soft)"
+        dt.className = "shrink-0 text-zinc-500 dark:text-zinc-400"
         dt.textContent = label
         const dd = document.createElement("dd")
-        dd.className = "text-right font-medium"
+        dd.className = "text-right font-medium text-zinc-900 dark:text-zinc-100"
         dd.textContent = value
         row.append(dt, dd)
         detailRowsEl.append(row)
@@ -1004,7 +585,7 @@ const SPARKLES = [
             : dict.sectionRange(item.startSection, item.endSection)
           : ""
       const timeRange =
-        item.startTime && item.endTime ? `${item.startTime}–${item.endTime}` : ""
+        item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : ""
       addRow(
         dict.rowTime,
         [item.date || dayLabel, sectionLabel, timeRange].filter(Boolean).join(" · ")
@@ -1016,10 +597,12 @@ const SPARKLES = [
       }
 
       detailModalEl.classList.remove("hidden")
+      detailModalEl.classList.add("flex")
     }
 
     function closeDetail(): void {
       detailModalEl.classList.add("hidden")
+      detailModalEl.classList.remove("flex")
     }
 
     detailCloseEl.addEventListener("click", closeDetail)
@@ -1030,10 +613,17 @@ const SPARKLES = [
       if (event.key === "Escape") closeDetail()
     })
 
-    const darkQuery = window.matchMedia("(prefers-color-scheme: dark)")
+    const mobileQuery = window.matchMedia("(max-width: 767px)")
 
-    function renderWeek(payload: SharedPayload, week: number, currentWeek: number): void {
-      const isDark = darkQuery.matches
+    function renderWeek(
+      payload: SharedPayload,
+      colorMap: Map<string, number>,
+      week: number,
+      currentWeek: number
+    ): void {
+      const isMobile = mobileQuery.matches
+      const rowHeight = isMobile ? 48 : 56
+
       const periods =
         payload.periods.length > 0
           ? [...payload.periods].sort((a, b) => a.section - b.section)
@@ -1053,7 +643,9 @@ const SPARKLES = [
         .map((p) => {
           const s = parseClockMinutes(p.startTime)
           const e = parseClockMinutes(p.endTime)
-          return s !== null && e !== null && e > s ? { section: p.section, startMin: s, endMin: e } : null
+          return s !== null && e !== null && e > s
+            ? { section: p.section, startMin: s, endMin: e }
+            : null
         })
         .filter((p): p is TimedPeriod => p !== null)
 
@@ -1066,10 +658,12 @@ const SPARKLES = [
       // Header row
       headerGridEl.replaceChildren()
       const corner = document.createElement("div")
-      corner.className = "flex items-center justify-center py-2.5 font-mono text-[10px] font-semibold tracking-widest"
-      corner.style.borderRight = "1px solid var(--ink-faint)"
-      corner.style.color = "var(--ink-soft)"
-      corner.textContent = dict.weekCorner(week)
+      corner.className =
+        "flex items-center justify-center border-r border-zinc-200/70 py-2 text-[10px] font-medium text-zinc-400 dark:border-zinc-800 md:text-xs"
+      corner.textContent = weekMonday ? `${weekMonday.getMonth() + 1}月` : ""
+      if (locale === "en" && weekMonday) {
+        corner.textContent = weekMonday.toLocaleString("en-US", { month: "short" })
+      }
       headerGridEl.append(corner)
 
       for (let day = 1; day <= 7; day += 1) {
@@ -1078,22 +672,26 @@ const SPARKLES = [
         const dayIso = dayDate ? formatIsoDate(dayDate) : null
         const isToday = dayIso === todayIso
 
-        cell.className = "flex flex-col items-center justify-center py-2 text-center"
-        if (day < 7) cell.style.borderRight = "1px solid var(--ink-hairline)"
-        if (isToday) {
-          cell.style.background = "var(--ink)"
-          cell.style.color = "var(--paper)"
-        }
+        cell.className =
+          "flex flex-col items-center justify-center border-r border-zinc-100 py-1.5 text-center last:border-r-0 dark:border-zinc-800/70 md:py-2" +
+          (isToday ? " bg-lime-500/12 dark:bg-lime-400/12" : "")
 
         const label = document.createElement("span")
-        label.className = "text-xs font-semibold tracking-wider"
-        label.textContent = dict.weekdays[day - 1]!
+        label.className =
+          "text-[11px] font-medium md:text-xs " +
+          (isToday
+            ? "font-semibold text-lime-700 dark:text-lime-300"
+            : "text-zinc-700 dark:text-zinc-200")
+        label.textContent = isMobile ? dict.weekdaysCompact[day - 1]! : dict.weekdays[day - 1]!
         cell.append(label)
 
         if (dayDate) {
           const dateSpan = document.createElement("span")
-          dateSpan.className = "mt-0.5 font-mono text-[10px]"
-          dateSpan.style.opacity = isToday ? "0.8" : "0.5"
+          dateSpan.className =
+            "mt-0.5 text-[10px] " +
+            (isToday
+              ? "font-medium text-lime-700 dark:text-lime-300"
+              : "text-zinc-400 dark:text-zinc-500")
           dateSpan.textContent = `${dayDate.getMonth() + 1}/${dayDate.getDate()}`
           cell.append(dateSpan)
         }
@@ -1102,27 +700,27 @@ const SPARKLES = [
 
       // Grid body
       bodyGridEl.replaceChildren()
-      const totalHeight = maxSection * ROW_HEIGHT
+      const totalHeight = maxSection * rowHeight
 
       // Period sidebar
       const timeCol = document.createElement("div")
-      timeCol.style.borderRight = "1px solid var(--ink-faint)"
+      timeCol.className = "border-r border-zinc-200/70 dark:border-zinc-800"
       for (let section = 1; section <= maxSection; section += 1) {
         const period = periodBySection.get(section)
         const cell = document.createElement("div")
-        cell.style.height = `${ROW_HEIGHT}px`
-        if (section < maxSection) cell.style.borderBottom = "1px solid var(--ink-hairline)"
-        cell.className = "flex flex-col items-center justify-center px-1 text-center"
+        cell.style.height = `${rowHeight}px`
+        cell.className =
+          "flex flex-col items-center justify-center border-b border-zinc-100 px-0.5 text-center last:border-b-0 dark:border-zinc-800/70 md:px-1"
 
         const num = document.createElement("span")
-        num.className = "font-mono text-xs font-semibold"
+        num.className = "text-[11px] font-medium text-zinc-600 dark:text-zinc-300 md:text-xs"
         num.textContent = String(section)
         cell.append(num)
 
         if (period?.startTime) {
           const time = document.createElement("span")
-          time.className = "font-mono text-[10px] leading-tight"
-          time.style.color = "var(--ink-soft)"
+          time.className =
+            "hidden text-[10px] leading-tight text-zinc-400 dark:text-zinc-500 md:block"
           time.textContent = period.startTime
           cell.append(time)
         }
@@ -1130,12 +728,10 @@ const SPARKLES = [
       }
       bodyGridEl.append(timeCol)
 
-      // All week items (courses, exams, personal events) render directly in the grid!
+      // All week items (courses, exams, personal events) directly inside the timetable grid
       const weekItems = payload.items.filter((item) =>
         itemAppliesToWeek(item, week, weekStartIso, weekEndIso)
       )
-
-      const accents = isDark ? COURSE_ACCENTS_DARK : COURSE_ACCENTS
 
       for (let day = 1; day <= 7; day += 1) {
         const dayDate = weekMonday ? addDays(weekMonday, day - 1) : null
@@ -1143,52 +739,65 @@ const SPARKLES = [
 
         const col = document.createElement("div")
         col.style.height = `${totalHeight}px`
-        if (day < 7) col.style.borderRight = "1px solid var(--ink-hairline)"
-        if (isToday) col.style.background = "var(--surface-subtle)"
-        col.className = "relative"
+        col.className =
+          "relative border-r border-zinc-100 last:border-r-0 dark:border-zinc-800/60" +
+          (isToday ? " bg-lime-500/[0.04] dark:bg-lime-400/[0.04]" : "")
 
         for (let section = 1; section <= maxSection; section += 1) {
           const line = document.createElement("div")
-          line.style.height = `${ROW_HEIGHT}px`
-          if (section < maxSection) line.style.borderBottom = "1px solid var(--ink-hairline)"
+          line.style.height = `${rowHeight}px`
+          line.className = "border-b border-zinc-100/90 last:border-b-0 dark:border-zinc-800/50"
           col.append(line)
         }
 
         const dayItems = weekItems.filter((item) => item.weekDay === day)
-        const positioned = layoutDayCards(dayItems, timedPeriods, maxSection)
+        const positioned = layoutDayCards(dayItems, timedPeriods, maxSection, rowHeight)
 
         for (const card of positioned) {
           const { item, top, bottom, col: cardCol, totalCols } = card
           const btn = document.createElement("button")
           btn.type = "button"
           btn.style.top = `${top}px`
-          btn.style.height = `${Math.max(32, bottom - top)}px`
+          btn.style.height = `${Math.max(30, bottom - top)}px`
+          const pad = isMobile ? 1.5 : 3
           const widthPct = 100 / totalCols
-          btn.style.left = `calc(${cardCol * widthPct}% + 3px)`
-          btn.style.width = `calc(${widthPct}% - 6px)`
+          btn.style.left = `calc(${cardCol * widthPct}% + ${pad}px)`
+          btn.style.width = `calc(${widthPct}% - ${pad * 2}px)`
 
-          const kindClass =
-            item.category === "busy"
-              ? "ba-card-busy"
-              : item.category === "exam"
-                ? "ba-card-exam"
-                : item.category === "event"
-                  ? "ba-card-event"
-                  : "ba-card-course"
-          btn.className = `ba-card ${kindClass}`
-
-          if (item.category === "course") {
-            btn.style.borderLeftColor = accents[hashString(item.title) % accents.length]!
+          let styleClass = ""
+          if (item.category === "busy") {
+            styleClass =
+              "bg-zinc-200/80 text-zinc-700 ring-1 ring-inset ring-zinc-300/80 dark:bg-zinc-800/85 dark:text-zinc-200 dark:ring-zinc-700/80"
+          } else if (item.category === "exam") {
+            styleClass =
+              "z-10 bg-amber-500/15 text-amber-950 ring-1 ring-inset ring-amber-500/50 dark:text-amber-100"
+          } else if (item.category === "event") {
+            styleClass =
+              "z-10 bg-indigo-500/12 text-indigo-950 ring-1 ring-inset ring-indigo-500/45 dark:text-indigo-100"
+          } else {
+            const idx = colorMap.get(item.title) ?? hashIndex(item.title)
+            styleClass = `${COURSE_BG_CLASSES[idx]} text-zinc-900 dark:text-zinc-100`
           }
 
+          btn.className =
+            "absolute flex flex-col justify-start overflow-hidden rounded-lg p-1 text-left transition hover:brightness-95 active:scale-[0.98] md:rounded-xl md:p-1.5 " +
+            styleClass
+
           const titleSpan = document.createElement("span")
-          titleSpan.className = "line-clamp-2 text-[11px] font-semibold leading-tight"
+          titleSpan.className =
+            "line-clamp-3 break-words text-[10px] font-medium leading-[1.2] md:line-clamp-2 md:text-xs md:leading-snug " +
+            (item.category === "exam"
+              ? "text-amber-700 dark:text-amber-300"
+              : item.category === "event"
+                ? "text-indigo-700 dark:text-indigo-300"
+                : "")
           titleSpan.textContent = item.title
           btn.append(titleSpan)
 
           if (item.location) {
             const locSpan = document.createElement("span")
-            locSpan.className = "mt-0.5 line-clamp-2 text-[10px] leading-tight opacity-75"
+            locSpan.className =
+              "mt-0.5 line-clamp-2 break-words text-[9px] leading-tight opacity-75 md:text-[11px]"
             locSpan.textContent = item.location
             btn.append(locSpan)
           } else if (
@@ -1197,7 +806,7 @@ const SPARKLES = [
             item.endTime
           ) {
             const timeSpan = document.createElement("span")
-            timeSpan.className = "mt-0.5 font-mono text-[10px] leading-tight opacity-75"
+            timeSpan.className = "mt-0.5 truncate text-[9px] leading-tight opacity-75 md:text-[11px]"
             timeSpan.textContent = `${item.startTime}-${item.endTime}`
             btn.append(timeSpan)
           }
@@ -1209,15 +818,16 @@ const SPARKLES = [
         bodyGridEl.append(col)
       }
 
-      // Sync controls & footer frame counter
+      // Sync controls
       weekSelect.value = String(week)
       prevBtn.disabled = week <= 1
       nextBtn.disabled = week >= payload.totalWeeks
-      footerFrameEl.textContent = `${dict.weekCorner(week)} / ${String(payload.totalWeeks).padStart(2, "0")}`
       if (payload.termStartDate && week !== currentWeek) {
         currentWeekBtn.classList.remove("hidden")
+        currentWeekBtn.classList.add("inline-flex")
       } else {
         currentWeekBtn.classList.add("hidden")
+        currentWeekBtn.classList.remove("inline-flex")
       }
     }
 
@@ -1236,14 +846,12 @@ const SPARKLES = [
           return
         }
         if (!res.ok) {
-          showError(`HTTP ${res.status}`)
+          showError(dict.errNetwork)
           return
         }
 
         const data = (await res.json()) as {
           payload?: SharedPayload
-          updatedAt?: number | null
-          expiresAt?: number | null
         }
         const payload = data.payload
         if (!payload || payload.version !== 1 || !Array.isArray(payload.items)) {
@@ -1252,20 +860,17 @@ const SPARKLES = [
         }
 
         const displayTitle = payload.semester
-          ? `${payload.semester} · ${dict.scheduleSuffix}`
+          ? `${payload.semester} ${dict.scheduleSuffix}`
           : dict.defaultTitle
-        document.title = `${displayTitle} · ORAHAKO`
+        document.title = `${displayTitle} · ${dict.brand}`
         titleEl.textContent = displayTitle
 
         if (payload.masked) {
-          maskedTagEl.textContent = dict.maskedTag
-          maskedTagEl.classList.remove("hidden")
-        }
-        if (data.expiresAt) {
-          expTagEl.textContent = `${dict.expPrefix} ${formatDateShort(data.expiresAt)}`
-          expTagEl.classList.remove("hidden")
+          maskedBadgeEl.textContent = dict.maskedTag
+          maskedBadgeEl.classList.remove("hidden")
         }
 
+        const colorMap = buildCourseColorMap(payload.items)
         const totalWeeks = Math.max(1, payload.totalWeeks || 20)
         const currentWeek = computeCurrentWeek(payload.termStartDate, totalWeeks)
         let activeWeek = currentWeek
@@ -1280,14 +885,16 @@ const SPARKLES = [
 
         const setWeek = (next: number) => {
           activeWeek = Math.min(totalWeeks, Math.max(1, next))
-          renderWeek(payload, activeWeek, currentWeek)
+          renderWeek(payload, colorMap, activeWeek, currentWeek)
         }
 
         prevBtn.addEventListener("click", () => setWeek(activeWeek - 1))
         nextBtn.addEventListener("click", () => setWeek(activeWeek + 1))
         currentWeekBtn.addEventListener("click", () => setWeek(currentWeek))
         weekSelect.addEventListener("change", () => setWeek(Number(weekSelect.value)))
-        darkQuery.addEventListener("change", () => renderWeek(payload, activeWeek, currentWeek))
+        mobileQuery.addEventListener("change", () =>
+          renderWeek(payload, colorMap, activeWeek, currentWeek)
+        )
 
         loadingEl.classList.add("hidden")
         weekControlsEl.classList.remove("hidden")
