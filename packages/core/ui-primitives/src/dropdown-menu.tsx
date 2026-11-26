@@ -5,12 +5,16 @@ import { CheckIcon, ChevronRightIcon } from "lucide-react"
 import { BackLayer, useBackOpenState } from "./back-layer"
 import { cn } from "./utils"
 
-function DropdownMenu(props: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
+function DropdownMenu({
+  modal = false,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   const { open, onOpenChange } = useBackOpenState(props)
   return (
     <BackLayer enabled={open} onBack={() => onOpenChange(false)}>
       <DropdownMenuPrimitive.Root
         data-slot="dropdown-menu"
+        modal={modal}
         {...props}
         open={open}
         onOpenChange={onOpenChange}
