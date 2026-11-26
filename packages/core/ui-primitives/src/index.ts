@@ -51,8 +51,12 @@ export {
   DialogHeader,
   DialogOverlay,
   DialogPortal,
+  DialogScopeProvider,
   DialogTitle,
   DialogTrigger,
+  useDialogScope,
+  type DialogScopeConfig,
+  type DialogScopeProviderProps,
 } from "./dialog"
 export {
   Drawer,
