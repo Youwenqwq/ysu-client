@@ -5,40 +5,40 @@ import Layout from "../layouts/Layout.astro"
 <Layout title="日程 · 酸橙盒" description="酸橙盒日程分享" robots="noindex, nofollow">
   <div class="schedule-share-root min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
     <div class="mx-auto flex max-w-6xl flex-col gap-3 px-1.5 py-3 sm:px-4 sm:py-5 md:gap-4 md:px-6 md:py-6">
-      <!-- Compact Toolbar (matches Schedule page) -->
-      <header class="flex flex-wrap items-center justify-between gap-2 px-1.5 sm:px-0">
-        <div class="flex min-w-0 items-center gap-2">
-          <h1 id="share-title" class="truncate text-base font-semibold tracking-tight md:text-lg">
+      <!-- Compact Single-Row Toolbar (matches Schedule page) -->
+      <header class="flex items-center justify-between gap-2 px-1.5 sm:px-0">
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <h1 id="share-title" class="truncate text-sm font-semibold tracking-tight sm:text-base md:text-lg">
             &nbsp;
           </h1>
         </div>
 
-        <div id="week-controls" class="hidden items-center gap-1">
+        <div id="week-controls" class="hidden shrink-0 items-center gap-1">
           <button
             id="btn-prev-week"
             type="button"
-            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-2xs transition hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-2xs transition hover:bg-zinc-100 active:scale-95 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 sm:h-8 sm:w-8"
             aria-label="Prev"
           >
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           </button>
           <select
             id="week-select"
             aria-label="Week"
-            class="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-800 shadow-2xs outline-none focus:border-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
+            class="h-7 max-w-[6.5rem] rounded-lg border border-zinc-200 bg-white px-1.5 text-xs font-medium text-zinc-800 shadow-2xs outline-none transition focus:border-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400 sm:h-8 sm:max-w-none sm:px-2"
           ></select>
           <button
             id="btn-current-week"
             type="button"
-            class="hidden h-8 items-center justify-center rounded-lg bg-zinc-900 px-2.5 text-xs font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            class="hidden h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-zinc-900 px-2 text-xs font-medium text-white transition hover:bg-zinc-800 active:scale-95 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 sm:h-8 sm:px-2.5"
           ></button>
           <button
             id="btn-next-week"
             type="button"
-            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-2xs transition hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-2xs transition hover:bg-zinc-100 active:scale-95 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 sm:h-8 sm:w-8"
             aria-label="Next"
           >
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
           </button>
         </div>
       </header>
@@ -103,12 +103,13 @@ import Layout from "../layouts/Layout.astro"
     <!-- Detail Modal -->
     <div
       id="detail-modal"
-      class="fixed inset-0 z-50 hidden items-end justify-center bg-black/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+      class="share-modal-backdrop fixed inset-0 z-50 hidden items-end justify-center bg-black/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
     >
       <div
-        class="w-full max-w-sm rounded-t-2xl border border-zinc-200 bg-white p-5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 sm:rounded-2xl"
+        id="detail-modal-card"
+        class="share-modal-card w-full max-w-sm rounded-t-2xl border border-zinc-200 bg-white p-5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 sm:rounded-2xl"
       >
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0 space-y-1">
@@ -165,6 +166,52 @@ import Layout from "../layouts/Layout.astro"
     :global(.bg-schedule-6) { background-color: var(--schedule-6); }
     :global(.bg-schedule-7) { background-color: var(--schedule-7); }
     :global(.bg-schedule-8) { background-color: var(--schedule-8); }
+
+    @keyframes share-fade-up {
+      from {
+        opacity: 0;
+        transform: translate3d(0, 8px, 0);
+      }
+      to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+      }
+    }
+
+    .share-enter {
+      animation: share-fade-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .share-modal-backdrop {
+      opacity: 0;
+      transition: opacity 180ms ease;
+    }
+
+    .share-modal-backdrop[data-open="true"] {
+      opacity: 1;
+    }
+
+    .share-modal-card {
+      transform: translate3d(0, 18px, 0) scale(0.98);
+      opacity: 0;
+      transition:
+        transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 180ms ease;
+    }
+
+    .share-modal-backdrop[data-open="true"] .share-modal-card {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 1;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .share-enter,
+      .share-modal-backdrop,
+      .share-modal-card {
+        animation: none;
+        transition: none;
+      }
+    }
   </style>
 
   <script>
@@ -224,8 +271,7 @@ import Layout from "../layouts/Layout.astro"
         scheduleSuffix: "日程",
         defaultTitle: "日程",
         thisWeek: "本周",
-        weekOption: (w: number, isCurrent: boolean) =>
-          isCurrent ? `第 ${w} 周（本周）` : `第 ${w} 周`,
+        weekOption: (w: number, isCurrent: boolean) => (isCurrent ? `第${w}周 · 本周` : `第${w}周`),
         weekdays: ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
         weekdaysCompact: ["一", "二", "三", "四", "五", "六", "日"],
         catCourse: "课程",
@@ -251,9 +297,8 @@ import Layout from "../layouts/Layout.astro"
         attribution: "Generated by Orahako",
         scheduleSuffix: "Schedule",
         defaultTitle: "Schedule",
-        thisWeek: "This week",
-        weekOption: (w: number, isCurrent: boolean) =>
-          isCurrent ? `Week ${w} (Now)` : `Week ${w}`,
+        thisWeek: "Now",
+        weekOption: (w: number, isCurrent: boolean) => (isCurrent ? `W${w} · Now` : `W${w}`),
         weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         weekdaysCompact: ["M", "T", "W", "T", "F", "S", "S"],
         catCourse: "Course",
@@ -601,11 +646,21 @@ import Layout from "../layouts/Layout.astro"
 
       detailModalEl.classList.remove("hidden")
       detailModalEl.classList.add("flex")
+      requestAnimationFrame(() => {
+        detailModalEl.dataset.open = "true"
+      })
     }
 
+    let modalCloseTimer: number | undefined
     function closeDetail(): void {
-      detailModalEl.classList.add("hidden")
-      detailModalEl.classList.remove("flex")
+      detailModalEl.dataset.open = "false"
+      window.clearTimeout(modalCloseTimer)
+      modalCloseTimer = window.setTimeout(() => {
+        if (detailModalEl.dataset.open !== "true") {
+          detailModalEl.classList.add("hidden")
+          detailModalEl.classList.remove("flex")
+        }
+      }, 190)
     }
 
     detailCloseEl.addEventListener("click", closeDetail)
@@ -900,23 +955,45 @@ import Layout from "../layouts/Layout.astro"
         }
         weekSelect.disabled = availableWeeks.length <= 1
 
-        const setWeek = (next: number) => {
-          activeWeek = availableWeeks.includes(next) ? next : (availableWeeks[0] ?? 1)
+        const animateWeekTransition = (dir: -1 | 0 | 1) => {
+          if (dir === 0) return
+          scheduleCardEl.style.transition = "none"
+          scheduleCardEl.style.transform = `translate3d(${dir * 22}px, 0, 0)`
+          scheduleCardEl.style.opacity = "0.72"
+          void scheduleCardEl.offsetWidth
+          scheduleCardEl.style.transition =
+            "transform 230ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease"
+          scheduleCardEl.style.transform = "translate3d(0, 0, 0)"
+          scheduleCardEl.style.opacity = "1"
+        }
+
+        const setWeek = (next: number, animateDir: -1 | 0 | 1 = 0) => {
+          const target = availableWeeks.includes(next) ? next : (availableWeeks[0] ?? 1)
+          const prev = activeWeek
+          activeWeek = target
           renderWeek(payload, colorMap, availableWeeks, activeWeek, currentWeek)
+          if (animateDir !== 0 && target !== prev) {
+            animateWeekTransition(animateDir)
+          }
         }
 
         const stepWeek = (delta: -1 | 1) => {
           const idx = availableWeeks.indexOf(activeWeek)
           const nextIdx = idx + delta
           if (nextIdx >= 0 && nextIdx < availableWeeks.length) {
-            setWeek(availableWeeks[nextIdx]!)
+            setWeek(availableWeeks[nextIdx]!, delta)
           }
         }
 
         prevBtn.addEventListener("click", () => stepWeek(-1))
         nextBtn.addEventListener("click", () => stepWeek(1))
-        currentWeekBtn.addEventListener("click", () => setWeek(currentWeek))
-        weekSelect.addEventListener("change", () => setWeek(Number(weekSelect.value)))
+        currentWeekBtn.addEventListener("click", () =>
+          setWeek(currentWeek, currentWeek > activeWeek ? 1 : currentWeek < activeWeek ? -1 : 0)
+        )
+        weekSelect.addEventListener("change", () => {
+          const next = Number(weekSelect.value)
+          setWeek(next, next > activeWeek ? 1 : next < activeWeek ? -1 : 0)
+        })
         mobileQuery.addEventListener("change", () =>
           renderWeek(payload, colorMap, availableWeeks, activeWeek, currentWeek)
         )
@@ -932,9 +1009,10 @@ import Layout from "../layouts/Layout.astro"
 
         const resetCardTransform = (animate: boolean) => {
           scheduleCardEl.style.transition = animate
-            ? "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)"
+            ? "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease"
             : "none"
           scheduleCardEl.style.transform = "translate3d(0, 0, 0)"
+          scheduleCardEl.style.opacity = "1"
         }
 
         mainEl.addEventListener(
@@ -971,8 +1049,11 @@ import Layout from "../layouts/Layout.astro"
             const idx = availableWeeks.indexOf(activeWeek)
             const atEdge =
               (dx > 0 && idx <= 0) || (dx < 0 && idx >= availableWeeks.length - 1)
-            const visualDx = atEdge ? dx * 0.25 : dx * 0.55
+            const visualDx = atEdge ? dx * 0.22 : dx * 0.55
+            const width = scheduleCardEl.clientWidth || 360
+            const fade = atEdge ? 1 : Math.max(0.82, 1 - (Math.abs(dx) / width) * 0.28)
             scheduleCardEl.style.transform = `translate3d(${visualDx}px, 0, 0)`
+            scheduleCardEl.style.opacity = String(fade)
           },
           { passive: true }
         )
@@ -991,17 +1072,9 @@ import Layout from "../layouts/Layout.astro"
           const idx = availableWeeks.indexOf(activeWeek)
 
           if (triggered && state.dx < 0 && idx < availableWeeks.length - 1) {
-            setWeek(availableWeeks[idx + 1]!)
-            scheduleCardEl.style.transition = "none"
-            scheduleCardEl.style.transform = "translate3d(24px, 0, 0)"
-            void scheduleCardEl.offsetWidth
-            resetCardTransform(true)
+            setWeek(availableWeeks[idx + 1]!, 1)
           } else if (triggered && state.dx > 0 && idx > 0) {
-            setWeek(availableWeeks[idx - 1]!)
-            scheduleCardEl.style.transition = "none"
-            scheduleCardEl.style.transform = "translate3d(-24px, 0, 0)"
-            void scheduleCardEl.offsetWidth
-            resetCardTransform(true)
+            setWeek(availableWeeks[idx - 1]!, -1)
           } else {
             resetCardTransform(true)
           }
@@ -1017,6 +1090,7 @@ import Layout from "../layouts/Layout.astro"
         weekControlsEl.classList.remove("hidden")
         weekControlsEl.classList.add("flex")
         mainEl.classList.remove("hidden")
+        mainEl.classList.add("share-enter")
 
         setWeek(activeWeek)
       } catch {

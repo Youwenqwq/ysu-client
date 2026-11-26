@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import {
   Bell,
@@ -537,6 +537,19 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
       setShareOpen(true)
     }
   }, [shareRequestNonce])
+
+  useLayoutEffect(() => {
+    if (!showOriginal) return
+    if (typeof window !== "undefined") {
+      window.scrollTo?.(0, 0)
+    }
+    if (typeof document !== "undefined") {
+      const shellMain = document.querySelector?.("[data-shell-main]")
+      if (shellMain instanceof HTMLElement) {
+        shellMain.scrollTop = 0
+      }
+    }
+  }, [showOriginal])
 
   useBackHandler(() => actions.finishEditing(), editing)
   useBackHandler(() => actions.setShowOriginal(false), showOriginal)

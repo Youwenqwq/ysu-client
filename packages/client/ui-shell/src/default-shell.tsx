@@ -434,6 +434,16 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
     return props.resolveChrome(location, uiSnapshot, locale)
   }, [locale, location, navRevision, props, startupPage, uiSnapshot])
 
+  const mainRef = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo?.(0, 0)
+    }
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0
+    }
+  }, [chrome.routeKey])
+
   const hasBackground = Boolean(backgroundImage || backgroundUrl)
   const outletTransitionMode = resolvePageOutletTransitionMode({
     fullscreen: chrome.fullscreen,
@@ -541,6 +551,7 @@ export const DefaultShell: SlotComponent<DefaultShellProps> = (props) => {
       </Sidebar>
 
       <main
+        ref={mainRef}
         data-shell-main=""
         className={cn(
           "flex min-w-0 flex-1 flex-col overflow-x-hidden pt-[calc(3rem+var(--safe-area-inset-top,env(safe-area-inset-top,0px)))] md:overflow-auto md:pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] md:pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom))]",
