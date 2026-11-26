@@ -48,6 +48,7 @@ export const NetworkActivitySettings: SlotComponent<NetworkActivitySettingsProps
   const { t, useStore, actions } = props
   const density = useStore((state) => state.density)
   const showTiming = useStore((state) => state.showTiming)
+  const showCompletionCheck = useStore((state) => state.showCompletionCheck)
   const showMascots = useStore((state) => state.showMascots)
   const longMascots = useStore((state) => state.longMascots)
 
@@ -85,6 +86,12 @@ export const NetworkActivitySettings: SlotComponent<NetworkActivitySettingsProps
           description={t("settings.showTimingDescription")}
           checked={showTiming}
           onCheckedChange={actions.setShowTiming}
+        />
+        <SettingSwitch
+          label={t("settings.showCompletionCheck")}
+          description={t("settings.showCompletionCheckDescription")}
+          checked={showCompletionCheck}
+          onCheckedChange={actions.setShowCompletionCheck}
         />
         <SettingSwitch
           label={t("settings.showMascots")}

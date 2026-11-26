@@ -22,6 +22,8 @@ export const networkActivityDictionary = defineDictionary({
       densityDescription: "选择顶栏中网络活动信息的密度。",
       showTiming: "简洁模式显示计时",
       showTimingDescription: "在简洁模式下显示当前加载条目的实时耗时；详细和调试模式始终显示计时。",
+      showCompletionCheck: "简洁模式显示完成对勾",
+      showCompletionCheckDescription: "在简洁模式下请求正常完成后，短暂显示打勾动画。",
       showMascots: "显示嘿咻",
       showMascotsDescription: "嘿咻！",
       longMascotsOff: "不那么长嘿咻",
@@ -68,6 +70,9 @@ export const networkActivityDictionary = defineDictionary({
       showTiming: "Show timing in compact mode",
       showTimingDescription:
         "Show the live duration of the current item in compact mode. Detailed and debug modes always show timing.",
+      showCompletionCheck: "Show completion checkmark in compact mode",
+      showCompletionCheckDescription:
+        "Briefly display a checkmark animation after requests succeed in compact mode.",
       showMascots: "Show Heixiu",
       showMascotsDescription: "Heixiu!",
       longMascotsOff: "Not-so-long Heixiu",

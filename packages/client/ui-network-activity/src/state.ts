@@ -5,6 +5,7 @@ export type ActivityDensity = "compact" | "detailed" | "debug"
 export interface ActivitySettingsState {
   readonly density: ActivityDensity
   readonly showTiming: boolean
+  readonly showCompletionCheck: boolean
   readonly showMascots: boolean
   readonly longMascots: boolean
 }
@@ -16,6 +17,7 @@ export function isActivityDensity(value: unknown): value is ActivityDensity {
 export const DEFAULT_ACTIVITY_SETTINGS: ActivitySettingsState = {
   density: "compact",
   showTiming: false,
+  showCompletionCheck: true,
   showMascots: true,
   longMascots: false,
 }
@@ -34,6 +36,11 @@ export const activitySettingsStore = defineStore({
     },
     setShowTiming(ctx, showTiming: boolean) {
       ctx.set((prev) => (prev.showTiming === showTiming ? prev : { ...prev, showTiming }))
+    },
+    setShowCompletionCheck(ctx, showCompletionCheck: boolean) {
+      ctx.set((prev) =>
+        prev.showCompletionCheck === showCompletionCheck ? prev : { ...prev, showCompletionCheck }
+      )
     },
     setShowMascots(ctx, showMascots: boolean) {
       ctx.set((prev) => (prev.showMascots === showMascots ? prev : { ...prev, showMascots }))

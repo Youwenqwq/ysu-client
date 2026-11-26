@@ -213,6 +213,7 @@ describe("@orahako/ui-network-activity", () => {
     const first = activitySettingsStore.create(storage)
     first.actions.setDensity("debug")
     first.actions.setShowTiming(true)
+    first.actions.setShowCompletionCheck(false)
     first.actions.setShowMascots(true)
     first.actions.setLongMascots(true)
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -223,6 +224,7 @@ describe("@orahako/ui-network-activity", () => {
     expect(second.source.getSnapshot()).toEqual({
       density: "debug",
       showTiming: true,
+      showCompletionCheck: false,
       showMascots: true,
       longMascots: true,
     })
@@ -370,6 +372,34 @@ describe("@orahako/ui-network-activity", () => {
       await act(async () => {
         finishReq3("ok")
       })
+
+      // Compact mode shows a brief checkmark animation when requests complete cleanly, then hides
+      await act(async () => {
+        sharedStore.actions.setDensity("compact")
+      })
+      let finishCompact!: (outcome?: "ok" | "error" | "aborted") => void
+      await act(async () => {
+        finishCompact = http.activity.beginRequest("https://jwxt.ysu.edu.cn/grades", "GET")
+      })
+      expect(dom.container.textContent).toContain("拉取成绩单")
+      await act(async () => {
+        finishCompact("ok")
+      })
+      expect(dom.container.toHtml()).toContain("data-network-compact-done")
+      await act(async () => {
+        vi.advanceTimersByTime(1_000)
+      })
+      expect(dom.container.toHtml()).not.toContain("data-network-compact-done")
+
+      // Disabling showCompletionCheck suppresses the compact checkmark animation
+      await act(async () => {
+        sharedStore.actions.setShowCompletionCheck(false)
+        finishCompact = http.activity.beginRequest("https://jwxt.ysu.edu.cn/grades", "GET")
+      })
+      await act(async () => {
+        finishCompact("ok")
+      })
+      expect(dom.container.toHtml()).not.toContain("data-network-compact-done")
 
       await dom.unmount()
       disposeActivitySlot()
