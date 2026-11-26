@@ -3,6 +3,11 @@
 复制本目录，修改 `manifest.json` 的 ID、名称和版本，再实现 `src/index.tsx` 与页面。模板使用 API v1 的 `definePlugin` 注册派生 Props 页面，并通过 `slots.inject` 等待默认 Shell 的 `shell.header.actions` Slot。
 
 ```bash
+# 在独立插件仓库中使用（无需克隆宿主仓库）
+pnpm add -D @orahako/sdk @orahako/ui-primitives @orahako/cli
+pnpm exec orahako pack <你的插件目录>
+
+# 或在宿主仓库根目录中直接打包
 pnpm install
 pnpm plugin pack <你的插件目录>
 ```

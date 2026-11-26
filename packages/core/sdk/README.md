@@ -250,7 +250,14 @@ paths, `@/` aliases and Next.js imports are not part of the SDK. In particular,
 `@orahako/academic-sdk` is not a shared module. Declare bundled entry CSS in
 `styles`; the packer appends `dist/tailwind.css` when it generates utilities.
 
-From the repository root:
+In an external plugin repository (no host checkout required):
+
+```sh
+pnpm add -D @orahako/sdk @orahako/ui-primitives @orahako/cli
+pnpm exec orahako pack <plugin-directory> [output.zip]
+```
+
+Or from the host repository root:
 
 ```sh
 pnpm plugin pack <plugin-directory> [output.zip]
@@ -269,10 +276,11 @@ Market indexes keep `schemaVersion: 1`; individual releases declare
 `apiVersion: 1`, `version`, `platforms` (`web` or `android`), `zipUrl`, `sha256`,
 `size` and `publishedAt`. Set `minAppVersion` to the oldest compatible app
 release if needed. Compatibility is filtered by API, platform, app version and
-native capabilities before selecting the highest matching SemVer. Publish the
-exact ZIP under `dist/plugins/<id>/<version>.zip` in
-`Youwenqwq/orahako-plugin-registry`, update its registry source, and commit the
-generated `dist/plugins.json`. The app reads both index and ZIPs from that
+native capabilities before selecting the highest matching SemVer. To publish to
+`Youwenqwq/orahako-plugin-registry`, run `pnpm run ingest <path/to/plugin.zip> --changelog "..."`
+followed by `pnpm run validate` in the registry repository, then commit the
+updated `plugins/<id>.json`, generated `dist/plugins.json`, and
+`dist/plugins/<id>/<version>.zip`. The app reads both index and ZIPs from that
 repository's `main` branch through GitHub Raw.
 
 ## Verification

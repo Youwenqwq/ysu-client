@@ -27,6 +27,8 @@ pnpm run verify-architecture
 pnpm run format
 
 pnpm plugin pack <plugin-directory> [output.zip]   # API v1 esbuild + Tailwind CSS + ZIP，输出 SHA-256
+pnpm run build:packages                            # 编译发布到 npm 的 @orahako/{sdk,ui-primitives,academic-sdk,cli}
+pnpm run publish:packages                          # 构建并发布上述 4 个公共 npm 包（需 npm 2FA）
 npx cap sync              # 构建后同步 dist/ 到 android/
 npx cap open android
 cd android && ./gradlew verifyNativeComposition testDebugUnitTest   # provider/widget 选择与占位符检查
@@ -38,7 +40,7 @@ scripts/deploy-website.sh # 构建 APP_BASE_PATH=/app 并部署 EdgeOne Pages
 pnpm run release          # 预检、创建草稿、编辑 notes、发布
 ```
 
-`pnpm run build` 含 `postbuild`，产出完整静态应用。`scripts/plugin.ts` 是打包入口，`scripts/plugin-build.ts` 实现 esbuild、Tailwind 与 ZIP 校验；从仓库根目录用 `pnpm plugin pack` 调用。
+`pnpm run build` 含 `postbuild`，产出完整静态应用。`packages/core/cli`（`@orahako/cli`）实现 esbuild、Tailwind 隔离编译与 ZIP 校验（发布时预生成宿主设计 token 与 utility selector 快照）；仓库内 `scripts/plugin.ts` / `scripts/plugin-build.ts` 委托给它并实时读取 `app/globals.css`，通过 `pnpm plugin pack` 调用。
 
 ## 架构
 
