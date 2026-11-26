@@ -70,7 +70,7 @@ android {
             storeFile file('release.keystore')
             storeType 'PKCS12'
             storePassword project.findProperty('KEYSTORE_PASSWORD') ?: ''
-            keyAlias "ysu-client"
+            keyAlias project.findProperty('KEY_ALIAS') ?: 'orahako'
             keyPassword project.findProperty('KEY_PASSWORD') ?: ''
         }
     }
