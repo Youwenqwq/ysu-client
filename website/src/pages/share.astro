@@ -29,12 +29,12 @@ import Layout from "../layouts/Layout.astro"
           <select
             id="week-select"
             aria-label="Week"
-            class="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-800 shadow-2xs outline-none focus:border-lime-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+            class="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-800 shadow-2xs outline-none focus:border-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
           ></select>
           <button
             id="btn-current-week"
             type="button"
-            class="hidden h-8 items-center justify-center rounded-lg bg-lime-500/15 px-2.5 text-xs font-medium text-lime-700 transition hover:bg-lime-500/25 dark:bg-lime-400/15 dark:text-lime-300 dark:hover:bg-lime-400/25"
+            class="hidden h-8 items-center justify-center rounded-lg bg-zinc-900 px-2.5 text-xs font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           ></button>
           <button
             id="btn-next-week"
@@ -74,17 +74,18 @@ import Layout from "../layouts/Layout.astro"
       </section>
 
       <!-- Schedule Grid (Mobile + Desktop adaptive, no horizontal scroll needed) -->
-      <main id="share-main" class="hidden">
+      <main id="share-main" class="hidden touch-pan-y">
         <div
-          class="overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-2xs dark:border-zinc-800 dark:bg-zinc-900"
+          id="schedule-card"
+          class="overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-2xs will-change-transform dark:border-zinc-800 dark:bg-zinc-900"
         >
           <div
             id="timetable-header"
-            class="grid grid-cols-[2rem_repeat(7,minmax(0,1fr))] border-b border-zinc-200/80 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/80 md:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]"
+            class="grid grid-cols-[2.75rem_repeat(7,minmax(0,1fr))] border-b border-zinc-200/80 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/80 md:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]"
           ></div>
           <div
             id="timetable-body"
-            class="relative grid grid-cols-[2rem_repeat(7,minmax(0,1fr))] md:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]"
+            class="relative grid grid-cols-[2.75rem_repeat(7,minmax(0,1fr))] md:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]"
           ></div>
         </div>
       </main>
@@ -532,9 +533,16 @@ import Layout from "../layouts/Layout.astro"
     const errorEl = document.getElementById("share-error")!
     const errorTitleEl = document.getElementById("share-error-title")!
     const mainEl = document.getElementById("share-main")!
+    const scheduleCardEl = document.getElementById("schedule-card")!
     const headerGridEl = document.getElementById("timetable-header")!
     const bodyGridEl = document.getElementById("timetable-body")!
     const attributionEl = document.getElementById("share-attribution")!
+
+    let suppressCardClickUntil = 0
+
+    function displayItemTitle(item: SharedItem): string {
+      return item.category === "busy" ? dict.catBusy : item.title
+    }
 
     const detailModalEl = document.getElementById("detail-modal")!
     const detailCloseEl = document.getElementById("detail-close")!
@@ -559,8 +567,9 @@ import Layout from "../layouts/Layout.astro"
     }
 
     function openDetail(item: SharedItem): void {
+      if (Date.now() < suppressCardClickUntil) return
       detailCategoryEl.textContent = categoryLabel(item.category)
-      detailTitleEl.textContent = item.title
+      detailTitleEl.textContent = displayItemTitle(item)
       detailRowsEl.replaceChildren()
 
       const addRow = (label: string, value: string) => {
@@ -622,7 +631,7 @@ import Layout from "../layouts/Layout.astro"
       currentWeek: number
     ): void {
       const isMobile = mobileQuery.matches
-      const rowHeight = isMobile ? 48 : 56
+      const rowHeight = 56
 
       const periods =
         payload.periods.length > 0
@@ -674,14 +683,14 @@ import Layout from "../layouts/Layout.astro"
 
         cell.className =
           "flex flex-col items-center justify-center border-r border-zinc-100 py-1.5 text-center last:border-r-0 dark:border-zinc-800/70 md:py-2" +
-          (isToday ? " bg-lime-500/12 dark:bg-lime-400/12" : "")
+          (isToday ? " bg-zinc-900/[0.06] dark:bg-zinc-100/[0.08]" : "")
 
         const label = document.createElement("span")
         label.className =
           "text-[11px] font-medium md:text-xs " +
           (isToday
-            ? "font-semibold text-lime-700 dark:text-lime-300"
-            : "text-zinc-700 dark:text-zinc-200")
+            ? "font-semibold text-zinc-950 dark:text-white"
+            : "text-zinc-600 dark:text-zinc-300")
         label.textContent = isMobile ? dict.weekdaysCompact[day - 1]! : dict.weekdays[day - 1]!
         cell.append(label)
 
@@ -690,7 +699,7 @@ import Layout from "../layouts/Layout.astro"
           dateSpan.className =
             "mt-0.5 text-[10px] " +
             (isToday
-              ? "font-medium text-lime-700 dark:text-lime-300"
+              ? "font-medium text-zinc-900 dark:text-zinc-100"
               : "text-zinc-400 dark:text-zinc-500")
           dateSpan.textContent = `${dayDate.getMonth() + 1}/${dayDate.getDate()}`
           cell.append(dateSpan)
@@ -719,10 +728,15 @@ import Layout from "../layouts/Layout.astro"
 
         if (period?.startTime) {
           const time = document.createElement("span")
-          time.className =
-            "hidden text-[10px] leading-tight text-zinc-400 dark:text-zinc-500 md:block"
+          time.className = "text-[9px] leading-tight text-zinc-400 dark:text-zinc-500 md:text-[10px]"
           time.textContent = period.startTime
           cell.append(time)
+        }
+        if (period?.endTime) {
+          const endTime = document.createElement("span")
+          endTime.className = "text-[9px] leading-tight text-zinc-400/80 dark:text-zinc-500/80 md:text-[10px]"
+          endTime.textContent = period.endTime
+          cell.append(endTime)
         }
         timeCol.append(cell)
       }
@@ -741,7 +755,7 @@ import Layout from "../layouts/Layout.astro"
         col.style.height = `${totalHeight}px`
         col.className =
           "relative border-r border-zinc-100 last:border-r-0 dark:border-zinc-800/60" +
-          (isToday ? " bg-lime-500/[0.04] dark:bg-lime-400/[0.04]" : "")
+          (isToday ? " bg-zinc-900/[0.025] dark:bg-zinc-100/[0.03]" : "")
 
         for (let section = 1; section <= maxSection; section += 1) {
           const line = document.createElement("div")
@@ -791,7 +805,7 @@ import Layout from "../layouts/Layout.astro"
               : item.category === "event"
                 ? "text-indigo-700 dark:text-indigo-300"
                 : "")
-          titleSpan.textContent = item.title
+          titleSpan.textContent = displayItemTitle(item)
           btn.append(titleSpan)
 
           if (item.location) {
@@ -895,6 +909,95 @@ import Layout from "../layouts/Layout.astro"
         mobileQuery.addEventListener("change", () =>
           renderWeek(payload, colorMap, activeWeek, currentWeek)
         )
+
+        // Mobile horizontal swipe gesture to switch weeks
+        let touchState: {
+          startX: number
+          startY: number
+          startTime: number
+          dx: number
+          locked: "x" | "y" | null
+        } | null = null
+
+        const resetCardTransform = (animate: boolean) => {
+          scheduleCardEl.style.transition = animate
+            ? "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)"
+            : "none"
+          scheduleCardEl.style.transform = "translate3d(0, 0, 0)"
+        }
+
+        mainEl.addEventListener(
+          "touchstart",
+          (event) => {
+            if (event.touches.length !== 1) return
+            const t = event.touches[0]!
+            touchState = {
+              startX: t.clientX,
+              startY: t.clientY,
+              startTime: Date.now(),
+              dx: 0,
+              locked: null,
+            }
+            scheduleCardEl.style.transition = "none"
+          },
+          { passive: true }
+        )
+
+        mainEl.addEventListener(
+          "touchmove",
+          (event) => {
+            if (!touchState || event.touches.length !== 1) return
+            const t = event.touches[0]!
+            const dx = t.clientX - touchState.startX
+            const dy = t.clientY - touchState.startY
+            if (!touchState.locked) {
+              if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return
+              touchState.locked = Math.abs(dx) > Math.abs(dy) * 1.2 ? "x" : "y"
+            }
+            if (touchState.locked !== "x") return
+
+            touchState.dx = dx
+            const atEdge = (dx > 0 && activeWeek <= 1) || (dx < 0 && activeWeek >= totalWeeks)
+            const visualDx = atEdge ? dx * 0.25 : dx * 0.55
+            scheduleCardEl.style.transform = `translate3d(${visualDx}px, 0, 0)`
+          },
+          { passive: true }
+        )
+
+        const finishSwipe = () => {
+          if (!touchState) return
+          const state = touchState
+          touchState = null
+          if (state.locked !== "x") return
+
+          suppressCardClickUntil = Date.now() + 350
+          const elapsed = Math.max(1, Date.now() - state.startTime)
+          const velocity = Math.abs(state.dx) / elapsed
+          const width = scheduleCardEl.clientWidth || 360
+          const triggered = Math.abs(state.dx) >= width * 0.2 || velocity >= 0.35
+
+          if (triggered && state.dx < 0 && activeWeek < totalWeeks) {
+            setWeek(activeWeek + 1)
+            scheduleCardEl.style.transition = "none"
+            scheduleCardEl.style.transform = "translate3d(24px, 0, 0)"
+            void scheduleCardEl.offsetWidth
+            resetCardTransform(true)
+          } else if (triggered && state.dx > 0 && activeWeek > 1) {
+            setWeek(activeWeek - 1)
+            scheduleCardEl.style.transition = "none"
+            scheduleCardEl.style.transform = "translate3d(-24px, 0, 0)"
+            void scheduleCardEl.offsetWidth
+            resetCardTransform(true)
+          } else {
+            resetCardTransform(true)
+          }
+        }
+
+        mainEl.addEventListener("touchend", finishSwipe, { passive: true })
+        mainEl.addEventListener("touchcancel", () => {
+          touchState = null
+          resetCardTransform(true)
+        })
 
         loadingEl.classList.add("hidden")
         weekControlsEl.classList.remove("hidden")
