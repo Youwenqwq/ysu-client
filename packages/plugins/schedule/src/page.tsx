@@ -16,13 +16,13 @@ import {
   Grid3x3,
   History,
   Link2,
+  MoreHorizontal,
   Pencil,
   Plus,
   RefreshCw,
   RotateCcw,
   Search,
   Share2,
-  SlidersHorizontal,
   Trash2,
   TriangleAlert,
   Undo2,
@@ -89,9 +89,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  Field,
-  FieldGroup,
-  FieldLabel,
   FilterDrawer,
   FilterTrigger,
   Input,
@@ -351,13 +348,15 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   const weekOverride = useStore((s) => s.weekOverride)
   const termInput = useStore((s) => s.termInput)
   const queriedTerm = useStore((s) => s.queriedTerm)
-  const filterDrawerOpen = useStore((s) => s.filterDrawerOpen)
+  const weekPickerOpen = useStore((s) => s.weekPickerOpen)
+  const menuOpen = useStore((s) => s.menuOpen)
   const editScope = useStore((s) => s.editScope)
   const showOriginal = useStore((s) => s.showOriginal)
   const pendingDrop = useStore((s) => s.pendingDrop)
   const manager = useStore((s) => s.manager)
   const undo = useStore((s) => s.undo)
   const createRequestNonce = useStore((s) => s.createRequestNonce)
+  const shareRequestNonce = useStore((s) => s.shareRequestNonce)
 
   const [activityCourse, setActivityCourse] = useState<Course | null>(null)
   const [activityWeek, setActivityWeek] = useState(1)
@@ -373,7 +372,10 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   const [webcalPending, setWebcalPending] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [sharePending, setSharePending] = useState(false)
+  const [shareCustomRange, setShareCustomRange] = useState(false)
+  const [shareSelectedWeeks, setShareSelectedWeeks] = useState<number[]>([])
   const lastCreateNonceRef = useRef(createRequestNonce)
+  const lastShareNonceRef = useRef(shareRequestNonce)
 
   const activeProvider = providerSnap.provider
   const hasAcademicTimetable = Boolean(
@@ -528,6 +530,13 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
       })
     }
   }, [clock.date, clock.weekday, createRequestNonce, isStandalone, selectedWeek])
+
+  useEffect(() => {
+    if (shareRequestNonce !== lastShareNonceRef.current) {
+      lastShareNonceRef.current = shareRequestNonce
+      setShareOpen(true)
+    }
+  }, [shareRequestNonce])
 
   useBackHandler(() => actions.finishEditing(), editing)
   useBackHandler(() => actions.setShowOriginal(false), showOriginal)
@@ -763,18 +772,23 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
     termCalendarQuery.error,
   ])
 
+  const handleRefreshSchedule = async (): Promise<void> => {
+    actions.setMenuOpen(false)
+    actions.setWeekPickerOpen(false)
+    await Promise.allSettled([
+      scheduleQuery.refresh(),
+      currentWeekQuery.refresh(),
+      termCalendarQuery.refresh(),
+      periodsQuery.refresh(),
+      props.refreshSources(),
+    ])
+  }
+
   const handleQuery = async (): Promise<void> => {
     const nextTerm = termInput.trim()
     props.onSemesterChange(nextTerm)
     if (nextTerm === queriedTerm) {
-      actions.setFilterDrawerOpen(false)
-      await Promise.allSettled([
-        scheduleQuery.refresh(),
-        currentWeekQuery.refresh(),
-        termCalendarQuery.refresh(),
-        periodsQuery.refresh(),
-        props.refreshSources(),
-      ])
+      await handleRefreshSchedule()
     } else {
       actions.commitQueriedTerm(nextTerm)
     }
@@ -967,13 +981,33 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
   }
 
   const sharedLinks = Array.isArray(settings.sharedLinks) ? settings.sharedLinks : []
-  const activeSharedLinkCount = sharedLinks.filter((item) => item.expiresAt > clockTick).length
 
   const buildShareUrl = (shareId: string): string =>
     props.shareViewerBaseUrl ? `${props.shareViewerBaseUrl}?id=${encodeURIComponent(shareId)}` : ""
 
+  const handleToggleShareCustomRange = (enabled: boolean): void => {
+    setShareCustomRange(enabled)
+    if (enabled && shareSelectedWeeks.length === 0) {
+      const defaultWeek =
+        currentWeek?.week && currentWeek.week >= 1 ? currentWeek.week : selectedWeek || 1
+      setShareSelectedWeeks([defaultWeek])
+    }
+  }
+
+  const handleToggleShareWeek = (weekNum: number): void => {
+    setShareSelectedWeeks((prev) =>
+      prev.includes(weekNum)
+        ? prev.filter((w) => w !== weekNum)
+        : [...prev, weekNum].sort((a, b) => a - b)
+    )
+  }
+
   const handleCreateShare = async (): Promise<void> => {
     if (!props.createScheduleShare) return
+    if (shareCustomRange && shareSelectedWeeks.length === 0) {
+      toast.info(t("schedule.shareRangeEmpty"))
+      return
+    }
     const payload = buildSharedSchedulePayload({
       courses,
       extraEntries: overlayEntries,
@@ -987,6 +1021,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         showLocation: settings.shareMaskShowLocation,
         showSubtitle: settings.shareMaskShowSubtitle,
       },
+      ...(shareCustomRange ? { allowedWeeks: shareSelectedWeeks } : {}),
       includePersonal: settings.shareIncludePersonal,
       includeExams: settings.shareIncludeExams,
       examTitlePrefix: t("schedule.examTitlePrefix"),
@@ -1061,98 +1096,87 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         ) ?? null)
       : null
 
-  const renderFilterControls = (idPrefix: string): ReactNode => (
-    <FieldGroup className="flex flex-row flex-wrap items-end gap-3">
-      {hasAcademicTimetable && (
-        <Field className="w-48">
-          <FieldLabel htmlFor={`${idPrefix}-term`}>{t("schedule.termLabel")}</FieldLabel>
-          <Input
-            id={`${idPrefix}-term`}
-            value={termInput}
-            onChange={(event) => actions.setTermInput(event.target.value)}
-            placeholder={t("schedule.termPlaceholder")}
-          />
-        </Field>
-      )}
-      <Field className="min-w-[16rem]">
-        <FieldLabel htmlFor={`${idPrefix}-week`}>{t("schedule.weekLabel")}</FieldLabel>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={() => shiftWeek(-1)}
-              aria-label={t("schedule.weekPrev")}
-            >
-              <ChevronLeft />
-            </Button>
-            {isStandalone ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => selectWeek(STANDALONE_TODAY_WEEK)}
-              >
-                {t("schedule.today")}
-              </Button>
-            ) : (
-              <Input
-                id={`${idPrefix}-week`}
-                type="number"
-                value={selectedWeek || ""}
-                onChange={(event) => selectWeek(Number.parseInt(event.target.value, 10) || 1)}
-                placeholder={t("schedule.weeks")}
-                className="w-20 text-center"
-              />
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={() => shiftWeek(1)}
-              aria-label={t("schedule.weekNext")}
-            >
-              <ChevronRight />
-            </Button>
-          </div>
-          {!isStandalone && currentWeek && currentWeek.week >= 1 && (
-            <Badge variant="secondary">
-              {t("schedule.currentWeekBadge", { week: currentWeek.week })}
-            </Badge>
-          )}
+  const isViewingCurrentWeek = isStandalone
+    ? selectedWeek === STANDALONE_TODAY_WEEK
+    : Boolean(currentWeek && currentWeek.week >= 1 && selectedWeek === currentWeek.week)
+
+  const handleBackToCurrentWeek = (): void => {
+    if (isStandalone) {
+      selectWeek(STANDALONE_TODAY_WEEK)
+    } else if (currentWeek && currentWeek.week >= 1) {
+      selectWeek(currentWeek.week)
+    }
+    actions.setWeekPickerOpen(false)
+  }
+
+  const renderDesktopToolbar = (): ReactNode => (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            onClick={() => shiftWeek(-1)}
+            aria-label={t("schedule.weekPrev")}
+          >
+            <ChevronLeft />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => actions.setWeekPickerOpen(true)}
+            className="min-w-24 justify-between gap-1"
+          >
+            <span>
+              {isStandalone
+                ? t("schedule.today")
+                : t("schedule.weekShort", { week: selectedWeek || 1 })}
+            </span>
+            <ChevronDown className="size-3.5 opacity-60" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            onClick={() => shiftWeek(1)}
+            aria-label={t("schedule.weekNext")}
+          >
+            <ChevronRight />
+          </Button>
         </div>
-      </Field>
+        {!isViewingCurrentWeek && (
+          <Button type="button" variant="secondary" size="sm" onClick={handleBackToCurrentWeek}>
+            {t("schedule.backToCurrentWeek")}
+          </Button>
+        )}
+        {hasAcademicTimetable && semester && (
+          <Badge variant="outline" className="font-normal text-muted-foreground">
+            {semester}
+          </Badge>
+        )}
+      </div>
+
       {editing ? (
         <ScheduleEditActionButtons
           hasUndo={Boolean(lastAdjustment)}
           onUndo={() => {
             if (lastAdjustment) requestUndo(lastAdjustment.id)
           }}
-          onOpenManager={() => {
-            actions.setFilterDrawerOpen(false)
-            openManager()
-          }}
-          onDone={() => {
-            actions.setFilterDrawerOpen(false)
-            actions.finishEditing()
-          }}
+          onOpenManager={() => openManager()}
+          onDone={() => actions.finishEditing()}
           t={t}
         />
       ) : (
-        <>
-          {hasAcademicTimetable && (
-            <Button type="button" onClick={() => void handleQuery()} disabled={loading}>
-              {loading ? <Spinner data-icon="inline-start" /> : <Search data-icon="inline-start" />}
-              {t("schedule.query")}
-            </Button>
-          )}
+        <div className="flex flex-wrap items-center gap-2">
+          {toolbarExtraActions}
           <Button
             type="button"
             variant={hasAcademicTimetable ? "outline" : "default"}
+            size="sm"
             data-schedule-add-item=""
-            onClick={() => {
-              actions.setFilterDrawerOpen(false)
+            onClick={() =>
               setItemFormTarget({
                 mode: "create",
                 initialKind: isStandalone ? "event" : "course",
@@ -1160,52 +1184,64 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 initialDate: clock.date,
                 initialWeek: selectedWeek,
               })
-            }}
+            }
           >
             <Plus data-icon="inline-start" />
             {t("schedule.addEntry")}
           </Button>
+          {props.createScheduleShare && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={courses.length === 0 && overlayEntries.length === 0}
+              onClick={() => setShareOpen(true)}
+            >
+              <Share2 data-icon="inline-start" />
+              {t("schedule.shareTitle")}
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 disabled={!activeScope}
                 data-schedule-manage-menu=""
               >
-                <SlidersHorizontal data-icon="inline-start" />
-                {t("schedule.manageMenu")}
+                <MoreHorizontal data-icon="inline-start" />
+                {t("schedule.moreMenu")}
                 {totalCustomizationCount > 0 && (
                   <Badge variant="secondary" className="ml-1">
                     {totalCustomizationCount}
                   </Badge>
                 )}
-                <ChevronDown className="ml-0.5 size-3.5 opacity-70" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
+              {hasAcademicTimetable && (
+                <>
+                  <DropdownMenuItem
+                    disabled={loading}
+                    onSelect={() => void handleRefreshSchedule()}
+                  >
+                    <RefreshCw className={cn("mr-2 size-4", loading && "animate-spin")} />
+                    {t("schedule.refreshSchedule")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuLabel className="text-xs text-muted-foreground">
                 {t("schedule.manageSectionEdit")}
               </DropdownMenuLabel>
               {hasAcademicTimetable && (
-                <DropdownMenuItem
-                  disabled={!canEdit}
-                  onSelect={() => {
-                    actions.setFilterDrawerOpen(false)
-                    enterEditor()
-                  }}
-                >
+                <DropdownMenuItem disabled={!canEdit} onSelect={() => enterEditor()}>
                   <Pencil className="mr-2 size-4" />
                   {t("schedule.manageDragAdjust")}
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem
-                disabled={!activeScope}
-                onSelect={() => {
-                  actions.setFilterDrawerOpen(false)
-                  openManager()
-                }}
-              >
+              <DropdownMenuItem disabled={!activeScope} onSelect={() => openManager()}>
                 <History className="mr-2 size-4" />
                 <span className="flex-1">{t("schedule.manageRecords")}</span>
                 {totalCustomizationCount > 0 && (
@@ -1217,10 +1253,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
               {hasAcademicTimetable && (
                 <DropdownMenuItem
                   disabled={!effective.ready}
-                  onSelect={() => {
-                    actions.setFilterDrawerOpen(false)
-                    actions.setShowOriginal(true)
-                  }}
+                  onSelect={() => actions.setShowOriginal(true)}
                 >
                   <Eye className="mr-2 size-4" />
                   {t("scheduleEditor.showOriginal")}
@@ -1231,12 +1264,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 {t("schedule.manageSectionSync")}
               </DropdownMenuLabel>
               {props.isNative() && props.toggleCalendarSync && (
-                <DropdownMenuItem
-                  onSelect={() => {
-                    actions.setFilterDrawerOpen(false)
-                    setCalendarSyncOpen(true)
-                  }}
-                >
+                <DropdownMenuItem onSelect={() => setCalendarSyncOpen(true)}>
                   <CalendarSync className="mr-2 size-4" />
                   <span className="flex-1">{t("schedule.syncSystemCalendar")}</span>
                   {settings.calendarSyncEnabled && (
@@ -1247,12 +1275,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 </DropdownMenuItem>
               )}
               {props.publishWebcalFeed && (
-                <DropdownMenuItem
-                  onSelect={() => {
-                    actions.setFilterDrawerOpen(false)
-                    setWebcalOpen(true)
-                  }}
-                >
+                <DropdownMenuItem onSelect={() => setWebcalOpen(true)}>
                   <Link2 className="mr-2 size-4" />
                   <span className="flex-1">{t("schedule.webcalSubscribe")}</span>
                   {settings.webcalEnabled && (
@@ -1262,49 +1285,24 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                   )}
                 </DropdownMenuItem>
               )}
-              {props.createScheduleShare && (
-                <DropdownMenuItem
-                  disabled={courses.length === 0 && overlayEntries.length === 0}
-                  onSelect={() => {
-                    actions.setFilterDrawerOpen(false)
-                    setShareOpen(true)
-                  }}
-                >
-                  <Share2 className="mr-2 size-4" />
-                  <span className="flex-1">{t("schedule.shareSchedule")}</span>
-                  {activeSharedLinkCount > 0 && (
-                    <Badge variant="secondary" className="ml-2 text-[10px]">
-                      {activeSharedLinkCount}
-                    </Badge>
-                  )}
-                </DropdownMenuItem>
-              )}
               <DropdownMenuItem
                 disabled={courses.length === 0 && overlayEntries.length === 0}
-                onSelect={() => {
-                  actions.setFilterDrawerOpen(false)
-                  void handleExportIcs()
-                }}
+                onSelect={() => void handleExportIcs()}
               >
                 <Download className="mr-2 size-4" />
                 {t("schedule.exportIcs")}
               </DropdownMenuItem>
               {props.isNative() && props.openNotificationsSettings && (
-                <DropdownMenuItem
-                  onSelect={() => {
-                    actions.setFilterDrawerOpen(false)
-                    props.openNotificationsSettings?.()
-                  }}
-                >
+                <DropdownMenuItem onSelect={() => props.openNotificationsSettings?.()}>
                   <Bell className="mr-2 size-4" />
                   {t("schedule.reminderSettingsShortcut")}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-        </>
+        </div>
       )}
-    </FieldGroup>
+    </div>
   )
 
   return (
@@ -1313,16 +1311,13 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
       className={isMobile && compactMode ? "flex min-h-0 flex-1 flex-col" : "flex flex-col gap-6"}
     >
       <Card className="hidden md:block">
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div className="flex flex-col gap-1.5">
-            <CardTitle>{t("schedule.title")}</CardTitle>
-            <CardDescription>
-              {isStandalone ? t("schedule.standaloneHint") : t("schedule.description")}
-            </CardDescription>
-          </div>
-          <div className="flex shrink-0 items-center gap-2 empty:hidden">{toolbarExtraActions}</div>
+        <CardHeader className="pb-3">
+          <CardTitle>{t("schedule.title")}</CardTitle>
+          <CardDescription>
+            {isStandalone ? t("schedule.standaloneHint") : t("schedule.description")}
+          </CardDescription>
         </CardHeader>
-        <CardContent>{renderFilterControls("schedule-desktop")}</CardContent>
+        <CardContent>{renderDesktopToolbar()}</CardContent>
       </Card>
 
       {showOriginal && !isMobile && (
@@ -1426,6 +1421,10 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 editor={editor}
                 compact={compactMode}
                 showGridWhenEmpty={periods.length > 0}
+                weekCornerLabel={
+                  isStandalone ? undefined : (week) => t("schedule.weekShort", { week })
+                }
+                onWeekTap={() => actions.setWeekPickerOpen(true)}
                 onPrevWeek={() => shiftWeek(-1)}
                 onNextWeek={() => shiftWeek(1)}
                 colorMap={courseColors}
@@ -1594,13 +1593,287 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
         onOpenChange={setSigninOpen}
       />
 
+      <ResponsiveModal open={weekPickerOpen} onOpenChange={actions.setWeekPickerOpen}>
+        <ResponsiveModalContent className="sm:max-w-md">
+          <ResponsiveModalHeader>
+            <ResponsiveModalTitle>{t("schedule.weekPickerTitle")}</ResponsiveModalTitle>
+          </ResponsiveModalHeader>
+          <ResponsiveModalBody className="flex min-w-0 flex-col gap-4">
+            {isStandalone ? (
+              <div className="flex items-center justify-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => shiftWeek(-1)}>
+                  <ChevronLeft className="mr-1 size-4" />
+                  {t("schedule.weekPrev")}
+                </Button>
+                <Button type="button" size="sm" onClick={handleBackToCurrentWeek}>
+                  {t("schedule.today")}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => shiftWeek(1)}>
+                  {t("schedule.weekNext")}
+                  <ChevronRight className="ml-1 size-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {t("schedule.weekLabel")}
+                  </span>
+                  {!isViewingCurrentWeek && currentWeek && currentWeek.week >= 1 && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 px-2.5 text-xs"
+                      onClick={handleBackToCurrentWeek}
+                    >
+                      {t("schedule.backToCurrentWeek")}
+                    </Button>
+                  )}
+                </div>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {Array.from({ length: Math.max(1, effectiveTotalWeeks || 20) }, (_, idx) => {
+                    const weekNum = idx + 1
+                    const isSelected = weekNum === selectedWeek
+                    const isCurrent = Boolean(currentWeek && currentWeek.week === weekNum)
+                    return (
+                      <Button
+                        key={weekNum}
+                        type="button"
+                        size="sm"
+                        variant={isSelected ? "default" : "outline"}
+                        className={cn(
+                          "relative h-9 px-0 text-xs",
+                          isCurrent && !isSelected && "border-primary/60 font-semibold"
+                        )}
+                        onClick={() => {
+                          selectWeek(weekNum)
+                          actions.setWeekPickerOpen(false)
+                        }}
+                      >
+                        {weekNum}
+                        {isCurrent && (
+                          <span
+                            className={cn(
+                              "absolute bottom-1 h-1 w-1 rounded-full",
+                              isSelected ? "bg-primary-foreground" : "bg-primary"
+                            )}
+                          />
+                        )}
+                      </Button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {hasAcademicTimetable && (
+              <div className="flex flex-col gap-2 border-t border-border pt-3">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t("schedule.termLabel")}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={termInput}
+                    onChange={(event) => actions.setTermInput(event.target.value)}
+                    placeholder={semester || t("schedule.termPlaceholder")}
+                    className="min-w-0 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={loading}
+                    onClick={() => void handleQuery()}
+                  >
+                    {loading ? (
+                      <Spinner data-icon="inline-start" />
+                    ) : (
+                      <Search data-icon="inline-start" />
+                    )}
+                    {t("schedule.query")}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </ResponsiveModalBody>
+        </ResponsiveModalContent>
+      </ResponsiveModal>
+
       <FilterDrawer
-        open={filterDrawerOpen}
-        onOpenChange={actions.setFilterDrawerOpen}
-        title={t("schedule.title")}
-        description={isStandalone ? t("schedule.standaloneHint") : t("schedule.description")}
+        open={menuOpen}
+        onOpenChange={actions.setMenuOpen}
+        title={t("schedule.moreMenu")}
       >
-        {renderFilterControls("schedule-drawer")}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border bg-card">
+            <button
+              type="button"
+              onClick={() => {
+                actions.setMenuOpen(false)
+                actions.setWeekPickerOpen(true)
+              }}
+              className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-sm transition-colors active:bg-muted"
+            >
+              <Calendar className="size-4 text-muted-foreground" />
+              <span className="flex-1">{t("schedule.weekPickerTitle")}</span>
+              <span className="text-xs text-muted-foreground">
+                {isStandalone
+                  ? t("schedule.today")
+                  : t("schedule.weekShort", { week: selectedWeek || 1 })}
+              </span>
+              <ChevronRight className="size-4 text-muted-foreground/70" />
+            </button>
+            {hasAcademicTimetable && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void handleRefreshSchedule()}
+                className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-sm transition-colors active:bg-muted disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={cn("size-4 text-muted-foreground", loading && "animate-spin")}
+                />
+                <span className="flex-1">{t("schedule.refreshSchedule")}</span>
+                {semester && <span className="text-xs text-muted-foreground">{semester}</span>}
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="px-1 text-xs font-medium text-muted-foreground">
+              {t("schedule.manageSectionView")}
+            </span>
+            <div className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border bg-card">
+              <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                <span className="flex items-center gap-3 text-sm">
+                  {settings.compactMode ? (
+                    <Grid3x3 className="size-4 text-muted-foreground" />
+                  ) : (
+                    <Grid3x2 className="size-4 text-muted-foreground" />
+                  )}
+                  {t("schedule.compactHint")}
+                </span>
+                <Switch
+                  aria-label={t("schedule.compactHint")}
+                  checked={settings.compactMode}
+                  onCheckedChange={(checked) => props.setCompactMode(checked)}
+                />
+              </div>
+              {hasAcademicTimetable && (
+                <button
+                  type="button"
+                  disabled={!canEdit}
+                  onClick={() => {
+                    actions.setMenuOpen(false)
+                    enterEditor()
+                  }}
+                  className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-sm transition-colors active:bg-muted disabled:opacity-40"
+                >
+                  <Pencil className="size-4 text-muted-foreground" />
+                  <span className="flex-1">{t("schedule.manageDragAdjust")}</span>
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={!activeScope}
+                onClick={() => {
+                  actions.setMenuOpen(false)
+                  openManager()
+                }}
+                className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-sm transition-colors active:bg-muted disabled:opacity-40"
+              >
+                <History className="size-4 text-muted-foreground" />
+                <span className="flex-1">{t("schedule.manageRecords")}</span>
+                {totalCustomizationCount > 0 && (
+                  <Badge variant="secondary">{totalCustomizationCount}</Badge>
+                )}
+              </button>
+              {hasAcademicTimetable && (
+                <button
+                  type="button"
+                  disabled={!effective.ready}
+                  onClick={() => {
+                    actions.setMenuOpen(false)
+                    actions.setShowOriginal(true)
+                  }}
+                  className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-sm transition-colors active:bg-muted disabled:opacity-40"
+                >
+                  <Eye className="size-4 text-muted-foreground" />
+                  <span className="flex-1">{t("scheduleEditor.showOriginal")}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="px-1 text-xs font-medium text-muted-foreground">
+              {t("schedule.manageSectionSync")}
+            </span>
+            <div className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border bg-card">
+              {props.isNative() && props.toggleCalendarSync && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    actions.setMenuOpen(false)
+                    setCalendarSyncOpen(true)
+                  }}
+                  className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-sm transition-colors active:bg-muted"
+                >
+                  <CalendarSync className="size-4 text-muted-foreground" />
+                  <span className="flex-1">{t("schedule.syncSystemCalendar")}</span>
+                  {settings.calendarSyncEnabled && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      ON
+                    </Badge>
+                  )}
+                </button>
+              )}
+              {props.publishWebcalFeed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    actions.setMenuOpen(false)
+                    setWebcalOpen(true)
+                  }}
+                  className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-sm transition-colors active:bg-muted"
+                >
+                  <Link2 className="size-4 text-muted-foreground" />
+                  <span className="flex-1">{t("schedule.webcalSubscribe")}</span>
+                  {settings.webcalEnabled && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      ON
+                    </Badge>
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={courses.length === 0 && overlayEntries.length === 0}
+                onClick={() => {
+                  actions.setMenuOpen(false)
+                  void handleExportIcs()
+                }}
+                className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-sm transition-colors active:bg-muted disabled:opacity-40"
+              >
+                <Download className="size-4 text-muted-foreground" />
+                <span className="flex-1">{t("schedule.exportIcs")}</span>
+              </button>
+              {props.isNative() && props.openNotificationsSettings && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    actions.setMenuOpen(false)
+                    props.openNotificationsSettings?.()
+                  }}
+                  className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-sm transition-colors active:bg-muted"
+                >
+                  <Bell className="size-4 text-muted-foreground" />
+                  <span className="flex-1">{t("schedule.reminderSettingsShortcut")}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </FilterDrawer>
 
       {props.isNative() && props.toggleCalendarSync && (
@@ -1847,14 +2120,14 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
 
       {props.createScheduleShare && (
         <ResponsiveModal open={shareOpen} onOpenChange={setShareOpen}>
-          <ResponsiveModalContent className="sm:max-w-md">
+          <ResponsiveModalContent className="overflow-hidden sm:max-w-md">
             <ResponsiveModalHeader>
               <ResponsiveModalTitle className="flex items-center gap-2">
                 <Share2 className="size-4 text-primary" />
                 {t("schedule.shareTitle")}
               </ResponsiveModalTitle>
             </ResponsiveModalHeader>
-            <ResponsiveModalBody className="flex flex-col gap-3">
+            <ResponsiveModalBody className="flex min-w-0 flex-col gap-3">
               <div className="flex flex-col gap-2.5">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-medium">{t("schedule.shareMask")}</span>
@@ -1918,6 +2191,76 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                 />
               </div>
 
+              {hasAcademicTimetable && (
+                <div className="flex flex-col gap-2.5 border-t border-border pt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm">{t("schedule.shareCustomRange")}</span>
+                    <Switch
+                      checked={shareCustomRange}
+                      onCheckedChange={handleToggleShareCustomRange}
+                    />
+                  </div>
+                  {shareCustomRange && (
+                    <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 text-xs"
+                          onClick={() => {
+                            const w =
+                              currentWeek?.week && currentWeek.week >= 1
+                                ? currentWeek.week
+                                : selectedWeek || 1
+                            setShareSelectedWeeks([w])
+                          }}
+                        >
+                          {t("schedule.shareRangeThisWeek")}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 text-xs"
+                          onClick={() =>
+                            setShareSelectedWeeks(
+                              Array.from(
+                                { length: Math.max(1, effectiveTotalWeeks || 20) },
+                                (_, i) => i + 1
+                              )
+                            )
+                          }
+                        >
+                          {t("schedule.shareRangeAll")}
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1">
+                        {Array.from(
+                          { length: Math.max(1, effectiveTotalWeeks || 20) },
+                          (_, idx) => {
+                            const weekNum = idx + 1
+                            const active = shareSelectedWeeks.includes(weekNum)
+                            return (
+                              <Button
+                                key={weekNum}
+                                type="button"
+                                size="sm"
+                                variant={active ? "default" : "outline"}
+                                className="h-7 px-0 text-xs"
+                                onClick={() => handleToggleShareWeek(weekNum)}
+                              >
+                                {weekNum}
+                              </Button>
+                            )
+                          }
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-col gap-2 border-t border-border pt-3">
                 <span className="text-sm">{t("schedule.shareTtlLabel")}</span>
                 <div className="grid grid-cols-3 gap-1.5">
@@ -1953,21 +2296,21 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
               </Button>
 
               {sharedLinks.length > 0 && (
-                <div className="flex flex-col gap-2 border-t border-border pt-3">
+                <div className="flex min-w-0 flex-col gap-2 border-t border-border pt-3">
                   <span className="text-xs font-medium text-muted-foreground">
                     {t("schedule.shareLinksTitle")}
                   </span>
-                  <div className="flex max-h-52 flex-col gap-2 overflow-y-auto pr-0.5">
+                  <div className="flex max-h-52 min-w-0 flex-col gap-2 overflow-y-auto pr-0.5">
                     {sharedLinks.map((link) => {
                       const url = buildShareUrl(link.shareId)
                       const expired = clockTick > link.expiresAt
                       return (
                         <div
                           key={link.shareId}
-                          className="flex flex-col gap-1.5 rounded-lg border bg-muted/25 p-2.5"
+                          className="flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-lg border bg-muted/25 p-2.5"
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-1">
+                          <div className="flex min-w-0 items-center justify-between gap-2">
+                            <div className="flex min-w-0 flex-wrap items-center gap-1">
                               {expired ? (
                                 <Badge variant="outline" className="text-[10px]">
                                   {t("schedule.shareExpiredBadge")}
@@ -2035,7 +2378,7 @@ export const SchedulePage: SlotComponent<SchedulePageProps> = (props) => {
                               </Button>
                             </div>
                           </div>
-                          <div className="truncate font-mono text-[11px] text-muted-foreground">
+                          <div className="w-0 min-w-full truncate font-mono text-[11px] text-muted-foreground">
                             {url}
                           </div>
                         </div>
@@ -2114,7 +2457,6 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
   const { t, useStore, actions } = props
   const location = props.useLocation()
   const clockTick = props.useClockTick()
-  const settings = props.useSettings()
   const patchesState = props.usePatches()
   const patchesHydrated = props.usePatchesHydrated()
   const customizationsState = props.useCustomizations()
@@ -2211,7 +2553,7 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
                 ? t("schedule.weekShort", { week: selectedWeek })
                 : t("schedule.today")
             }
-            onClick={() => actions.setFilterDrawerOpen(true)}
+            onClick={() => actions.setWeekPickerOpen(true)}
           />
         </>
       ) : (
@@ -2230,20 +2572,22 @@ export const ScheduleHeaderActions: SlotComponent<ScheduleHeaderActionsProps> = 
             type="button"
             variant="ghost"
             size="icon-sm"
-            onClick={() => props.setCompactMode(!settings.compactMode)}
             className="h-8 w-8"
-            aria-label={t("schedule.compactHint")}
+            onClick={() => actions.requestShare()}
+            aria-label={t("schedule.shareTitle")}
           >
-            {settings.compactMode ? <Grid3x3 className="size-4" /> : <Grid3x2 className="size-4" />}
+            <Share2 className="size-4" />
           </Button>
-          <FilterTrigger
-            label={
-              hasAcademicTimetable && selectedWeek
-                ? t("schedule.weekShort", { week: selectedWeek })
-                : t("schedule.today")
-            }
-            onClick={() => actions.setFilterDrawerOpen(true)}
-          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-8 w-8"
+            onClick={() => actions.setMenuOpen(true)}
+            aria-label={t("schedule.moreMenu")}
+          >
+            <MoreHorizontal className="size-4" />
+          </Button>
         </>
       )}
     </div>

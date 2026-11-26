@@ -80,6 +80,8 @@ export interface ScheduleMobileProps {
   fullscreen?: boolean
   /** Keep the interactive grid visible even when a week has no courses or overlays. */
   showGridWhenEmpty?: boolean
+  weekCornerLabel?: (week: number) => string
+  onWeekTap?: () => void
   onPrevWeek?: () => void
   onNextWeek?: () => void
   onCourseTap?: (course: Course, week: number) => void
@@ -124,6 +126,8 @@ export function ScheduleMobile({
   compact = false,
   fullscreen = false,
   showGridWhenEmpty = false,
+  weekCornerLabel,
+  onWeekTap,
   onPrevWeek,
   onNextWeek,
   onCourseTap,
@@ -352,6 +356,8 @@ export function ScheduleMobile({
                 nowMinutes={nowMinutes}
                 compact={compact}
                 showGridWhenEmpty={showGridWhenEmpty}
+                weekCornerLabel={weekCornerLabel}
+                onWeekTap={onWeekTap}
                 colorMap={colorMap}
                 labels={labels}
                 editor={editor}
@@ -462,6 +468,8 @@ interface WeekGridProps {
   nowMinutes: number
   compact: boolean
   showGridWhenEmpty: boolean
+  weekCornerLabel?: (week: number) => string
+  onWeekTap?: () => void
   colorMap: CourseColorMap
   labels: ScheduleLabels
   editor: ScheduleEditorState
@@ -506,6 +514,8 @@ const WeekGrid = memo(function WeekGrid({
   nowMinutes,
   compact,
   showGridWhenEmpty,
+  weekCornerLabel,
+  onWeekTap,
   colorMap,
   labels,
   editor,
@@ -620,7 +630,25 @@ const WeekGrid = memo(function WeekGrid({
         gridTemplateRows,
       }}
     >
-      <div className="border-r border-b border-border" />
+      {onWeekTap && week >= 1 ? (
+        <button
+          type="button"
+          onClick={onWeekTap}
+          className="@container flex items-center justify-center overflow-hidden border-r border-b border-border px-0.5 text-[10px] font-semibold whitespace-nowrap text-foreground transition-colors active:bg-muted"
+          aria-label={weekCornerLabel ? weekCornerLabel(week) : String(week)}
+        >
+          {weekCornerLabel ? (
+            <>
+              <span className="hidden @[40px]:inline">{weekCornerLabel(week)}</span>
+              <span className="@[40px]:hidden">{week}</span>
+            </>
+          ) : (
+            <span>{week}</span>
+          )}
+        </button>
+      ) : (
+        <div className="border-r border-b border-border" />
+      )}
 
       {SCHEDULE_DAYS.map((d, idx) => (
         <div

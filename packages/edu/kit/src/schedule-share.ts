@@ -50,6 +50,7 @@ export interface SharedSchedulePayload {
   readonly semester?: string
   readonly termStartDate?: string
   readonly totalWeeks: number
+  readonly allowedWeeks?: readonly number[]
   readonly timeZone?: string
   readonly periods: readonly SharedSchedulePeriod[]
   readonly items: readonly SharedScheduleItem[]
@@ -64,6 +65,7 @@ export interface BuildSharedSchedulePayloadInput {
   readonly calendar?: TermCalendar
   readonly timeZone?: string
   readonly privacy?: SharedSchedulePrivacy
+  readonly allowedWeeks?: readonly number[]
   readonly includePersonal?: boolean
   readonly includeExams?: boolean
   readonly examTitlePrefix?: string
@@ -111,6 +113,11 @@ export function buildSharedSchedulePayload(
   const term = resolveScheduleTerm(input.calendar, input.currentWeek)
   const semester = term?.semester || input.currentWeek?.semester || input.calendar?.semester
   const totalWeeks = term?.totalWeeks ?? Math.max(input.calendar?.totalWeeks ?? 0, 20)
+  const allowedWeeks =
+    input.allowedWeeks && input.allowedWeeks.length > 0
+      ? sortUniqueNumbers(input.allowedWeeks)
+      : undefined
+  const allowedWeekSet = allowedWeeks ? new Set(allowedWeeks) : null
 
   // Compact courses (including expanded ScheduleOccurrence[]) by slot & metadata to keep JSON tiny.
   const courseBuckets = new Map<
@@ -147,7 +154,8 @@ export function buildSharedSchedulePayload(
       const list = course.weekList?.length ? course.weekList : parseWeeks(course.weeks || "")
       weeks.push(...list)
     }
-    if (weeks.length === 0) continue
+    const filteredWeeks = allowedWeekSet ? weeks.filter((w) => allowedWeekSet.has(w)) : weeks
+    if (filteredWeeks.length === 0) continue
 
     const bucketKey = JSON.stringify([
       title,
@@ -159,7 +167,7 @@ export function buildSharedSchedulePayload(
     ])
     const existing = courseBuckets.get(bucketKey)
     if (existing) {
-      for (const w of weeks) existing.weeks.add(w)
+      for (const w of filteredWeeks) existing.weeks.add(w)
     } else {
       courseBuckets.set(bucketKey, {
         title,
@@ -170,7 +178,7 @@ export function buildSharedSchedulePayload(
         endSection,
         startTime,
         endTime,
-        weeks: new Set(weeks),
+        weeks: new Set(filteredWeeks),
       })
     }
   }
@@ -198,6 +206,20 @@ export function buildSharedSchedulePayload(
     const resolvedTime = resolveScheduleEntryTime(entry, timeMap)
     if (!resolvedTime && !entry.sections) continue
 
+    let entryWeekList: number[] | undefined =
+      entry.weekList && entry.weekList.length > 0 ? sortUniqueNumbers(entry.weekList) : undefined
+    if (allowedWeekSet) {
+      if (entry.date && term?.termStartDate) {
+        const w = scheduleWeek(entry.date, term.termStartDate).week
+        if (!allowedWeekSet.has(w)) continue
+      } else if (entryWeekList) {
+        entryWeekList = entryWeekList.filter((w) => allowedWeekSet.has(w))
+        if (entryWeekList.length === 0) continue
+      } else if (allowedWeeks) {
+        entryWeekList = allowedWeeks
+      }
+    }
+
     const rawTitle =
       entry.category === "exam" && examTitlePrefix && !entry.title.startsWith(examTitlePrefix)
         ? `${examTitlePrefix}${entry.title}`
@@ -219,9 +241,7 @@ export function buildSharedSchedulePayload(
             : "event",
       ...(entry.date ? { date: entry.date } : {}),
       weekDay: entry.weekDay,
-      ...(entry.weekList && entry.weekList.length > 0
-        ? { weekList: sortUniqueNumbers(entry.weekList) }
-        : {}),
+      ...(entryWeekList && entryWeekList.length > 0 ? { weekList: entryWeekList } : {}),
       ...(entry.sections
         ? {
             startSection: entry.sections.startSection,
@@ -244,6 +264,7 @@ export function buildSharedSchedulePayload(
     ...(semester ? { semester } : {}),
     ...(term?.termStartDate ? { termStartDate: term.termStartDate } : {}),
     totalWeeks,
+    ...(allowedWeeks ? { allowedWeeks } : {}),
     ...(input.timeZone ? { timeZone: input.timeZone } : {}),
     periods: normalizedPeriods,
     items,

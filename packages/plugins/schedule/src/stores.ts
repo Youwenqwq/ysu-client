@@ -999,13 +999,15 @@ export interface ScheduleViewState {
   readonly weekOverride: number | null
   readonly termInput: string
   readonly queriedTerm: string
-  readonly filterDrawerOpen: boolean
+  readonly weekPickerOpen: boolean
+  readonly menuOpen: boolean
   readonly editScope: string | null
   readonly showOriginal: boolean
   readonly pendingDrop: PendingScheduleDrop | null
   readonly manager: ActivePatchManager | null
   readonly undo: PendingPatchUndo | null
   readonly createRequestNonce: number
+  readonly shareRequestNonce: number
 }
 
 export const scheduleViewStore = defineStore({
@@ -1013,13 +1015,15 @@ export const scheduleViewStore = defineStore({
     weekOverride: null,
     termInput: "",
     queriedTerm: "",
-    filterDrawerOpen: false,
+    weekPickerOpen: false,
+    menuOpen: false,
     editScope: null,
     showOriginal: false,
     pendingDrop: null,
     manager: null,
     undo: null,
     createRequestNonce: 0,
+    shareRequestNonce: 0,
   }),
   actions: {
     setWeekOverride(ctx, weekOverride: number | null) {
@@ -1033,20 +1037,22 @@ export const scheduleViewStore = defineStore({
         ...prev,
         queriedTerm,
         weekOverride: null,
-        filterDrawerOpen: false,
+        weekPickerOpen: false,
       }))
     },
-    setFilterDrawerOpen(ctx, open: boolean) {
-      ctx.set((prev) =>
-        prev.filterDrawerOpen === open ? prev : { ...prev, filterDrawerOpen: open }
-      )
+    setWeekPickerOpen(ctx, open: boolean) {
+      ctx.set((prev) => (prev.weekPickerOpen === open ? prev : { ...prev, weekPickerOpen: open }))
+    },
+    setMenuOpen(ctx, open: boolean) {
+      ctx.set((prev) => (prev.menuOpen === open ? prev : { ...prev, menuOpen: open }))
     },
     enterEditor(ctx, scope: string, clampedWeek: number) {
       ctx.set((prev) => ({
         ...prev,
         weekOverride: clampedWeek,
         showOriginal: false,
-        filterDrawerOpen: false,
+        weekPickerOpen: false,
+        menuOpen: false,
         editScope: scope,
       }))
     },
@@ -1076,8 +1082,17 @@ export const scheduleViewStore = defineStore({
     requestCreate(ctx) {
       ctx.set((prev) => ({
         ...prev,
-        filterDrawerOpen: false,
+        weekPickerOpen: false,
+        menuOpen: false,
         createRequestNonce: prev.createRequestNonce + 1,
+      }))
+    },
+    requestShare(ctx) {
+      ctx.set((prev) => ({
+        ...prev,
+        weekPickerOpen: false,
+        menuOpen: false,
+        shareRequestNonce: prev.shareRequestNonce + 1,
       }))
     },
     reset(ctx) {

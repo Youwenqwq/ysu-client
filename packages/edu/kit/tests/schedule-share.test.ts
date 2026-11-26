@@ -130,4 +130,20 @@ describe("buildSharedSchedulePayload", () => {
     })
     expect(partial.items[1]?.location).toBeUndefined()
   })
+
+  it("filters courses and extra entries by allowedWeeks when custom range is specified", () => {
+    const onlyWeek3 = buildSharedSchedulePayload({
+      courses,
+      extraEntries,
+      currentWeek,
+      calendar,
+      allowedWeeks: [3],
+      includePersonal: true,
+      includeExams: true,
+    })
+    expect(onlyWeek3.allowedWeeks).toEqual([3])
+    expect(onlyWeek3.items).toHaveLength(2) // course in week 3 + weekly personal event (exam is week 10)
+    expect(onlyWeek3.items[0]?.weekList).toEqual([3])
+    expect(onlyWeek3.items[1]?.weekList).toEqual([3])
+  })
 })

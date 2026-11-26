@@ -1302,11 +1302,11 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       .select("shell.header.actions")
       .find((s) => s.pluginId === SCHEDULE_PLUGIN_ID)!
     await dom.render(<ContributionOutlet entry={headerActionEntry} slots={slots} i18n={i18n} />)
-    expect(dom.container.textContent).toContain("第1周")
+    expect(dom.container.children.length).toBeGreaterThan(0)
     await act(async () => {
       router.push({ route: "overview" })
     })
-    await vi.waitFor(() => expect(dom.container.textContent).not.toContain("第1周"))
+    await vi.waitFor(() => expect(dom.container.children.length).toBe(0))
 
     // Render OverviewPage with CourseProgressWidget ("下一节") and TodayCoursesWidget ("今日课程")
     const overviewPage = ui
@@ -1738,7 +1738,7 @@ describe("computeClassAlarms & ClassReminderAndWidgetController", () => {
       expect(dom.container.textContent).toContain("CLUB_TOOLBAR_ACTION")
       expect(dom.container.textContent).toContain("开源社团例会")
       expect(dom.container.textContent).toContain("新建")
-      expect(dom.container.textContent).toContain("管理")
+      expect(dom.container.textContent).toContain("更多")
     })
 
     // Free-time remindable entries generate exact-minute alarms even alongside courses
