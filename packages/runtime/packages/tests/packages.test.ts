@@ -132,8 +132,8 @@ describe("@orahako/runtime-packages", () => {
       updatedAt: "2026-11-18T00:00:00Z",
       plugins: [
         {
-          id: "community.skbird",
-          name: "Skbird",
+          id: "community.toybox",
+          name: "Toybox",
           summary: "Community toybox",
           author: "orahako",
           categories: ["toybox"],
@@ -143,7 +143,7 @@ describe("@orahako/runtime-packages", () => {
               version: "9.9.9",
               apiVersion: 2,
               platforms: ["web", "android"],
-              zipUrl: "https://market.example/skbird-9.9.9.zip",
+              zipUrl: "https://market.example/toybox-9.9.9.zip",
               sha256: SHA_A,
               size: 1024,
               publishedAt: "2026-01-01T00:00:00Z",
@@ -153,7 +153,7 @@ describe("@orahako/runtime-packages", () => {
               apiVersion: PLUGIN_API_VERSION,
               minAppVersion: "0.16.0",
               platforms: ["web", "android"],
-              zipUrl: "https://market.example/skbird-2.0.0.zip",
+              zipUrl: "https://market.example/toybox-2.0.0.zip",
               sha256: SHA_B,
               size: 2048,
               publishedAt: "2026-11-18T00:00:00Z",
@@ -190,7 +190,7 @@ describe("@orahako/runtime-packages", () => {
     const applyBundleSpy = vi.fn(
       async (pluginIds: readonly string[], _index: MarketplaceIndex): Promise<PluginManifest> => ({
         id: pluginIds[0]!,
-        name: "Skbird",
+        name: "Toybox",
         version: "2.0.0",
         apiVersion: PLUGIN_API_VERSION,
         kind: "feature",
@@ -232,10 +232,10 @@ describe("@orahako/runtime-packages", () => {
       await runtime.startAndWait(installerRuntimePlugin.manifest.id)
       await runtime.startAndWait(consumer.manifest.id)
 
-      const installed = await installer.installFromMarket("community.skbird")
-      expect(installed).toMatchObject({ id: "community.skbird", version: "2.0.0" })
+      const installed = await installer.installFromMarket("community.toybox")
+      expect(installed).toMatchObject({ id: "community.toybox", version: "2.0.0" })
       expect(applyBundleSpy).toHaveBeenCalledTimes(1)
-      expect(applyBundleSpy.mock.calls[0]?.[0]).toEqual(["community.skbird"])
+      expect(applyBundleSpy.mock.calls[0]?.[0]).toEqual(["community.toybox"])
 
       // Unknown plugin throws
       await expect(installer.installFromMarket("community.unknown")).rejects.toThrow(

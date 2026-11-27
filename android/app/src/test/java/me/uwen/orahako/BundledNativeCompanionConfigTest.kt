@@ -47,8 +47,8 @@ class BundledNativeCompanionConfigTest {
 
         val file = config.entries[0]
         assertEquals("orahako_apk_update", file.config["apkDirectory"])
-        assertEquals("skbird", file.config["galleryDirectory"])
-        assertEquals("skbird", file.config["fileNamePrefix"])
+        assertEquals("Orahako", file.config["galleryDirectory"])
+        assertEquals("orahako", file.config["fileNamePrefix"])
 
         val webview = config.entries[1]
         assertEquals("https://orahako.welain.com/faq", webview.config["faqUrl"])
