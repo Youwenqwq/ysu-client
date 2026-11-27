@@ -48,7 +48,9 @@ export interface YSUSessionLifecycle {
 
 async function stopNativeIntegrations(ctx: YSUContext): Promise<void> {
   const { capabilities } = ctx.native
-  await capabilities.invoke("academic.polling@1", "stop").catch(() => {})
+  await capabilities
+    .invoke("background.tasks@1", "clearPlugin", { pluginId: "orahako.provider.ysu" })
+    .catch(() => {})
   await capabilities.invoke("widgets.generic@1", "clear").catch(() => {})
 }
 

@@ -23,6 +23,8 @@ export interface PluginManifest {
   apiVersion: number
   kind: PluginKind
   entry: string
+  /** Optional standalone headless JS entry executed by `background.tasks@1` (QuickJS). */
+  background?: string
   minAppVersion?: string
   description?: string
   author?: string
@@ -128,11 +130,16 @@ export function validatePluginManifest(input: unknown): PluginManifest {
     issues.push("entry must be a safe relative JavaScript file path")
   }
 
+  const background = optionalString(input.background, "background", issues)
   const minAppVersion = optionalString(input.minAppVersion, "minAppVersion", issues)
   const description = optionalString(input.description, "description", issues)
   const author = optionalString(input.author, "author", issues)
   const homepage = optionalString(input.homepage, "homepage", issues)
   const icon = optionalString(input.icon, "icon", issues)
+
+  if (background !== undefined && !PACKAGE_FILE_PATTERN.test(background)) {
+    issues.push("background must be a safe relative JavaScript file path")
+  }
 
   if (icon !== undefined && !PACKAGE_FILE_PATTERN.test(icon)) {
     issues.push("icon must be a safe relative file path")
@@ -202,6 +209,7 @@ export function validatePluginManifest(input: unknown): PluginManifest {
     apiVersion: input.apiVersion,
     kind: input.kind,
     entry: input.entry,
+    ...(background !== undefined ? { background } : {}),
     ...(minAppVersion !== undefined ? { minAppVersion } : {}),
     ...(description !== undefined ? { description } : {}),
     ...(author !== undefined ? { author } : {}),

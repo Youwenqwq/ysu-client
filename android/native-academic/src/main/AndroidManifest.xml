@@ -24,7 +24,7 @@
                 android:value="User-enabled Live Updates: refresh pre-class, in-class and consecutive-class countdowns from the configured reminder time, using the same visible notification and a wake lock bounded by class end." />
         </service>
 
-        <!-- Class reminder notifications open the schedule route. -->
+        <!-- Notification deep links open their app routes. -->
         <activity
             android:name="${applicationId}.MainActivity"
             android:exported="true">
@@ -35,6 +35,15 @@
                 <data
                     android:scheme="${orahakoDeepLinkScheme}"
                     android:host="${orahakoDeepLinkHostSchedule}" />
+                <data
+                    android:scheme="${orahakoDeepLinkScheme}"
+                    android:host="${orahakoDeepLinkHostGrades}" />
+                <data
+                    android:scheme="${orahakoDeepLinkScheme}"
+                    android:host="${orahakoDeepLinkHostExams}" />
+                <data
+                    android:scheme="${orahakoDeepLinkScheme}"
+                    android:host="${orahakoDeepLinkHostSettings}" />
             </intent-filter>
         </activity>
     </application>

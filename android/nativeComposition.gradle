@@ -29,7 +29,6 @@ def orahakoNativeCompositionProviderClass =
 def orahakoOfficialNativeCompanions = [
     ':native-platform',
     ':native-academic',
-    ':native-ysu',
     ':native-widgets',
     ':native-widgets-schedule',
     ':native-widgets-exam',

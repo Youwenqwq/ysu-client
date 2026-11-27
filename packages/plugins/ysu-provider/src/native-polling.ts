@@ -1,4 +1,5 @@
 import type { NativePollingSlice } from "@orahako/academic-sdk"
+import { YSU_BACKGROUND_WORKER_SCRIPT, YSU_NOTIFICATION_CHANNELS } from "./background-worker"
 import type { YSUContext } from "./context"
 import { YSU_SECURE_KEY_CAS_TGC } from "./ysu-config"
 
@@ -94,7 +95,10 @@ export function createYsuNativePolling(ctx: YSUContext): YsuNativePolling {
 
   return {
     handlerId: "ysu",
+    pluginId: "orahako.provider.ysu",
     getServerConfig,
     getAuthToken,
+    getBackgroundScript: () => YSU_BACKGROUND_WORKER_SCRIPT,
+    getNotificationChannels: () => YSU_NOTIFICATION_CHANNELS,
   }
 }

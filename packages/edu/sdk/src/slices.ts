@@ -1,3 +1,4 @@
+import type { NativeNotificationChannelSpec } from "@orahako/sdk"
 import { ProviderError, ProviderErrorCode } from "./errors"
 import type {
   AcademicCapabilities,
@@ -208,8 +209,13 @@ export interface ComprehensiveSlice {
 
 export interface NativePollingSlice {
   readonly handlerId?: string
+  readonly pluginId?: string
   getServerConfig(): object
   getAuthToken(): Promise<string | null>
+  /** Self-contained QuickJS background worker script executed by `background.tasks@1`. */
+  getBackgroundScript?(): string
+  /** Notification channels published by this provider's background worker. */
+  getNotificationChannels?(): readonly NativeNotificationChannelSpec[]
 }
 
 /**

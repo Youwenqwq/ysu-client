@@ -1,8 +1,8 @@
 import { Bell } from "lucide-react"
 import { definePlugin, PLUGIN_API_VERSION } from "@orahako/sdk"
 import {
-  ACADEMIC_POLLING_CAPABILITY,
   AcademicPollingController,
+  BACKGROUND_TASKS_CAPABILITY,
   evaluateNotificationChannels,
   hashNotifyAccount,
   NOTIFICATIONS_CORE_CAPABILITY,
@@ -28,8 +28,8 @@ import {
 export const NOTIFICATIONS_PLUGIN_ID = "orahako.notifications"
 
 export {
-  ACADEMIC_POLLING_CAPABILITY,
   AcademicPollingController,
+  BACKGROUND_TASKS_CAPABILITY,
   evaluateNotificationChannels,
   hashNotifyAccount,
   NOTIFICATION_CATEGORY_CHILDREN,
@@ -56,7 +56,7 @@ export const notificationsPlugin = definePlugin({
     required: true,
     entry: "index.js",
     description: "系统通知权限、动态通道后台轮询与提醒设置",
-    nativeCapabilities: [NOTIFICATIONS_CORE_CAPABILITY, ACADEMIC_POLLING_CAPABILITY],
+    nativeCapabilities: [NOTIFICATIONS_CORE_CAPABILITY, BACKGROUND_TASKS_CAPABILITY],
     inject: [
       "slots",
       "settings",

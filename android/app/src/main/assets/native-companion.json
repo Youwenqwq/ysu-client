@@ -29,13 +29,12 @@
       "config": {}
     },
     {
-      "id": "academic.polling@1",
+      "id": "background.tasks@1",
       "config": {
         "minimumIntervalMinutes": 15,
         "defaultIntervalMinutes": 60,
-        "workNamePrefix": "orahako_polling",
-        "tagPrefix": "orahako_polling",
-        "requiresNetwork": true
+        "workNamePrefix": "orahako_bg_task",
+        "tagPrefix": "orahako_bg_task"
       }
     },
     {

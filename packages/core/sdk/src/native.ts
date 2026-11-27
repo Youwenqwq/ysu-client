@@ -96,6 +96,135 @@ export interface NativeCalendarSyncResult {
 
 const NOTIFICATIONS_CORE_ID = "notifications.core@1"
 const CALENDAR_SYNC_ID = "calendar.sync@1"
+const BACKGROUND_TASKS_ID = "background.tasks@1"
+
+export type BackgroundTaskOutcome = "success" | "retry" | "skipped"
+
+export interface BackgroundHttpRequest {
+  readonly url: string
+  readonly method?: string
+  readonly headers?: Readonly<Record<string, string>>
+  readonly body?: string
+  readonly followRedirects?: boolean
+  readonly timeoutMs?: number
+  readonly responseType?: "text" | "base64"
+}
+
+export interface BackgroundHttpResponse {
+  readonly status: number
+  readonly url: string
+  readonly headers: Readonly<Record<string, string>>
+  readonly setCookies: readonly string[]
+  readonly body: string
+}
+
+export interface BackgroundTaskContext {
+  readonly pluginId: string
+  readonly taskId: string
+  readonly http: {
+    send(request: BackgroundHttpRequest): Promise<BackgroundHttpResponse>
+  }
+  readonly storage: {
+    getItem(key: string): Promise<string | null>
+    setItem(key: string, value: string): Promise<void>
+    removeItem(key: string): Promise<void>
+  }
+  readonly notifications: {
+    ensureChannel(spec: NativeNotificationChannelSpec): Promise<boolean>
+    post(spec: NativeLocalNotificationSpec): Promise<{ id: number; tag?: string | null; posted: boolean }>
+    cancel(target: { readonly id?: number; readonly tag?: string; readonly channelId?: string }): Promise<number>
+  }
+  readonly state: {
+    setDiagnostics(snapshot: Record<string, unknown>): Promise<void>
+  }
+}
+
+export type BackgroundTaskHandler<TPayload = Record<string, unknown>> = (
+  ctx: BackgroundTaskContext,
+  payload: TPayload
+) => Promise<BackgroundTaskOutcome | void> | BackgroundTaskOutcome | void
+
+/**
+ * Registers a headless QuickJS background task handler inside a plugin's
+ * standalone `background` bundle.
+ */
+export function defineBackgroundTask<TPayload = Record<string, unknown>>(
+  handler: BackgroundTaskHandler<TPayload>
+): BackgroundTaskHandler<TPayload> {
+  const target = globalThis as Record<string, unknown>
+  target.__orahakoBackgroundTask = handler
+  return handler
+}
+
+export interface BackgroundTaskRegistration {
+  readonly taskId: string
+  readonly pluginId: string
+  readonly script: string
+  readonly intervalMinutes?: number
+  readonly requiresNetwork?: boolean
+  readonly timeoutMs?: number
+  readonly payload?: Record<string, unknown>
+}
+
+export async function registerBackgroundTask(
+  native: PluginNativeService,
+  registration: BackgroundTaskRegistration
+): Promise<{ taskId: string; pluginId: string; intervalMinutes: number; scheduled: boolean } | null> {
+  if (!native.isNative || !native.capabilities.has(BACKGROUND_TASKS_ID)) return null
+  return native.capabilities.invoke(BACKGROUND_TASKS_ID, "register", { ...registration })
+}
+
+export async function unregisterBackgroundTask(
+  native: PluginNativeService,
+  taskId?: string
+): Promise<readonly string[]> {
+  if (!native.isNative || !native.capabilities.has(BACKGROUND_TASKS_ID)) return []
+  const result = await native.capabilities.invoke<{ unregistered?: readonly string[] }>(
+    BACKGROUND_TASKS_ID,
+    "unregister",
+    taskId ? { taskId } : {}
+  )
+  return result?.unregistered ?? []
+}
+
+export async function runBackgroundTaskNow(
+  native: PluginNativeService,
+  taskId: string
+): Promise<boolean> {
+  if (!native.isNative || !native.capabilities.has(BACKGROUND_TASKS_ID)) return false
+  const result = await native.capabilities.invoke<{ queued?: boolean }>(
+    BACKGROUND_TASKS_ID,
+    "runNow",
+    { taskId }
+  )
+  return result?.queued === true
+}
+
+export async function inspectBackgroundTask(
+  native: PluginNativeService,
+  taskId: string
+): Promise<Record<string, unknown> | null> {
+  if (!native.isNative || !native.capabilities.has(BACKGROUND_TASKS_ID)) return null
+  const result = await native.capabilities.invoke<{ state?: Record<string, unknown> }>(
+    BACKGROUND_TASKS_ID,
+    "inspect",
+    { taskId }
+  )
+  return result?.state ?? null
+}
+
+export async function clearPluginBackgroundTasks(
+  native: PluginNativeService,
+  pluginId: string
+): Promise<readonly string[]> {
+  if (!native.isNative || !native.capabilities.has(BACKGROUND_TASKS_ID)) return []
+  const result = await native.capabilities.invoke<{ clearedTasks?: readonly string[] }>(
+    BACKGROUND_TASKS_ID,
+    "clearPlugin",
+    { pluginId }
+  )
+  return result?.clearedTasks ?? []
+}
 
 export async function ensureNotificationChannel(
   native: PluginNativeService,

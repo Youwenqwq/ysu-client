@@ -138,6 +138,37 @@ export async function packPlugin(
   const assetsDirectory = path.join(directory, "assets")
   if (existsSync(assetsDirectory)) await collectFiles(directory, assetsDirectory, files)
 
+  if (manifest.background) {
+    const backgroundSource = [
+      "src/background.ts",
+      "src/background.js",
+      "background.ts",
+      "background.js",
+    ].find((entry) => existsSync(path.join(directory, entry)))
+    if (!backgroundSource) {
+      throw new Error(
+        `Manifest declares background "${manifest.background}" but no background source entry was found in ${directory}`
+      )
+    }
+    const bgBuild = await build({
+      absWorkingDir: directory,
+      entryPoints: [backgroundSource],
+      bundle: true,
+      format: "iife",
+      platform: "neutral",
+      target: ["es2022"],
+      write: false,
+      minify: true,
+      sourcemap: false,
+      logLevel: "warning",
+    })
+    const bgOutput = bgBuild.outputFiles[0]
+    if (!bgOutput) {
+      throw new Error(`Failed to bundle background entry: ${backgroundSource}`)
+    }
+    files[manifest.background] = bgOutput.contents
+  }
+
   const utilities = await buildPluginUtilities(directory, options.hostRoot)
   const styles = [...(manifest.styles ?? [])]
   if (utilities) {

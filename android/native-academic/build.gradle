@@ -10,6 +10,9 @@ apply plugin: 'org.jetbrains.kotlin.android'
 def deepLinkScheme = (gradle.ext.find('orahakoDeepLinkScheme') ?: 'orahako').toString()
 def deepLinkHosts = gradle.ext.find('orahakoDeepLinkHosts') ?: [:]
 def scheduleHost = (deepLinkHosts['schedule'] ?: 'schedule').toString()
+def gradesHost = (deepLinkHosts['grades'] ?: 'grades').toString()
+def examsHost = (deepLinkHosts['exams'] ?: 'exams').toString()
+def settingsHost = (deepLinkHosts['settings'] ?: 'settings').toString()
 
 android {
     namespace = "me.uwen.orahako.notify"
@@ -18,8 +21,11 @@ android {
     defaultConfig {
         minSdkVersion rootProject.ext.minSdkVersion
         manifestPlaceholders = [
-            orahakoDeepLinkScheme    : deepLinkScheme,
+            orahakoDeepLinkScheme      : deepLinkScheme,
             orahakoDeepLinkHostSchedule: scheduleHost,
+            orahakoDeepLinkHostGrades  : gradesHost,
+            orahakoDeepLinkHostExams   : examsHost,
+            orahakoDeepLinkHostSettings: settingsHost,
         ]
         resValue "string", "orahako_academic_host_schedule", scheduleHost
     }

@@ -26,8 +26,8 @@ import {
 } from "@orahako/sdk"
 import { ToggleGroupItem } from "@orahako/ui-primitives"
 import {
-  ACADEMIC_POLLING_CAPABILITY,
   AcademicPollingController,
+  BACKGROUND_TASKS_CAPABILITY,
   evaluateNotificationChannels,
   NOTIFICATIONS_CORE_CAPABILITY,
   NOTIFICATIONS_PLUGIN_ID,
@@ -70,14 +70,14 @@ function createHarness(options?: { isNative?: boolean }) {
   const getAuthToken = vi.fn(async () => tokenValue)
 
   const invoke = vi.fn(async (id: string, method: string, payload?: Record<string, unknown>) => {
-    if (id === ACADEMIC_POLLING_CAPABILITY) {
-      if (method === "configure") {
+    if (id === BACKGROUND_TASKS_CAPABILITY) {
+      if (method === "register") {
         pollingConfig = { ...payload }
         return { scheduled: true }
       }
-      if (method === "stop") {
+      if (method === "unregister") {
         pollingConfig = null
-        return { stopped: [payload?.handlerId] }
+        return { unregistered: [payload?.taskId] }
       }
       if (method === "runNow") {
         runNowCalls += 1
@@ -110,7 +110,7 @@ function createHarness(options?: { isNative?: boolean }) {
     capabilities: {
       list: () => [
         { id: "notifications.core", version: 1, methods: [] },
-        { id: "academic.polling", version: 1, methods: [] },
+        { id: "background.tasks", version: 1, methods: [] },
         { id: "widgets.generic", version: 1, methods: [] },
       ],
       has: () => true,
@@ -142,6 +142,7 @@ function createHarness(options?: { isNative?: boolean }) {
           handlerId,
           getServerConfig: () => ({ endpoint: `https://${id}.edu` }),
           getAuthToken,
+          getBackgroundScript: () => "globalThis.__orahakoBackgroundTask = async () => 'success';",
         },
       },
       async initialize() {},
@@ -362,7 +363,7 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
 
     await vi.waitFor(() => {
       expect(harness.getPollingConfig()).toMatchObject({
-        handlerId: "handler-a",
+        taskId: "handler-a",
         intervalMinutes: 45,
         payload: expect.objectContaining({
           providerId: "campus-a",
@@ -423,7 +424,7 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
 
     await vi.waitFor(() => {
       expect(harness.getPollingConfig()).toMatchObject({
-        handlerId: "handler-a",
+        taskId: "handler-a",
         payload: expect.objectContaining({
           castgc: "renewed-token",
         }),
@@ -442,7 +443,7 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
     expect(onDisableBeta).toHaveBeenCalled()
     await vi.waitFor(() => {
       expect(harness.getPollingConfig()).toMatchObject({
-        handlerId: "handler-b",
+        taskId: "handler-b",
         payload: expect.objectContaining({
           providerId: "campus-b",
           watchAlpha: true,

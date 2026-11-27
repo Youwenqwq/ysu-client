@@ -4,7 +4,6 @@ export const academicBundle = defineBundle({
   id: "orahako.bundle.academic",
   defaults: { landing: "overview" },
   nativeCapabilities: [
-    "academic.polling@1",
     "reminders.classes@1",
     "calendar.sync@1",
     "widgets.schedule@1",

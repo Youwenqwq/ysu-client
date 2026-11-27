@@ -17,7 +17,7 @@ import {
 import type { NotificationSettingsStoreInstance } from "./store"
 
 export const NOTIFICATIONS_CORE_CAPABILITY = "notifications.core@1"
-export const ACADEMIC_POLLING_CAPABILITY = "academic.polling@1"
+export const BACKGROUND_TASKS_CAPABILITY = "background.tasks@1"
 
 export interface EvaluatedNotificationChannel {
   readonly channel: AcademicNotificationChannel
@@ -224,10 +224,10 @@ export class AcademicPollingController {
   }
 
   async inspect(): Promise<Record<string, unknown> | null> {
-    const handlerId = this.resolveHandlerId() ?? this.lastBoundHandlerId
-    if (!handlerId) return null
-    const result = await this.callPolling<{ state?: Record<string, unknown> }>("inspect", {
-      handlerId,
+    const taskId = this.resolveHandlerId() ?? this.lastBoundHandlerId
+    if (!taskId) return null
+    const result = await this.callBackgroundTasks<{ state?: Record<string, unknown> }>("inspect", {
+      taskId,
     })
     return result?.state ?? null
   }
@@ -316,9 +316,25 @@ export class AcademicPollingController {
       }
       if (!isValid()) return
 
-      await this.callPolling("configure", {
-        handlerId,
+      const channels = pollingSlice.getNotificationChannels?.()
+      if (channels && channels.length > 0) {
+        await this.callNotifications("ensureChannels", { channels })
+      }
+      if (!isValid()) return
+
+      const script = pollingSlice.getBackgroundScript?.()
+      if (!script) {
+        await this.stopPollingNative(handlerId)
+        this.lastPollingHash = ""
+        return
+      }
+
+      await this.callBackgroundTasks("register", {
+        taskId: handlerId,
+        pluginId: pollingSlice.pluginId ?? `orahako.provider.${providerId}`,
+        script,
         intervalMinutes: settings.checkInterval,
+        requiresNetwork: true,
         payload: {
           serverConfig: pollingSlice.getServerConfig(),
           providerId,
@@ -334,7 +350,7 @@ export class AcademicPollingController {
       this.pendingTokenRefresh = false
       if (this.pendingCheck) {
         this.pendingCheck = false
-        await this.callPolling("runNow", { handlerId })
+        await this.callBackgroundTasks("runNow", { taskId: handlerId })
       }
     })
 
@@ -364,7 +380,7 @@ export class AcademicPollingController {
     if (!this.native.isNative || this.stopped || !sessionBefore.isAuthenticated) {
       return false
     }
-    if (!(await this.capabilityAvailable(ACADEMIC_POLLING_CAPABILITY))) {
+    if (!(await this.capabilityAvailable(BACKGROUND_TASKS_CAPABILITY))) {
       return false
     }
 
@@ -406,11 +422,11 @@ export class AcademicPollingController {
   }
 
   checkNow(): Promise<void> {
-    const handlerId = this.resolveHandlerId() ?? this.lastBoundHandlerId
-    if (!handlerId) return Promise.resolve()
+    const taskId = this.resolveHandlerId() ?? this.lastBoundHandlerId
+    if (!taskId) return Promise.resolve()
     return this.enqueueNative(async () => {
       if (this.disposed || !this.native.isNative) return
-      await this.callPolling("runNow", { handlerId })
+      await this.callBackgroundTasks("runNow", { taskId })
     })
   }
 
@@ -599,12 +615,12 @@ export class AcademicPollingController {
     return this.native.capabilities.has(capabilityId)
   }
 
-  private async callPolling<T = Record<string, unknown>>(
+  private async callBackgroundTasks<T = Record<string, unknown>>(
     method: string,
     payload: Record<string, unknown> = {}
   ): Promise<T | undefined> {
-    if (!(await this.capabilityAvailable(ACADEMIC_POLLING_CAPABILITY))) return undefined
-    return this.native.capabilities.invoke<T>(ACADEMIC_POLLING_CAPABILITY, method, payload)
+    if (!(await this.capabilityAvailable(BACKGROUND_TASKS_CAPABILITY))) return undefined
+    return this.native.capabilities.invoke<T>(BACKGROUND_TASKS_CAPABILITY, method, payload)
   }
 
   private async callNotifications<T = Record<string, unknown>>(
@@ -615,7 +631,7 @@ export class AcademicPollingController {
     return this.native.capabilities.invoke<T>(NOTIFICATIONS_CORE_CAPABILITY, method, payload)
   }
 
-  private async stopPollingNative(handlerId: string | undefined): Promise<void> {
-    await this.callPolling("stop", handlerId ? { handlerId } : {})
+  private async stopPollingNative(taskId: string | undefined): Promise<void> {
+    await this.callBackgroundTasks("unregister", taskId ? { taskId } : {})
   }
 }

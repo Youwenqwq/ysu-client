@@ -35,7 +35,7 @@ class BundledNativeCompanionConfigTest {
                 "native.webview@1",
                 "native.geolocation@1",
                 "notifications.core@1",
-                "academic.polling@1",
+                "background.tasks@1",
                 "reminders.classes@1",
                 "calendar.sync@1",
                 "widgets.generic@1",
@@ -62,11 +62,11 @@ class BundledNativeCompanionConfigTest {
         val notifications = config.entries[3]
         assertEquals(emptyMap<String, Any?>(), notifications.config)
 
-        val polling = config.entries[4]
-        assertEquals(15, polling.config["minimumIntervalMinutes"])
-        assertEquals(60, polling.config["defaultIntervalMinutes"])
-        assertEquals("orahako_polling", polling.config["workNamePrefix"])
-        assertEquals(true, polling.config["requiresNetwork"])
+        val backgroundTasks = config.entries[4]
+        assertEquals(15, backgroundTasks.config["minimumIntervalMinutes"])
+        assertEquals(60, backgroundTasks.config["defaultIntervalMinutes"])
+        assertEquals("orahako_bg_task", backgroundTasks.config["workNamePrefix"])
+        assertEquals("orahako_bg_task", backgroundTasks.config["tagPrefix"])
 
         val reminders = config.entries[5]
         assertEquals(emptyMap<String, Any?>(), reminders.config)

@@ -7,6 +7,7 @@ export const platformBundle = defineBundle({
     "native.files@1",
     "native.webview@1",
     "notifications.core@1",
+    "background.tasks@1",
     "widgets.generic@1",
   ],
   plugins: [

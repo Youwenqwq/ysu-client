@@ -1,6 +1,5 @@
 package me.uwen.orahako.nativebridge.official
 
-import me.uwen.orahako.companion.ysu.YsuBackgroundTaskHandler
 import me.uwen.orahako.nativebridge.NativeCapability
 import me.uwen.orahako.nativebridge.NativeCapabilityCompositionException
 import me.uwen.orahako.nativebridge.NativeCapabilityCompositionModule
@@ -13,12 +12,10 @@ import me.uwen.orahako.nativebridge.NativeComposition
 import me.uwen.orahako.nativebridge.NativeCompositionProvider
 import me.uwen.orahako.nativebridge.capabilities.FilesCapability
 import me.uwen.orahako.nativebridge.capabilities.WebViewCapability
+import me.uwen.orahako.nativebridge.capabilities.background.BackgroundTasksCapability
 import me.uwen.orahako.nativebridge.capabilities.calendar.CalendarSyncCapability
 import me.uwen.orahako.nativebridge.capabilities.geolocation.GeolocationCapability
 import me.uwen.orahako.nativebridge.capabilities.notifications.NotificationsCoreCapability
-import me.uwen.orahako.nativebridge.capabilities.polling.AcademicPollingCapability
-import me.uwen.orahako.nativebridge.capabilities.polling.BackgroundTaskHandler
-import me.uwen.orahako.nativebridge.capabilities.polling.BackgroundTaskHandlers
 import me.uwen.orahako.notify.ClassRemindersCapability
 import me.uwen.orahako.widget.AndroidWidgetsController
 import me.uwen.orahako.widget.NativeWidgetCompositionModule
@@ -29,16 +26,9 @@ import me.uwen.orahako.widget.WidgetsCapability
 /**
  * Build-time native choices of the official application.
  *
- * The generic core never imports this object. The host application installs the
- * provider class named by its generated build configuration through
- * [NativeComposition.installFromProvider], and the mounted bridge, background
- * workers and the companion reconciler then compose the capabilities listed in
- * `assets/native-companion.json`.
- *
- * The generic widget host is registered here; schedule/exam companions are
- * optional composition modules listed in the generated
- * [BuildConfig.NATIVE_CAPABILITY_COMPOSITION_MODULES] field, so a build can
- * include `widgets.generic` without either official widget companion.
+ * Every capability registered here is a generic OS primitive — no school- or
+ * provider-specific Kotlin companion is required. Background tasks run
+ * plugin-supplied JavaScript inside QuickJS via `background.tasks@1`.
  */
 object OfficialNativeComposition : NativeCapabilityFactories, NativeCompositionProvider {
 
@@ -47,24 +37,13 @@ object OfficialNativeComposition : NativeCapabilityFactories, NativeCompositionP
         WebViewCapability.ID to { host, config -> WebViewCapability(host, config) },
         GeolocationCapability.ID to { host, config -> GeolocationCapability(host, config) },
         CalendarSyncCapability.ID to { host, config -> CalendarSyncCapability(host, config) },
+        BackgroundTasksCapability.ID to { host, config -> BackgroundTasksCapability(host, config) },
         NotificationsCoreCapability.ID to { host, config ->
             NotificationsCoreCapability(host, config)
-        },
-        AcademicPollingCapability.ID to { host, config ->
-            AcademicPollingCapability(host, config)
         },
         ClassRemindersCapability.ID to { host, config ->
             ClassRemindersCapability(host, config)
         },
-    )
-
-    /**
-     * Official background adapters. WorkManager may run in a fresh process, so
-     * these are registered from the application bootstrap rather than lazily
-     * from a capability invocation.
-     */
-    private val backgroundTaskHandlers: List<BackgroundTaskHandler> = listOf(
-        YsuBackgroundTaskHandler,
     )
 
     /** Optional composition modules selected by nativeComposition.gradle. */
@@ -115,11 +94,6 @@ object OfficialNativeComposition : NativeCapabilityFactories, NativeCompositionP
             }
             capability
         }
-    }
-
-    /** Registers the official adapters with the generic scheduling registry. */
-    override fun installBackgroundTaskHandlers() {
-        for (handler in backgroundTaskHandlers) BackgroundTaskHandlers.register(handler)
     }
 
     /**

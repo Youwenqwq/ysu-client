@@ -6,7 +6,6 @@ import me.uwen.orahako.nativebridge.NativeCapabilityCompositionException
 import me.uwen.orahako.nativebridge.NativeCapabilityHost
 import me.uwen.orahako.nativebridge.NativeCapabilityRegistry
 import me.uwen.orahako.nativebridge.NativeCompanionConfig
-import me.uwen.orahako.nativebridge.capabilities.polling.BackgroundTaskHandlers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
@@ -122,7 +121,7 @@ class OfficialNativeCompositionTest {
         val companionEntries = entries + listOf(
             NativeCompanionConfig.Entry("notifications.core", 1, emptyMap()),
             NativeCompanionConfig.Entry(
-                "academic.polling",
+                "background.tasks",
                 1,
                 mapOf("minimumIntervalMinutes" to 15, "defaultIntervalMinutes" to 60),
             ),
@@ -153,8 +152,8 @@ class OfficialNativeCompositionTest {
             byId.getValue("notifications.core").methods,
         )
         assertEquals(
-            listOf("configure", "inspect", "pause", "resume", "runNow", "status", "stop"),
-            byId.getValue("academic.polling").methods,
+            listOf("clearPlugin", "inspect", "pause", "register", "resume", "runNow", "status", "unregister"),
+            byId.getValue("background.tasks").methods,
         )
         assertEquals(
             listOf("cancel", "debug", "schedule"),
@@ -164,19 +163,5 @@ class OfficialNativeCompositionTest {
             listOf("checkPermissions", "clear", "remove", "requestPermissions", "sync", "upsert"),
             byId.getValue("calendar.sync").methods,
         )
-    }
-
-    @Test
-    fun officialCompositionRegistersTheYsuAdapterForScheduledWork() {
-        BackgroundTaskHandlers.clear()
-        try {
-            OfficialNativeComposition.installBackgroundTaskHandlers()
-            assertSame(
-                me.uwen.orahako.companion.ysu.YsuBackgroundTaskHandler,
-                BackgroundTaskHandlers.find("ysu"),
-            )
-        } finally {
-            BackgroundTaskHandlers.clear()
-        }
     }
 }
