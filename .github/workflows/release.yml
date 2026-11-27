@@ -19,6 +19,7 @@ jobs:
 
     outputs:
       version: ${{ steps.versions.outputs.version }}
+      channel: ${{ steps.versions.outputs.channel }}
       apk_version_name: ${{ steps.versions.outputs.apk_version_name }}
       apk_version_code: ${{ steps.versions.outputs.apk_version_code }}
       built_apk: ${{ steps.apk-decision.outputs.should_build_apk }}
@@ -26,7 +27,6 @@ jobs:
     env:
       TAG: ${{ github.event.release.tag_name }}
       REPO: ${{ github.repository }}
-      IS_PRERELEASE: ${{ github.event.release.prerelease }}
       VERSION_API_URL: ${{ vars.VERSION_API_URL || 'https://orahako.welain.com/api/version' }}
 
     steps:
@@ -71,34 +71,51 @@ jobs:
         run: |
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
+          CHANNEL=$(node - <<'NODE'
+          const semver = require('semver');
+          const pre = semver.prerelease(require('./package.json').version);
+          if (!pre || pre.length === 0) {
+            process.stdout.write('stable');
+          } else {
+            const tag = String(pre[0]).toLowerCase();
+            process.stdout.write(tag === 'beta' || tag === 'rc' ? 'beta' : 'canary');
+          }
+          NODE
+          )
           read -r APK_VERSION_NAME APK_VERSION_CODE < <(cd android && ./gradlew -q :app:printReleaseVersion)
           {
             echo "VERSION=$VERSION"
+            echo "CHANNEL=$CHANNEL"
             echo "APK_VERSION_NAME=$APK_VERSION_NAME"
             echo "APK_VERSION_CODE=$APK_VERSION_CODE"
           } >> "$GITHUB_ENV"
           {
             echo "version=$VERSION"
+            echo "channel=$CHANNEL"
             echo "apk_version_name=$APK_VERSION_NAME"
             echo "apk_version_code=$APK_VERSION_CODE"
           } >> "$GITHUB_OUTPUT"
-          echo "Web version: $VERSION / Android: $APK_VERSION_NAME ($APK_VERSION_CODE)"
+          echo "Web version: $VERSION ($CHANNEL) / Android: $APK_VERSION_NAME ($APK_VERSION_CODE)"
 
       - name: Decide APK build
         id: apk-decision
         run: |
           set -euo pipefail
           SHOULD_BUILD_APK="true"
-          if [[ "${IS_PRERELEASE}" == "true" ]]; then
+          if [[ "${CHANNEL}" != "stable" ]]; then
             SHOULD_BUILD_APK="false"
             STABLE_APK_CODE=0
-            PREV_PRE_APK_CODE=0
+            EXISTING_APK_URL=""
             MANIFEST_FILE=$(mktemp)
             if curl -fsS "${VERSION_API_URL}" -o "${MANIFEST_FILE}" 2>/dev/null; then
               STABLE_APK_CODE=$(jq -r '.channels.stable.apkVersionCode // .apkVersionCode // 0' "${MANIFEST_FILE}")
-              PREV_PRE_APK_CODE=$(jq -r '.channels.prerelease.apkVersionCode // 0' "${MANIFEST_FILE}")
+              EXISTING_APK_URL=$(jq -r --arg ch "$CHANNEL" --argjson code "$APK_VERSION_CODE" '
+                (if $ch == "canary" then [.channels.canary, .channels.beta] else [.channels[$ch]] end)
+                | map(select(. != null and (.apkVersionCode // 0) == $code and ((.apkDownloadUrl // "") != "")))
+                | .[0].apkDownloadUrl // ""
+              ' "${MANIFEST_FILE}")
             fi
-            if (( APK_VERSION_CODE > STABLE_APK_CODE && APK_VERSION_CODE != PREV_PRE_APK_CODE )); then
+            if (( APK_VERSION_CODE > STABLE_APK_CODE )) && [[ -z "${EXISTING_APK_URL}" ]]; then
               SHOULD_BUILD_APK="true"
             fi
           fi
@@ -160,7 +177,7 @@ jobs:
     env:
       TAG: ${{ github.event.release.tag_name }}
       REPO: ${{ github.repository }}
-      IS_PRERELEASE: ${{ github.event.release.prerelease }}
+      CHANNEL: ${{ needs.build.outputs.channel }}
       VERSION: ${{ needs.build.outputs.version }}
       APK_VERSION_CODE: ${{ needs.build.outputs.apk_version_code }}
       BUILT_APK: ${{ needs.build.outputs.built_apk }}
@@ -179,7 +196,7 @@ jobs:
           DIST_URL="https://github.com/${REPO}/releases/download/${TAG}/dist.zip"
           APK_URL="https://github.com/${REPO}/releases/download/${TAG}/app-release-${VERSION}.apk"
 
-          if [[ "${IS_PRERELEASE}" != "true" ]]; then
+          if [[ "${CHANNEL}" == "stable" ]]; then
             jq -n \
               --arg channel "stable" \
               --arg webVersion "$VERSION" \
@@ -202,16 +219,19 @@ jobs:
             if curl -fsS "${VERSION_API_URL}" -o "$CURRENT_FILE" 2>/dev/null; then
               :
             else
-              echo "::warning::existing /api/version unavailable; syncing prerelease without prior metadata"
+              echo "::warning::existing /api/version unavailable; syncing ${CHANNEL} without prior metadata"
             fi
 
             STABLE_APK_CODE=$(jq -r '.channels.stable.apkVersionCode // .apkVersionCode // 0' "$CURRENT_FILE")
-            PREV_PRE_APK_CODE=$(jq -r '.channels.prerelease.apkVersionCode // 0' "$CURRENT_FILE")
-            PREV_PRE_APK_URL=$(jq -r '.channels.prerelease.apkDownloadUrl // ""' "$CURRENT_FILE")
+            REUSABLE_APK_URL=$(jq -r --arg ch "$CHANNEL" --argjson code "$APK_VERSION_CODE" '
+              (if $ch == "canary" then [.channels.canary, .channels.beta] else [.channels[$ch]] end)
+              | map(select(. != null and (.apkVersionCode // 0) == $code and ((.apkDownloadUrl // "") != "")))
+              | .[0].apkDownloadUrl // ""
+            ' "$CURRENT_FILE")
 
             if [[ "${BUILT_APK}" == "true" ]]; then
               jq -n \
-                --arg channel "prerelease" \
+                --arg channel "$CHANNEL" \
                 --arg webVersion "$VERSION" \
                 --arg webDownloadUrl "$DIST_URL" \
                 --arg apkDownloadUrl "$APK_URL" \
@@ -226,14 +246,14 @@ jobs:
                   apkDownloadUrl: $apkDownloadUrl,
                   body: $body
                 }' > channel-payload.json
-            elif (( APK_VERSION_CODE > STABLE_APK_CODE && APK_VERSION_CODE == PREV_PRE_APK_CODE )) && [[ -n "${PREV_PRE_APK_URL}" ]]; then
+            elif (( APK_VERSION_CODE > STABLE_APK_CODE )) && [[ -n "${REUSABLE_APK_URL}" ]]; then
               jq -n \
-                --arg channel "prerelease" \
+                --arg channel "$CHANNEL" \
                 --arg webVersion "$VERSION" \
                 --arg webDownloadUrl "$DIST_URL" \
-                --arg apkDownloadUrl "$PREV_PRE_APK_URL" \
+                --arg apkDownloadUrl "$REUSABLE_APK_URL" \
                 --arg body "$BODY" \
-                --argjson apkVersionCode "$PREV_PRE_APK_CODE" \
+                --argjson apkVersionCode "$APK_VERSION_CODE" \
                 --argjson minApkVersionCode "$APK_VERSION_CODE" \
                 '{
                   channel: $channel,
@@ -246,7 +266,7 @@ jobs:
                 }' > channel-payload.json
             else
               jq -n \
-                --arg channel "prerelease" \
+                --arg channel "$CHANNEL" \
                 --arg webVersion "$VERSION" \
                 --arg webDownloadUrl "$DIST_URL" \
                 --arg body "$BODY" \

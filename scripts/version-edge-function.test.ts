@@ -85,8 +85,8 @@ describe("EdgeOne /api/version Edge Function", () => {
     })
     expect(stablePut.status).toBe(200)
 
-    // Write prerelease channel (web-only OTA without APK)
-    const prePut = await putVersion({
+    // Write beta channel (web-only OTA without APK)
+    const betaPut = await putVersion({
       request: new Request("https://orahako.welain.com/api/version", {
         method: "PUT",
         headers: {
@@ -94,7 +94,7 @@ describe("EdgeOne /api/version Edge Function", () => {
           authorization: `Bearer ${releaseToken}`,
         },
         body: JSON.stringify({
-          channel: "prerelease",
+          channel: "beta",
           webVersion: "0.17.0-rc.1",
           webDownloadUrl:
             "https://github.com/Youwenqwq/orahako/releases/download/v0.17.0-rc.1/dist.zip",
@@ -104,9 +104,30 @@ describe("EdgeOne /api/version Edge Function", () => {
       }),
       env,
     })
-    expect(prePut.status).toBe(200)
+    expect(betaPut.status).toBe(200)
 
-    // Synthesized GET merges both channels and flattens stable at top level
+    // Write canary channel
+    const canaryPut = await putVersion({
+      request: new Request("https://orahako.welain.com/api/version", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${releaseToken}`,
+        },
+        body: JSON.stringify({
+          channel: "canary",
+          webVersion: "0.18.0-canary.1",
+          webDownloadUrl:
+            "https://github.com/Youwenqwq/orahako/releases/download/v0.18.0-canary.1/dist.zip",
+          minApkVersionCode: 1060099,
+          body: "## 0.18.0-canary.1",
+        }),
+      }),
+      env,
+    })
+    expect(canaryPut.status).toBe(200)
+
+    // Synthesized GET merges all three channels and flattens stable at top level
     const manifestRes = await getVersion({ env })
     expect(manifestRes.status).toBe(200)
     expect(manifestRes.headers.get("cache-control")).toBe("no-cache")
@@ -131,12 +152,19 @@ describe("EdgeOne /api/version Edge Function", () => {
             "https://github.com/Youwenqwq/orahako/releases/download/v0.16.0/app-release-0.16.0.apk",
           body: "## 0.16.0",
         },
-        prerelease: {
+        beta: {
           webVersion: "0.17.0-rc.1",
           webDownloadUrl:
             "https://github.com/Youwenqwq/orahako/releases/download/v0.17.0-rc.1/dist.zip",
           minApkVersionCode: 1060099,
           body: "## 0.17.0-rc.1",
+        },
+        canary: {
+          webVersion: "0.18.0-canary.1",
+          webDownloadUrl:
+            "https://github.com/Youwenqwq/orahako/releases/download/v0.18.0-canary.1/dist.zip",
+          minApkVersionCode: 1060099,
+          body: "## 0.18.0-canary.1",
         },
       },
     })
@@ -172,7 +200,7 @@ describe("EdgeOne /api/version Edge Function", () => {
           authorization: `Bearer ${releaseToken}`,
         },
         body: JSON.stringify({
-          channel: "prerelease",
+          channel: "beta",
           webVersion: "0.17.0-rc.1",
           webDownloadUrl:
             "https://github.com/Youwenqwq/orahako/releases/download/v0.17.0-rc.1/dist.zip",

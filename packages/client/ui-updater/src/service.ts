@@ -59,8 +59,22 @@ function normalizeVersion(version: string): string | null {
   return valid(trimmed) ?? clean(trimmed) ?? null
 }
 
+const CHANNEL_RANK: Readonly<Record<UpdateChannel, number>> = {
+  stable: 0,
+  beta: 1,
+  canary: 2,
+}
+
+function getVersionChannel(version: string): UpdateChannel {
+  const pre = prerelease(version)
+  if (!pre || pre.length === 0) return "stable"
+  const tag = String(pre[0]).toLowerCase()
+  if (tag === "beta" || tag === "rc") return "beta"
+  return "canary"
+}
+
 function isAllowedTarget(version: string, channel: UpdateChannel): boolean {
-  return channel === "prerelease" || prerelease(version) === null
+  return CHANNEL_RANK[getVersionChannel(version)] <= CHANNEL_RANK[channel]
 }
 
 /** Compare two semver strings. Returns true when target > current for the channel. */
@@ -90,7 +104,12 @@ function toTopLevelEntry(data: UpdateManifest): UpdateManifestEntry {
 function getChannelCandidates(data: UpdateManifest, channel: UpdateChannel): UpdateCandidate[] {
   const topLevel = toTopLevelEntry(data)
   const stable = data.channels?.stable ? { ...topLevel, ...data.channels.stable } : topLevel
-  const entries = channel === "stable" ? [stable] : [stable, data.channels?.prerelease]
+  const entries =
+    channel === "stable"
+      ? [stable]
+      : channel === "beta"
+        ? [stable, data.channels?.beta]
+        : [stable, data.channels?.beta, data.channels?.canary]
 
   return entries.flatMap((entry) => {
     if (!entry?.webVersion) return []

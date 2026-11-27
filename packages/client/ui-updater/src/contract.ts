@@ -1,4 +1,4 @@
-export type UpdateChannel = "stable" | "prerelease"
+export type UpdateChannel = "stable" | "beta" | "canary"
 
 export interface UpdateMirror {
   readonly label: string

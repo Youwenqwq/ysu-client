@@ -3,20 +3,26 @@ set -euo pipefail
 
 VERSION=$(node -p "require('./package.json').version")
 TAG="v${VERSION}"
-IS_PRERELEASE=$(node - <<'NODE'
+RELEASE_CHANNEL=$(node - <<'NODE'
 const semver = require('semver');
 const version = require('./package.json').version;
 if (!semver.valid(version)) {
   console.error(`Error: package.json version '${version}' is not valid SemVer.`);
   process.exit(1);
 }
-process.stdout.write(semver.prerelease(version) ? 'true' : 'false');
+const pre = semver.prerelease(version);
+if (!pre || pre.length === 0) {
+  process.stdout.write('stable');
+} else {
+  const tag = String(pre[0]).toLowerCase();
+  process.stdout.write(tag === 'beta' || tag === 'rc' ? 'beta' : 'canary');
+}
 NODE
 )
 
-RELEASE_CHANNEL="stable"
-if [[ "${IS_PRERELEASE}" == "true" ]]; then
-  RELEASE_CHANNEL="prerelease"
+IS_PRERELEASE="false"
+if [[ "${RELEASE_CHANNEL}" != "stable" ]]; then
+  IS_PRERELEASE="true"
 fi
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 

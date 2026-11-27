@@ -161,10 +161,21 @@ export const UpdaterAboutSection: SlotComponent<UpdaterAboutSectionProps> = (pro
     }
   }
 
-  const versionText =
-    channel === "prerelease"
-      ? `${t("versionLabel")} ${currentVersion} · ${t("channelPrerelease")}`
-      : `${t("versionLabel")} ${currentVersion}`
+  const channelLabel =
+    channel === "beta"
+      ? t("channelBeta")
+      : channel === "canary"
+        ? t("channelCanary")
+        : null
+  const versionText = channelLabel
+    ? `${t("versionLabel")} ${currentVersion} · ${channelLabel}`
+    : `${t("versionLabel")} ${currentVersion}`
+  const dialogChannelDesc =
+    dialogChannel === "beta"
+      ? t("channelBetaDesc")
+      : dialogChannel === "canary"
+        ? t("channelCanaryDesc")
+        : t("channelStableDesc")
 
   if (!native && !showInstallRow) return null
 
@@ -301,10 +312,7 @@ export const UpdaterAboutSection: SlotComponent<UpdaterAboutSectionProps> = (pro
                 )}
                 <Separator />
                 <div className="flex flex-col gap-2">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium">{t("channel")}</span>
-                    <span className="text-xs text-muted-foreground">{t("channelDesc")}</span>
-                  </div>
+                  <span className="text-sm font-medium">{t("channel")}</span>
                   <ToggleGroup
                     type="single"
                     value={dialogChannel}
@@ -318,10 +326,14 @@ export const UpdaterAboutSection: SlotComponent<UpdaterAboutSectionProps> = (pro
                     <ToggleGroupItem value="stable" className="text-xs">
                       {t("channelStable")}
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="prerelease" className="text-xs">
-                      {t("channelPrerelease")}
+                    <ToggleGroupItem value="beta" className="text-xs">
+                      {t("channelBeta")}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="canary" className="text-xs">
+                      {t("channelCanary")}
                     </ToggleGroupItem>
                   </ToggleGroup>
+                  <p className="text-xs text-muted-foreground">{dialogChannelDesc}</p>
                 </div>
               </div>
               <Separator />

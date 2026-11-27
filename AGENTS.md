@@ -83,7 +83,10 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 
 ### 版本号
 
-- **Web 版本**（`package.json`）：SemVer，可带 prerelease，如 `0.16.0`、`0.16.0-rc.1`。
+- **Web 版本**（`package.json`）：SemVer，按预发布标识自动映射更新通道（客户端层级包含：`stable < beta < canary`）：
+  - `stable`（稳定版）：无预发布后缀，如 `0.16.0`
+  - `beta`（预览版）：`-beta.*` / `-rc.*`，如 `0.16.0-beta.1`、`0.16.0-rc.1`
+  - `canary`（金丝雀）：`-alpha.*` / `-canary.*` 等其他预发布后缀，如 `0.16.0-canary.1`、`0.16.0-alpha.1`
 - **APK versionName**（`android/app/build.gradle`）：独立 SemVer，如 `1.6.0`。
 - **APK versionCode**：`major*1000000 + minor*10000 + patch*100 + stageCode`
   - stable：`99`
@@ -124,7 +127,7 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 5. 用 `gh release view` 确认 `dist.zip` 与（按需构建的）`app-release-*.apk` 已上传，且 `/api/version` 已同步最新通道元数据。
 6. 发布后修改 notes 时，重新运行 `release.yml` 以同步 `/api/version`；草稿阶段的编辑不会触发构建。
 
-GitHub Release 仅保存不可变构建产物（`dist.zip`、`app-release-*.apk`），OTA 更新清单由 EdgeOne `/api/version`（`STATS_KV` 按 `stable` / `prerelease` 通道独立存储，写入由 `RELEASE_TOKEN` 鉴权）实时合成，与 `scripts/deploy-website.sh` 静态部署解耦。
+GitHub Release 仅保存不可变构建产物（`dist.zip`、`app-release-*.apk`），OTA 更新清单由 EdgeOne `/api/version`（`STATS_KV` 按 `stable` / `beta` / `canary` 通道独立存储，写入由 `RELEASE_TOKEN` 鉴权）实时合成，与 `scripts/deploy-website.sh` 静态部署解耦。
 
 <!-- BEGIN:nextjs-agent-rules -->
 

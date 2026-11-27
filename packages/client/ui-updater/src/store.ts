@@ -7,7 +7,7 @@ export interface UpdaterPreferencesState {
 }
 
 export function isUpdateChannel(value: unknown): value is UpdateChannel {
-  return value === "stable" || value === "prerelease"
+  return value === "stable" || value === "beta" || value === "canary"
 }
 
 export const updaterPreferencesStore = defineStore({

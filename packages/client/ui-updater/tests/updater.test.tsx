@@ -152,17 +152,23 @@ describe("@orahako/ui-updater", () => {
     fetchMock.mockResolvedValue(new Response("rate limited", { status: 403 }))
     await expect(service.checkForUpdate()).rejects.toThrow("RATE_LIMIT")
     await expect(
-      service.checkForUpdate({ automatic: true, channel: "prerelease" })
+      service.checkForUpdate({ automatic: true, channel: "beta" })
     ).resolves.toMatchObject({
       available: false,
       version: "",
     })
 
-    // Semver channel comparison
+    // Semver channel comparison (stable < beta/rc < canary/alpha)
     expect(isNewer("1.0.0", "1.1.0")).toBe(true)
     expect(isNewer("1.1.0", "1.1.0")).toBe(false)
     expect(isNewer("1.0.0", "1.1.0-beta.1", "stable")).toBe(false)
-    expect(isNewer("1.0.0", "1.1.0-beta.1", "prerelease")).toBe(true)
+    expect(isNewer("1.0.0", "1.1.0-beta.1", "beta")).toBe(true)
+    expect(isNewer("1.0.0", "1.1.0-rc.1", "beta")).toBe(true)
+    expect(isNewer("1.0.0", "1.1.0-alpha.1", "beta")).toBe(false)
+    expect(isNewer("1.0.0", "1.1.0-canary.1", "beta")).toBe(false)
+    expect(isNewer("1.0.0", "1.1.0-alpha.1", "canary")).toBe(true)
+    expect(isNewer("1.0.0", "1.1.0-canary.1", "canary")).toBe(true)
+    expect(isNewer("1.0.0", "1.1.0-beta.1", "canary")).toBe(true)
 
     // Empty manifestUrl returns EMPTY_UPDATE safely
     const unconfigured = new ConfiguredUpdateService({ currentVersion: "1.0.0" })
@@ -182,7 +188,7 @@ describe("@orahako/ui-updater", () => {
       },
     })
 
-    // Installed build is 100; prerelease Web OTA requires minApkVersionCode 100 -> Web OTA is offered
+    // Installed build is 100; beta Web OTA requires minApkVersionCode 100 -> Web OTA is offered
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
         webVersion: "1.0.0",
@@ -193,25 +199,66 @@ describe("@orahako/ui-updater", () => {
             apkVersionCode: 100,
             apkDownloadUrl: "https://downloads.example.test/app-1.0.0.apk",
           },
-          prerelease: {
+          beta: {
             webVersion: "1.1.0-rc.1",
             webDownloadUrl: "https://downloads.example.test/dist-1.1.0-rc.1.zip",
             minApkVersionCode: 100,
-            body: "Preview OTA",
+            body: "Beta OTA",
+          },
+          canary: {
+            webVersion: "1.2.0-canary.1",
+            webDownloadUrl: "https://downloads.example.test/dist-1.2.0-canary.1.zip",
+            minApkVersionCode: 100,
+            body: "Canary OTA",
           },
         },
       })
     )
-    await expect(service.checkForUpdate({ channel: "prerelease" })).resolves.toEqual({
+    await expect(service.checkForUpdate({ channel: "beta" })).resolves.toEqual({
       available: true,
       version: "1.1.0-rc.1",
       downloadUrl: "https://downloads.example.test/dist-1.1.0-rc.1.zip",
-      body: "Preview OTA",
+      body: "Beta OTA",
       apkUpdateAvailable: false,
       apkDownloadUrl: "",
     })
 
-    // Prerelease Web OTA requires minApkVersionCode 110 > installed build 100 -> falls back to APK update
+    // Canary channel sees canary > beta > stable
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        webVersion: "1.0.0",
+        apkVersionCode: 100,
+        channels: {
+          stable: {
+            webVersion: "1.0.0",
+            apkVersionCode: 100,
+            apkDownloadUrl: "https://downloads.example.test/app-1.0.0.apk",
+          },
+          beta: {
+            webVersion: "1.1.0-rc.1",
+            webDownloadUrl: "https://downloads.example.test/dist-1.1.0-rc.1.zip",
+            minApkVersionCode: 100,
+            body: "Beta OTA",
+          },
+          canary: {
+            webVersion: "1.2.0-canary.1",
+            webDownloadUrl: "https://downloads.example.test/dist-1.2.0-canary.1.zip",
+            minApkVersionCode: 100,
+            body: "Canary OTA",
+          },
+        },
+      })
+    )
+    await expect(service.checkForUpdate({ channel: "canary" })).resolves.toEqual({
+      available: true,
+      version: "1.2.0-canary.1",
+      downloadUrl: "https://downloads.example.test/dist-1.2.0-canary.1.zip",
+      body: "Canary OTA",
+      apkUpdateAvailable: false,
+      apkDownloadUrl: "",
+    })
+
+    // Beta Web OTA requires minApkVersionCode 110 > installed build 100 -> falls back to APK update
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
         webVersion: "1.1.0",
@@ -225,16 +272,16 @@ describe("@orahako/ui-updater", () => {
             apkDownloadUrl: "https://downloads.example.test/app-1.1.0.apk",
             body: "Stable native",
           },
-          prerelease: {
+          beta: {
             webVersion: "1.2.0-rc.1",
             webDownloadUrl: "https://downloads.example.test/dist-1.2.0-rc.1.zip",
             minApkVersionCode: 110,
-            body: "Preview OTA",
+            body: "Beta OTA",
           },
         },
       })
     )
-    await expect(service.checkForUpdate({ channel: "prerelease" })).resolves.toEqual({
+    await expect(service.checkForUpdate({ channel: "beta" })).resolves.toEqual({
       available: false,
       version: "1.1.0",
       downloadUrl: "https://downloads.example.test/dist-1.2.0-rc.1.zip",

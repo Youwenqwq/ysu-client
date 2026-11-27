@@ -1,6 +1,7 @@
 const CHANNEL_KEYS = {
   stable: 'version:channel:stable',
-  prerelease: 'version:channel:prerelease',
+  beta: 'version:channel:beta',
+  canary: 'version:channel:canary',
 };
 
 function jsonHeaders() {
@@ -63,8 +64,8 @@ function parseChannelEntry(body) {
   }
 
   const channel = typeof body.channel === 'string' ? body.channel.trim() : '';
-  if (channel !== 'stable' && channel !== 'prerelease') {
-    return { error: 'Invalid channel. Must be stable or prerelease' };
+  if (!Object.prototype.hasOwnProperty.call(CHANNEL_KEYS, channel)) {
+    return { error: 'Invalid channel. Must be stable, beta, or canary' };
   }
 
   const webVersion = typeof body.webVersion === 'string' ? body.webVersion.trim() : '';
@@ -134,18 +135,20 @@ export async function onRequestGet({ env }) {
       return jsonResponse({ error: 'KV not configured' }, 503);
     }
 
-    const [stable, prerelease] = await Promise.all([
+    const [stable, beta, canary] = await Promise.all([
       kv.get(CHANNEL_KEYS.stable, 'json'),
-      kv.get(CHANNEL_KEYS.prerelease, 'json'),
+      kv.get(CHANNEL_KEYS.beta, 'json'),
+      kv.get(CHANNEL_KEYS.canary, 'json'),
     ]);
 
-    if (!stable && !prerelease) {
+    if (!stable && !beta && !canary) {
       return jsonResponse({ error: 'No release manifest published' }, 404);
     }
 
     const channels = {};
     if (stable) channels.stable = stable;
-    if (prerelease) channels.prerelease = prerelease;
+    if (beta) channels.beta = beta;
+    if (canary) channels.canary = canary;
 
     const manifest = {
       ...(stable ?? {}),
