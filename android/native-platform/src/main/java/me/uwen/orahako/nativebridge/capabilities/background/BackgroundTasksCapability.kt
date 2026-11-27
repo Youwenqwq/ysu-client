@@ -81,7 +81,7 @@ class BackgroundTasksCapability(
     override fun reconcile() {
         for (task in BackgroundTaskStore.loadAll(stateStore)) {
             if (task.enabled) scheduler.schedulePeriodic(scheduleSpec(task))
-            else scheduler.cancel(workName(task.taskId), tag(task.taskId))
+            else scheduler.cancel(workName(task.key), tag(task.key))
         }
     }
 
@@ -97,7 +97,7 @@ class BackgroundTasksCapability(
                 METHOD_PAUSE -> setEnabled(payload, false, result)
                 METHOD_RESUME -> setEnabled(payload, true, result)
                 METHOD_RUN_NOW -> runNow(payload, result)
-                METHOD_STATUS -> status(result)
+                METHOD_STATUS -> status(payload, result)
                 METHOD_INSPECT -> inspect(payload, result)
                 METHOD_CLEAR_PLUGIN -> clearPlugin(payload, result)
             }
@@ -131,7 +131,7 @@ class BackgroundTasksCapability(
             timeoutMs = timeoutMs,
             payload = taskPayload,
         )
-        scriptStorage.saveScript(taskId, script)
+        scriptStorage.saveScript(record.key, script)
         BackgroundTaskStore.save(stateStore, record)
         scheduler.schedulePeriodic(scheduleSpec(record))
         result.resolve(
@@ -145,18 +145,23 @@ class BackgroundTasksCapability(
     }
 
     private fun unregister(payload: Map<String, Any?>, result: NativeInvokeResult) {
+        val pluginId = payload.string("pluginId")
+        if (pluginId == null) {
+            result.reject("Missing pluginId")
+            return
+        }
         val requestedTaskId = payload.string("taskId")
-        val taskIds = if (requestedTaskId != null) {
-            listOf(requestedTaskId)
+        val keys = if (requestedTaskId != null) {
+            listOf(BackgroundTaskKey(pluginId, requestedTaskId))
         } else {
-            BackgroundTaskStore.loadAll(stateStore).map { it.taskId }
+            BackgroundTaskStore.loadByPlugin(stateStore, pluginId).map { it.key }
         }
-        for (taskId in taskIds) {
-            scheduler.cancel(workName(taskId), tag(taskId))
-            scriptStorage.deleteScript(taskId)
-            BackgroundTaskStore.remove(stateStore, taskId)
+        for (key in keys) {
+            scheduler.cancel(workName(key), tag(key))
+            scriptStorage.deleteScript(key)
+            BackgroundTaskStore.remove(stateStore, key)
         }
-        result.resolve(mapOf("unregistered" to taskIds))
+        result.resolve(mapOf("unregistered" to keys.map { it.taskId }))
     }
 
     private fun setEnabled(
@@ -165,22 +170,25 @@ class BackgroundTasksCapability(
         result: NativeInvokeResult,
     ) {
         val taskId = payload.string("taskId")
-        if (taskId == null) {
-            result.reject("Missing taskId")
+        val pluginId = payload.string("pluginId")
+        if (taskId == null || pluginId == null) {
+            result.reject("taskId and pluginId are required")
             return
         }
-        val existing = BackgroundTaskStore.load(stateStore, taskId)
+        val key = BackgroundTaskKey(pluginId, taskId)
+        val existing = BackgroundTaskStore.load(stateStore, key)
         if (existing == null) {
-            result.reject("No background task registered for $taskId")
+            result.reject("No background task registered for $pluginId/$taskId")
             return
         }
         val updated = existing.copy(enabled = enabled)
         BackgroundTaskStore.save(stateStore, updated)
         if (enabled) scheduler.schedulePeriodic(scheduleSpec(updated))
-        else scheduler.cancel(workName(taskId), tag(taskId))
+        else scheduler.cancel(workName(key), tag(key))
         result.resolve(
             mapOf(
                 "taskId" to taskId,
+                "pluginId" to pluginId,
                 "enabled" to enabled,
                 "intervalMinutes" to updated.intervalMinutes,
             ),
@@ -189,21 +197,27 @@ class BackgroundTasksCapability(
 
     private fun runNow(payload: Map<String, Any?>, result: NativeInvokeResult) {
         val taskId = payload.string("taskId")
-        if (taskId == null) {
-            result.reject("Missing taskId")
+        val pluginId = payload.string("pluginId")
+        if (taskId == null || pluginId == null) {
+            result.reject("taskId and pluginId are required")
             return
         }
-        val existing = BackgroundTaskStore.load(stateStore, taskId)
+        val existing = BackgroundTaskStore.load(stateStore, BackgroundTaskKey(pluginId, taskId))
         if (existing == null) {
-            result.reject("No background task registered for $taskId")
+            result.reject("No background task registered for $pluginId/$taskId")
             return
         }
         scheduler.scheduleOnce(scheduleSpec(existing))
-        result.resolve(mapOf("taskId" to taskId, "queued" to true))
+        result.resolve(mapOf("taskId" to taskId, "pluginId" to pluginId, "queued" to true))
     }
 
-    private fun status(result: NativeInvokeResult) {
-        val tasks = BackgroundTaskStore.loadAll(stateStore).map { task ->
+    private fun status(payload: Map<String, Any?>, result: NativeInvokeResult) {
+        val pluginId = payload.string("pluginId")
+        if (pluginId == null) {
+            result.reject("Missing pluginId")
+            return
+        }
+        val tasks = BackgroundTaskStore.loadByPlugin(stateStore, pluginId).map { task ->
             mapOf(
                 "taskId" to task.taskId,
                 "pluginId" to task.pluginId,
@@ -217,12 +231,14 @@ class BackgroundTasksCapability(
 
     private fun inspect(payload: Map<String, Any?>, result: NativeInvokeResult) {
         val taskId = payload.string("taskId")
-        if (taskId == null) {
-            result.reject("Missing taskId")
+        val pluginId = payload.string("pluginId")
+        if (taskId == null || pluginId == null) {
+            result.reject("taskId and pluginId are required")
             return
         }
-        val diag = BackgroundTaskStore.loadDiagnostics(stateStore, taskId)
-        result.resolve(mapOf("taskId" to taskId, "state" to diag))
+        val key = BackgroundTaskKey(pluginId, taskId)
+        val diag = BackgroundTaskStore.loadDiagnostics(stateStore, key)
+        result.resolve(mapOf("taskId" to taskId, "pluginId" to pluginId, "state" to diag))
     }
 
     private fun clearPlugin(payload: Map<String, Any?>, result: NativeInvokeResult) {
@@ -233,9 +249,9 @@ class BackgroundTasksCapability(
         }
         val owned = BackgroundTaskStore.loadByPlugin(stateStore, pluginId)
         for (task in owned) {
-            scheduler.cancel(workName(task.taskId), tag(task.taskId))
-            scriptStorage.deleteScript(task.taskId)
-            BackgroundTaskStore.remove(stateStore, task.taskId)
+            scheduler.cancel(workName(task.key), tag(task.key))
+            scriptStorage.deleteScript(task.key)
+            BackgroundTaskStore.remove(stateStore, task.key)
         }
         clearPluginStorage(pluginId)
         result.resolve(
@@ -247,15 +263,15 @@ class BackgroundTasksCapability(
     }
 
     private fun scheduleSpec(task: BackgroundTaskRecord) = BackgroundScheduleSpec(
-        taskId = task.taskId,
-        workName = workName(task.taskId),
-        tag = tag(task.taskId),
+        key = task.key,
+        workName = workName(task.key),
+        tag = tag(task.key),
         intervalMinutes = task.intervalMinutes.toLong(),
         requiresNetwork = task.requiresNetwork,
     )
 
-    private fun workName(taskId: String) = "$workNamePrefix:$taskId"
-    private fun tag(taskId: String) = "$tagPrefix:$taskId"
+    private fun workName(key: BackgroundTaskKey) = "$workNamePrefix:${key.storageKey}"
+    private fun tag(key: BackgroundTaskKey) = "$tagPrefix:${key.storageKey}"
 }
 
 private fun Map<String, Any?>.string(key: String): String? =

@@ -19,7 +19,7 @@ import me.uwen.orahako.nativebridge.NativeCapabilityState
 import java.util.concurrent.TimeUnit
 
 data class BackgroundScheduleSpec(
-    val taskId: String,
+    val key: BackgroundTaskKey,
     val workName: String,
     val tag: String,
     val intervalMinutes: Long,
@@ -41,7 +41,7 @@ internal class WorkManagerBackgroundWorkScheduler(context: Context) : Background
             TimeUnit.MINUTES,
         )
             .setConstraints(constraints(spec.requiresNetwork))
-            .setInputData(inputData(spec.taskId))
+            .setInputData(inputData(spec.key))
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5, TimeUnit.MINUTES)
             .addTag(spec.tag)
             .addTag(BackgroundJsWorker.TAG)
@@ -56,7 +56,7 @@ internal class WorkManagerBackgroundWorkScheduler(context: Context) : Background
     override fun scheduleOnce(spec: BackgroundScheduleSpec) {
         val request = OneTimeWorkRequestBuilder<BackgroundJsWorker>()
             .setConstraints(constraints(spec.requiresNetwork))
-            .setInputData(inputData(spec.taskId))
+            .setInputData(inputData(spec.key))
             .addTag(spec.tag)
             .addTag(BackgroundJsWorker.TAG)
             .build()
@@ -73,8 +73,9 @@ internal class WorkManagerBackgroundWorkScheduler(context: Context) : Background
         if (requiresNetwork) setRequiredNetworkType(NetworkType.CONNECTED)
     }.build()
 
-    private fun inputData(taskId: String): Data = Data.Builder()
-        .putString(BackgroundJsWorker.INPUT_TASK_ID, taskId)
+    private fun inputData(key: BackgroundTaskKey): Data = Data.Builder()
+        .putString(BackgroundJsWorker.INPUT_PLUGIN_ID, key.pluginId)
+        .putString(BackgroundJsWorker.INPUT_TASK_ID, key.taskId)
         .build()
 }
 
@@ -87,21 +88,24 @@ class BackgroundJsWorker(context: Context, params: WorkerParameters) :
 
     companion object {
         const val TAG = "orahako_background_js"
+        const val INPUT_PLUGIN_ID = "pluginId"
         const val INPUT_TASK_ID = "taskId"
         private const val LOG_TAG = "OrahakoBackgroundJsWorker"
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        val pluginId = inputData.getString(INPUT_PLUGIN_ID) ?: return@withContext Result.failure()
         val taskId = inputData.getString(INPUT_TASK_ID) ?: return@withContext Result.failure()
+        val key = BackgroundTaskKey(pluginId, taskId)
         val stateStore = NativeCapabilityState(applicationContext, BackgroundTasksCapability.ID)
-        val task = BackgroundTaskStore.load(stateStore, taskId)
+        val task = BackgroundTaskStore.load(stateStore, key)
             ?: return@withContext Result.success()
         if (!task.enabled) return@withContext Result.success()
 
         val scriptStorage = FileBackgroundScriptStorage(applicationContext)
-        val script = scriptStorage.loadScript(taskId)
+        val script = scriptStorage.loadScript(key)
         if (script.isNullOrBlank()) {
-            Log.w(LOG_TAG, "Missing background script for task $taskId")
+            Log.w(LOG_TAG, "Missing background script for task $pluginId/$taskId")
             return@withContext Result.failure()
         }
 
@@ -109,7 +113,7 @@ class BackgroundJsWorker(context: Context, params: WorkerParameters) :
             context = applicationContext,
             pluginId = task.pluginId,
             onDiagnostics = { diagJson ->
-                BackgroundTaskStore.saveDiagnostics(stateStore, taskId, diagJson)
+                BackgroundTaskStore.saveDiagnostics(stateStore, key, diagJson)
             },
         )
 

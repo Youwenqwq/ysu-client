@@ -108,6 +108,11 @@ async function readPollingToken(slice: NativePollingSlice): Promise<string | und
   }
 }
 
+type BackgroundTaskRef = {
+  readonly pluginId: string
+  readonly taskId: string
+}
+
 export interface AcademicPollingControllerOptions {
   readonly store: NotificationSettingsStoreInstance
   readonly notifications: AcademicNotificationService
@@ -135,7 +140,7 @@ export class AcademicPollingController {
   private stopped = false
   private disposed = false
   private lastPollingHash = ""
-  private lastBoundHandlerId: string | undefined
+  private lastBoundTask: BackgroundTaskRef | undefined
   private pendingTokenRefresh = false
   private pendingCheck = false
 
@@ -184,12 +189,15 @@ export class AcademicPollingController {
     )
   }
 
-  resolveHandlerId(): string | undefined {
+  private resolveTask(): BackgroundTaskRef | undefined {
     const activeProvider = this.provider.getSnapshot().provider
     if (!activeProvider) return undefined
     const pollingSlice = getSlice(activeProvider, "nativePolling")
     if (!pollingSlice) return undefined
-    return pollingSlice.handlerId ?? activeProvider.id
+    return {
+      pluginId: pollingSlice.pluginId ?? `orahako.provider.${activeProvider.id}`,
+      taskId: pollingSlice.handlerId ?? activeProvider.id,
+    }
   }
 
   async checkNotificationPermission(): Promise<boolean> {
@@ -224,11 +232,12 @@ export class AcademicPollingController {
   }
 
   async inspect(): Promise<Record<string, unknown> | null> {
-    const taskId = this.resolveHandlerId() ?? this.lastBoundHandlerId
-    if (!taskId) return null
-    const result = await this.callBackgroundTasks<{ state?: Record<string, unknown> }>("inspect", {
-      taskId,
-    })
+    const task = this.resolveTask() ?? this.lastBoundTask
+    if (!task) return null
+    const result = await this.callBackgroundTasks<{ state?: Record<string, unknown> }>(
+      "inspect",
+      task
+    )
     return result?.state ?? null
   }
 
@@ -249,7 +258,13 @@ export class AcademicPollingController {
       const activeProvider = this.provider.getSnapshot().provider
       const pollingSlice = getSlice(activeProvider, "nativePolling")
       const providerId = activeProvider?.id
-      const handlerId = pollingSlice ? (pollingSlice.handlerId ?? activeProvider?.id) : undefined
+      const task =
+        activeProvider && pollingSlice
+          ? {
+              pluginId: pollingSlice.pluginId ?? `orahako.provider.${activeProvider.id}`,
+              taskId: pollingSlice.handlerId ?? activeProvider.id,
+            }
+          : undefined
       const plan = evaluateNotificationChannels(
         this.notifications.getSnapshot(),
         activeProvider,
@@ -270,27 +285,28 @@ export class AcademicPollingController {
         !activeProvider ||
         !pollingSlice ||
         !providerId ||
-        !handlerId ||
+        !task ||
         !sessionSnap.username
       ) {
-        const stopTarget = handlerId ?? this.lastBoundHandlerId
+        const stopTarget = task ?? this.lastBoundTask
         await this.stopPollingNative(stopTarget)
         this.lastPollingHash = ""
         return
       }
 
-      this.lastBoundHandlerId = handlerId
+      this.lastBoundTask = task
       const authToken = await readPollingToken(pollingSlice)
       if (!isValid()) return
       if (!authToken) {
-        await this.stopPollingNative(handlerId)
+        await this.stopPollingNative(task)
         this.lastPollingHash = ""
         return
       }
 
       const hash = JSON.stringify([
         providerId,
-        handlerId,
+        task.pluginId,
+        task.taskId,
         sessionSnap.username,
         authToken,
         settings.checkInterval,
@@ -304,7 +320,7 @@ export class AcademicPollingController {
 
       if (!settings.enabled) {
         this.pendingCheck = false
-        await this.stopPollingNative(handlerId)
+        await this.stopPollingNative(task)
         this.lastPollingHash = ""
         return
       }
@@ -324,14 +340,13 @@ export class AcademicPollingController {
 
       const script = pollingSlice.getBackgroundScript?.()
       if (!script) {
-        await this.stopPollingNative(handlerId)
+        await this.stopPollingNative(task)
         this.lastPollingHash = ""
         return
       }
 
       await this.callBackgroundTasks("register", {
-        taskId: handlerId,
-        pluginId: pollingSlice.pluginId ?? `orahako.provider.${providerId}`,
+        ...task,
         script,
         intervalMinutes: settings.checkInterval,
         requiresNetwork: true,
@@ -350,7 +365,7 @@ export class AcademicPollingController {
       this.pendingTokenRefresh = false
       if (this.pendingCheck) {
         this.pendingCheck = false
-        await this.callBackgroundTasks("runNow", { taskId: handlerId })
+        await this.callBackgroundTasks("runNow", task)
       }
     })
 
@@ -422,16 +437,16 @@ export class AcademicPollingController {
   }
 
   checkNow(): Promise<void> {
-    const taskId = this.resolveHandlerId() ?? this.lastBoundHandlerId
-    if (!taskId) return Promise.resolve()
+    const task = this.resolveTask() ?? this.lastBoundTask
+    if (!task) return Promise.resolve()
     return this.enqueueNative(async () => {
       if (this.disposed || !this.native.isNative) return
-      await this.callBackgroundTasks("runNow", { taskId })
+      await this.callBackgroundTasks("runNow", task)
     })
   }
 
   stopAll(): Promise<void> {
-    const handlerId = this.resolveHandlerId() ?? this.lastBoundHandlerId
+    const task = this.resolveTask() ?? this.lastBoundTask
     this.stopped = true
     this.lifecycleRevision += 1
     this.pollingRevision += 1
@@ -441,10 +456,7 @@ export class AcademicPollingController {
 
     return this.enqueueNative(async () => {
       if (!this.native.isNative) return
-      await Promise.allSettled([
-        this.stopPollingNative(handlerId),
-        this.callNotifications("cancelAll"),
-      ])
+      await Promise.allSettled([this.stopPollingNative(task), this.callNotifications("cancelAll")])
     })
   }
 
@@ -546,10 +558,10 @@ export class AcademicPollingController {
     const previousActive = this.previousActiveChannels
 
     if (providerChanged) {
-      if (this.previousBoundHandlerNeedsStop(currentProviderId)) {
-        const previousHandlerId = this.lastBoundHandlerId
+      if (this.previousBoundTaskNeedsStop(currentProviderId)) {
+        const previousTask = this.lastBoundTask
         void this.enqueueNative(async () => {
-          await this.stopPollingNative(previousHandlerId)
+          await this.stopPollingNative(previousTask)
         })
       }
       for (const prevChannel of previousActive.values()) {
@@ -579,8 +591,8 @@ export class AcademicPollingController {
     this.previousActiveChannels = nextActive
   }
 
-  private previousBoundHandlerNeedsStop(nextProviderId: string | null): boolean {
-    return Boolean(this.lastBoundHandlerId && this.previousProviderId !== nextProviderId)
+  private previousBoundTaskNeedsStop(nextProviderId: string | null): boolean {
+    return Boolean(this.lastBoundTask && this.previousProviderId !== nextProviderId)
   }
 
   private notifyAllChannelsDisabled(): void {
@@ -631,7 +643,8 @@ export class AcademicPollingController {
     return this.native.capabilities.invoke<T>(NOTIFICATIONS_CORE_CAPABILITY, method, payload)
   }
 
-  private async stopPollingNative(taskId: string | undefined): Promise<void> {
-    await this.callBackgroundTasks("unregister", taskId ? { taskId } : {})
+  private async stopPollingNative(task: BackgroundTaskRef | undefined): Promise<void> {
+    if (!task) return
+    await this.callBackgroundTasks("unregister", task)
   }
 }

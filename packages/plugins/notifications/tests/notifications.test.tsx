@@ -364,6 +364,7 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
     await vi.waitFor(() => {
       expect(harness.getPollingConfig()).toMatchObject({
         taskId: "handler-a",
+        pluginId: "orahako.provider.campus-a",
         intervalMinutes: 45,
         payload: expect.objectContaining({
           providerId: "campus-a",
@@ -375,6 +376,10 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
       })
     })
     expect(harness.getRunNowCalls()).toBeGreaterThanOrEqual(1)
+    expect(harness.invoke).toHaveBeenCalledWith(BACKGROUND_TASKS_CAPABILITY, "runNow", {
+      taskId: "handler-a",
+      pluginId: "orahako.provider.campus-a",
+    })
 
     // Render settings category & debug panel cleanly via ContributionOutlet
     const categoryHtml = renderToStaticMarkup(
@@ -444,12 +449,18 @@ describe("@orahako/plugin-notifications declarative channels & serialized contro
     await vi.waitFor(() => {
       expect(harness.getPollingConfig()).toMatchObject({
         taskId: "handler-b",
+        pluginId: "orahako.provider.campus-b",
         payload: expect.objectContaining({
           providerId: "campus-b",
           watchAlpha: true,
           watchBeta: false, // feature.beta is excluded by campus-b supportedPlugins!
         }),
       })
+    })
+
+    expect(harness.invoke).toHaveBeenCalledWith(BACKGROUND_TASKS_CAPABILITY, "unregister", {
+      taskId: "handler-a",
+      pluginId: "orahako.provider.campus-a",
     })
 
     // Token lookup finishing AFTER logout cannot resurrect polling

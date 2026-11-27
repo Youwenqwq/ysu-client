@@ -38,10 +38,10 @@ class BackgroundTasksCapabilityTest {
     }
 
     private class InMemoryScriptStorage : BackgroundScriptStorage {
-        val scripts = LinkedHashMap<String, String>()
-        override fun saveScript(taskId: String, script: String) { scripts[taskId] = script }
-        override fun loadScript(taskId: String): String? = scripts[taskId]
-        override fun deleteScript(taskId: String) { scripts.remove(taskId) }
+        val scripts = LinkedHashMap<BackgroundTaskKey, String>()
+        override fun saveScript(key: BackgroundTaskKey, script: String) { scripts[key] = script }
+        override fun loadScript(key: BackgroundTaskKey): String? = scripts[key]
+        override fun deleteScript(key: BackgroundTaskKey) { scripts.remove(key) }
     }
 
     private class RecordingScheduler : BackgroundWorkScheduler {
@@ -102,23 +102,88 @@ class BackgroundTasksCapabilityTest {
                 "payload" to mapOf("checkGrades" to true),
             ),
         )
+        val key = BackgroundTaskKey("orahako.provider.ysu", "ysu-poll")
         assertEquals(true, reg["scheduled"])
         assertEquals(15, reg["intervalMinutes"])
         assertEquals(1, scheduler.periodic.size)
-        assertTrue(scripts.loadScript("ysu-poll")!!.contains("__orahakoBackgroundTask"))
+        assertTrue(scripts.loadScript(key)!!.contains("__orahakoBackgroundTask"))
 
-        invoke(registry, "runNow", mapOf("taskId" to "ysu-poll"))
+        invoke(registry, "runNow", mapOf("taskId" to "ysu-poll", "pluginId" to "orahako.provider.ysu"))
         assertEquals(1, scheduler.once.size)
 
-        invoke(registry, "pause", mapOf("taskId" to "ysu-poll"))
+        invoke(registry, "pause", mapOf("taskId" to "ysu-poll", "pluginId" to "orahako.provider.ysu"))
         assertEquals(1, scheduler.cancelled.size)
 
-        invoke(registry, "resume", mapOf("taskId" to "ysu-poll"))
+        invoke(registry, "resume", mapOf("taskId" to "ysu-poll", "pluginId" to "orahako.provider.ysu"))
         assertEquals(2, scheduler.periodic.size)
 
         val cleared = invoke(registry, "clearPlugin", mapOf("pluginId" to "orahako.provider.ysu"))
         assertEquals(listOf("ysu-poll"), cleared["clearedTasks"])
         assertEquals(listOf("orahako.provider.ysu"), clearedPlugins)
-        assertNull(scripts.loadScript("ysu-poll"))
+        assertNull(scripts.loadScript(key))
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    @Test
+    fun isolatesSameTaskIdAcrossPlugins() {
+        val store = InMemoryStateStore()
+        val scripts = InMemoryScriptStorage()
+        val scheduler = RecordingScheduler()
+        val capability = BackgroundTasksCapability(
+            host = UnusedHost(),
+            config = emptyMap(),
+            storeOverride = store,
+            scriptStorageOverride = scripts,
+            schedulerOverride = scheduler,
+            pluginStorageClearOverride = {},
+        )
+        val registry = NativeCapabilityRegistry(listOf(capability))
+        val pluginA = "community.alpha"
+        val pluginB = "community.beta"
+        val keyA = BackgroundTaskKey(pluginA, "shared")
+        val keyB = BackgroundTaskKey(pluginB, "shared")
+
+        for ((pluginId, script) in listOf(pluginA to "script-a", pluginB to "script-b")) {
+            invoke(
+                registry,
+                "register",
+                mapOf("taskId" to "shared", "pluginId" to pluginId, "script" to script),
+            )
+        }
+
+        assertEquals("script-a", scripts.loadScript(keyA))
+        assertEquals("script-b", scripts.loadScript(keyB))
+        assertEquals(2, scheduler.periodic.map { it.workName }.toSet().size)
+
+        invoke(registry, "pause", mapOf("taskId" to "shared", "pluginId" to pluginA))
+        val tasksA = invoke(registry, "status", mapOf("pluginId" to pluginA))["tasks"]
+            as List<Map<String, Any?>>
+        val tasksB = invoke(registry, "status", mapOf("pluginId" to pluginB))["tasks"]
+            as List<Map<String, Any?>>
+        assertEquals(false, tasksA.single()["enabled"])
+        assertEquals(true, tasksB.single()["enabled"])
+
+        BackgroundTaskStore.saveDiagnostics(store, keyA, """{"owner":"a"}""")
+        BackgroundTaskStore.saveDiagnostics(store, keyB, """{"owner":"b"}""")
+        val diagA = invoke(
+            registry,
+            "inspect",
+            mapOf("taskId" to "shared", "pluginId" to pluginA),
+        )["state"] as Map<String, Any?>
+        val diagB = invoke(
+            registry,
+            "inspect",
+            mapOf("taskId" to "shared", "pluginId" to pluginB),
+        )["state"] as Map<String, Any?>
+        assertEquals("a", diagA["owner"])
+        assertEquals("b", diagB["owner"])
+
+        val removed = invoke(registry, "unregister", mapOf("pluginId" to pluginA))
+        assertEquals(listOf("shared"), removed["unregistered"])
+        assertNull(BackgroundTaskStore.load(store, keyA))
+        assertNull(scripts.loadScript(keyA))
+        assertEquals("script-b", scripts.loadScript(keyB))
+        assertEquals(true, BackgroundTaskStore.load(store, keyB)?.enabled)
+        assertTrue(scheduler.cancelled.none { it == scheduler.periodic[1].workName })
     }
 }

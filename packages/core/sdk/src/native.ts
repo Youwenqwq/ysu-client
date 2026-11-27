@@ -176,39 +176,42 @@ export async function registerBackgroundTask(
 
 export async function unregisterBackgroundTask(
   native: PluginNativeService,
+  pluginId: string,
   taskId?: string
 ): Promise<readonly string[]> {
   if (!native.isNative || !native.capabilities.has(BACKGROUND_TASKS_ID)) return []
   const result = await native.capabilities.invoke<{ unregistered?: readonly string[] }>(
     BACKGROUND_TASKS_ID,
     "unregister",
-    taskId ? { taskId } : {}
+    { pluginId, ...(taskId ? { taskId } : {}) }
   )
   return result?.unregistered ?? []
 }
 
 export async function runBackgroundTaskNow(
   native: PluginNativeService,
+  pluginId: string,
   taskId: string
 ): Promise<boolean> {
   if (!native.isNative || !native.capabilities.has(BACKGROUND_TASKS_ID)) return false
   const result = await native.capabilities.invoke<{ queued?: boolean }>(
     BACKGROUND_TASKS_ID,
     "runNow",
-    { taskId }
+    { pluginId, taskId }
   )
   return result?.queued === true
 }
 
 export async function inspectBackgroundTask(
   native: PluginNativeService,
+  pluginId: string,
   taskId: string
 ): Promise<Record<string, unknown> | null> {
   if (!native.isNative || !native.capabilities.has(BACKGROUND_TASKS_ID)) return null
   const result = await native.capabilities.invoke<{ state?: Record<string, unknown> }>(
     BACKGROUND_TASKS_ID,
     "inspect",
-    { taskId }
+    { pluginId, taskId }
   )
   return result?.state ?? null
 }

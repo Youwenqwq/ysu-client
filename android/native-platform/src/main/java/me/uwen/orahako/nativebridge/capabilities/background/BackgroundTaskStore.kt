@@ -5,6 +5,27 @@ import me.uwen.orahako.nativebridge.NativeStateStore
 import org.json.JSONObject
 import java.io.File
 
+private const val HEX_DIGITS = "0123456789abcdef"
+
+private fun encodeTaskKeyPart(value: String): String {
+    val bytes = value.toByteArray(Charsets.UTF_8)
+    val encoded = StringBuilder(bytes.size * 2)
+    for (byte in bytes) {
+        val unsigned = byte.toInt() and 0xff
+        encoded.append(HEX_DIGITS[unsigned ushr 4])
+        encoded.append(HEX_DIGITS[unsigned and 0x0f])
+    }
+    return encoded.toString()
+}
+
+/** Stable, collision-free identity for one plugin-owned background task. */
+data class BackgroundTaskKey(
+    val pluginId: String,
+    val taskId: String,
+) {
+    val storageKey: String = "${encodeTaskKeyPart(pluginId)}.${encodeTaskKeyPart(taskId)}"
+}
+
 /** Persisted desired state of one generic JS background task. */
 data class BackgroundTaskRecord(
     val taskId: String,
@@ -15,6 +36,8 @@ data class BackgroundTaskRecord(
     val timeoutMs: Long,
     val payload: JSONObject,
 ) {
+    val key: BackgroundTaskKey get() = BackgroundTaskKey(pluginId, taskId)
+
     fun toJson(): JSONObject = JSONObject()
         .put("taskId", taskId)
         .put("pluginId", pluginId)
@@ -26,22 +49,19 @@ data class BackgroundTaskRecord(
 }
 
 interface BackgroundScriptStorage {
-    fun saveScript(taskId: String, script: String)
-    fun loadScript(taskId: String): String?
-    fun deleteScript(taskId: String)
+    fun saveScript(key: BackgroundTaskKey, script: String)
+    fun loadScript(key: BackgroundTaskKey): String?
+    fun deleteScript(key: BackgroundTaskKey)
 }
 
 class FileBackgroundScriptStorage(context: Context) : BackgroundScriptStorage {
     private val dir: File = File(context.applicationContext.filesDir, "orahako_bg_scripts")
 
-    private fun fileFor(taskId: String): File {
-        val safe = taskId.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        return File(dir, "$safe.js")
-    }
+    private fun fileFor(key: BackgroundTaskKey): File = File(dir, "${key.storageKey}.js")
 
-    override fun saveScript(taskId: String, script: String) {
+    override fun saveScript(key: BackgroundTaskKey, script: String) {
         if (!dir.exists()) dir.mkdirs()
-        val target = fileFor(taskId)
+        val target = fileFor(key)
         val tmp = File(dir, "${target.name}.tmp")
         tmp.writeText(script, Charsets.UTF_8)
         if (!tmp.renameTo(target)) {
@@ -50,13 +70,13 @@ class FileBackgroundScriptStorage(context: Context) : BackgroundScriptStorage {
         }
     }
 
-    override fun loadScript(taskId: String): String? {
-        val file = fileFor(taskId)
+    override fun loadScript(key: BackgroundTaskKey): String? {
+        val file = fileFor(key)
         return if (file.isFile) file.readText(Charsets.UTF_8) else null
     }
 
-    override fun deleteScript(taskId: String) {
-        fileFor(taskId).delete()
+    override fun deleteScript(key: BackgroundTaskKey) {
+        fileFor(key).delete()
     }
 }
 
@@ -64,11 +84,11 @@ internal object BackgroundTaskStore {
     private const val TASK_PREFIX = "task:"
     private const val DIAG_PREFIX = "diag:"
 
-    private fun taskKey(taskId: String) = "$TASK_PREFIX$taskId"
-    private fun diagKey(taskId: String) = "$DIAG_PREFIX$taskId"
+    private fun taskKey(key: BackgroundTaskKey) = "$TASK_PREFIX${key.storageKey}"
+    private fun diagKey(key: BackgroundTaskKey) = "$DIAG_PREFIX${key.storageKey}"
 
-    fun load(store: NativeStateStore, taskId: String): BackgroundTaskRecord? =
-        parse(store.getString(taskKey(taskId), ""))
+    fun load(store: NativeStateStore, key: BackgroundTaskKey): BackgroundTaskRecord? =
+        parse(store.getString(taskKey(key), ""))
 
     fun loadAll(store: NativeStateStore): List<BackgroundTaskRecord> =
         store.keys()
@@ -80,20 +100,20 @@ internal object BackgroundTaskStore {
         loadAll(store).filter { it.pluginId == pluginId }
 
     fun save(store: NativeStateStore, task: BackgroundTaskRecord) {
-        store.putString(taskKey(task.taskId), task.toJson().toString())
+        store.putString(taskKey(task.key), task.toJson().toString())
     }
 
-    fun remove(store: NativeStateStore, taskId: String) {
-        store.remove(taskKey(taskId))
-        store.remove(diagKey(taskId))
+    fun remove(store: NativeStateStore, key: BackgroundTaskKey) {
+        store.remove(taskKey(key))
+        store.remove(diagKey(key))
     }
 
-    fun saveDiagnostics(store: NativeStateStore, taskId: String, diagnosticsJson: String) {
-        store.putString(diagKey(taskId), diagnosticsJson)
+    fun saveDiagnostics(store: NativeStateStore, key: BackgroundTaskKey, diagnosticsJson: String) {
+        store.putString(diagKey(key), diagnosticsJson)
     }
 
-    fun loadDiagnostics(store: NativeStateStore, taskId: String): Map<String, Any?> {
-        val raw = store.getString(diagKey(taskId), "")
+    fun loadDiagnostics(store: NativeStateStore, key: BackgroundTaskKey): Map<String, Any?> {
+        val raw = store.getString(diagKey(key), "")
         if (raw.isBlank()) return emptyMap()
         val obj = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyMap()
         return jsonObjectToMap(obj)
