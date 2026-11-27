@@ -66,6 +66,9 @@ jobs:
         working-directory: dist
         run: zip -r ../dist.zip . -x '*.DS_Store'
 
+      - name: Sync to Capacitor
+        run: npx cap sync
+
       - name: Compute versions
         id: versions
         run: |
@@ -134,10 +137,6 @@ jobs:
             echo "::error::KEYSTORE_BASE64 secret not set — cannot sign release APK"
             exit 1
           fi
-
-      - name: Sync to Capacitor
-        if: env.SHOULD_BUILD_APK == 'true'
-        run: npx cap sync
 
       - name: Build release APK
         if: env.SHOULD_BUILD_APK == 'true'
