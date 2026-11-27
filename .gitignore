@@ -58,7 +58,6 @@
 !/android/native-widgets/
 !/android/native-widgets-schedule/
 !/android/native-widgets-exam/
-!/android/native-ysu/
 /android/native-core/build/
 /android/native-official/build/
 /android/native-platform/build/
@@ -66,7 +65,6 @@
 /android/native-widgets/build/
 /android/native-widgets-schedule/build/
 /android/native-widgets-exam/build/
-/android/native-ysu/build/
 
 # misc
 .DS_Store

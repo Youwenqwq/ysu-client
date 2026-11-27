@@ -5,8 +5,8 @@
       "id": "native.files@1",
       "config": {
         "apkDirectory": "orahako_apk_update",
-        "galleryDirectory": "skbird",
-        "fileNamePrefix": "skbird"
+        "galleryDirectory": "Orahako",
+        "fileNamePrefix": "orahako"
       }
     },
     {
