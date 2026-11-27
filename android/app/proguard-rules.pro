@@ -82,5 +82,10 @@
 -keepclassmembers class okhttp3.** { *; }
 -keep class okio.** { *; }
 
+# === QuickJS (background.tasks@1) ===
+-keep class com.dokar.quickjs.** { *; }
+-keepclassmembers class com.dokar.quickjs.** { *; }
+-keep class kotlin.Unit { *; }
+
 # === Preserve line numbers for release stack traces ===
 -keepattributes SourceFile,LineNumberTable

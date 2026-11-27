@@ -262,10 +262,12 @@ object BackgroundJsRuntime {
                         val level = args.getOrNull(0)?.toString() ?: "d"
                         val message = args.getOrNull(1)?.toString() ?: ""
                         bridge.log(level, message)
+                        null
                     }
-                    asyncFunction<Unit>("sleep") { args ->
+                    asyncFunction<Any?>("sleep") { args ->
                         val ms = (args.getOrNull(0) as? Number)?.toLong()?.coerceIn(0L, boundedTimeout) ?: 0L
                         delay(ms)
+                        null
                     }
                     asyncFunction<String>("httpSend") { args ->
                         val reqJson = args.getOrNull(0)?.toString() ?: "{}"
@@ -275,14 +277,16 @@ object BackgroundJsRuntime {
                         val key = args.getOrNull(0)?.toString() ?: ""
                         bridge.storageGet(key)
                     }
-                    asyncFunction<Unit>("storageSet") { args ->
+                    asyncFunction<Any?>("storageSet") { args ->
                         val key = args.getOrNull(0)?.toString() ?: ""
                         val value = args.getOrNull(1)?.toString() ?: ""
                         bridge.storageSet(key, value)
+                        null
                     }
-                    asyncFunction<Unit>("storageRemove") { args ->
+                    asyncFunction<Any?>("storageRemove") { args ->
                         val key = args.getOrNull(0)?.toString() ?: ""
                         bridge.storageRemove(key)
+                        null
                     }
                     asyncFunction<Boolean>("ensureChannel") { args ->
                         val specJson = args.getOrNull(0)?.toString() ?: "{}"
@@ -296,9 +300,10 @@ object BackgroundJsRuntime {
                         val targetJson = args.getOrNull(0)?.toString() ?: "{}"
                         bridge.cancelNotification(targetJson)
                     }
-                    asyncFunction<Unit>("saveDiagnostics") { args ->
+                    asyncFunction<Any?>("saveDiagnostics") { args ->
                         val diagJson = args.getOrNull(0)?.toString() ?: "{}"
                         bridge.saveDiagnostics(diagJson)
+                        null
                     }
                 }
 
