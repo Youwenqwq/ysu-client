@@ -43,9 +43,29 @@ class CalendarSyncCapabilityTest {
 
         val events = parseIncomingCalendarEvents(raw)!!
         assertEquals(2, events.size)
-        assertEquals("orahako:course:1", events[0].syncKey)
+        assertEquals("orahako:default:course:1", events[0].syncKey)
         assertEquals(15, events[0].remindMinutes)
         assertNull(events[1].remindMinutes)
+    }
+
+    @Test
+    fun isolatesSyncKeysByNormalizedNamespace() {
+        val raw = listOf(
+            mapOf(
+                "uid" to "exam-1",
+                "title" to "期末考试",
+                "startAt" to 1_000L,
+                "endAt" to 2_000L,
+            ),
+        )
+
+        val scheduleEvents = parseIncomingCalendarEvents(raw, "orahako.schedule")!!
+        val clubEvents = parseIncomingCalendarEvents(raw, "community:club/events")!!
+        val blankEvents = parseIncomingCalendarEvents(raw, "   ")!!
+
+        assertEquals("orahako:orahako.schedule:exam-1", scheduleEvents[0].syncKey)
+        assertEquals("orahako:community_club_events:exam-1", clubEvents[0].syncKey)
+        assertEquals("orahako:default:exam-1", blankEvents[0].syncKey)
     }
 
     @Test

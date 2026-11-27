@@ -1,5 +1,6 @@
 package me.uwen.orahako.companion.ysu
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -113,6 +114,7 @@ object YsuNotifications {
                 importance = kind.importance,
                 sound = kind != YsuNotificationKind.ERRORS,
                 vibration = kind != YsuNotificationKind.ERRORS,
+                lockscreenVisibility = if (kind == YsuNotificationKind.ERRORS) null else Notification.VISIBILITY_PUBLIC,
             ),
         )
     }

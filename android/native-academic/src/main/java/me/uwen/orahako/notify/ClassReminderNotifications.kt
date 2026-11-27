@@ -60,11 +60,20 @@ internal object ClassReminderNotifications {
         )
     }
 
-    fun builder(context: Context): NotificationCompat.Builder {
+    fun builder(
+        context: Context,
+        channelId: String = REMINDER_CHANNEL_ID,
+        deepLink: android.net.Uri? = null,
+    ): NotificationCompat.Builder {
         ensureChannels(context)
-        return NotificationCompat.Builder(context, REMINDER_CHANNEL_ID)
+        val contentIntent = if (deepLink != null) {
+            NativeHostApp.activityPendingIntent(context, deepLink = deepLink)
+        } else {
+            openScheduleIntent(context)
+        }
+        return NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_class)
-            .setContentIntent(openScheduleIntent(context))
+            .setContentIntent(contentIntent)
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

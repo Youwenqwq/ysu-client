@@ -21,20 +21,38 @@ internal data class IncomingCalendarEvent(
     val startAt: Long,
     val endAt: Long,
     val remindMinutes: Int?,
+    val namespace: String = DEFAULT_NAMESPACE,
 ) {
     val syncKey: String
-        get() = "$SYNC_KEY_PREFIX$uid"
+        get() = syncKeyFor(namespace, uid)
 
     fun fingerprint(): String =
         "$title|$location|$description|$startAt|$endAt|${remindMinutes ?: -1}"
 
     companion object {
         const val SYNC_KEY_PREFIX = "orahako:"
+        const val DEFAULT_NAMESPACE = "default"
+        private val VALID_NAMESPACE = Regex("[^A-Za-z0-9._-]")
+
+        fun normalizeNamespace(raw: Any?): String {
+            val cleaned = (raw as? String)?.trim()?.replace(VALID_NAMESPACE, "_")?.trim('_').orEmpty()
+            return cleaned.ifEmpty { DEFAULT_NAMESPACE }
+        }
+
+        fun namespacePrefix(namespace: String): String =
+            "$SYNC_KEY_PREFIX${normalizeNamespace(namespace)}:"
+
+        fun syncKeyFor(namespace: String, uid: String): String =
+            "${namespacePrefix(namespace)}$uid"
     }
 }
 
-internal fun parseIncomingCalendarEvents(raw: Any?): List<IncomingCalendarEvent>? {
+internal fun parseIncomingCalendarEvents(
+    raw: Any?,
+    namespace: String = IncomingCalendarEvent.DEFAULT_NAMESPACE,
+): List<IncomingCalendarEvent>? {
     val list = raw as? List<*> ?: return null
+    val normalizedNamespace = IncomingCalendarEvent.normalizeNamespace(namespace)
     val parsed = ArrayList<IncomingCalendarEvent>(list.size)
     val seenUids = HashSet<String>()
     for (item in list) {
@@ -57,6 +75,7 @@ internal fun parseIncomingCalendarEvents(raw: Any?): List<IncomingCalendarEvent>
                 startAt = startAt,
                 endAt = endAt,
                 remindMinutes = remindMinutes,
+                namespace = normalizedNamespace,
             ),
         )
     }
@@ -64,9 +83,16 @@ internal fun parseIncomingCalendarEvents(raw: Any?): List<IncomingCalendarEvent>
 }
 
 /**
- * One-way schedule synchronization to the Android system calendar via
- * [CalendarContract]. Creates and owns an isolated `ACCOUNT_TYPE_LOCAL`
- * calendar so user events in other calendars are never modified.
+ * Generic, namespace-isolated synchronization to the Android system calendar
+ * via [CalendarContract].
+ *
+ * Each plugin owns its own `namespace` (`orahako:<namespace>:<uid>`) inside the
+ * isolated `ACCOUNT_TYPE_LOCAL` calendar so multiple plugins can sync, upsert,
+ * remove or clear events independently without touching each other or user
+ * events in other calendars.
+ *
+ * Changed events are updated in place (instead of delete-before-insert) and
+ * deletions run only after inserts/updates succeed.
  */
 class CalendarSyncCapability(
     private val host: NativeCapabilityHost,
@@ -80,6 +106,8 @@ class CalendarSyncCapability(
         private const val METHOD_CHECK_PERMISSIONS = "checkPermissions"
         private const val METHOD_REQUEST_PERMISSIONS = "requestPermissions"
         private const val METHOD_SYNC = "sync"
+        private const val METHOD_UPSERT = "upsert"
+        private const val METHOD_REMOVE = "remove"
         private const val METHOD_CLEAR = "clear"
 
         private const val DEFAULT_ACCOUNT_NAME = "Orahako"
@@ -99,6 +127,8 @@ class CalendarSyncCapability(
         METHOD_CHECK_PERMISSIONS,
         METHOD_REQUEST_PERMISSIONS,
         METHOD_SYNC,
+        METHOD_UPSERT,
+        METHOD_REMOVE,
         METHOD_CLEAR,
     )
 
@@ -127,8 +157,10 @@ class CalendarSyncCapability(
                     mapOf("granted" to hasCalendarPermissions()),
                 )
                 METHOD_REQUEST_PERMISSIONS -> requestPermissions(result)
-                METHOD_SYNC -> sync(payload, result)
-                METHOD_CLEAR -> clear(result)
+                METHOD_SYNC -> sync(payload, result, deleteMissing = true)
+                METHOD_UPSERT -> sync(payload, result, deleteMissing = false)
+                METHOD_REMOVE -> remove(payload, result)
+                METHOD_CLEAR -> clear(payload, result)
             }
         }
 
@@ -149,12 +181,17 @@ class CalendarSyncCapability(
         }
     }
 
-    private fun sync(payload: Map<String, Any?>, result: NativeInvokeResult) {
+    private fun sync(
+        payload: Map<String, Any?>,
+        result: NativeInvokeResult,
+        deleteMissing: Boolean,
+    ) {
         if (!hasCalendarPermissions()) {
             result.reject("Calendar permission not granted")
             return
         }
-        val events = parseIncomingCalendarEvents(payload["events"])
+        val namespace = IncomingCalendarEvent.normalizeNamespace(payload["namespace"])
+        val events = parseIncomingCalendarEvents(payload["events"], namespace)
         if (events == null) {
             result.reject("Missing events")
             return
@@ -167,9 +204,18 @@ class CalendarSyncCapability(
         try {
             val context = host.context
             val (calendarId, dedicated) = ensureTargetCalendar(context, displayName, timeZone)
-            val stats = applyEventDiff(context, calendarId, dedicated, events, timeZone)
+            val stats = applyEventDiff(
+                context = context,
+                calendarId = calendarId,
+                dedicated = dedicated,
+                namespace = namespace,
+                incoming = events,
+                timeZone = timeZone,
+                deleteMissing = deleteMissing,
+            )
             result.resolve(
                 mapOf(
+                    "namespace" to namespace,
                     "synced" to events.size,
                     "created" to stats.created,
                     "updated" to stats.updated,
@@ -183,7 +229,50 @@ class CalendarSyncCapability(
         }
     }
 
-    private fun clear(result: NativeInvokeResult) {
+    private fun remove(payload: Map<String, Any?>, result: NativeInvokeResult) {
+        if (!hasCalendarPermissions()) {
+            result.reject("Calendar permission not granted")
+            return
+        }
+        val rawUids = payload["uids"] as? List<*>
+        if (rawUids == null) {
+            result.reject("Missing uids")
+            return
+        }
+        val namespace = IncomingCalendarEvent.normalizeNamespace(payload["namespace"])
+        val syncKeys = rawUids.mapNotNull { (it as? String)?.trim()?.takeIf(String::isNotEmpty) }
+            .distinct()
+            .map { IncomingCalendarEvent.syncKeyFor(namespace, it) }
+        if (syncKeys.isEmpty()) {
+            result.resolve(mapOf("namespace" to namespace, "deleted" to 0))
+            return
+        }
+
+        try {
+            val context = host.context
+            val account = accountName()
+            val dedicatedId = findDedicatedCalendarId(context, account)
+            val uri = if (dedicatedId != null) {
+                asSyncAdapter(CalendarContract.Events.CONTENT_URI, account)
+            } else {
+                CalendarContract.Events.CONTENT_URI
+            }
+            var deleted = 0
+            for (chunk in syncKeys.chunked(BATCH_LIMIT)) {
+                val placeholders = chunk.joinToString(",") { "?" }
+                deleted += context.contentResolver.delete(
+                    uri,
+                    "${CalendarContract.Events.SYNC_DATA1} IN ($placeholders)",
+                    chunk.toTypedArray(),
+                )
+            }
+            result.resolve(mapOf("namespace" to namespace, "deleted" to deleted))
+        } catch (error: Exception) {
+            result.reject("Unable to remove calendar events", error)
+        }
+    }
+
+    private fun clear(payload: Map<String, Any?>, result: NativeInvokeResult) {
         if (!hasCalendarPermissions()) {
             result.resolve(mapOf("cleared" to false))
             return
@@ -191,7 +280,33 @@ class CalendarSyncCapability(
         try {
             val context = host.context
             val account = accountName()
+            val rawNamespace = (payload["namespace"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
             val dedicatedId = findDedicatedCalendarId(context, account)
+
+            if (rawNamespace != null) {
+                val namespace = IncomingCalendarEvent.normalizeNamespace(rawNamespace)
+                val prefix = IncomingCalendarEvent.namespacePrefix(namespace)
+                val eventsUri = if (dedicatedId != null) {
+                    asSyncAdapter(CalendarContract.Events.CONTENT_URI, account)
+                } else {
+                    CalendarContract.Events.CONTENT_URI
+                }
+                context.contentResolver.delete(
+                    eventsUri,
+                    "${CalendarContract.Events.SYNC_DATA1} LIKE ?",
+                    arrayOf("$prefix%"),
+                )
+                if (dedicatedId != null && countEventsInCalendar(context, dedicatedId) == 0) {
+                    context.contentResolver.delete(
+                        asSyncAdapter(CalendarContract.Calendars.CONTENT_URI, account),
+                        "${CalendarContract.Calendars._ID} = ?",
+                        arrayOf(dedicatedId.toString()),
+                    )
+                }
+                result.resolve(mapOf("cleared" to true, "namespace" to namespace))
+                return
+            }
+
             if (dedicatedId != null) {
                 context.contentResolver.delete(
                     asSyncAdapter(CalendarContract.Calendars.CONTENT_URI, account),
@@ -211,25 +326,43 @@ class CalendarSyncCapability(
         }
     }
 
+    private fun countEventsInCalendar(context: Context, calendarId: Long): Int {
+        context.contentResolver.query(
+            CalendarContract.Events.CONTENT_URI,
+            arrayOf(CalendarContract.Events._ID),
+            "${CalendarContract.Events.CALENDAR_ID} = ? AND ${CalendarContract.Events.DELETED} = 0",
+            arrayOf(calendarId.toString()),
+            null,
+        )?.use { cursor ->
+            return cursor.count
+        }
+        return 0
+    }
+
     private fun ensureTargetCalendar(
         context: Context,
         displayName: String,
         timeZone: String,
     ): Pair<Long, Boolean> {
         val account = accountName()
-        findDedicatedCalendarId(context, account)?.let { existingId ->
-            val values = ContentValues().apply {
-                put(CalendarContract.Calendars.CALENDAR_DISPLAY_NAME, displayName)
-                put(CalendarContract.Calendars.VISIBLE, 1)
-                put(CalendarContract.Calendars.SYNC_EVENTS, 1)
+        findDedicatedCalendar(context, account)?.let { existing ->
+            if (existing.displayName != displayName || !existing.visible || !existing.syncEvents) {
+                val values = ContentValues().apply {
+                    put(CalendarContract.Calendars.CALENDAR_DISPLAY_NAME, displayName)
+                    put(CalendarContract.Calendars.VISIBLE, 1)
+                    put(CalendarContract.Calendars.SYNC_EVENTS, 1)
+                }
+                context.contentResolver.update(
+                    asSyncAdapter(
+                        ContentUris.withAppendedId(CalendarContract.Calendars.CONTENT_URI, existing.id),
+                        account,
+                    ),
+                    values,
+                    null,
+                    null,
+                )
             }
-            context.contentResolver.update(
-                asSyncAdapter(ContentUris.withAppendedId(CalendarContract.Calendars.CONTENT_URI, existingId), account),
-                values,
-                null,
-                null,
-            )
-            return existingId to true
+            return existing.id to true
         }
 
         val values = ContentValues().apply {
@@ -259,8 +392,20 @@ class CalendarSyncCapability(
         return fallbackId to false
     }
 
-    private fun findDedicatedCalendarId(context: Context, account: String): Long? {
-        val projection = arrayOf(CalendarContract.Calendars._ID)
+    private data class DedicatedCalendarInfo(
+        val id: Long,
+        val displayName: String,
+        val visible: Boolean,
+        val syncEvents: Boolean,
+    )
+
+    private fun findDedicatedCalendar(context: Context, account: String): DedicatedCalendarInfo? {
+        val projection = arrayOf(
+            CalendarContract.Calendars._ID,
+            CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Calendars.VISIBLE,
+            CalendarContract.Calendars.SYNC_EVENTS,
+        )
         val selection =
             "${CalendarContract.Calendars.ACCOUNT_NAME} = ? AND ${CalendarContract.Calendars.ACCOUNT_TYPE} = ?"
         val args = arrayOf(account, CalendarContract.ACCOUNT_TYPE_LOCAL)
@@ -271,10 +416,20 @@ class CalendarSyncCapability(
             args,
             null,
         )?.use { cursor ->
-            if (cursor.moveToFirst()) return cursor.getLong(0)
+            if (cursor.moveToFirst()) {
+                return DedicatedCalendarInfo(
+                    id = cursor.getLong(0),
+                    displayName = cursor.getString(1).orEmpty(),
+                    visible = cursor.getInt(2) != 0,
+                    syncEvents = cursor.getInt(3) != 0,
+                )
+            }
         }
         return null
     }
+
+    private fun findDedicatedCalendarId(context: Context, account: String): Long? =
+        findDedicatedCalendar(context, account)?.id
 
     private fun findWritableFallbackCalendarId(context: Context): Long? {
         val projection = arrayOf(
@@ -312,8 +467,10 @@ class CalendarSyncCapability(
         context: Context,
         calendarId: Long,
         dedicated: Boolean,
+        namespace: String,
         incoming: List<IncomingCalendarEvent>,
         timeZone: String,
+        deleteMissing: Boolean,
     ): DiffStats {
         val account = accountName()
         val eventsUri = if (dedicated) {
@@ -327,6 +484,7 @@ class CalendarSyncCapability(
             CalendarContract.Reminders.CONTENT_URI
         }
 
+        val namespacePrefix = IncomingCalendarEvent.namespacePrefix(namespace)
         val existingByKey = LinkedHashMap<String, ExistingEvent>()
         val projection = arrayOf(
             CalendarContract.Events._ID,
@@ -335,7 +493,7 @@ class CalendarSyncCapability(
         )
         val selection =
             "${CalendarContract.Events.CALENDAR_ID} = ? AND ${CalendarContract.Events.SYNC_DATA1} LIKE ? AND ${CalendarContract.Events.DELETED} = 0"
-        val args = arrayOf(calendarId.toString(), "${IncomingCalendarEvent.SYNC_KEY_PREFIX}%")
+        val args = arrayOf(calendarId.toString(), "$namespacePrefix%")
         context.contentResolver.query(
             CalendarContract.Events.CONTENT_URI,
             projection,
@@ -365,58 +523,102 @@ class CalendarSyncCapability(
             ops.clear()
         }
 
-        // Delete removed or changed events first (changed events are cleanly re-inserted with fresh reminders).
-        for ((key, existing) in existingByKey) {
-            val next = incomingByKey[key]
-            if (next == null || next.fingerprint() != existing.fingerprint) {
+        // 1. Insert new events and update changed events in place (never delete before writing).
+        for (event in incoming) {
+            val existing = existingByKey[event.syncKey]
+            val nextFingerprint = event.fingerprint()
+            if (existing != null && existing.fingerprint == nextFingerprint) continue
+
+            // Keep each event + its reminder ops atomic inside a single batch.
+            if (ops.size + 3 > BATCH_LIMIT) flushOps()
+
+            if (existing == null) {
+                created += 1
+                val eventInsertIndex = ops.size
+                ops.add(
+                    ContentProviderOperation.newInsert(eventsUri)
+                        .withValue(CalendarContract.Events.CALENDAR_ID, calendarId)
+                        .withValue(CalendarContract.Events.TITLE, event.title)
+                        .withValue(CalendarContract.Events.EVENT_LOCATION, event.location)
+                        .withValue(CalendarContract.Events.DESCRIPTION, event.description)
+                        .withValue(CalendarContract.Events.DTSTART, event.startAt)
+                        .withValue(CalendarContract.Events.DTEND, event.endAt)
+                        .withValue(CalendarContract.Events.EVENT_TIMEZONE, timeZone)
+                        .withValue(CalendarContract.Events.HAS_ALARM, if (event.remindMinutes != null) 1 else 0)
+                        .withValue(CalendarContract.Events.SYNC_DATA1, event.syncKey)
+                        .withValue(CalendarContract.Events.SYNC_DATA2, nextFingerprint)
+                        .build(),
+                )
+                if (event.remindMinutes != null) {
+                    ops.add(
+                        ContentProviderOperation.newInsert(remindersUri)
+                            .withValueBackReference(CalendarContract.Reminders.EVENT_ID, eventInsertIndex)
+                            .withValue(CalendarContract.Reminders.MINUTES, event.remindMinutes)
+                            .withValue(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
+                            .build(),
+                    )
+                }
+            } else {
+                updated += 1
+                val eventUri = if (dedicated) {
+                    asSyncAdapter(
+                        ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existing.id),
+                        account,
+                    )
+                } else {
+                    ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existing.id)
+                }
+                ops.add(
+                    ContentProviderOperation.newUpdate(eventUri)
+                        .withValue(CalendarContract.Events.TITLE, event.title)
+                        .withValue(CalendarContract.Events.EVENT_LOCATION, event.location)
+                        .withValue(CalendarContract.Events.DESCRIPTION, event.description)
+                        .withValue(CalendarContract.Events.DTSTART, event.startAt)
+                        .withValue(CalendarContract.Events.DTEND, event.endAt)
+                        .withValue(CalendarContract.Events.EVENT_TIMEZONE, timeZone)
+                        .withValue(CalendarContract.Events.HAS_ALARM, if (event.remindMinutes != null) 1 else 0)
+                        .withValue(CalendarContract.Events.SYNC_DATA2, nextFingerprint)
+                        .build(),
+                )
+                ops.add(
+                    ContentProviderOperation.newDelete(remindersUri)
+                        .withSelection("${CalendarContract.Reminders.EVENT_ID} = ?", arrayOf(existing.id.toString()))
+                        .build(),
+                )
+                if (event.remindMinutes != null) {
+                    ops.add(
+                        ContentProviderOperation.newInsert(remindersUri)
+                            .withValue(CalendarContract.Reminders.EVENT_ID, existing.id)
+                            .withValue(CalendarContract.Reminders.MINUTES, event.remindMinutes)
+                            .withValue(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
+                            .build(),
+                    )
+                }
+            }
+        }
+        flushOps()
+
+        // 2. Delete removed events only after all inserts and in-place updates succeeded.
+        if (deleteMissing) {
+            for ((key, existing) in existingByKey) {
+                if (key in incomingByKey) continue
                 ops.add(
                     ContentProviderOperation.newDelete(
                         if (dedicated) {
-                            asSyncAdapter(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existing.id), account)
+                            asSyncAdapter(
+                                ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existing.id),
+                                account,
+                            )
                         } else {
                             ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existing.id)
                         },
                     ).build(),
                 )
-                if (next == null) deleted += 1 else updated += 1
+                deleted += 1
                 if (ops.size >= BATCH_LIMIT) flushOps()
             }
+            flushOps()
         }
-        flushOps()
-
-        // Insert new or changed events.
-        for (event in incoming) {
-            val existing = existingByKey[event.syncKey]
-            if (existing != null && existing.fingerprint == event.fingerprint()) continue
-            if (existing == null) created += 1
-
-            val eventInsertIndex = ops.size
-            ops.add(
-                ContentProviderOperation.newInsert(eventsUri)
-                    .withValue(CalendarContract.Events.CALENDAR_ID, calendarId)
-                    .withValue(CalendarContract.Events.TITLE, event.title)
-                    .withValue(CalendarContract.Events.EVENT_LOCATION, event.location)
-                    .withValue(CalendarContract.Events.DESCRIPTION, event.description)
-                    .withValue(CalendarContract.Events.DTSTART, event.startAt)
-                    .withValue(CalendarContract.Events.DTEND, event.endAt)
-                    .withValue(CalendarContract.Events.EVENT_TIMEZONE, timeZone)
-                    .withValue(CalendarContract.Events.HAS_ALARM, if (event.remindMinutes != null) 1 else 0)
-                    .withValue(CalendarContract.Events.SYNC_DATA1, event.syncKey)
-                    .withValue(CalendarContract.Events.SYNC_DATA2, event.fingerprint())
-                    .build(),
-            )
-            if (event.remindMinutes != null) {
-                ops.add(
-                    ContentProviderOperation.newInsert(remindersUri)
-                        .withValueBackReference(CalendarContract.Reminders.EVENT_ID, eventInsertIndex)
-                        .withValue(CalendarContract.Reminders.MINUTES, event.remindMinutes)
-                        .withValue(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
-                        .build(),
-                )
-            }
-            if (ops.size >= BATCH_LIMIT) flushOps()
-        }
-        flushOps()
 
         return DiffStats(created = created, updated = updated, deleted = deleted)
     }

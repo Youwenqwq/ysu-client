@@ -5,6 +5,7 @@ import android.util.Log
 import me.uwen.orahako.nativebridge.NativeCapability
 import me.uwen.orahako.nativebridge.NativeCapabilityBinding
 import me.uwen.orahako.nativebridge.NativeCapabilityHost
+import me.uwen.orahako.nativebridge.NativeCapabilityInitializer
 import me.uwen.orahako.nativebridge.NativeCapabilityReconciler
 import me.uwen.orahako.nativebridge.NativeInvokeResult
 import me.uwen.orahako.nativebridge.kotlinValueToJson
@@ -25,7 +26,7 @@ import java.util.Locale
 class ClassRemindersCapability(
     private val host: NativeCapabilityHost,
     override val config: Map<String, Any?>,
-) : NativeCapability, NativeCapabilityReconciler {
+) : NativeCapability, NativeCapabilityInitializer, NativeCapabilityReconciler {
 
     companion object {
         const val ID = "reminders.classes"
@@ -41,7 +42,14 @@ class ClassRemindersCapability(
 
     override val methods: Set<String> = setOf(METHOD_SCHEDULE, METHOD_CANCEL, METHOD_DEBUG)
 
-    override fun bind(): NativeCapabilityBinding = Binding()
+    override fun initialize() {
+        ClassReminderNotifications.ensureChannels(host.context)
+    }
+
+    override fun bind(): NativeCapabilityBinding {
+        ClassReminderNotifications.ensureChannels(host.context)
+        return Binding()
+    }
 
     override fun reconcile() {
         val context = host.context
@@ -63,7 +71,7 @@ class ClassRemindersCapability(
         ) {
             when (method) {
                 METHOD_SCHEDULE -> schedule(payload, result)
-                METHOD_CANCEL -> cancel(result)
+                METHOD_CANCEL -> cancel(payload, result)
                 METHOD_DEBUG -> debug(payload, result)
             }
         }
@@ -78,22 +86,68 @@ class ClassRemindersCapability(
             result.reject("Missing alarms")
             return
         }
+        val namespace = payload.string("namespace")
         try {
-            ClassAlarmManager.scheduleAlarms(host.context, alarms.toString())
-            result.resolve(mapOf("scheduled" to alarms.length()))
+            ClassReminderNotifications.ensureChannels(host.context)
+            val merged = mergeAlarmsByNamespace(host.context, alarms, namespace)
+            ClassAlarmManager.scheduleAlarms(host.context, merged.toString())
+            val response = LinkedHashMap<String, Any?>()
+            response["scheduled"] = alarms.length()
+            if (namespace != null) response["namespace"] = namespace
+            result.resolve(response)
         } catch (error: Exception) {
             result.reject("Unable to schedule class reminders", error)
         }
     }
 
-    private fun cancel(result: NativeInvokeResult) {
+    private fun cancel(payload: Map<String, Any?>, result: NativeInvokeResult) {
+        val namespace = payload.string("namespace")
         try {
-            ClassAlarmManager.cancelAllAlarms(host.context)
-            ClassReminderNotifications.cancelAll(host.context)
-            result.resolve(mapOf("cancelled" to true))
+            if (namespace != null) {
+                val remaining = filterOutNamespace(host.context, namespace)
+                if (remaining.length() == 0) {
+                    ClassAlarmManager.cancelAllAlarms(host.context)
+                    ClassReminderNotifications.cancelAll(host.context)
+                } else {
+                    ClassAlarmManager.scheduleAlarms(host.context, remaining.toString())
+                }
+                result.resolve(mapOf("cancelled" to true, "namespace" to namespace))
+            } else {
+                ClassAlarmManager.cancelAllAlarms(host.context)
+                ClassReminderNotifications.cancelAll(host.context)
+                result.resolve(mapOf("cancelled" to true))
+            }
         } catch (error: Exception) {
             result.reject("Unable to cancel class reminders", error)
         }
+    }
+
+    private fun mergeAlarmsByNamespace(
+        context: android.content.Context,
+        incoming: JSONArray,
+        namespace: String?,
+    ): JSONArray {
+        if (namespace == null) return incoming
+        val merged = filterOutNamespace(context, namespace)
+        for (i in 0 until incoming.length()) {
+            val item = JSONObject(incoming.getJSONObject(i).toString())
+            item.put("namespace", namespace)
+            merged.put(item)
+        }
+        return merged
+    }
+
+    private fun filterOutNamespace(context: android.content.Context, namespace: String): JSONArray {
+        val existing = runCatching { JSONArray(ClassReminderState.alarmsJson(context)) }
+            .getOrElse { JSONArray() }
+        val kept = JSONArray()
+        for (i in 0 until existing.length()) {
+            val item = existing.optJSONObject(i) ?: continue
+            if (item.optString("namespace", "") != namespace) {
+                kept.put(item)
+            }
+        }
+        return kept
     }
 
     /**

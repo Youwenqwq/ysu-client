@@ -50,6 +50,14 @@ class ClassReminderService : Service() {
             return value.toString().trim().takeUnless { it.isEmpty() || it == "null" } ?: fallback
         }
 
+        private fun title(alarm: JSONObject, fallback: String): String =
+            text(alarm, "title").ifEmpty { text(alarm, "courseName", fallback) }
+
+        private fun location(alarm: JSONObject): String =
+            text(alarm, "subtitle").ifEmpty {
+                text(alarm, "location").ifEmpty { text(alarm, "classroom") }
+            }
+
         internal fun nextClass(context: Context, currentId: String, endedAt: Long): JSONObject? =
             ClassLiveUpdate.findNextClass(context, currentId, endedAt)
 
@@ -160,11 +168,13 @@ class ClassReminderService : Service() {
                 if (category == "event") R.string.notify_fallback_alarm_event
                 else R.string.notify_fallback_alarm_course
             )
+            val displayTitle = title(alarm, fallbackTitle)
+            val displayLocation = location(alarm)
             val livePosted = ClassAlarmManager.supportsLiveUpdate(context, alarm) &&
                 ClassLiveUpdate.post(
                     context, id,
-                    text(alarm, "courseName", fallbackTitle),
-                    text(alarm, "classroom"), text(alarm, "startTime"), start,
+                    displayTitle,
+                    displayLocation, text(alarm, "startTime"), start,
                     alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end,
                     category,
                 )
@@ -172,19 +182,30 @@ class ClassReminderService : Service() {
                 ClassReminderService.start(context, alarm)
             } else {
                 if (!claimReminderDelivery(context, id, start, expiry)) return false
-                val parts = buildList {
-                    val startTime = text(alarm, "startTime")
-                    val classroom = text(alarm, "classroom")
-                    if (startTime.isNotEmpty()) add(startTime)
-                    if (classroom.isNotEmpty()) add(classroom)
-                }
-                val content = if (parts.isNotEmpty()) parts.joinToString(" · ")
+                val explicitBody = text(alarm, "body")
+                val content = if (explicitBody.isNotEmpty()) {
+                    explicitBody
+                } else {
+                    val parts = buildList {
+                        val startTime = text(alarm, "startTime")
+                        if (startTime.isNotEmpty()) add(startTime)
+                        if (displayLocation.isNotEmpty()) add(displayLocation)
+                    }
+                    if (parts.isNotEmpty()) parts.joinToString(" · ")
                     else context.getString(
                         if (category == "event") R.string.event_alarm_text else R.string.class_alarm_text,
                         alarm.optInt("remindMinutes", 15),
                     )
-                val notification = ClassReminderNotifications.builder(context)
-                    .setContentTitle(text(alarm, "courseName", fallbackTitle))
+                }
+                val channelId = text(alarm, "channelId", ClassReminderNotifications.REMINDER_CHANNEL_ID)
+                val deepLink = text(alarm, "deepLink").takeIf { it.isNotEmpty() }
+                    ?.let { runCatching { android.net.Uri.parse(it) }.getOrNull() }
+                val notification = ClassReminderNotifications.builder(
+                    context = context,
+                    channelId = channelId,
+                    deepLink = deepLink,
+                )
+                    .setContentTitle(displayTitle)
                     .setContentText(content)
                     .build()
                 (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
@@ -288,9 +309,11 @@ class ClassReminderService : Service() {
                     if (category == "event") R.string.notify_fallback_alarm_event
                     else R.string.notify_fallback_alarm_course
                 )
+                val displayTitle = title(alarm, fallbackTitle)
+                val displayLocation = location(alarm)
                 val extras = ClassLiveUpdate.buildExtras(
-                    text(alarm, "courseName", fallbackTitle),
-                    text(alarm, "classroom"), start, end,
+                    displayTitle,
+                    displayLocation, start, end,
                     alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1),
                     category,
                 )
@@ -298,8 +321,8 @@ class ClassReminderService : Service() {
                 if (live && System.currentTimeMillis() < start) {
                     ClassLiveUpdate.post(
                         this@ClassReminderService, id,
-                        text(alarm, "courseName", fallbackTitle),
-                        text(alarm, "classroom"), text(alarm, "startTime"), start,
+                        displayTitle,
+                        displayLocation, text(alarm, "startTime"), start,
                         alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end,
                         category,
                     )
@@ -317,8 +340,8 @@ class ClassReminderService : Service() {
                     if (!isCurrent(alarm) || System.currentTimeMillis() >= expiry) return@launch
                     if (live) ClassLiveUpdate.post(
                         this@ClassReminderService, id,
-                        text(alarm, "courseName", fallbackTitle),
-                        text(alarm, "classroom"), text(alarm, "startTime"), start,
+                        displayTitle,
+                        displayLocation, text(alarm, "startTime"), start,
                         alarm.optInt("remindMinutes", 15), alarm.optInt("conflictCount", 1), end,
                         category,
                     )

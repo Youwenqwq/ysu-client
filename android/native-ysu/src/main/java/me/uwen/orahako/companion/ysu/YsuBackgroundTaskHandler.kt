@@ -38,6 +38,10 @@ object YsuBackgroundTaskHandler : BackgroundTaskHandler {
     private val nextNotificationId = AtomicInteger(NOTIFICATION_ID_BASE)
     private val sessionLock = ReentrantLock()
 
+    override fun prepare(context: Context) {
+        YsuNotifications.ensureChannels(context)
+    }
+
     override fun run(context: Context, payload: JSONObject): BackgroundTaskResult {
         YsuNotifyProtocol.bindHostApp(context)
         return sessionLock.withLock { checkForUpdates(context, payload) }

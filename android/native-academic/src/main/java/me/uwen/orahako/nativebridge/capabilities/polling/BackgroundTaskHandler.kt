@@ -15,6 +15,12 @@ import org.json.JSONObject
 interface BackgroundTaskHandler {
     val id: String
 
+    /**
+     * Lightweight startup preparation (such as pre-creating notification
+     * channels owned by this handler). Safe to call repeatedly.
+     */
+    fun prepare(context: Context) = Unit
+
     /** Runs one scheduled pass. The payload is the opaque JSON supplied at configuration time. */
     fun run(context: Context, payload: JSONObject): BackgroundTaskResult
 
@@ -53,6 +59,14 @@ object BackgroundTaskHandlers {
 
     @Synchronized
     fun registeredIds(): List<String> = handlers.keys.toList()
+
+    /** Runs [BackgroundTaskHandler.prepare] on every registered handler. */
+    fun prepareAll(context: Context) {
+        val snapshot = synchronized(this) { handlers.values.toList() }
+        for (handler in snapshot) {
+            runCatching { handler.prepare(context) }
+        }
+    }
 
     /** Test seam: the app never clears the registry at runtime. */
     @Synchronized

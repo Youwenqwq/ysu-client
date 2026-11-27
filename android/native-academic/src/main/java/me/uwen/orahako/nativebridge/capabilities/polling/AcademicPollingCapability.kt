@@ -3,6 +3,7 @@ package me.uwen.orahako.nativebridge.capabilities.polling
 import me.uwen.orahako.nativebridge.NativeCapability
 import me.uwen.orahako.nativebridge.NativeCapabilityBinding
 import me.uwen.orahako.nativebridge.NativeCapabilityHost
+import me.uwen.orahako.nativebridge.NativeCapabilityInitializer
 import me.uwen.orahako.nativebridge.NativeCapabilityReconciler
 import me.uwen.orahako.nativebridge.NativeCapabilityState
 import me.uwen.orahako.nativebridge.NativeInvokeResult
@@ -24,7 +25,7 @@ class AcademicPollingCapability(
     storeOverride: NativeStateStore? = null,
     schedulerOverride: BackgroundTaskScheduler? = null,
     handlerClearOverride: ((String) -> Unit)? = null,
-) : NativeCapability, NativeCapabilityReconciler {
+) : NativeCapability, NativeCapabilityInitializer, NativeCapabilityReconciler {
 
     companion object {
         const val ID = "academic.polling"
@@ -73,9 +74,18 @@ class AcademicPollingCapability(
 
     private val clearHandlerOverride: ((String) -> Unit)? = handlerClearOverride
 
+    private val useDefaultHostContext: Boolean = storeOverride == null
+
+    override fun initialize() {
+        BackgroundTaskHandlers.prepareAll(host.context)
+    }
+
     override fun bind(): NativeCapabilityBinding = Binding()
 
     override fun reconcile() {
+        if (useDefaultHostContext) {
+            BackgroundTaskHandlers.prepareAll(host.context)
+        }
         for (task in PollingTaskStore.loadAll(stateStore)) {
             if (task.enabled) taskScheduler.schedulePeriodic(spec(task))
             else taskScheduler.cancel(workName(task.handlerId), tag(task.handlerId))

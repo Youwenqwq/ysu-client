@@ -88,6 +88,38 @@ object NativeComposition {
         )
 
     /**
+     * Runs lightweight startup initialization (such as pre-creating declared
+     * notification channels) across every enabled capability that implements
+     * [NativeCapabilityInitializer]. Safe to call repeatedly; failures are
+     * logged so one broken capability cannot block process startup.
+     */
+    fun initialize(context: Context) {
+        val appContext = context.applicationContext
+        val composition = factories ?: return
+        composition.installBackgroundTaskHandlers()
+        val config = try {
+            NativeCompanionConfig.load(appContext)
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to load the native companion config for initialization", error)
+            return
+        }
+        val capabilities = try {
+            composition.create(ContextNativeCapabilityHost(appContext), config.entries)
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to compose native capabilities for initialization", error)
+            return
+        }
+        for (capability in capabilities) {
+            if (capability !is NativeCapabilityInitializer) continue
+            try {
+                capability.initialize()
+            } catch (error: Exception) {
+                Log.e(TAG, "Unable to initialize ${capability.qualifiedId}", error)
+            }
+        }
+    }
+
+    /**
      * Rebuilds the enabled capabilities from the auditable asset and lets every
      * capability that owns OS schedules re-apply its persisted desired state.
      * Used after boot, app updates and clock/timezone changes; a failure is

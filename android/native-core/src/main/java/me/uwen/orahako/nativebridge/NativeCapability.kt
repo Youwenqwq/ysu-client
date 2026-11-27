@@ -29,6 +29,16 @@ val NativeCapability.qualifiedId: String
     get() = "$id@$version"
 
 /**
+ * Lightweight startup hook for capabilities that declare OS metadata (such as
+ * Android notification channels) that should exist as soon as the app launches
+ * or notification permissions are granted, without waiting for the first
+ * background task or user toggle.
+ */
+interface NativeCapabilityInitializer {
+    fun initialize()
+}
+
+/**
  * Re-applies the capability's persisted desired state after a reboot, an app
  * update or a clock change. Implemented by capabilities that own OS-level
  * schedules (alarms, periodic work); the generic reconciler receiver calls it

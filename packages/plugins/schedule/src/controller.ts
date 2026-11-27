@@ -49,6 +49,8 @@ import {
 export const NOTIFICATIONS_CORE_CAPABILITY = "notifications.core@1"
 export const REMINDERS_CLASSES_CAPABILITY = "reminders.classes@1"
 export const CALENDAR_SYNC_CAPABILITY = "calendar.sync@1"
+export const CALENDAR_SYNC_NAMESPACE = "orahako.schedule"
+const CALENDAR_SYNC_DEBOUNCE_MS = 350
 export const NATIVE_FILES_CAPABILITY = "native.files@1"
 export const SCHEDULE_WIDGET_IDS = ["schedule", "tomorrow"] as const
 export type ScheduleWidgetId = (typeof SCHEDULE_WIDGET_IDS)[number]
@@ -312,6 +314,7 @@ export class ClassReminderAndWidgetController {
   private lastAlarmHash = ""
   private lastWidgetHash = ""
   private lastCalendarHash = ""
+  private calendarDebounceTimer: ReturnType<typeof setTimeout> | null = null
   private latestExplicitSchedule: ScheduleSyncInput | null = null
 
   private previousSettings: {
@@ -381,10 +384,19 @@ export class ClassReminderAndWidgetController {
       widgetShowNextDaySchedule: initialSettings.widgetShowNextDaySchedule,
     }
 
+    if (initialSettings.calendarSyncLastAt !== null || initialSettings.calendarSyncLastCount !== null) {
+      this.calendarSyncStatusSource.set({
+        syncing: false,
+        lastSyncedCount: initialSettings.calendarSyncLastCount,
+        lastSyncedAt: initialSettings.calendarSyncLastAt,
+        error: null,
+      })
+    }
+
     this.attachSubscriptions()
     void this.refreshAlarms()
     void this.refreshWidgets()
-    void this.refreshCalendarSync()
+    this.scheduleCalendarSync()
   }
 
   private isFeatureSupported(): boolean {
@@ -567,15 +579,38 @@ export class ClassReminderAndWidgetController {
     return true
   }
 
+  private cancelCalendarDebounce(): void {
+    if (this.calendarDebounceTimer !== null) {
+      clearTimeout(this.calendarDebounceTimer)
+      this.calendarDebounceTimer = null
+    }
+  }
+
+  private scheduleCalendarSync(): void {
+    if (this.disposed || !this.native.isNative) return
+    this.cancelCalendarDebounce()
+    this.calendarDebounceTimer = setTimeout(() => {
+      this.calendarDebounceTimer = null
+      void this.refreshCalendarSync()
+    }, CALENDAR_SYNC_DEBOUNCE_MS)
+  }
+
   refreshCalendarSync(options: { force?: boolean } = {}): Promise<void> {
     if (this.disposed) return Promise.resolve()
+    this.cancelCalendarDebounce()
     const revision = ++this.calendarRevision
 
     const task = this.enqueueNative(async () => {
       if (this.disposed || !this.native.isNative || revision !== this.calendarRevision) return
       const sessionSnap = this.session.getSnapshot()
       const settingsHydrated = this.settingsStore.hydrated.getSnapshot()
-      if (!sessionSnap.hasHydrated || !settingsHydrated) return
+      const patchesHydrated = this.patchesStore.hydrated.getSnapshot()
+      const customizationsHydrated = this.customizationsStore
+        ? this.customizationsStore.hydrated.getSnapshot()
+        : true
+      if (!sessionSnap.hasHydrated || !settingsHydrated || !patchesHydrated || !customizationsHydrated) {
+        return
+      }
 
       const settings = this.settingsStore.source.getSnapshot()
       const isValid = (): boolean =>
@@ -586,9 +621,10 @@ export class ClassReminderAndWidgetController {
         this.session.getSnapshot().isAuthenticated
 
       if (!isValid() || !settings.calendarSyncEnabled || !this.isFeatureSupported()) {
-        if (this.lastCalendarHash) {
+        if (this.lastCalendarHash || settings.calendarSyncLastHash) {
           await this.clearNativeCalendar()
           this.lastCalendarHash = ""
+          this.settingsStore.actions.clearCalendarSyncRecord()
         }
         return
       }
@@ -596,10 +632,21 @@ export class ClassReminderAndWidgetController {
       if (!(await this.checkCalendarPermission())) {
         if (!isValid()) return
         this.settingsStore.actions.setCalendarSyncEnabled(false)
+        this.settingsStore.actions.clearCalendarSyncRecord()
         this.lastCalendarHash = ""
         return
       }
       if (!isValid()) return
+
+      // Wait until the primary schedule query has loaded at least once before syncing,
+      // so early personal/exam overlays cannot trigger a partial snapshot that deletes courses.
+      if (
+        this.latestExplicitSchedule === null &&
+        this.scheduleSource &&
+        this.scheduleSource.getSnapshot().data === undefined
+      ) {
+        return
+      }
 
       const schedule = this.resolveCurrentScheduleInput()
       const extraEntries = this.scheduleStateSource?.getSnapshot().entries ?? []
@@ -623,8 +670,24 @@ export class ClassReminderAndWidgetController {
           : undefined,
       })
 
-      const hash = JSON.stringify([events, timeZone])
-      if (!options.force && hash === this.lastCalendarHash) return
+      const activeProviderId = this.provider.getSnapshot().provider?.id ?? ""
+      const hash = JSON.stringify([activeProviderId, sessionSnap.username ?? "", events, timeZone])
+      const persistedHash = settings.calendarSyncLastHash ?? ""
+      if (!options.force && (hash === this.lastCalendarHash || hash === persistedHash)) {
+        this.lastCalendarHash = hash
+        if (
+          this.calendarSyncStatusSource.getSnapshot().lastSyncedAt === null &&
+          settings.calendarSyncLastAt !== null
+        ) {
+          this.calendarSyncStatusSource.set({
+            syncing: false,
+            lastSyncedCount: settings.calendarSyncLastCount ?? events.length,
+            lastSyncedAt: settings.calendarSyncLastAt,
+            error: null,
+          })
+        }
+        return
+      }
 
       this.calendarSyncStatusSource.set({
         ...this.calendarSyncStatusSource.getSnapshot(),
@@ -635,15 +698,22 @@ export class ClassReminderAndWidgetController {
       try {
         if (await this.capabilityAvailable(CALENDAR_SYNC_CAPABILITY)) {
           await this.native.capabilities.invoke(CALENDAR_SYNC_CAPABILITY, "sync", {
+            namespace: CALENDAR_SYNC_NAMESPACE,
             events,
             ...(timeZone ? { timeZone } : {}),
           })
           if (!isValid()) return
+          const syncedAt = Date.now()
           this.lastCalendarHash = hash
+          this.settingsStore.actions.setCalendarSyncRecord({
+            hash,
+            count: events.length,
+            syncedAt,
+          })
           this.calendarSyncStatusSource.set({
             syncing: false,
             lastSyncedCount: events.length,
-            lastSyncedAt: Date.now(),
+            lastSyncedAt: syncedAt,
             error: null,
           })
         }
@@ -661,8 +731,10 @@ export class ClassReminderAndWidgetController {
   }
 
   clearSystemCalendar(): Promise<void> {
+    this.cancelCalendarDebounce()
     this.calendarRevision += 1
     this.lastCalendarHash = ""
+    this.settingsStore.actions.clearCalendarSyncRecord()
     this.calendarSyncStatusSource.set({
       syncing: false,
       lastSyncedCount: null,
@@ -878,27 +950,32 @@ export class ClassReminderAndWidgetController {
     ]).then(() => undefined)
   }
 
-  clearAlarmsAndWidgets(): Promise<void> {
+  clearAlarmsAndWidgets(options: { readonly clearCalendar?: boolean } = {}): Promise<void> {
+    const clearCalendar = options.clearCalendar !== false
+    this.cancelCalendarDebounce()
     this.lifecycleRevision += 1
     this.alarmRevision += 1
     this.widgetRevision += 1
     this.calendarRevision += 1
     this.lastAlarmHash = ""
     this.lastWidgetHash = ""
-    this.lastCalendarHash = ""
     this.scheduledAlarmsSource.set([])
-    this.calendarSyncStatusSource.set({
-      syncing: false,
-      lastSyncedCount: null,
-      lastSyncedAt: null,
-      error: null,
-    })
+    if (clearCalendar) {
+      this.lastCalendarHash = ""
+      this.settingsStore.actions.clearCalendarSyncRecord()
+      this.calendarSyncStatusSource.set({
+        syncing: false,
+        lastSyncedCount: null,
+        lastSyncedAt: null,
+        error: null,
+      })
+    }
 
     return this.enqueueNative(async () => {
       if (!this.native.isNative) return
       await Promise.allSettled([
         this.cancelNativeAlarms(),
-        this.clearNativeCalendar(),
+        ...(clearCalendar ? [this.clearNativeCalendar()] : []),
         ...SCHEDULE_WIDGET_IDS.map((widgetId) => this.widgets.clear(widgetId)),
       ])
     })
@@ -906,12 +983,15 @@ export class ClassReminderAndWidgetController {
 
   dispose(): Promise<void> {
     if (this.disposed) return Promise.resolve()
+    this.cancelCalendarDebounce()
     for (const unsubscribe of this.unsubscribers.splice(0)) {
       unsubscribe()
     }
     this.stopped = true
     this.latestExplicitSchedule = null
-    const cleanup = this.clearAlarmsAndWidgets()
+    // Do not wipe the user's persisted system calendar on plugin reload/unmount;
+    // explicit disable, logout, user switch, or channel disable clears it instead.
+    const cleanup = this.clearAlarmsAndWidgets({ clearCalendar: false })
     this.disposed = true
     return cleanup
   }
@@ -954,7 +1034,7 @@ export class ClassReminderAndWidgetController {
           void this.refreshAlarms()
         }
         if (calendarSettingsChanged) {
-          void this.refreshCalendarSync()
+          this.scheduleCalendarSync()
         }
         if (widgetSettingsChanged) {
           if (this.resolveCurrentScheduleInput()) {
@@ -965,22 +1045,34 @@ export class ClassReminderAndWidgetController {
         }
       }),
       this.settingsStore.hydrated.subscribe(() => {
+        const snap = this.settingsStore.source.getSnapshot()
+        if (
+          this.calendarSyncStatusSource.getSnapshot().lastSyncedAt === null &&
+          (snap.calendarSyncLastAt !== null || snap.calendarSyncLastCount !== null)
+        ) {
+          this.calendarSyncStatusSource.set({
+            syncing: false,
+            lastSyncedCount: snap.calendarSyncLastCount,
+            lastSyncedAt: snap.calendarSyncLastAt,
+            error: null,
+          })
+        }
         void this.refreshAlarms()
         void this.refreshWidgets()
-        void this.refreshCalendarSync()
+        this.scheduleCalendarSync()
       }),
       this.patchesStore.source.subscribe(() => {
         if (this.latestExplicitSchedule === null) {
           void this.refreshAlarms()
           void this.refreshWidgets()
-          void this.refreshCalendarSync()
+          this.scheduleCalendarSync()
         }
       }),
       this.patchesStore.hydrated.subscribe(() => {
         if (this.latestExplicitSchedule === null) {
           void this.refreshAlarms()
           void this.refreshWidgets()
-          void this.refreshCalendarSync()
+          this.scheduleCalendarSync()
         }
       }),
       ...(this.customizationsStore
@@ -989,14 +1081,14 @@ export class ClassReminderAndWidgetController {
               if (this.latestExplicitSchedule === null) {
                 void this.refreshAlarms()
                 void this.refreshWidgets()
-                void this.refreshCalendarSync()
+                this.scheduleCalendarSync()
               }
             }),
             this.customizationsStore.hydrated.subscribe(() => {
               if (this.latestExplicitSchedule === null) {
                 void this.refreshAlarms()
                 void this.refreshWidgets()
-                void this.refreshCalendarSync()
+                this.scheduleCalendarSync()
               }
             }),
           ]
@@ -1007,7 +1099,7 @@ export class ClassReminderAndWidgetController {
               if (this.latestExplicitSchedule === null) {
                 void this.refreshAlarms()
                 void this.refreshWidgets()
-                void this.refreshCalendarSync()
+                this.scheduleCalendarSync()
               }
             }),
           ]
@@ -1060,7 +1152,7 @@ export class ClassReminderAndWidgetController {
         this.latestExplicitSchedule = null
         void this.refreshAlarms()
         void this.refreshWidgets()
-        void this.refreshCalendarSync()
+        this.scheduleCalendarSync()
       }
       if (this.scheduleSource) {
         this.unsubscribers.push(this.scheduleSource.subscribe(onDataChange))
@@ -1099,7 +1191,9 @@ export class ClassReminderAndWidgetController {
 
   private async clearNativeCalendar(): Promise<void> {
     if (!(await this.capabilityAvailable(CALENDAR_SYNC_CAPABILITY))) return
-    await this.native.capabilities.invoke(CALENDAR_SYNC_CAPABILITY, "clear")
+    await this.native.capabilities.invoke(CALENDAR_SYNC_CAPABILITY, "clear", {
+      namespace: CALENDAR_SYNC_NAMESPACE,
+    })
   }
 
   private async capabilityAvailable(capabilityId: string): Promise<boolean> {

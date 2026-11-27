@@ -47,8 +47,18 @@ import { PluginRuntime } from "@orahako/kernel"
 import {
   createObservableSource,
   definePlugin,
+  cancelLocalNotification,
+  clearCalendarNamespace,
+  ensureNotificationChannel,
+  ensureNotificationChannels,
+  getNotificationChannelStatus,
+  openNotificationSettings,
   parseRouteLocation,
   PLUGIN_API_VERSION,
+  postLocalNotification,
+  removeCalendarEvents,
+  syncCalendarNamespace,
+  upsertCalendarEvents,
   WIDGETS_GENERIC_CAPABILITY,
   WIDGETS_SCHEDULE_CAPABILITY,
   type NativeCapabilityDescriptor,
@@ -203,6 +213,105 @@ describe("@orahako/runtime-native", () => {
       "notifications.core@1:checkBatteryOptimization",
       "notifications.core@1:requestIgnoreBatteryOptimization",
     ])
+  })
+
+  it("exposes generic notification and namespaced calendar helpers for any plugin", async () => {
+    const calls: Array<{ id: string; method: string; payload?: Record<string, unknown> }> = []
+    const capabilities = createMockCapabilities(
+      [
+        { id: "notifications.core", version: 1, methods: [] },
+        { id: "calendar.sync", version: 1, methods: [] },
+      ],
+      (id, method, payload) => {
+        calls.push({ id, method, payload })
+        switch (`${id}:${method}`) {
+          case "notifications.core@1:ensureChannel":
+            return { id: payload?.id, created: true }
+          case "notifications.core@1:ensureChannels":
+            return { channels: [{ id: "community.alerts", created: true }] }
+          case "notifications.core@1:getChannelStatus":
+            return { id: payload?.id, exists: true, importance: 4, blocked: false }
+          case "notifications.core@1:openNotificationSettings":
+            return { opened: true }
+          case "notifications.core@1:post":
+            return { id: 42, tag: payload?.tag ?? null, posted: true }
+          case "notifications.core@1:cancel":
+            return { cancelled: 1 }
+          case "calendar.sync@1:sync":
+          case "calendar.sync@1:upsert":
+            return {
+              namespace: payload?.namespace,
+              synced: 1,
+              created: 1,
+              updated: 0,
+              deleted: 0,
+              calendarId: 9,
+              dedicated: true,
+            }
+          case "calendar.sync@1:remove":
+            return { deleted: 1 }
+          case "calendar.sync@1:clear":
+            return { cleared: true }
+          default:
+            throw new Error(`Unexpected ${id}:${method}`)
+        }
+      }
+    )
+
+    const native = createNativeService({
+      isNative: () => true,
+      capabilities,
+      loadCapabilities: async () => [],
+    })
+
+    expect(
+      await ensureNotificationChannel(native, {
+        id: "community.alerts",
+        name: "Alerts",
+        importance: "high",
+        lockscreenVisibility: "public",
+      })
+    ).toEqual({ id: "community.alerts", created: true })
+    expect(
+      await ensureNotificationChannels(native, [{ id: "community.alerts", name: "Alerts" }])
+    ).toEqual([{ id: "community.alerts", created: true }])
+    expect(await getNotificationChannelStatus(native, "community.alerts")).toMatchObject({
+      id: "community.alerts",
+      exists: true,
+      blocked: false,
+    })
+    expect(await openNotificationSettings(native, "community.alerts")).toBe(true)
+    expect(
+      await postLocalNotification(native, {
+        channelId: "community.alerts",
+        title: "Library due",
+        body: "Return book tomorrow",
+      })
+    ).toMatchObject({ id: 42, posted: true })
+    expect(await cancelLocalNotification(native, { channelId: "community.alerts" })).toBe(1)
+
+    const sampleEvent = { uid: "book-1", title: "Return book", startAt: 1000, endAt: 2000 }
+    expect(
+      await syncCalendarNamespace(native, {
+        namespace: "community.library",
+        events: [sampleEvent],
+      })
+    ).toMatchObject({ namespace: "community.library", created: 1 })
+    expect(
+      await upsertCalendarEvents(native, {
+        namespace: "community.library",
+        events: [sampleEvent],
+      })
+    ).toMatchObject({ namespace: "community.library", created: 1 })
+    expect(await removeCalendarEvents(native, "community.library", ["book-1"])).toBe(1)
+    expect(await clearCalendarNamespace(native, "community.library")).toBe(true)
+
+    expect(calls.find((c) => c.method === "openNotificationSettings")?.payload).toEqual({
+      channelId: "community.alerts",
+    })
+    expect(calls.find((c) => c.method === "clear")?.payload).toEqual({
+      namespace: "community.library",
+    })
   })
 
   it("handles Web Notification fallback and non-native permission guards cleanly", async () => {

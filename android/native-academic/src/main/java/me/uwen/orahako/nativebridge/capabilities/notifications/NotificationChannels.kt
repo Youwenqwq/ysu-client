@@ -1,5 +1,6 @@
 package me.uwen.orahako.nativebridge.capabilities.notifications
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -22,6 +23,34 @@ data class NotificationChannelSpec(
     val showBadge: Boolean = true,
     val lockscreenVisibility: Int? = null,
 )
+
+/**
+ * Snapshot of an Android notification channel's actual OS-effective settings.
+ * Allows plugins to detect when an OEM ROM or user has downgraded or blocked a channel.
+ */
+data class NotificationChannelStatus(
+    val id: String,
+    val exists: Boolean,
+    val name: String? = null,
+    val importance: Int? = null,
+    val soundEnabled: Boolean? = null,
+    val vibrationEnabled: Boolean? = null,
+    val showBadge: Boolean? = null,
+    val lockscreenVisibility: Int? = null,
+    val blocked: Boolean = false,
+) {
+    fun toMap(): Map<String, Any?> = mapOf(
+        "id" to id,
+        "exists" to exists,
+        "name" to name,
+        "importance" to importance,
+        "soundEnabled" to soundEnabled,
+        "vibrationEnabled" to vibrationEnabled,
+        "showBadge" to showBadge,
+        "lockscreenVisibility" to lockscreenVisibility,
+        "blocked" to blocked,
+    )
+}
 
 object NotificationChannels {
 
@@ -58,4 +87,47 @@ object NotificationChannels {
         manager.createNotificationChannel(channel)
         return created
     }
+
+    /** Inspects one channel's actual OS-effective state. */
+    fun inspect(context: Context, channelId: String): NotificationChannelStatus {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return NotificationChannelStatus(id = channelId, exists = false)
+        }
+        val manager = context.getSystemService(NotificationManager::class.java)
+            ?: return NotificationChannelStatus(id = channelId, exists = false)
+        val channel = manager.getNotificationChannel(channelId)
+            ?: return NotificationChannelStatus(id = channelId, exists = false)
+        return toStatus(channel)
+    }
+
+    /** Inspects every notification channel currently registered for this app. */
+    fun inspectAll(context: Context): List<NotificationChannelStatus> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return emptyList()
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return emptyList()
+        return manager.notificationChannels.map(::toStatus)
+    }
+
+    private fun toStatus(channel: NotificationChannel): NotificationChannelStatus =
+        NotificationChannelStatus(
+            id = channel.id,
+            exists = true,
+            name = channel.name?.toString(),
+            importance = channel.importance,
+            soundEnabled = channel.sound != null,
+            vibrationEnabled = channel.shouldVibrate(),
+            showBadge = channel.canShowBadge(),
+            lockscreenVisibility = channel.lockscreenVisibility,
+            blocked = channel.importance == NotificationManager.IMPORTANCE_NONE,
+        )
+}
+
+internal fun parseLockscreenVisibility(value: Any?): Int? = when (value) {
+    is Number -> value.toInt()
+    is String -> when (value.lowercase()) {
+        "public" -> Notification.VISIBILITY_PUBLIC
+        "private" -> Notification.VISIBILITY_PRIVATE
+        "secret" -> Notification.VISIBILITY_SECRET
+        else -> null
+    }
+    else -> null
 }

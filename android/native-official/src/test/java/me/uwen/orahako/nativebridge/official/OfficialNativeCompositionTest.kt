@@ -127,6 +127,7 @@ class OfficialNativeCompositionTest {
                 mapOf("minimumIntervalMinutes" to 15, "defaultIntervalMinutes" to 60),
             ),
             NativeCompanionConfig.Entry("reminders.classes", 1, emptyMap()),
+            NativeCompanionConfig.Entry("calendar.sync", 1, emptyMap()),
         )
 
         val registry = NativeCapabilityRegistry(OfficialNativeComposition.create(UnusedHost(), companionEntries))
@@ -134,13 +135,17 @@ class OfficialNativeCompositionTest {
 
         assertEquals(
             listOf(
+                "cancel",
                 "cancelAll",
                 "checkBatteryOptimization",
                 "checkExactAlarmPermission",
                 "checkPermissions",
                 "ensureChannel",
+                "ensureChannels",
+                "getChannelStatus",
                 "openAutoStartSettings",
                 "openNotificationSettings",
+                "post",
                 "requestExactAlarmPermission",
                 "requestIgnoreBatteryOptimization",
                 "requestPermissions",
@@ -154,6 +159,10 @@ class OfficialNativeCompositionTest {
         assertEquals(
             listOf("cancel", "debug", "schedule"),
             byId.getValue("reminders.classes").methods,
+        )
+        assertEquals(
+            listOf("checkPermissions", "clear", "remove", "requestPermissions", "sync", "upsert"),
+            byId.getValue("calendar.sync").methods,
         )
     }
 

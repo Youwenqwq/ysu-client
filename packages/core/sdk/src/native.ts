@@ -23,6 +23,210 @@ export interface PluginNativeService {
   requestBatteryOptimizationExemption(): Promise<boolean>
 }
 
+export type NotificationImportance = "none" | "min" | "low" | "default" | "high" | "max"
+export type NotificationVisibility = "public" | "private" | "secret"
+export type NotificationCategory =
+  | "reminder"
+  | "event"
+  | "alarm"
+  | "error"
+  | "message"
+  | "progress"
+  | "status"
+
+export interface NativeNotificationChannelSpec {
+  readonly id: string
+  readonly name: string
+  readonly description?: string
+  readonly importance?: NotificationImportance
+  readonly sound?: boolean
+  readonly vibration?: boolean
+  readonly showBadge?: boolean
+  readonly lockscreenVisibility?: NotificationVisibility
+}
+
+export interface NativeNotificationChannelStatus {
+  readonly id: string
+  readonly exists: boolean
+  readonly name?: string | null
+  readonly importance?: number | null
+  readonly soundEnabled?: boolean | null
+  readonly vibrationEnabled?: boolean | null
+  readonly showBadge?: boolean | null
+  readonly lockscreenVisibility?: number | null
+  readonly blocked: boolean
+}
+
+export interface NativeLocalNotificationSpec {
+  readonly channelId: string
+  readonly title: string
+  readonly body: string
+  readonly bigText?: string
+  readonly id?: number
+  readonly tag?: string
+  readonly deepLink?: string
+  readonly category?: NotificationCategory
+  readonly priority?: Exclude<NotificationImportance, "none">
+  readonly autoCancel?: boolean
+  readonly onlyAlertOnce?: boolean
+  readonly silent?: boolean
+  readonly visibility?: NotificationVisibility
+  readonly ongoing?: boolean
+}
+
+export interface NativeCalendarEventSpec {
+  readonly uid: string
+  readonly title: string
+  readonly location?: string
+  readonly description?: string
+  readonly startAt: number
+  readonly endAt: number
+  readonly remindMinutes?: number
+}
+
+export interface NativeCalendarSyncResult {
+  readonly namespace: string
+  readonly synced: number
+  readonly created: number
+  readonly updated: number
+  readonly deleted: number
+  readonly calendarId: number
+  readonly dedicated: boolean
+}
+
+const NOTIFICATIONS_CORE_ID = "notifications.core@1"
+const CALENDAR_SYNC_ID = "calendar.sync@1"
+
+export async function ensureNotificationChannel(
+  native: PluginNativeService,
+  spec: NativeNotificationChannelSpec
+): Promise<{ id: string; created: boolean } | null> {
+  if (!native.isNative || !native.capabilities.has(NOTIFICATIONS_CORE_ID)) return null
+  return native.capabilities.invoke<{ id: string; created: boolean }>(
+    NOTIFICATIONS_CORE_ID,
+    "ensureChannel",
+    { ...spec }
+  )
+}
+
+export async function ensureNotificationChannels(
+  native: PluginNativeService,
+  channels: readonly NativeNotificationChannelSpec[]
+): Promise<readonly { id: string; created: boolean }[]> {
+  if (!native.isNative || !native.capabilities.has(NOTIFICATIONS_CORE_ID)) return []
+  const result = await native.capabilities.invoke<{
+    channels?: readonly { id: string; created: boolean }[]
+  }>(NOTIFICATIONS_CORE_ID, "ensureChannels", { channels })
+  return result?.channels ?? []
+}
+
+export async function getNotificationChannelStatus(
+  native: PluginNativeService,
+  channelId: string
+): Promise<NativeNotificationChannelStatus | null> {
+  if (!native.isNative || !native.capabilities.has(NOTIFICATIONS_CORE_ID)) return null
+  return native.capabilities.invoke<NativeNotificationChannelStatus>(
+    NOTIFICATIONS_CORE_ID,
+    "getChannelStatus",
+    { id: channelId }
+  )
+}
+
+export async function openNotificationSettings(
+  native: PluginNativeService,
+  channelId?: string
+): Promise<boolean> {
+  if (!native.isNative || !native.capabilities.has(NOTIFICATIONS_CORE_ID)) return false
+  const result = await native.capabilities.invoke<{ opened?: boolean }>(
+    NOTIFICATIONS_CORE_ID,
+    "openNotificationSettings",
+    channelId ? { channelId } : {}
+  )
+  return result?.opened === true
+}
+
+export async function postLocalNotification(
+  native: PluginNativeService,
+  spec: NativeLocalNotificationSpec
+): Promise<{ id: number; tag?: string | null; posted: boolean } | null> {
+  if (!native.isNative || !native.capabilities.has(NOTIFICATIONS_CORE_ID)) return null
+  return native.capabilities.invoke<{ id: number; tag?: string | null; posted: boolean }>(
+    NOTIFICATIONS_CORE_ID,
+    "post",
+    { ...spec }
+  )
+}
+
+export async function cancelLocalNotification(
+  native: PluginNativeService,
+  target: { readonly id?: number; readonly tag?: string; readonly channelId?: string }
+): Promise<number> {
+  if (!native.isNative || !native.capabilities.has(NOTIFICATIONS_CORE_ID)) return 0
+  const result = await native.capabilities.invoke<{ cancelled?: number }>(
+    NOTIFICATIONS_CORE_ID,
+    "cancel",
+    { ...target }
+  )
+  return result?.cancelled ?? 0
+}
+
+export async function syncCalendarNamespace(
+  native: PluginNativeService,
+  options: {
+    readonly namespace: string
+    readonly events: readonly NativeCalendarEventSpec[]
+    readonly timeZone?: string
+    readonly calendarName?: string
+  }
+): Promise<NativeCalendarSyncResult | null> {
+  if (!native.isNative || !native.capabilities.has(CALENDAR_SYNC_ID)) return null
+  return native.capabilities.invoke<NativeCalendarSyncResult>(CALENDAR_SYNC_ID, "sync", {
+    ...options,
+  })
+}
+
+export async function upsertCalendarEvents(
+  native: PluginNativeService,
+  options: {
+    readonly namespace: string
+    readonly events: readonly NativeCalendarEventSpec[]
+    readonly timeZone?: string
+    readonly calendarName?: string
+  }
+): Promise<NativeCalendarSyncResult | null> {
+  if (!native.isNative || !native.capabilities.has(CALENDAR_SYNC_ID)) return null
+  return native.capabilities.invoke<NativeCalendarSyncResult>(CALENDAR_SYNC_ID, "upsert", {
+    ...options,
+  })
+}
+
+export async function removeCalendarEvents(
+  native: PluginNativeService,
+  namespace: string,
+  uids: readonly string[]
+): Promise<number> {
+  if (!native.isNative || !native.capabilities.has(CALENDAR_SYNC_ID)) return 0
+  const result = await native.capabilities.invoke<{ deleted?: number }>(
+    CALENDAR_SYNC_ID,
+    "remove",
+    { namespace, uids }
+  )
+  return result?.deleted ?? 0
+}
+
+export async function clearCalendarNamespace(
+  native: PluginNativeService,
+  namespace: string
+): Promise<boolean> {
+  if (!native.isNative || !native.capabilities.has(CALENDAR_SYNC_ID)) return false
+  const result = await native.capabilities.invoke<{ cleared?: boolean }>(
+    CALENDAR_SYNC_ID,
+    "clear",
+    { namespace }
+  )
+  return result?.cleared === true
+}
+
 /** Detects whether the app runs inside a Capacitor native shell. */
 export function isCapacitor(): boolean {
   try {

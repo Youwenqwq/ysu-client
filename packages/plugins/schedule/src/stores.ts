@@ -48,6 +48,9 @@ export interface ScheduleSettingsState {
   readonly calendarSyncEnabled: boolean
   readonly calendarSyncIncludeExams: boolean
   readonly calendarSyncWriteReminders: boolean
+  readonly calendarSyncLastHash: string | null
+  readonly calendarSyncLastCount: number | null
+  readonly calendarSyncLastAt: number | null
   readonly webcalEnabled: boolean
   readonly webcalIncludeExams: boolean
   readonly webcalWriteReminders: boolean
@@ -85,6 +88,9 @@ export const scheduleSettingsStore = defineStore({
     calendarSyncEnabled: false,
     calendarSyncIncludeExams: true,
     calendarSyncWriteReminders: false,
+    calendarSyncLastHash: null,
+    calendarSyncLastCount: null,
+    calendarSyncLastAt: null,
     webcalEnabled: false,
     webcalIncludeExams: true,
     webcalWriteReminders: true,
@@ -179,6 +185,37 @@ export const scheduleSettingsStore = defineStore({
         prev.calendarSyncWriteReminders === writeReminders
           ? prev
           : { ...prev, calendarSyncWriteReminders: writeReminders }
+      )
+    },
+    setCalendarSyncRecord(
+      ctx,
+      payload: { readonly hash: string; readonly count: number; readonly syncedAt: number }
+    ) {
+      ctx.set((prev) =>
+        prev.calendarSyncLastHash === payload.hash &&
+        prev.calendarSyncLastCount === payload.count &&
+        prev.calendarSyncLastAt === payload.syncedAt
+          ? prev
+          : {
+              ...prev,
+              calendarSyncLastHash: payload.hash,
+              calendarSyncLastCount: payload.count,
+              calendarSyncLastAt: payload.syncedAt,
+            }
+      )
+    },
+    clearCalendarSyncRecord(ctx) {
+      ctx.set((prev) =>
+        prev.calendarSyncLastHash === null &&
+        prev.calendarSyncLastCount === null &&
+        prev.calendarSyncLastAt === null
+          ? prev
+          : {
+              ...prev,
+              calendarSyncLastHash: null,
+              calendarSyncLastCount: null,
+              calendarSyncLastAt: null,
+            }
       )
     },
     setWebcalIncludeExams(ctx, includeExams: boolean) {

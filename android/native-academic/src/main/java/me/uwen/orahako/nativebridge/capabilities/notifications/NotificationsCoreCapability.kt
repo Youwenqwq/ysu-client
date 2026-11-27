@@ -2,6 +2,7 @@ package me.uwen.orahako.nativebridge.capabilities.notifications
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
@@ -9,26 +10,29 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import me.uwen.orahako.nativebridge.NativeCapability
 import me.uwen.orahako.nativebridge.NativeCapabilityBinding
 import me.uwen.orahako.nativebridge.NativeCapabilityHost
+import me.uwen.orahako.nativebridge.NativeCapabilityInitializer
 import me.uwen.orahako.nativebridge.NativeCapabilityReconciler
+import me.uwen.orahako.nativebridge.NativeComposition
+import me.uwen.orahako.nativebridge.NativeHostApp
 import me.uwen.orahako.nativebridge.NativeInvokeResult
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Notification permissions, channel operations and the system settings the
- * app asks the user to open (exact alarms, battery optimization, auto-start).
- *
- * The capability never publishes notifications: channel catalogs and copy stay
- * with the publisher that owns the channel. `config` may declare additional
- * channels, which are ensured when the capability is bound.
+ * Generic notification primitive for every plugin: permissions, channel
+ * management & inspection, local notification publishing/cancellation, and the
+ * system settings the app asks the user to open (notification channels, exact
+ * alarms, battery optimization, auto-start).
  */
 class NotificationsCoreCapability(
     private val host: NativeCapabilityHost,
     override val config: Map<String, Any?>,
-) : NativeCapability, NativeCapabilityReconciler {
+) : NativeCapability, NativeCapabilityInitializer, NativeCapabilityReconciler {
 
     companion object {
         const val ID = "notifications.core"
@@ -48,7 +52,13 @@ class NotificationsCoreCapability(
         private const val METHOD_OPEN_AUTO_START = "openAutoStartSettings"
         private const val METHOD_OPEN_SETTINGS = "openNotificationSettings"
         private const val METHOD_ENSURE_CHANNEL = "ensureChannel"
+        private const val METHOD_ENSURE_CHANNELS = "ensureChannels"
+        private const val METHOD_GET_CHANNEL_STATUS = "getChannelStatus"
+        private const val METHOD_POST = "post"
+        private const val METHOD_CANCEL = "cancel"
         private const val METHOD_CANCEL_ALL = "cancelAll"
+
+        private val nextNotificationId = AtomicInteger(50_000)
     }
 
     override val id: String = ID
@@ -64,8 +74,16 @@ class NotificationsCoreCapability(
         METHOD_OPEN_AUTO_START,
         METHOD_OPEN_SETTINGS,
         METHOD_ENSURE_CHANNEL,
+        METHOD_ENSURE_CHANNELS,
+        METHOD_GET_CHANNEL_STATUS,
+        METHOD_POST,
+        METHOD_CANCEL,
         METHOD_CANCEL_ALL,
     )
+
+    override fun initialize() {
+        ensureConfiguredChannels()
+    }
 
     override fun bind(): NativeCapabilityBinding {
         ensureConfiguredChannels()
@@ -78,26 +96,14 @@ class NotificationsCoreCapability(
 
     /**
      * Channels declared by the composition config (publishers still own their
-     * own catalogs). Re-applied on acquire and after reboot/update.
+     * own catalogs). Re-applied on startup, acquire and after reboot/update.
      */
     private fun ensureConfiguredChannels() {
         val channels = config["channels"] as? List<*> ?: return
         for (raw in channels) {
             val channel = raw as? Map<*, *> ?: continue
-            val id = channel["id"] as? String ?: continue
-            val name = channel["name"] as? String ?: continue
-            NotificationChannels.ensure(
-                host.context,
-                NotificationChannelSpec(
-                    id = id,
-                    name = name,
-                    description = channel["description"] as? String ?: "",
-                    importance = importanceOf(channel["importance"]),
-                    sound = channel["sound"] as? Boolean ?: true,
-                    vibration = channel["vibration"] as? Boolean ?: true,
-                    showBadge = channel["showBadge"] as? Boolean ?: true,
-                ),
-            )
+            val spec = parseChannelSpec(channel) ?: continue
+            NotificationChannels.ensure(host.context, spec)
         }
     }
 
@@ -121,8 +127,12 @@ class NotificationsCoreCapability(
                 )
                 METHOD_REQUEST_BATTERY -> requestIgnoreBatteryOptimization(result)
                 METHOD_OPEN_AUTO_START -> openAutoStartSettings(result)
-                METHOD_OPEN_SETTINGS -> openNotificationSettings(result)
+                METHOD_OPEN_SETTINGS -> openNotificationSettings(payload, result)
                 METHOD_ENSURE_CHANNEL -> ensureChannel(payload, result)
+                METHOD_ENSURE_CHANNELS -> ensureChannels(payload, result)
+                METHOD_GET_CHANNEL_STATUS -> getChannelStatus(payload, result)
+                METHOD_POST -> postNotification(payload, result)
+                METHOD_CANCEL -> cancelNotification(payload, result)
                 METHOD_CANCEL_ALL -> {
                     NotificationManagerCompat.from(host.context).cancelAll()
                     result.resolve(mapOf("cancelled" to true))
@@ -139,12 +149,16 @@ class NotificationsCoreCapability(
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
-            result.resolve(mapOf("granted" to notificationsGranted(context)))
+            val granted = notificationsGranted(context)
+            if (granted) NativeComposition.initialize(context)
+            result.resolve(mapOf("granted" to granted))
             return
         }
         try {
             host.requestPermissions(NOTIFICATION_PERMISSIONS) {
-                result.resolve(mapOf("granted" to notificationsGranted(context)))
+                val granted = notificationsGranted(context)
+                if (granted) NativeComposition.initialize(context)
+                result.resolve(mapOf("granted" to granted))
             }
         } catch (_: Exception) {
             result.resolve(mapOf("granted" to notificationsGranted(context)))
@@ -228,10 +242,15 @@ class NotificationsCoreCapability(
         result.resolve(mapOf("opened" to false))
     }
 
-    private fun openNotificationSettings(result: NativeInvokeResult) {
+    private fun openNotificationSettings(payload: Map<String, Any?>, result: NativeInvokeResult) {
         val context = host.context
+        val channelId = payload.string("channelId")
         try {
-            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && channelId != null) {
+                Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    .putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                     .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
             } else {
@@ -246,27 +265,138 @@ class NotificationsCoreCapability(
     }
 
     private fun ensureChannel(payload: Map<String, Any?>, result: NativeInvokeResult) {
-        val id = payload.string("id")
-        val name = payload.string("name")
-        if (id == null || name == null) {
+        val spec = parseChannelSpec(payload)
+        if (spec == null) {
             result.reject("Channel id and name are required")
             return
         }
-        val spec = NotificationChannelSpec(
-            id = id,
-            name = name,
-            description = payload.string("description") ?: "",
-            importance = importanceOf(payload["importance"]),
-            sound = payload.boolean("sound", true),
-            vibration = payload.boolean("vibration", true),
-            showBadge = payload.boolean("showBadge", true),
-        )
         result.resolve(
             mapOf(
                 "id" to spec.id,
                 "created" to NotificationChannels.ensure(host.context, spec),
             )
         )
+    }
+
+    private fun ensureChannels(payload: Map<String, Any?>, result: NativeInvokeResult) {
+        val rawList = payload["channels"] as? List<*>
+        if (rawList == null) {
+            result.reject("channels array is required")
+            return
+        }
+        val results = ArrayList<Map<String, Any?>>(rawList.size)
+        for (raw in rawList) {
+            val map = raw as? Map<*, *> ?: continue
+            val spec = parseChannelSpec(map) ?: continue
+            val created = NotificationChannels.ensure(host.context, spec)
+            results.add(mapOf("id" to spec.id, "created" to created))
+        }
+        result.resolve(mapOf("channels" to results))
+    }
+
+    private fun getChannelStatus(payload: Map<String, Any?>, result: NativeInvokeResult) {
+        val channelId = payload.string("id") ?: payload.string("channelId")
+        if (channelId != null) {
+            result.resolve(NotificationChannels.inspect(host.context, channelId).toMap())
+            return
+        }
+        val channels = NotificationChannels.inspectAll(host.context).map { it.toMap() }
+        result.resolve(mapOf("channels" to channels))
+    }
+
+    private fun postNotification(payload: Map<String, Any?>, result: NativeInvokeResult) {
+        val context = host.context
+        if (!notificationsGranted(context)) {
+            result.reject("Notification permission not granted")
+            return
+        }
+        val channelId = payload.string("channelId")
+        val title = payload.string("title")
+        if (channelId == null || title == null) {
+            result.reject("channelId and title are required")
+            return
+        }
+        val body = payload.string("body") ?: ""
+        val bigText = payload.string("bigText")
+        val tag = payload.string("tag")
+        val notificationId = (payload["id"] as? Number)?.toInt() ?: nextNotificationId.getAndIncrement()
+        val silent = payload.boolean("silent", false)
+        val autoCancel = payload.boolean("autoCancel", true)
+        val onlyAlertOnce = payload.boolean("onlyAlertOnce", false)
+        val ongoing = payload.boolean("ongoing", false)
+        val deepLinkUri = payload.string("deepLink")?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        val visibility = parseLockscreenVisibility(payload["visibility"] ?: payload["lockscreenVisibility"])
+            ?: NotificationCompat.VISIBILITY_PUBLIC
+
+        val builder = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setContentIntent(
+                NativeHostApp.activityPendingIntent(
+                    context,
+                    requestCode = notificationId,
+                    deepLink = deepLinkUri,
+                )
+            )
+            .setAutoCancel(autoCancel)
+            .setOnlyAlertOnce(onlyAlertOnce)
+            .setOngoing(ongoing)
+            .setVisibility(visibility)
+            .setPriority(priorityOf(payload["priority"]))
+            .setCategory(categoryOf(payload.string("category")))
+            .setDefaults(
+                if (silent) 0
+                else NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE
+            )
+
+        if (bigText != null) {
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
+        }
+
+        try {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (tag != null) {
+                manager.notify(tag, notificationId, builder.build())
+            } else {
+                manager.notify(notificationId, builder.build())
+            }
+            result.resolve(
+                mapOf(
+                    "id" to notificationId,
+                    "tag" to tag,
+                    "posted" to true,
+                )
+            )
+        } catch (error: Exception) {
+            result.reject("Unable to post notification", error)
+        }
+    }
+
+    private fun cancelNotification(payload: Map<String, Any?>, result: NativeInvokeResult) {
+        val context = host.context
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val id = (payload["id"] as? Number)?.toInt()
+        val tag = payload.string("tag")
+        val channelId = payload.string("channelId")
+        var cancelled = 0
+
+        if (id != null) {
+            if (tag != null) manager.cancel(tag, id) else manager.cancel(id)
+            cancelled = 1
+        } else if (channelId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            for (active in manager.activeNotifications) {
+                if (active.notification.channelId == channelId) {
+                    if (active.tag != null) manager.cancel(active.tag, active.id)
+                    else manager.cancel(active.id)
+                    cancelled += 1
+                }
+            }
+        } else {
+            result.reject("Either id or channelId is required to cancel notifications")
+            return
+        }
+        result.resolve(mapOf("cancelled" to cancelled))
     }
 
     private fun openAppDetailsSettings(context: Context) {
@@ -283,6 +413,28 @@ class NotificationsCoreCapability(
     }
 }
 
+internal fun parseChannelSpec(raw: Map<*, *>): NotificationChannelSpec? {
+    val id = (raw["id"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val name = (raw["name"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val importance = importanceOf(raw["importance"])
+    val explicitVisibility = parseLockscreenVisibility(raw["lockscreenVisibility"])
+    val visibility = explicitVisibility ?: if (importance >= NotificationManager.IMPORTANCE_HIGH) {
+        Notification.VISIBILITY_PUBLIC
+    } else {
+        null
+    }
+    return NotificationChannelSpec(
+        id = id,
+        name = name,
+        description = (raw["description"] as? String) ?: "",
+        importance = importance,
+        sound = raw["sound"] as? Boolean ?: true,
+        vibration = raw["vibration"] as? Boolean ?: true,
+        showBadge = raw["showBadge"] as? Boolean ?: true,
+        lockscreenVisibility = visibility,
+    )
+}
+
 private fun importanceOf(value: Any?): Int = when (value) {
     is Number -> value.toInt()
     is String -> when (value.lowercase()) {
@@ -293,6 +445,28 @@ private fun importanceOf(value: Any?): Int = when (value) {
         else -> NotificationManager.IMPORTANCE_DEFAULT
     }
     else -> NotificationManager.IMPORTANCE_DEFAULT
+}
+
+private fun priorityOf(value: Any?): Int = when (value) {
+    is Number -> value.toInt()
+    is String -> when (value.lowercase()) {
+        "min" -> NotificationCompat.PRIORITY_MIN
+        "low" -> NotificationCompat.PRIORITY_LOW
+        "high" -> NotificationCompat.PRIORITY_HIGH
+        "max" -> NotificationCompat.PRIORITY_MAX
+        else -> NotificationCompat.PRIORITY_DEFAULT
+    }
+    else -> NotificationCompat.PRIORITY_HIGH
+}
+
+private fun categoryOf(value: String?): String = when (value?.lowercase()) {
+    "reminder" -> NotificationCompat.CATEGORY_REMINDER
+    "event" -> NotificationCompat.CATEGORY_EVENT
+    "alarm" -> NotificationCompat.CATEGORY_ALARM
+    "error" -> NotificationCompat.CATEGORY_ERROR
+    "message" -> NotificationCompat.CATEGORY_MESSAGE
+    "progress" -> NotificationCompat.CATEGORY_PROGRESS
+    else -> NotificationCompat.CATEGORY_STATUS
 }
 
 internal fun notificationsGranted(context: Context): Boolean {

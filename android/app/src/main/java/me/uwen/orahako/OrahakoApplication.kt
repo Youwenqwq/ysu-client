@@ -17,5 +17,6 @@ class OrahakoApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         NativeComposition.installFromProvider(BuildConfig.NATIVE_COMPOSITION_PROVIDER)
+        NativeComposition.initialize(this)
     }
 }
