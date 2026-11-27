@@ -40,13 +40,13 @@ const deployment: CompositionLayer = {
     },
     {
       id: "orahako.announcement",
-      config: { endpoint: "https://orahako.welain.com/updates/announcement.json" },
+      config: { endpoint: "https://orahako.welain.com/api/announcement" },
     },
     {
       id: "orahako.updater",
       config: {
         currentVersion: appVersion,
-        releaseBaseUrl: `${repoUrl}/releases/latest/download`,
+        manifestUrl: "https://orahako.welain.com/api/version",
         mirrors: [{ label: "GitHub 直连", value: "" }],
         mirrorableOrigins: ["https://github.com"],
         basePath,

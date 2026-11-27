@@ -71,6 +71,7 @@ export default function AdminPanel() {
       let headers: Record<string, string> = {}
       if (type === "announcement") {
         url = "/api/announcement"
+        headers = { Authorization: `Bearer ${savedPassword}` }
       } else {
         url = `/api/admin?type=${type}&date=${date}`
         headers = { Authorization: `Bearer ${savedPassword}` }
@@ -205,7 +206,9 @@ function AnnouncementView({
   const fetchHistory = async () => {
     setHistoryLoading(true)
     try {
-      const res = await fetch("/api/announcement?history=true")
+      const res = await fetch("/api/announcement?history=true", {
+        headers: { Authorization: `Bearer ${password}` },
+      })
       if (res.ok) {
         const data = (await res.json()) as { entries?: AnnouncementInfo[] }
         setHistory(data.entries || [])

@@ -56,6 +56,7 @@ describe("official composition", () => {
     expect(configs.get("orahako.updater")).toMatchObject({
       basePath,
       currentVersion: officialCompositionSource.appVersion,
+      manifestUrl: "https://orahako.welain.com/api/version",
     })
     expect(configs.get("orahako.runtime.navigation")).toEqual({ fallbackHref: "/" })
     expect(configs.get("orahako.analytics")).toMatchObject({
@@ -63,7 +64,7 @@ describe("official composition", () => {
       appVersion: officialCompositionSource.appVersion,
     })
     expect(configs.get("orahako.announcement")).toEqual({
-      endpoint: "https://orahako.welain.com/updates/announcement.json",
+      endpoint: "https://orahako.welain.com/api/announcement",
     })
     expect(configs.get("orahako.profile")).toMatchObject({
       appName: appIdentity.name,

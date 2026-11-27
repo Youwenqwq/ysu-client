@@ -121,10 +121,10 @@ pnpm run release          # 预检、创建草稿、编辑 notes、发布
 2. 运行 `pnpm run typecheck`。
 3. 运行 `./scripts/release.sh`：预检（stable 必须来自 `main`、工作区干净、提交已推送、tag 不存在）→ 创建草稿 → 编辑 notes → 发布。
 4. 用 `gh run watch` 等待 `.github/workflows/release.yml` 完成。
-5. 用 `gh release view` 确认 `dist.zip`、`app-release-*.apk`、`version.json` 三个产物已上传。
-6. 发布后修改 notes 时，重新运行 release.yml 以同步 `version.json`；草稿阶段的编辑不会触发构建。
+5. 用 `gh release view` 确认 `dist.zip` 与（按需构建的）`app-release-*.apk` 已上传，且 `/api/version` 已同步最新通道元数据。
+6. 发布后修改 notes 时，重新运行 `release.yml` 以同步 `/api/version`；草稿阶段的编辑不会触发构建。
 
-prerelease 合并后的 manifest 会同步覆盖到最新 stable release，因为 OTA 检查固定使用 `releases/latest/download/version.json`。
+GitHub Release 仅保存不可变构建产物（`dist.zip`、`app-release-*.apk`），OTA 更新清单由 EdgeOne `/api/version`（`STATS_KV` 按 `stable` / `prerelease` 通道独立存储，写入由 `RELEASE_TOKEN` 鉴权）实时合成，与 `scripts/deploy-website.sh` 静态部署解耦。
 
 <!-- BEGIN:nextjs-agent-rules -->
 

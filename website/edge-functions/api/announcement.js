@@ -1,14 +1,39 @@
 const KV_KEY = 'announcement:current';
+const STATUS_KEY = 'site:status';
 
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
-    'content-type': 'application/json',
+    'Cache-Control': 'no-cache',
+    'content-type': 'application/json; charset=utf-8',
   };
 }
 
 function getKV(env) {
   return env?.STATS_KV ?? globalThis?.STATS_KV;
+}
+
+function isAdminAuthorized(request, env) {
+  const adminPassword = env?.ADMIN_PASSWORD ?? globalThis?.ADMIN_PASSWORD;
+  if (!adminPassword) return false;
+  const providedPassword = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
+  return providedPassword === adminPassword;
+}
+
+async function isSiteActive(env) {
+  const flag = env?.ANNOUNCEMENT_ENABLED ?? globalThis?.ANNOUNCEMENT_ENABLED;
+  // Env var override: explicitly disabled at deployment level
+  if (flag === false || flag === '0' || flag === 'false') return false;
+
+  const kv = getKV(env);
+  if (!kv) return false;
+
+  try {
+    const status = await kv.get(STATUS_KEY, 'json');
+    return status?.enabled !== false;
+  } catch {
+    return true;
+  }
 }
 
 const HISTORY_KEY = 'announcement:history';
@@ -21,6 +46,14 @@ export async function onRequestGet({ request, env }) {
       return new Response(
         JSON.stringify({ error: 'KV not configured' }),
         { status: 503, headers: corsHeaders() }
+      );
+    }
+
+    const isAdmin = isAdminAuthorized(request, env);
+    if (!isAdmin && !(await isSiteActive(env))) {
+      return new Response(
+        JSON.stringify({ message: 'Announcement system disabled' }),
+        { status: 404, headers: corsHeaders() }
       );
     }
 

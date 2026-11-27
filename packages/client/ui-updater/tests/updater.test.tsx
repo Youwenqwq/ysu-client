@@ -97,7 +97,7 @@ describe("@orahako/ui-updater", () => {
 
     let now = 1_000_000
     const service = new ConfiguredUpdateService({
-      releaseBaseUrl: "https://releases.example.test/latest/",
+      manifestUrl: "https://orahako.example.test/api/version",
       currentVersion: "1.0.0",
       mirrors: [
         { label: "Direct", value: "" },
@@ -111,6 +111,7 @@ describe("@orahako/ui-updater", () => {
 
     expect(service.getMirrors()).toHaveLength(2)
     const mirrored = await service.checkForUpdate({ mirror: "https://mirror.example.test/" })
+    expect(fetchMock).toHaveBeenCalledWith("https://orahako.example.test/api/version")
     expect(mirrored).toEqual({
       available: true,
       version: "1.2.0",
@@ -163,7 +164,7 @@ describe("@orahako/ui-updater", () => {
     expect(isNewer("1.0.0", "1.1.0-beta.1", "stable")).toBe(false)
     expect(isNewer("1.0.0", "1.1.0-beta.1", "prerelease")).toBe(true)
 
-    // Empty releaseBaseUrl returns EMPTY_UPDATE safely
+    // Empty manifestUrl returns EMPTY_UPDATE safely
     const unconfigured = new ConfiguredUpdateService({ currentVersion: "1.0.0" })
     await expect(unconfigured.checkForUpdate()).resolves.toMatchObject({ available: false })
   })
@@ -173,7 +174,7 @@ describe("@orahako/ui-updater", () => {
     vi.stubGlobal("fetch", fetchMock)
 
     const service = new ConfiguredUpdateService({
-      releaseBaseUrl: "https://releases.example.test/latest",
+      manifestUrl: "https://orahako.example.test/api/version",
       currentVersion: "1.0.0",
       native: {
         isNative: true,
@@ -298,7 +299,7 @@ describe("@orahako/ui-updater", () => {
       runtime.register(storageRuntimePlugin, "builtin")
       runtime.register(fakeNativePlugin, "builtin")
       runtime.register(updaterPlugin, "builtin", {
-        releaseBaseUrl: "https://releases.example.test/latest",
+        manifestUrl: "https://orahako.example.test/api/version",
         currentVersion: "1.0.0",
         mirrors: [
           { label: "直连", value: "" },

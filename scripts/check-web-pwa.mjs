@@ -176,18 +176,18 @@ await attempt('static asset', async () => {
   check('static asset immutable Cache-Control', hasDirective(cacheControl, 'immutable'), cacheControl || 'missing');
 });
 
-await attempt('version.json', async () => {
-  const response = await fetch(url('/updates/version.json'), { method: 'GET', redirect: 'follow' });
+await attempt('/api/version', async () => {
+  const response = await fetch(url('/api/version'), { method: 'GET', redirect: 'follow' });
   const text = await response.text();
   const cacheControl = value(response, 'cache-control');
 
-  check('version.json status', response.status === 200, describeResponse(response));
-  check('version.json Cache-Control', hasDirective(cacheControl, 'no-cache'), cacheControl || 'missing');
+  check('/api/version status', response.status === 200, describeResponse(response));
+  check('/api/version Cache-Control', hasDirective(cacheControl, 'no-cache'), cacheControl || 'missing');
   try {
     JSON.parse(text);
-    check('version.json JSON', true, 'valid JSON');
+    check('/api/version JSON', true, 'valid JSON');
   } catch (error) {
-    check('version.json JSON', false, error instanceof Error ? error.message : String(error));
+    check('/api/version JSON', false, error instanceof Error ? error.message : String(error));
   }
 });
 

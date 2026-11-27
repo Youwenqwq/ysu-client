@@ -78,15 +78,6 @@
           "value": "no-cache"
         }
       ]
-    },
-    {
-      "source": "/updates/version.json",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-cache"
-        }
-      ]
     }
   ]
 }

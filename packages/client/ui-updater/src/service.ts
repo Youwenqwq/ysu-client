@@ -18,8 +18,6 @@ import type {
   UpdateMirror,
 } from "./contract"
 
-const DEFAULT_VERSION_MANIFEST = "version.json"
-const DEFAULT_BUNDLE_ASSET = "dist.zip"
 const DEFAULT_CHECK_COOLDOWN_MS = 30 * 60 * 1000
 const DEFAULT_CHECK_COOLDOWN_KEY = "update-last-check"
 const DEFAULT_OTA_CLEANUP_KEY = "ota-cleanup"
@@ -35,16 +33,14 @@ export const EMPTY_UPDATE: UpdateInfo = {
 }
 
 export interface ConfiguredUpdateOptions {
-  /** Base URL hosting the release manifest and bundle assets; omit/empty disables remote checks. */
-  readonly releaseBaseUrl?: string
+  /** Endpoint URL serving the release manifest JSON; omit/empty disables remote checks. */
+  readonly manifestUrl?: string
   /** Installed application version used for web-bundle comparisons. */
   readonly currentVersion: string
   /** Mirror presets exposed to UI controls; defaults to direct download only. */
   readonly mirrors?: readonly UpdateMirror[]
-  /** Asset origins that may be prefixed with a mirror; empty disables mirroring on explicit asset URLs. */
+  /** Asset origins that may be prefixed with a mirror; empty disables mirroring on URLs. */
   readonly mirrorableOrigins?: readonly string[]
-  readonly versionManifestName?: string
-  readonly bundleAssetName?: string
   readonly checkCooldownMs?: number
   readonly checkCooldownStorageKey?: string
   readonly otaCleanupStorageKey?: string
@@ -114,12 +110,10 @@ function getHighestVersionCandidate(
 }
 
 export class ConfiguredUpdateService implements PluginUpdateService {
-  private readonly releaseBaseUrl: string | null
+  private readonly manifestUrl: string | null
   private readonly currentVersion: string
   private readonly mirrors: readonly UpdateMirror[]
   private readonly mirrorableOrigins: ReadonlySet<string>
-  private readonly versionManifestName: string
-  private readonly bundleAssetName: string
   private readonly checkCooldownMs: number
   private readonly checkCooldownStorageKey: string
   private readonly otaCleanupStorageKey: string
@@ -131,12 +125,10 @@ export class ConfiguredUpdateService implements PluginUpdateService {
   private disposed = false
 
   constructor({
-    releaseBaseUrl,
+    manifestUrl,
     currentVersion,
     mirrors = DEFAULT_MIRRORS,
     mirrorableOrigins = [],
-    versionManifestName = DEFAULT_VERSION_MANIFEST,
-    bundleAssetName = DEFAULT_BUNDLE_ASSET,
     checkCooldownMs = DEFAULT_CHECK_COOLDOWN_MS,
     checkCooldownStorageKey = DEFAULT_CHECK_COOLDOWN_KEY,
     otaCleanupStorageKey = DEFAULT_OTA_CLEANUP_KEY,
@@ -144,15 +136,13 @@ export class ConfiguredUpdateService implements PluginUpdateService {
     native,
     now = () => Date.now(),
   }: ConfiguredUpdateOptions) {
-    const trimmedBase = releaseBaseUrl?.trim().replace(/\/+$/, "") ?? ""
-    this.releaseBaseUrl = trimmedBase.length > 0 ? trimmedBase : null
+    const trimmedUrl = manifestUrl?.trim() ?? ""
+    this.manifestUrl = trimmedUrl.length > 0 ? trimmedUrl : null
     this.currentVersion = currentVersion
     this.mirrors = mirrors.length > 0 ? mirrors : DEFAULT_MIRRORS
     this.mirrorableOrigins = new Set(
       mirrorableOrigins.map((origin) => origin.trim().replace(/\/+$/, "")).filter(Boolean)
     )
-    this.versionManifestName = versionManifestName
-    this.bundleAssetName = bundleAssetName
     this.checkCooldownMs = checkCooldownMs
     this.checkCooldownStorageKey = checkCooldownStorageKey
     this.otaCleanupStorageKey = otaCleanupStorageKey
@@ -166,7 +156,7 @@ export class ConfiguredUpdateService implements PluginUpdateService {
   }
 
   async checkForUpdate(options: UpdateCheckOptions = {}): Promise<UpdateInfo> {
-    if (!this.releaseBaseUrl || this.disposed) {
+    if (!this.manifestUrl || this.disposed) {
       return EMPTY_UPDATE
     }
 
@@ -182,11 +172,10 @@ export class ConfiguredUpdateService implements PluginUpdateService {
       }
     }
 
-    const versionJsonUrl = this.withMirror(mirror, this.releaseUrl(this.versionManifestName), true)
-    const distZipUrl = this.withMirror(mirror, this.releaseUrl(this.bundleAssetName), true)
+    const manifestRequestUrl = this.withMirror(mirror, this.manifestUrl)
 
     try {
-      const res = await fetch(versionJsonUrl)
+      const res = await fetch(manifestRequestUrl)
       if (res.status === 403) throw new Error("RATE_LIMIT")
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
@@ -213,7 +202,7 @@ export class ConfiguredUpdateService implements PluginUpdateService {
       let apkDownloadUrl = ""
       const downloadUrl = displayCandidate.webDownloadUrl
         ? this.withMirror(mirror, displayCandidate.webDownloadUrl)
-        : distZipUrl
+        : ""
 
       if (this.isNativePlatform()) {
         const installedBuild = await this.getInstalledBuild()
@@ -333,13 +322,8 @@ export class ConfiguredUpdateService implements PluginUpdateService {
     return this.native ? this.native.isNative : isCapacitor()
   }
 
-  private releaseUrl(assetName: string): string {
-    return `${this.releaseBaseUrl}/${assetName}`
-  }
-
-  private withMirror(prefix: string, url: string, allowAnyAsset = false): string {
-    if (!prefix) return url
-    if (!allowAnyAsset && !this.isMirrorable(url)) return url
+  private withMirror(prefix: string, url: string): string {
+    if (!prefix || !this.isMirrorable(url)) return url
     return `${prefix}${url}`
   }
 

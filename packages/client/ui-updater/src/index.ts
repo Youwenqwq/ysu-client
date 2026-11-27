@@ -75,7 +75,7 @@ export type {
 } from "./contract"
 
 export type UpdaterPluginConfig = {
-  readonly releaseBaseUrl?: string
+  readonly manifestUrl?: string
   readonly currentVersion: string
   readonly mirrors?: readonly UpdateMirror[]
   readonly mirrorableOrigins?: readonly string[]
@@ -104,7 +104,7 @@ export const updaterPlugin = definePlugin<
     type: "object",
     required: ["currentVersion"],
     properties: {
-      releaseBaseUrl: { type: "string", minLength: 1 },
+      manifestUrl: { type: "string", minLength: 1 },
       currentVersion: { type: "string", minLength: 1 },
       mirrors: {
         type: "array",
@@ -138,7 +138,7 @@ export const updaterPlugin = definePlugin<
     })
 
     const service = new ConfiguredUpdateService({
-      ...(config.releaseBaseUrl !== undefined ? { releaseBaseUrl: config.releaseBaseUrl } : {}),
+      ...(config.manifestUrl !== undefined ? { manifestUrl: config.manifestUrl } : {}),
       currentVersion: config.currentVersion,
       ...(config.mirrors !== undefined ? { mirrors: config.mirrors } : {}),
       ...(config.mirrorableOrigins !== undefined
@@ -174,7 +174,7 @@ export const updaterPlugin = definePlugin<
     if (ctx.native.isNative) {
       CapacitorUpdater.notifyAppReady().catch(() => {})
 
-      if (config.releaseBaseUrl) {
+      if (config.manifestUrl) {
         const triggerAutoCheck = () => {
           if (disposed || !preferencesStore.hydrated.getSnapshot()) return false
           const prefs = preferencesStore.source.getSnapshot()

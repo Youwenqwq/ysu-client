@@ -1,7 +1,8 @@
 name: Release Artifacts
 
 # 维护者本地运行 scripts/release.sh 创建 GitHub Release 后，
-# 本 workflow 自动构建 dist.zip、按需构建签名 APK、生成 version.json 并上传到该 Release。
+# 本 workflow 自动构建 dist.zip、按需构建签名 APK 上传到该 Release（不可变产物），
+# 并将对应通道元数据同步到 EdgeOne /api/version。
 on:
   release:
     types: [published]
@@ -26,6 +27,7 @@ jobs:
       TAG: ${{ github.event.release.tag_name }}
       REPO: ${{ github.repository }}
       IS_PRERELEASE: ${{ github.event.release.prerelease }}
+      VERSION_API_URL: ${{ vars.VERSION_API_URL || 'https://orahako.welain.com/api/version' }}
 
     steps:
       - name: Checkout release tag
@@ -84,23 +86,17 @@ jobs:
 
       - name: Decide APK build
         id: apk-decision
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           SHOULD_BUILD_APK="true"
           if [[ "${IS_PRERELEASE}" == "true" ]]; then
             SHOULD_BUILD_APK="false"
-            LATEST_STABLE_TAG=$(gh api "repos/${REPO}/releases/latest" -q .tag_name 2>/dev/null || true)
             STABLE_APK_CODE=0
             PREV_PRE_APK_CODE=0
-            if [[ -n "${LATEST_STABLE_TAG}" ]]; then
-              STABLE_DIR=$(mktemp -d)
-              if gh release download "${LATEST_STABLE_TAG}" --repo "${REPO}" \
-                  --pattern "version.json" --dir "${STABLE_DIR}" 2>/dev/null; then
-                STABLE_APK_CODE=$(jq -r '.channels.stable.apkVersionCode // .apkVersionCode // 0' "${STABLE_DIR}/version.json")
-                PREV_PRE_APK_CODE=$(jq -r '.channels.prerelease.apkVersionCode // 0' "${STABLE_DIR}/version.json")
-              fi
+            MANIFEST_FILE=$(mktemp)
+            if curl -fsS "${VERSION_API_URL}" -o "${MANIFEST_FILE}" 2>/dev/null; then
+              STABLE_APK_CODE=$(jq -r '.channels.stable.apkVersionCode // .apkVersionCode // 0' "${MANIFEST_FILE}")
+              PREV_PRE_APK_CODE=$(jq -r '.channels.prerelease.apkVersionCode // 0' "${MANIFEST_FILE}")
             fi
             if (( APK_VERSION_CODE > STABLE_APK_CODE && APK_VERSION_CODE != PREV_PRE_APK_CODE )); then
               SHOULD_BUILD_APK="true"
@@ -153,12 +149,12 @@ jobs:
               dist.zip --clobber
           fi
 
-  manifest:
+  sync-version:
     needs: build
     runs-on: ubuntu-latest
-    # 串行更新 version.json，避免并发发版时读到旧基底互相覆盖通道信息。
+    # 串行同步通道元数据，避免并发发版乱序写入。
     concurrency:
-      group: release-manifest
+      group: release-version-sync
       cancel-in-progress: false
 
     env:
@@ -168,6 +164,7 @@ jobs:
       VERSION: ${{ needs.build.outputs.version }}
       APK_VERSION_CODE: ${{ needs.build.outputs.apk_version_code }}
       BUILT_APK: ${{ needs.build.outputs.built_apk }}
+      VERSION_API_URL: ${{ vars.VERSION_API_URL || 'https://orahako.welain.com/api/version' }}
 
     steps:
       - name: Fetch release notes
@@ -175,150 +172,108 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release view "$TAG" --repo "$REPO" --json body -q .body > release-notes.txt
 
-      - name: Generate version.json
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Build channel payload
         run: |
           set -euo pipefail
           BODY=$(cat release-notes.txt)
           DIST_URL="https://github.com/${REPO}/releases/download/${TAG}/dist.zip"
           APK_URL="https://github.com/${REPO}/releases/download/${TAG}/app-release-${VERSION}.apk"
 
-          BASE_FILE=$(mktemp)
-          echo '{}' > "$BASE_FILE"
-
-          # stable 发布时以「上一个 stable release」的 version.json 为基底，
-          # 继承其中的 channels.prerelease，避免每次 stable 发版清空预览通道信息。
           if [[ "${IS_PRERELEASE}" != "true" ]]; then
-            PREV_STABLE_TAG=$(gh api "repos/${REPO}/releases" --paginate \
-              -q '[.[] | select(.prerelease == false and .draft == false and .tag_name != "'"${TAG}"'")][0].tag_name // ""' 2>/dev/null || true)
-            if [[ -n "${PREV_STABLE_TAG}" ]]; then
-              PREV_DIR=$(mktemp -d)
-              if gh release download "${PREV_STABLE_TAG}" --repo "${REPO}" \
-                  --pattern "version.json" --dir "${PREV_DIR}" 2>/dev/null; then
-                cp "${PREV_DIR}/version.json" "$BASE_FILE"
-              else
-                echo "::warning::previous stable version.json unavailable; starting from empty manifest"
-              fi
-            fi
-
-            jq \
+            jq -n \
+              --arg channel "stable" \
               --arg webVersion "$VERSION" \
               --arg webDownloadUrl "$DIST_URL" \
               --arg apkDownloadUrl "$APK_URL" \
               --arg body "$BODY" \
               --argjson apkVersionCode "$APK_VERSION_CODE" \
-              '. + {
-                apkVersionCode: $apkVersionCode,
-                minApkVersionCode: $apkVersionCode,
+              '{
+                channel: $channel,
                 webVersion: $webVersion,
                 webDownloadUrl: $webDownloadUrl,
+                apkVersionCode: $apkVersionCode,
+                minApkVersionCode: $apkVersionCode,
                 apkDownloadUrl: $apkDownloadUrl,
                 body: $body
-              }
-              | .channels = ((.channels // {}) + {
-                stable: {
-                  apkVersionCode: $apkVersionCode,
-                  minApkVersionCode: $apkVersionCode,
-                  webVersion: $webVersion,
-                  webDownloadUrl: $webDownloadUrl,
-                  apkDownloadUrl: $apkDownloadUrl,
-                  body: $body
-                }
-              })' \
-              "$BASE_FILE" > version.json
+              }' > channel-payload.json
           else
-            LATEST_STABLE_TAG=$(gh api "repos/${REPO}/releases/latest" -q .tag_name 2>/dev/null || true)
-            if [[ -n "${LATEST_STABLE_TAG}" ]]; then
-              STABLE_DIR=$(mktemp -d)
-              if gh release download "${LATEST_STABLE_TAG}" --repo "${REPO}" \
-                  --pattern "version.json" --dir "${STABLE_DIR}" 2>/dev/null; then
-                cp "${STABLE_DIR}/version.json" "$BASE_FILE"
-              else
-                echo "::warning::stable version.json unavailable; prerelease manifest will not include stable metadata"
-              fi
+            CURRENT_FILE=$(mktemp)
+            echo '{}' > "$CURRENT_FILE"
+            if curl -fsS "${VERSION_API_URL}" -o "$CURRENT_FILE" 2>/dev/null; then
+              :
             else
-              echo "::warning::no stable release found; prerelease manifest will not include stable metadata"
+              echo "::warning::existing /api/version unavailable; syncing prerelease without prior metadata"
             fi
 
-            STABLE_APK_CODE=$(jq -r '.channels.stable.apkVersionCode // .apkVersionCode // 0' "$BASE_FILE")
-            PREV_PRE_APK_CODE=$(jq -r '.channels.prerelease.apkVersionCode // 0' "$BASE_FILE")
-            PREV_PRE_APK_URL=$(jq -r '.channels.prerelease.apkDownloadUrl // ""' "$BASE_FILE")
+            STABLE_APK_CODE=$(jq -r '.channels.stable.apkVersionCode // .apkVersionCode // 0' "$CURRENT_FILE")
+            PREV_PRE_APK_CODE=$(jq -r '.channels.prerelease.apkVersionCode // 0' "$CURRENT_FILE")
+            PREV_PRE_APK_URL=$(jq -r '.channels.prerelease.apkDownloadUrl // ""' "$CURRENT_FILE")
 
             if [[ "${BUILT_APK}" == "true" ]]; then
-              jq \
+              jq -n \
+                --arg channel "prerelease" \
                 --arg webVersion "$VERSION" \
                 --arg webDownloadUrl "$DIST_URL" \
                 --arg apkDownloadUrl "$APK_URL" \
                 --arg body "$BODY" \
                 --argjson apkVersionCode "$APK_VERSION_CODE" \
-                '.channels = ((.channels // {}) + {
-                  prerelease: {
-                    webVersion: $webVersion,
-                    webDownloadUrl: $webDownloadUrl,
-                    apkVersionCode: $apkVersionCode,
-                    minApkVersionCode: $apkVersionCode,
-                    apkDownloadUrl: $apkDownloadUrl,
-                    body: $body
-                  }
-                })' \
-                "$BASE_FILE" > version.json
+                '{
+                  channel: $channel,
+                  webVersion: $webVersion,
+                  webDownloadUrl: $webDownloadUrl,
+                  apkVersionCode: $apkVersionCode,
+                  minApkVersionCode: $apkVersionCode,
+                  apkDownloadUrl: $apkDownloadUrl,
+                  body: $body
+                }' > channel-payload.json
             elif (( APK_VERSION_CODE > STABLE_APK_CODE && APK_VERSION_CODE == PREV_PRE_APK_CODE )) && [[ -n "${PREV_PRE_APK_URL}" ]]; then
-              jq \
+              jq -n \
+                --arg channel "prerelease" \
                 --arg webVersion "$VERSION" \
                 --arg webDownloadUrl "$DIST_URL" \
                 --arg apkDownloadUrl "$PREV_PRE_APK_URL" \
                 --arg body "$BODY" \
                 --argjson apkVersionCode "$PREV_PRE_APK_CODE" \
                 --argjson minApkVersionCode "$APK_VERSION_CODE" \
-                '.channels = ((.channels // {}) + {
-                  prerelease: {
-                    webVersion: $webVersion,
-                    webDownloadUrl: $webDownloadUrl,
-                    apkVersionCode: $apkVersionCode,
-                    minApkVersionCode: $minApkVersionCode,
-                    apkDownloadUrl: $apkDownloadUrl,
-                    body: $body
-                  }
-                })' \
-                "$BASE_FILE" > version.json
+                '{
+                  channel: $channel,
+                  webVersion: $webVersion,
+                  webDownloadUrl: $webDownloadUrl,
+                  apkVersionCode: $apkVersionCode,
+                  minApkVersionCode: $minApkVersionCode,
+                  apkDownloadUrl: $apkDownloadUrl,
+                  body: $body
+                }' > channel-payload.json
             else
-              jq \
+              jq -n \
+                --arg channel "prerelease" \
                 --arg webVersion "$VERSION" \
                 --arg webDownloadUrl "$DIST_URL" \
                 --arg body "$BODY" \
                 --argjson minApkVersionCode "$APK_VERSION_CODE" \
-                '.channels = ((.channels // {}) + {
-                  prerelease: {
-                    webVersion: $webVersion,
-                    webDownloadUrl: $webDownloadUrl,
-                    minApkVersionCode: $minApkVersionCode,
-                    body: $body
-                  }
-                })' \
-                "$BASE_FILE" > version.json
+                '{
+                  channel: $channel,
+                  webVersion: $webVersion,
+                  webDownloadUrl: $webDownloadUrl,
+                  minApkVersionCode: $minApkVersionCode,
+                  body: $body
+                }' > channel-payload.json
             fi
           fi
 
-          cat version.json
+          cat channel-payload.json
 
-      - name: Upload version.json
+      - name: Sync channel to EdgeOne /api/version
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" --repo "$REPO" version.json --clobber
-
-      # OTA 检查固定走 releases/latest/download/version.json（latest 永远指向最新
-      # stable），因此 prerelease 合并后的 manifest 必须同步覆盖到最新 stable
-      # release 上，prerelease 通道的用户才能看到 channels.prerelease 更新。
-      - name: Sync version.json to latest stable release
-        if: ${{ github.event.release.prerelease }}
-        env:
-          GH_TOKEN: ${{ github.token }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
-          LATEST_STABLE_TAG=$(gh api "repos/${REPO}/releases/latest" -q .tag_name 2>/dev/null || true)
-          if [[ -z "${LATEST_STABLE_TAG}" ]]; then
-            echo "::warning::no stable release found; skipping version.json sync"
-            exit 0
+          if [[ -z "${RELEASE_TOKEN:-}" ]]; then
+            echo "::error::RELEASE_TOKEN secret not set — cannot sync /api/version"
+            exit 1
           fi
-          gh release upload "${LATEST_STABLE_TAG}" --repo "${REPO}" version.json --clobber
+          curl -fsS -X PUT "${VERSION_API_URL}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${RELEASE_TOKEN}" \
+            --data-binary @channel-payload.json
+          echo ""

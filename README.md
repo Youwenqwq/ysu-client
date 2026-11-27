@@ -65,7 +65,7 @@ cd android && ./gradlew verifyNativeComposition testDebugUnitTest
 pnpm run release
 ```
 
-发布由 GitHub Actions 构建 `dist.zip`、签名 APK 与 `version.json`。文档不表示已完成线上部署或真机验收；Android WebView、通知、闹钟、后台轮询、widget 和真实学校账号仍需单独验收。
+发布由 GitHub Actions 构建不可变产物 `dist.zip` 与签名 APK 上传到 GitHub Release，并同步通道元数据到 EdgeOne `/api/version`。文档不表示已完成线上部署或真机验收；Android WebView、通知、闹钟、后台轮询、widget 和真实学校账号仍需单独验收。
 
 ## 相关项目与协议
 
