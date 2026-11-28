@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import {
   findAvailableUpdates,
+  isAppVersionCompatible,
   loadPluginMarket,
   PLATFORM_MODULES,
   PLUGIN_API_VERSION,
@@ -216,6 +217,24 @@ describe("marketplace index validation & v1 release selection", () => {
     )
     expect(updates).toHaveLength(1)
     expect(updates[0]?.release.version).toBe("2.1.0")
+  })
+
+  it("treats prerelease app builds as compatible with matching stable minAppVersion", () => {
+    expect(isAppVersionCompatible("0.15.0-canary.1", "0.15.0")).toBe(true)
+    expect(isAppVersionCompatible("0.15.0-beta.2", "0.15.0")).toBe(true)
+    expect(isAppVersionCompatible("0.15.0", "0.15.0")).toBe(true)
+    expect(isAppVersionCompatible("0.14.9", "0.15.0")).toBe(false)
+    expect(isAppVersionCompatible("0.15.0-canary.1", "0.16.0")).toBe(false)
+    // Explicit prerelease minAppVersion uses strict SemVer ordering
+    expect(isAppVersionCompatible("0.15.0-canary.1", "0.15.0-canary.2")).toBe(false)
+    expect(isAppVersionCompatible("0.15.0-canary.2", "0.15.0-canary.2")).toBe(true)
+    expect(isAppVersionCompatible("0.15.0", "0.15.0-canary.2")).toBe(true)
+
+    // selectCompatibleRelease allows minAppVersion: "0.16.0" on 0.16.0-canary.1
+    const canaryMatch = selectCompatibleRelease(mixedPlugin, "0.16.0-canary.1", "web", [
+      "widgets.generic@1",
+    ])
+    expect(canaryMatch?.version).toBe("2.1.0")
   })
 
   it("expands GitHub Raw market URLs to prefer jsDelivr with automatic fallback", async () => {

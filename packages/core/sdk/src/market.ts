@@ -76,6 +76,25 @@ export interface PluginMarketResult {
   stale: boolean
 }
 
+/**
+ * Compare running `appVersion` against a plugin's `minAppVersion`.
+ *
+ * When `minAppVersion` has no prerelease identifier (e.g. `"0.15.0"`), prerelease
+ * builds of that release line (e.g. `"0.15.0-canary.1"`, `"0.15.0-beta.1"`) are
+ * treated as compatible by comparing `major.minor.patch`. When `minAppVersion`
+ * explicitly declares a prerelease identifier, strict SemVer ordering applies.
+ */
+export function isAppVersionCompatible(appVersion: string, minAppVersion: string): boolean {
+  const parsedApp = semver.parse(appVersion)
+  const parsedMin = semver.parse(minAppVersion)
+  if (!parsedApp || !parsedMin) return false
+  if (parsedMin.prerelease.length > 0) {
+    return semver.gte(parsedApp, parsedMin)
+  }
+  const appBase = `${parsedApp.major}.${parsedApp.minor}.${parsedApp.patch}`
+  return semver.gte(appBase, parsedMin)
+}
+
 export function selectCompatibleRelease(
   plugin: MarketplacePlugin,
   appVersion: string,
@@ -92,8 +111,7 @@ export function selectCompatibleRelease(
     )
     .filter(
       (release) =>
-        !release.minAppVersion ||
-        (semver.valid(release.minAppVersion) && semver.gte(appVersion, release.minAppVersion))
+        !release.minAppVersion || isAppVersionCompatible(appVersion, release.minAppVersion)
     )
     .sort((a, b) => semver.rcompare(a.version, b.version))[0]
 }

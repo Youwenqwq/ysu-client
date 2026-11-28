@@ -2,6 +2,7 @@ import semver from "semver"
 import {
   composeApplication,
   createObservableSource,
+  isAppVersionCompatible,
   isCapacitor,
   resolveMarketUrls,
   selectCompatibleRelease,
@@ -550,7 +551,7 @@ export class PluginHost {
     if (!semver.valid(this.appVersion)) {
       throw new Error(`Host app version is not valid SemVer: ${this.appVersion}`)
     }
-    if (semver.lt(this.appVersion, minimum)) {
+    if (!isAppVersionCompatible(this.appVersion, minimum)) {
       throw new Error(
         `Plugin ${manifest.id}@${manifest.version} requires app ${minimum} or newer (current ${this.appVersion})`
       )
