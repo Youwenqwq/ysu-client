@@ -3,6 +3,7 @@ import { useState } from "react"
 import type {
   DerivedComponentProps,
   ObservableSource,
+  PluginHostPreferenceSnapshot,
   RouteLocation,
   SlotComponent,
 } from "@orahako/sdk"
@@ -28,9 +29,12 @@ import type { PluginManagerPreferencesStore } from "./store"
 export interface PluginsHeaderActionsInject {
   readonly hooks: {
     readonly location: ObservableSource<RouteLocation>
+    readonly preference: ObservableSource<PluginHostPreferenceSnapshot>
   }
   readonly pluginId: string
   readonly defaultMarketUrl?: string
+  readonly setMarketEnabled: (enabled: boolean) => void
+  readonly setCustomMarketUrl: (url: string) => void
 }
 
 export type PluginsHeaderActionsProps = DerivedComponentProps<
@@ -42,11 +46,12 @@ export type PluginsHeaderActionsProps = DerivedComponentProps<
 >
 
 export const PluginsHeaderActions: SlotComponent<PluginsHeaderActionsProps> = (props) => {
-  const { t, useStore, actions } = props
+  const { t, useStore, actions, setMarketEnabled, setCustomMarketUrl } = props
   const location = props.useLocation()
+  const preference = props.usePreference()
   const showSystemPlugins = useStore((state) => state.showSystemPlugins)
-  const marketEnabled = useStore((state) => state.marketEnabled)
-  const customMarketUrl = useStore((state) => state.customMarketUrl)
+  const marketEnabled = preference.marketEnabled ?? false
+  const customMarketUrl = preference.customMarketUrl ?? ""
   const [open, setOpen] = useState(false)
   const [marketUrlDraft, setMarketUrlDraft] = useState("")
   const [marketUrlInvalid, setMarketUrlInvalid] = useState(false)
@@ -75,7 +80,7 @@ export const PluginsHeaderActions: SlotComponent<PluginsHeaderActionsProps> = (p
         return
       }
     }
-    actions.setCustomMarketUrl(nextUrl)
+    setCustomMarketUrl(nextUrl)
     setOpen(false)
   }
 
@@ -121,7 +126,7 @@ export const PluginsHeaderActions: SlotComponent<PluginsHeaderActionsProps> = (p
                 <Switch
                   id="plugin-enable-market"
                   checked={marketEnabled}
-                  onCheckedChange={actions.setMarketEnabled}
+                  onCheckedChange={setMarketEnabled}
                   aria-label={t("settings.enableMarket")}
                 />
               </div>

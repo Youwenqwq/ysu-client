@@ -4,16 +4,12 @@ export interface PluginManagerPreferencesState {
   readonly autoCheckUpdates: boolean
   readonly lastUpdateCheck: number
   readonly showSystemPlugins: boolean
-  readonly marketEnabled: boolean
-  readonly customMarketUrl: string
 }
 
 const initialPreferences = (): PluginManagerPreferencesState => ({
   autoCheckUpdates: true,
   lastUpdateCheck: 0,
   showSystemPlugins: false,
-  marketEnabled: false,
-  customMarketUrl: "",
 })
 
 export const pluginManagerPreferencesStore = defineStore({
@@ -21,13 +17,14 @@ export const pluginManagerPreferencesStore = defineStore({
   persist: {
     key: "preferences",
     mode: "local",
-    version: 2,
+    version: 3,
     migrate(persisted): PluginManagerPreferencesState {
-      const previous = persisted as Pick<
-        PluginManagerPreferencesState,
-        "autoCheckUpdates" | "lastUpdateCheck"
-      >
-      return { ...initialPreferences(), ...previous }
+      const previous = persisted as Partial<PluginManagerPreferencesState> | undefined
+      return {
+        autoCheckUpdates: previous?.autoCheckUpdates ?? true,
+        lastUpdateCheck: previous?.lastUpdateCheck ?? 0,
+        showSystemPlugins: previous?.showSystemPlugins ?? false,
+      }
     },
   },
   actions: {
@@ -44,14 +41,6 @@ export const pluginManagerPreferencesStore = defineStore({
     setShowSystemPlugins(ctx, showSystemPlugins: boolean) {
       ctx.set((prev) =>
         prev.showSystemPlugins === showSystemPlugins ? prev : { ...prev, showSystemPlugins }
-      )
-    },
-    setMarketEnabled(ctx, marketEnabled: boolean) {
-      ctx.set((prev) => (prev.marketEnabled === marketEnabled ? prev : { ...prev, marketEnabled }))
-    },
-    setCustomMarketUrl(ctx, customMarketUrl: string) {
-      ctx.set((prev) =>
-        prev.customMarketUrl === customMarketUrl ? prev : { ...prev, customMarketUrl }
       )
     },
   },

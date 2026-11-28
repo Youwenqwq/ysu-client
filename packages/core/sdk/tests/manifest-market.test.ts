@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import {
   findAvailableUpdates,
+  loadPluginMarket,
   PLATFORM_MODULES,
   PLUGIN_API_VERSION,
   PluginManifestError,
+  resolveMarketUrls,
   selectCompatibleRelease,
   validateMarketplaceIndex,
   validatePluginManifest,
@@ -214,5 +216,35 @@ describe("marketplace index validation & v1 release selection", () => {
     )
     expect(updates).toHaveLength(1)
     expect(updates[0]?.release.version).toBe("2.1.0")
+  })
+
+  it("expands GitHub Raw market URLs to prefer jsDelivr with automatic fallback", async () => {
+    const rawUrl =
+      "https://raw.githubusercontent.com/Youwenqwq/orahako-plugin-registry/main/dist/plugins.json"
+    const cdnUrl =
+      "https://cdn.jsdelivr.net/gh/Youwenqwq/orahako-plugin-registry@main/dist/plugins.json"
+
+    expect(resolveMarketUrls(rawUrl)).toEqual([cdnUrl, rawUrl])
+    expect(resolveMarketUrls(cdnUrl)).toEqual([cdnUrl, rawUrl])
+    expect(resolveMarketUrls("https://market.example.com/plugins.json")).toEqual([
+      "https://market.example.com/plugins.json",
+    ])
+
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      if (String(input) === cdnUrl) {
+        return new Response("cdn down", { status: 503 })
+      }
+      return new Response(JSON.stringify(marketJson), { status: 200 })
+    })
+    vi.stubGlobal("fetch", fetchMock)
+    try {
+      const result = await loadPluginMarket(rawUrl)
+      expect(result.stale).toBe(false)
+      expect(result.index.plugins).toHaveLength(1)
+      expect(fetchMock).toHaveBeenNthCalledWith(1, cdnUrl, { cache: "no-store" })
+      expect(fetchMock).toHaveBeenNthCalledWith(2, rawUrl, { cache: "no-store" })
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

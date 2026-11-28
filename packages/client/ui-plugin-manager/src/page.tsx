@@ -1,5 +1,5 @@
-import { Download, Package, Puzzle, RefreshCw, Store, Trash2 } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { Check, Download, Package, Palette, Puzzle, RefreshCw, Store, Trash2 } from "lucide-react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import semver from "semver"
 import { toast } from "sonner"
 import {
@@ -14,6 +14,7 @@ import {
   type MarketplaceIndex,
   type MarketplacePlugin,
   type ObservableSource,
+  type PluginHostPreferenceSnapshot,
   type PluginKind,
   type PluginManagerState,
   type PluginManifest,
@@ -72,6 +73,9 @@ export interface PluginsPageInject {
   readonly getActiveShell: () => string | undefined
   readonly setActiveShell: (shellId: string | undefined) => void
   readonly getDefaultShell?: () => string | undefined
+  readonly getActiveTheme?: () => string | undefined
+  readonly setActiveTheme?: (themeId: string | undefined) => void
+  readonly openThemeSettings?: () => void
   readonly isSafeMode: () => boolean
   readonly getPlatform: () => PluginPlatform
   readonly confirmUninstall?: (message: string) => boolean
@@ -79,6 +83,7 @@ export interface PluginsPageInject {
     readonly states: ObservableSource<readonly PluginManagerState[]>
     readonly ui: ObservableSource<PluginUIServiceSnapshot>
     readonly provider: ObservableSource<OptionalProviderSnapshot>
+    readonly preference: ObservableSource<PluginHostPreferenceSnapshot>
   }
 }
 
@@ -107,11 +112,11 @@ const STATUS_KEYS: Readonly<Record<string, StatusKey>> = {
 const CATEGORY_LABEL_KEYS: Readonly<
   Record<PluginCategory, Extract<TranslationKeyOf<PluginsDictionary>, `category.${string}`>>
 > = {
-  provider: "category.provider",
-  academic: "category.academic",
-  toybox: "category.toybox",
-  system: "category.system",
   appearance: "category.appearance",
+  toybox: "category.toybox",
+  academic: "category.academic",
+  provider: "category.provider",
+  system: "category.system",
 }
 
 function isSupportedFeature(
@@ -158,22 +163,27 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
     getActiveShell,
     setActiveShell,
     getDefaultShell,
+    getActiveTheme,
+    setActiveTheme,
+    openThemeSettings,
     isSafeMode,
     getPlatform,
     confirmUninstall,
     useStates,
     useUi,
     useProvider,
+    usePreference,
   } = props
 
   const states = useStates()
   const uiSnapshot = useUi()
   const providerInfo = useProvider()
+  const preference = usePreference()
   const autoCheckUpdates = useStore((s) => s.autoCheckUpdates)
   const lastUpdateCheck = useStore((s) => s.lastUpdateCheck)
   const showSystemPlugins = useStore((s) => s.showSystemPlugins)
-  const marketEnabled = useStore((s) => s.marketEnabled)
-  const customMarketUrl = useStore((s) => s.customMarketUrl)
+  const marketEnabled = preference.marketEnabled ?? false
+  const customMarketUrl = preference.customMarketUrl ?? ""
   const [defaultMarketUrl] = useState(() => getMarketUrl())
   const marketUrl = marketEnabled ? customMarketUrl.trim() || defaultMarketUrl : undefined
 
@@ -187,7 +197,7 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
   const [marketError, setMarketError] = useState<string | undefined>()
   const [busy, setBusy] = useState<string | undefined>()
   const [checking, setChecking] = useState(false)
-  const [selectedShell, setSelectedShell] = useState<string | undefined>(() => getActiveShell())
+  const [activeTab, setActiveTab] = useState<"installed" | "market">("installed")
   const checkingRef = useRef(false)
   const initialFetchUrlRef = useRef<string | undefined>(undefined)
 
@@ -196,6 +206,9 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
   const nativeCapabilities = getNativeCapabilities()
   const loadErrors = getLoadErrors()
   const safeMode = isSafeMode()
+
+  const activeShellId = preference.activeShell ?? getActiveShell() ?? getDefaultShell?.()
+  const activeThemeId = preference.activeTheme ?? getActiveTheme?.() ?? ""
 
   const refreshPackages = useCallback(async () => {
     setPackages(await listInstalled())
@@ -227,6 +240,7 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
     setMarket(marketUrl ? loadCachedPluginMarket(marketUrl) : undefined)
     setMarketOffline(false)
     setMarketError(undefined)
+    if (!marketUrl) setActiveTab("installed")
   }, [marketUrl])
 
   useEffect(() => {
@@ -249,7 +263,6 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
     try {
       await task()
       await refreshPackages()
-      setSelectedShell(getActiveShell())
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error))
     } finally {
@@ -353,9 +366,19 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
       )
     : []
 
-  const installedGroups = groupByPluginCategory(
-    showSystemPlugins ? rows : rows.filter((row) => pluginCategory(row) !== "system")
-  )
+  // External plugins are always visible so users can manage or uninstall anything they installed.
+  const visibleRows = showSystemPlugins
+    ? rows
+    : rows.filter((row) => row.source === "external" || pluginCategory(row) !== "system")
+
+  const installedGroups = groupByPluginCategory(visibleRows).map((group) => ({
+    id: group.id,
+    plugins: [...group.plugins].sort((left, right) => {
+      if (left.source === right.source) return 0
+      return left.source === "external" ? -1 : 1
+    }),
+  }))
+
   const compatibleMarketPlugins =
     market?.index.plugins.filter(
       (plugin) =>
@@ -381,12 +404,76 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
         }).format(lastUpdateCheck)
       : undefined
 
-  const shells = uiSnapshot.shells
-  const activeShellId = selectedShell ?? getDefaultShell?.()
+  const defaultShellId = getDefaultShell?.()
 
-  const handleSelectShell = (shellId: string): void => {
-    setActiveShell(shellId)
-    setSelectedShell(shellId)
+  const renderAppearanceAction = (pluginId: string, status: string): ReactNode => {
+    if (status !== "active") return null
+
+    const pluginShells = uiSnapshot.shells.filter((shell) => shell.pluginId === pluginId)
+    if (pluginShells.length > 0) {
+      const shell = pluginShells[0]!
+      const qualified = `${shell.pluginId}:${shell.id}`
+      const isCurrent =
+        activeShellId !== undefined && (activeShellId === qualified || activeShellId === shell.id)
+      const isDefault = qualified === defaultShellId || shell.id === defaultShellId
+      return (
+        <Button
+          size="sm"
+          variant={isCurrent ? "secondary" : "outline"}
+          disabled={isCurrent || Boolean(busy)}
+          data-plugin-apply-shell={qualified}
+          onClick={() => setActiveShell(isDefault ? undefined : qualified)}
+        >
+          {isCurrent && <Check data-icon="inline-start" />}
+          {t(isCurrent ? "activeShellBadge" : "useShell")}
+        </Button>
+      )
+    }
+
+    const pluginThemes = uiSnapshot.themes.filter((theme) => theme.pluginId === pluginId)
+    if (pluginThemes.length > 1) {
+      const anyActive = pluginThemes.some(
+        (theme) =>
+          activeThemeId === `${theme.pluginId}:${theme.id}` || activeThemeId === theme.id
+      )
+      return (
+        <Button
+          size="sm"
+          variant={anyActive ? "secondary" : "outline"}
+          disabled={Boolean(busy)}
+          data-plugin-choose-theme={pluginId}
+          onClick={() => openThemeSettings?.()}
+        >
+          {anyActive ? <Check data-icon="inline-start" /> : <Palette data-icon="inline-start" />}
+          {t("chooseTheme")}
+        </Button>
+      )
+    }
+
+    if (pluginThemes.length === 1) {
+      const theme = pluginThemes[0]!
+      const isDefaultTheme = theme.css.trim().length === 0
+      const qualified = isDefaultTheme ? "" : `${theme.pluginId}:${theme.id}`
+      const isCurrent = isDefaultTheme
+        ? !activeThemeId ||
+          activeThemeId === "default" ||
+          activeThemeId === `${theme.pluginId}:${theme.id}`
+        : activeThemeId === qualified || activeThemeId === theme.id
+      return (
+        <Button
+          size="sm"
+          variant={isCurrent ? "secondary" : "outline"}
+          disabled={isCurrent || Boolean(busy)}
+          data-plugin-apply-theme={qualified || "default"}
+          onClick={() => setActiveTheme?.(qualified || undefined)}
+        >
+          {isCurrent && <Check data-icon="inline-start" />}
+          {t(isCurrent ? "activeThemeBadge" : "applyTheme")}
+        </Button>
+      )
+    }
+
+    return null
   }
 
   const askConfirmUninstall = (name: string): boolean => {
@@ -398,14 +485,8 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
     return true
   }
 
-  return (
+  const installedSection = (
     <div className="flex flex-col gap-6">
-      {safeMode && (
-        <Card className="border-amber-500/50 bg-amber-500/5 py-0">
-          <CardContent className="p-4 text-sm">{t("safeMode")}</CardContent>
-        </Card>
-      )}
-
       {marketUrl && (
         <Card className="py-0">
           <CardContent className="flex flex-col gap-3 p-4">
@@ -451,6 +532,128 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
         </Card>
       )}
 
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <Puzzle className="size-4" />
+            {t("installed")}
+          </h2>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-primary">
+            <Download className="size-4" />
+            {t("sideload")}
+            <input
+              type="file"
+              accept=".zip,application/zip"
+              className="hidden"
+              disabled={Boolean(busy)}
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.target.value = ""
+                if (file) {
+                  void runAction("sideload", async () => {
+                    const manifest = await installPackage(file)
+                    toast.success(t("installedSuccess", { name: manifest.name }))
+                  })
+                }
+              }}
+            />
+          </label>
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">{t("trustWarning")}</p>
+        {installedGroups.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Package />
+              </EmptyMedia>
+              <EmptyTitle>{t("noPlugins")}</EmptyTitle>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          installedGroups.map((group) => (
+            <div key={group.id} className="flex flex-col gap-3" data-plugin-group={group.id}>
+              <h3 className="text-xs font-medium text-muted-foreground">
+                {t(CATEGORY_LABEL_KEYS[group.id])}
+              </h3>
+              {group.plugins.map((plugin) => {
+                const statusKey = STATUS_KEYS[plugin.status] ?? "disabled"
+                const appearanceAction = renderAppearanceAction(plugin.id, plugin.status)
+                return (
+                  <Card key={plugin.id} className="py-0">
+                    <CardContent className="flex flex-col gap-3 p-4">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium">{plugin.name}</div>
+                          <div className="truncate font-mono text-xs text-muted-foreground">
+                            {plugin.id} · v{plugin.version}
+                          </div>
+                        </div>
+                        <Badge variant="outline">{t(plugin.source)}</Badge>
+                        <Badge variant={plugin.status === "failed" ? "destructive" : "secondary"}>
+                          {t(statusKey)}
+                        </Badge>
+                      </div>
+                      {plugin.error && (
+                        <p className="text-xs break-words text-destructive">{plugin.error}</p>
+                      )}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        {!plugin.protected ? (
+                          <Switch
+                            checked={
+                              plugin.status === "active" ||
+                              plugin.status === "starting" ||
+                              plugin.status === "waiting"
+                            }
+                            disabled={
+                              Boolean(busy) ||
+                              !plugin.supported ||
+                              plugin.status === "registered" ||
+                              plugin.status === "starting"
+                            }
+                            onCheckedChange={(enabled) =>
+                              void runAction(plugin.id, async () => {
+                                if (enabled) await enablePlugin(plugin.id)
+                                else disablePlugin(plugin.id)
+                              })
+                            }
+                            aria-label={t("toggle", { name: plugin.name })}
+                          />
+                        ) : (
+                          <span />
+                        )}
+                        <div className="flex items-center gap-2">
+                          {appearanceAction}
+                          {plugin.source === "external" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive"
+                              disabled={Boolean(busy)}
+                              onClick={() => {
+                                if (askConfirmUninstall(plugin.name)) {
+                                  void runAction(plugin.id, () => uninstallPlugin(plugin.id))
+                                }
+                              }}
+                            >
+                              <Trash2 />
+                              {t("uninstall")}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          ))
+        )}
+      </section>
+    </div>
+  )
+
+  const marketSection = marketUrl ? (
+    <div className="flex flex-col gap-6">
       {recommendedBundles.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
@@ -499,226 +702,94 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
       )}
 
       <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <Puzzle className="size-4" />
-            {t("installed")}
+            <Store className="size-4" />
+            {t("market")}
           </h2>
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-primary">
-            <Download className="size-4" />
-            {t("sideload")}
-            <input
-              type="file"
-              accept=".zip,application/zip"
-              className="hidden"
-              disabled={Boolean(busy)}
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                event.target.value = ""
-                if (file) {
-                  void runAction("sideload", async () => {
-                    const manifest = await installPackage(file)
-                    toast.success(t("installedSuccess", { name: manifest.name }))
-                  })
-                }
-              }}
-            />
-          </label>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => void refreshMarket()}
+            aria-label={t("refresh")}
+          >
+            <RefreshCw className={checking ? "animate-spin" : undefined} />
+          </Button>
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">{t("trustWarning")}</p>
-        {installedGroups.length === 0 ? (
+        {marketOffline && <p className="text-xs text-amber-600">{t("staleMarket")}</p>}
+        {marketError && <p className="text-sm text-destructive">{marketError}</p>}
+        {!market && !marketError && <Skeleton className="h-28 w-full" />}
+        {market && compatibleMarketPlugins.length === 0 && (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <Package />
+                <Store />
               </EmptyMedia>
-              <EmptyTitle>{t("noPlugins")}</EmptyTitle>
+              <EmptyTitle>{t("noMarket")}</EmptyTitle>
+              <EmptyDescription>{t("noMarketDesc")}</EmptyDescription>
             </EmptyHeader>
           </Empty>
-        ) : (
-          installedGroups.map((group) => (
-            <div key={group.id} className="flex flex-col gap-3">
-              <h3 className="text-xs font-medium text-muted-foreground">
-                {t(CATEGORY_LABEL_KEYS[group.id])}
-              </h3>
-              {group.plugins.map((plugin) => {
-                const statusKey = STATUS_KEYS[plugin.status] ?? "disabled"
-                return (
-                  <Card key={plugin.id} className="py-0">
-                    <CardContent className="flex flex-col gap-3 p-4">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium">{plugin.name}</div>
-                          <div className="truncate font-mono text-xs text-muted-foreground">
-                            {plugin.id} · v{plugin.version}
-                          </div>
-                        </div>
-                        <Badge variant="outline">{t(plugin.source)}</Badge>
-                        <Badge variant={plugin.status === "failed" ? "destructive" : "secondary"}>
-                          {t(statusKey)}
-                        </Badge>
-                      </div>
-                      {plugin.error && (
-                        <p className="text-xs break-words text-destructive">{plugin.error}</p>
-                      )}
-                      <div className="flex items-center justify-between gap-2">
-                        {!plugin.protected ? (
-                          <Switch
-                            checked={
-                              plugin.status === "active" ||
-                              plugin.status === "starting" ||
-                              plugin.status === "waiting"
-                            }
-                            disabled={
-                              Boolean(busy) ||
-                              !plugin.supported ||
-                              plugin.status === "registered" ||
-                              plugin.status === "starting"
-                            }
-                            onCheckedChange={(enabled) =>
-                              void runAction(plugin.id, async () => {
-                                if (enabled) await enablePlugin(plugin.id)
-                                else disablePlugin(plugin.id)
-                              })
-                            }
-                            aria-label={t("toggle", { name: plugin.name })}
-                          />
-                        ) : (
-                          <span />
-                        )}
-                        {plugin.source === "external" && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive"
-                            disabled={Boolean(busy)}
-                            onClick={() => {
-                              if (askConfirmUninstall(plugin.name)) {
-                                void runAction(plugin.id, () => uninstallPlugin(plugin.id))
-                              }
-                            }}
-                          >
-                            <Trash2 />
-                            {t("uninstall")}
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          ))
         )}
-      </section>
-
-      {shells.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold">{t("shell")}</h2>
-          <div className="grid grid-cols-2 gap-2">
-            {shells.map((shell) => {
-              const id = `${shell.pluginId}:${shell.id}`
-              const selected =
-                activeShellId !== undefined && (activeShellId === id || activeShellId === shell.id)
-              return (
-                <Button
-                  key={id}
-                  variant={selected ? "default" : "outline"}
-                  onClick={() => handleSelectShell(id)}
-                >
-                  {shell.name}
-                </Button>
+        {marketGroups.map((group) => (
+          <div key={group.id} className="flex flex-col gap-3" data-market-group={group.id}>
+            <h3 className="text-xs font-medium text-muted-foreground">
+              {t(CATEGORY_LABEL_KEYS[group.id])}
+            </h3>
+            {group.plugins.map((plugin) => {
+              const release = selectCompatibleRelease(
+                plugin,
+                appVersion,
+                platform,
+                nativeCapabilities
               )
-            })}
-          </div>
-        </section>
-      )}
-
-      {marketUrl && (
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-sm font-semibold">
-              <Store className="size-4" />
-              {t("market")}
-            </h2>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => void refreshMarket()}
-              aria-label={t("refresh")}
-            >
-              <RefreshCw className={checking ? "animate-spin" : undefined} />
-            </Button>
-          </div>
-          {marketOffline && <p className="text-xs text-amber-600">{t("staleMarket")}</p>}
-          {marketError && <p className="text-sm text-destructive">{marketError}</p>}
-          {!market && !marketError && <Skeleton className="h-28 w-full" />}
-          {market && compatibleMarketPlugins.length === 0 && (
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <Store />
-                </EmptyMedia>
-                <EmptyTitle>{t("noMarket")}</EmptyTitle>
-                <EmptyDescription>{t("noMarketDesc")}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          )}
-          {marketGroups.map((group) => (
-            <div key={group.id} className="flex flex-col gap-3">
-              <h3 className="text-xs font-medium text-muted-foreground">
-                {t(CATEGORY_LABEL_KEYS[group.id])}
-              </h3>
-              {group.plugins.map((plugin) => {
-                const release = selectCompatibleRelease(
-                  plugin,
-                  appVersion,
-                  platform,
-                  nativeCapabilities
-                )
-                if (!release) return null
-                const installed = rows.find((row) => row.id === plugin.id)
-                const hasUpdate = Boolean(
-                  installed && semver.gt(release.version, installed.version)
-                )
-                return (
-                  <Card key={plugin.id} className="py-0">
-                    <CardContent className="flex items-center gap-3 p-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-sm font-medium">{plugin.name}</span>
-                          {plugin.trust === "official" && (
-                            <Badge variant="secondary">{t("official")}</Badge>
-                          )}
-                          {plugin.trust === "community" && (
-                            <Badge variant="outline">{t("community")}</Badge>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                          {plugin.summary}
-                        </p>
-                        <div className="mt-2 flex flex-wrap items-center gap-x-1.5 font-mono text-xs text-muted-foreground">
-                          <span>
-                            {plugin.author} ·{" "}
-                            {hasUpdate && installed
-                              ? `v${installed.version} → v${release.version}`
-                              : `v${release.version}`}
-                          </span>
-                          {plugin.homepage && (
-                            <>
-                              <span>·</span>
-                              <a
-                                href={plugin.homepage}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-sans text-primary underline-offset-4 hover:underline"
-                              >
-                                {t("sourceLink")}
-                              </a>
-                            </>
-                          )}
-                        </div>
+              if (!release) return null
+              const installed = rows.find((row) => row.id === plugin.id)
+              const hasUpdate = Boolean(
+                installed && semver.gt(release.version, installed.version)
+              )
+              const appearanceAction =
+                installed && !hasUpdate
+                  ? renderAppearanceAction(plugin.id, installed.status)
+                  : null
+              return (
+                <Card key={plugin.id} className="py-0">
+                  <CardContent className="flex items-center gap-3 p-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-sm font-medium">{plugin.name}</span>
+                        {plugin.trust === "official" && (
+                          <Badge variant="secondary">{t("official")}</Badge>
+                        )}
+                        {plugin.trust === "community" && (
+                          <Badge variant="outline">{t("community")}</Badge>
+                        )}
                       </div>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {plugin.summary}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-1.5 font-mono text-xs text-muted-foreground">
+                        <span>
+                          {plugin.author} ·{" "}
+                          {hasUpdate && installed
+                            ? `v${installed.version} → v${release.version}`
+                            : `v${release.version}`}
+                        </span>
+                        {plugin.homepage && (
+                          <>
+                            <span>·</span>
+                            <a
+                              href={plugin.homepage}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-sans text-primary underline-offset-4 hover:underline"
+                            >
+                              {t("sourceLink")}
+                            </a>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {appearanceAction ?? (
                       <Button
                         size="sm"
                         disabled={Boolean(busy) || (Boolean(installed) && !hasUpdate)}
@@ -726,13 +797,71 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
                       >
                         {t(hasUpdate ? "update" : installed ? "installedBadge" : "install")}
                       </Button>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          ))}
-        </section>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        ))}
+      </section>
+    </div>
+  ) : null
+
+  return (
+    <div className="flex flex-col gap-6">
+      {safeMode && (
+        <Card className="border-amber-500/50 bg-amber-500/5 py-0">
+          <CardContent className="p-4 text-sm">{t("safeMode")}</CardContent>
+        </Card>
+      )}
+
+      {marketUrl ? (
+        <div className="flex flex-col gap-6">
+          <div
+            role="tablist"
+            className="grid w-full grid-cols-2 rounded-lg bg-muted p-[3px] text-muted-foreground"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "installed"}
+              data-plugin-tab="installed"
+              data-state={activeTab === "installed" ? "active" : "inactive"}
+              onClick={() => setActiveTab("installed")}
+              className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-sm font-medium transition-all ${
+                activeTab === "installed"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "hover:text-foreground"
+              }`}
+            >
+              {t("tabInstalled")}
+              {availableUpdates.length > 0 && (
+                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                  {availableUpdates.length}
+                </Badge>
+              )}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "market"}
+              data-plugin-tab="market"
+              data-state={activeTab === "market" ? "active" : "inactive"}
+              onClick={() => setActiveTab("market")}
+              className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-sm font-medium transition-all ${
+                activeTab === "market"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "hover:text-foreground"
+              }`}
+            >
+              {t("tabMarket")}
+            </button>
+          </div>
+          <div role="tabpanel">{activeTab === "installed" ? installedSection : marketSection}</div>
+        </div>
+      ) : (
+        installedSection
       )}
     </div>
   )

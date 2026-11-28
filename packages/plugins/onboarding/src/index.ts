@@ -240,6 +240,15 @@ export const onboardingPlugin = definePlugin({
             setAnalyticsConsent: (enabled: boolean) => {
               analytics?.setConsent(enabled)
             },
+            hasMarket: () =>
+              Boolean(
+                resolveRuntimeMarketUrl(packageRuntime, config.marketUrl) &&
+                  typeof packageRuntime.setMarketEnabled === "function"
+              ),
+            getMarketEnabled: () => packageRuntime.getMarketEnabled?.() ?? false,
+            setMarketEnabled: (enabled: boolean) => {
+              packageRuntime.setMarketEnabled?.(enabled)
+            },
             isNative: () => native.isNative,
             hasProvider: (schoolId: string) => providers.hasProvider(schoolId),
             activateSchoolChoice,

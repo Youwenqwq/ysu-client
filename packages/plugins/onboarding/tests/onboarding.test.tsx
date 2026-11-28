@@ -317,6 +317,7 @@ function createOnboardingEnv(options: {
   registerOnlineProviders?: readonly string[]
   persisted?: Readonly<Record<string, string>>
   analyticsEndpoint?: string
+  enableMarketPreference?: boolean
 }) {
   const dom = mountMiniDom()
   const localBackend = createMemoryStorage(options.persisted)
@@ -367,11 +368,22 @@ function createOnboardingEnv(options: {
     }
   )
 
+  const setMarketEnabledSpy = vi.fn()
+  let marketEnabledState = false
   const packageRuntime: PluginPackageRuntime = {
     installFromUrl: vi.fn(),
     applyPluginBundle,
     assetUrl: () => undefined,
     nativeCapabilities: () => [],
+    ...(options.enableMarketPreference
+      ? {
+          getMarketEnabled: () => marketEnabledState,
+          setMarketEnabled: (enabled: boolean) => {
+            marketEnabledState = enabled
+            setMarketEnabledSpy(enabled)
+          },
+        }
+      : {}),
   }
   runtime.context.set("packageRuntime", packageRuntime)
 
@@ -490,6 +502,7 @@ function createOnboardingEnv(options: {
     fetchMock,
     applyPluginBundle,
     setAnalyticsConsentSpy,
+    setMarketEnabledSpy,
     slots,
     entry,
     injected,
@@ -773,6 +786,32 @@ describe("@orahako/plugin-onboarding", () => {
 
     await clickButton(env.dom.container, "同意并继续")
     expect(env.setAnalyticsConsentSpy).toHaveBeenCalledWith(false)
+    expect(env.dom.container.textContent).toContain("选择你的学校")
+  })
+
+  it("prompts whether to enable the plugin marketplace when supported by packageRuntime", async () => {
+    const env = createOnboardingEnv({
+      enableMarketPreference: true,
+    })
+    activeUnmount = env.cleanup
+
+    await vi.waitFor(() => expect(env.storeInstance.hydrated.getSnapshot()).toBe(true))
+    await vi.waitFor(() =>
+      expect(env.runtime.context.get("session")?.getSnapshot().hasHydrated).toBe(true)
+    )
+
+    const i18n = env.runtime.context.get("i18n") as PluginI18nRegistryService
+    await env.dom.render(<ContributionOutlet entry={env.entry} slots={env.slots} i18n={i18n} />)
+
+    await clickButton(env.dom.container, "开始设置")
+    await clickButton(env.dom.container, "同意并继续")
+
+    expect(env.dom.container.textContent).toContain("插件市场")
+    expect(env.dom.container.textContent).toContain("开启插件市场")
+    expect(env.dom.container.textContent).toContain("暂不开启")
+
+    await clickButton(env.dom.container, "开启插件市场")
+    expect(env.setMarketEnabledSpy).toHaveBeenCalledWith(true)
     expect(env.dom.container.textContent).toContain("选择你的学校")
   })
 })

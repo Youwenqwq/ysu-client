@@ -3,6 +3,7 @@ import {
   composeApplication,
   createObservableSource,
   isCapacitor,
+  resolveMarketUrls,
   selectCompatibleRelease,
   validatePluginManifest,
   type AppComposition,
@@ -48,6 +49,8 @@ interface StoredHostPreferences {
   activeShell?: string
   activeTheme?: string
   startupPage?: string
+  marketEnabled?: boolean
+  customMarketUrl?: string
 }
 
 export function createPluginHostPreferences(
@@ -57,6 +60,8 @@ export function createPluginHostPreferences(
   let memoryActiveShell: string | undefined
   let memoryActiveTheme: string | undefined
   let memoryStartupPage: string | undefined
+  let memoryMarketEnabled = false
+  let memoryCustomMarketUrl = ""
   // Read localStorage once on creation and keep the in-memory snapshot
   // authoritative afterwards: avoids repeated synchronous JSON.parse during
   // plugin boot loops and never forks reads from writes if setItem fails.
@@ -87,10 +92,20 @@ export function createPluginHostPreferences(
                 "startupPage" in parsed && typeof parsed.startupPage === "string"
                   ? parsed.startupPage
                   : undefined
+              const marketEnabled =
+                "marketEnabled" in parsed && typeof parsed.marketEnabled === "boolean"
+                  ? parsed.marketEnabled
+                  : false
+              const customMarketUrl =
+                "customMarketUrl" in parsed && typeof parsed.customMarketUrl === "string"
+                  ? parsed.customMarketUrl
+                  : ""
               memoryDisabled = new Set(disabled)
               memoryActiveShell = activeShell
               memoryActiveTheme = activeTheme
               memoryStartupPage = startupPage
+              memoryMarketEnabled = marketEnabled
+              memoryCustomMarketUrl = customMarketUrl
             }
           }
         }
@@ -103,6 +118,8 @@ export function createPluginHostPreferences(
       ...(memoryActiveShell !== undefined ? { activeShell: memoryActiveShell } : {}),
       ...(memoryActiveTheme !== undefined ? { activeTheme: memoryActiveTheme } : {}),
       ...(memoryStartupPage !== undefined ? { startupPage: memoryStartupPage } : {}),
+      ...(memoryMarketEnabled ? { marketEnabled: true } : {}),
+      ...(memoryCustomMarketUrl ? { customMarketUrl: memoryCustomMarketUrl } : {}),
     }
   }
 
@@ -112,6 +129,8 @@ export function createPluginHostPreferences(
     memoryActiveShell = next.activeShell
     memoryActiveTheme = next.activeTheme
     memoryStartupPage = next.startupPage
+    memoryMarketEnabled = Boolean(next.marketEnabled)
+    memoryCustomMarketUrl = next.customMarketUrl ?? ""
     try {
       if (typeof localStorage !== "undefined") {
         localStorage.setItem(storageKey, JSON.stringify(next))
@@ -125,11 +144,33 @@ export function createPluginHostPreferences(
     ...(preferences.activeShell !== undefined ? { activeShell: preferences.activeShell } : {}),
     ...(preferences.activeTheme !== undefined ? { activeTheme: preferences.activeTheme } : {}),
     ...(preferences.startupPage !== undefined ? { startupPage: preferences.startupPage } : {}),
+    ...(preferences.marketEnabled ? { marketEnabled: true } : {}),
+    ...(preferences.customMarketUrl ? { customMarketUrl: preferences.customMarketUrl } : {}),
   })
   const stateSource = createObservableSource<PluginHostPreferenceSnapshot>(snapshot(read()))
   const commit = (next: StoredHostPreferences, publish: boolean): void => {
     write(next)
     if (publish) stateSource.set(snapshot(next))
+  }
+
+  const rebuild = (
+    current: StoredHostPreferences,
+    patch: Partial<Omit<StoredHostPreferences, "disabledPluginIds">>
+  ): StoredHostPreferences => {
+    const activeShell = "activeShell" in patch ? patch.activeShell : current.activeShell
+    const activeTheme = "activeTheme" in patch ? patch.activeTheme : current.activeTheme
+    const startupPage = "startupPage" in patch ? patch.startupPage : current.startupPage
+    const marketEnabled = "marketEnabled" in patch ? Boolean(patch.marketEnabled) : Boolean(current.marketEnabled)
+    const customMarketUrl =
+      "customMarketUrl" in patch ? (patch.customMarketUrl ?? "") : (current.customMarketUrl ?? "")
+    return {
+      disabledPluginIds: current.disabledPluginIds,
+      ...(activeShell !== undefined ? { activeShell } : {}),
+      ...(activeTheme !== undefined ? { activeTheme } : {}),
+      ...(startupPage !== undefined ? { startupPage } : {}),
+      ...(marketEnabled ? { marketEnabled: true } : {}),
+      ...(customMarketUrl ? { customMarketUrl } : {}),
+    }
   }
 
   return {
@@ -152,46 +193,31 @@ export function createPluginHostPreferences(
       return read().activeShell
     },
     setActiveShell(shellId: string | undefined): void {
-      const current = read()
-      commit(
-        {
-          disabledPluginIds: current.disabledPluginIds,
-          ...(shellId !== undefined ? { activeShell: shellId } : {}),
-          ...(current.activeTheme !== undefined ? { activeTheme: current.activeTheme } : {}),
-          ...(current.startupPage !== undefined ? { startupPage: current.startupPage } : {}),
-        },
-        true
-      )
+      commit(rebuild(read(), { activeShell: shellId }), true)
     },
     getActiveTheme(): string | undefined {
       return read().activeTheme
     },
     setActiveTheme(themeId: string | undefined): void {
-      const current = read()
-      commit(
-        {
-          disabledPluginIds: current.disabledPluginIds,
-          ...(current.activeShell !== undefined ? { activeShell: current.activeShell } : {}),
-          ...(themeId !== undefined ? { activeTheme: themeId } : {}),
-          ...(current.startupPage !== undefined ? { startupPage: current.startupPage } : {}),
-        },
-        true
-      )
+      commit(rebuild(read(), { activeTheme: themeId }), true)
     },
     getStartupPage(): string | undefined {
       return read().startupPage
     },
     setStartupPage(startupPage: string | undefined): void {
-      const current = read()
-      commit(
-        {
-          disabledPluginIds: current.disabledPluginIds,
-          ...(current.activeShell !== undefined ? { activeShell: current.activeShell } : {}),
-          ...(current.activeTheme !== undefined ? { activeTheme: current.activeTheme } : {}),
-          ...(startupPage !== undefined ? { startupPage } : {}),
-        },
-        true
-      )
+      commit(rebuild(read(), { startupPage }), true)
+    },
+    getMarketEnabled(): boolean {
+      return Boolean(read().marketEnabled)
+    },
+    setMarketEnabled(marketEnabled: boolean): void {
+      commit(rebuild(read(), { marketEnabled }), true)
+    },
+    getCustomMarketUrl(): string {
+      return read().customMarketUrl ?? ""
+    },
+    setCustomMarketUrl(customMarketUrl: string): void {
+      commit(rebuild(read(), { customMarketUrl: customMarketUrl.trim() }), true)
     },
   }
 }
@@ -271,6 +297,10 @@ export class PluginHost {
       setActiveTheme: (themeId: string | undefined) => this.preferences.setActiveTheme(themeId),
       getStartupPage: () => this.preferences.getStartupPage(),
       setStartupPage: (route: string | undefined) => this.preferences.setStartupPage(route),
+      getMarketEnabled: () => this.preferences.getMarketEnabled(),
+      setMarketEnabled: (enabled: boolean) => this.preferences.setMarketEnabled(enabled),
+      getCustomMarketUrl: () => this.preferences.getCustomMarketUrl(),
+      setCustomMarketUrl: (url: string) => this.preferences.setCustomMarketUrl(url),
       defaultLanding: () => this.composition.defaults.landing,
       defaultShell: () => this.composition.defaults.shell,
       safeMode: () => Boolean(this.recovery?.safeMode),
@@ -374,9 +404,21 @@ export class PluginHost {
     sha256: string,
     expected: { id: string; version: string }
   ): Promise<PluginManifest> {
-    const response = await fetch(url)
-    if (!response.ok) throw new Error(`Plugin download returned HTTP ${response.status}`)
-    return this.install(await response.arrayBuffer(), sha256, expected)
+    const candidates = resolveMarketUrls(url)
+    let bytes: ArrayBuffer | undefined
+    let lastError: unknown
+    for (const candidateUrl of candidates) {
+      try {
+        const response = await fetch(candidateUrl)
+        if (!response.ok) throw new Error(`Plugin download returned HTTP ${response.status}`)
+        bytes = await response.arrayBuffer()
+        break
+      } catch (error) {
+        lastError = error
+      }
+    }
+    if (!bytes) throw lastError
+    return this.install(bytes, sha256, expected)
   }
 
   async applyPluginBundle(

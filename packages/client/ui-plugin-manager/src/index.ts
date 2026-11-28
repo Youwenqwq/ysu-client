@@ -6,6 +6,7 @@ import {
   PLUGIN_API_VERSION,
   type MarketplaceIndex,
   type ObservableSource,
+  type PluginHostPreferenceSnapshot,
 } from "@orahako/sdk"
 import type { ProviderRuntimeService } from "@orahako/academic-sdk"
 import {
@@ -54,6 +55,16 @@ export {
 }
 
 const EMPTY_LOAD_ERRORS: ReadonlyMap<string, string> = new Map()
+
+const EMPTY_PREFERENCE_SNAPSHOT: PluginHostPreferenceSnapshot = {
+  marketEnabled: false,
+  customMarketUrl: "",
+}
+
+const STATIC_PREFERENCE_SOURCE: ObservableSource<PluginHostPreferenceSnapshot> = {
+  getSnapshot: () => EMPTY_PREFERENCE_SNAPSHOT,
+  subscribe: () => () => {},
+}
 
 const STATIC_PROVIDER_SNAPSHOT: OptionalProviderSnapshot = {
   schoolId: null,
@@ -146,6 +157,9 @@ export const pluginManagerPlugin = definePlugin({
       en: { ...pluginsDictionary.en, plugins: pluginsDictionary.en },
     })
 
+    const preferenceSource: ObservableSource<PluginHostPreferenceSnapshot> =
+      ctx.packageRuntime.preferenceState ?? STATIC_PREFERENCE_SOURCE
+
     ctx.slots.inject("shell.header.actions", () =>
       ctx.slots.register(
         {
@@ -154,9 +168,14 @@ export const pluginManagerPlugin = definePlugin({
           dictionary: pluginsDictionary,
           store: preferencesStore,
           inject: (): PluginsHeaderActionsInject => ({
-            hooks: { location: ctx.router.current },
+            hooks: {
+              location: ctx.router.current,
+              preference: preferenceSource,
+            },
             pluginId: pluginManagerPlugin.manifest.id,
             defaultMarketUrl: ctx.packageRuntime.marketUrl?.(),
+            setMarketEnabled: (enabled: boolean) => ctx.packageRuntime.setMarketEnabled?.(enabled),
+            setCustomMarketUrl: (url: string) => ctx.packageRuntime.setCustomMarketUrl?.(url),
           }),
         },
         PluginsHeaderActions
@@ -212,12 +231,19 @@ export const pluginManagerPlugin = definePlugin({
             getDefaultShell: () => ctx.packageRuntime.defaultShell?.(),
             setActiveShell: (shellId: string | undefined) =>
               ctx.packageRuntime.setActiveShell?.(shellId),
+            getActiveTheme: () => ctx.packageRuntime.getActiveTheme?.(),
+            setActiveTheme: (themeId: string | undefined) =>
+              ctx.packageRuntime.setActiveTheme?.(themeId),
+            openThemeSettings: () => {
+              ctx.router.push({ route: "theme" })
+            },
             isSafeMode: () => ctx.packageRuntime.safeMode?.() ?? false,
             getPlatform: () => (isCapacitor() ? "android" : "web"),
             hooks: {
               states: ctx.pluginManager.state,
               ui: ctx.ui.state,
               provider: providerProjection.source,
+              preference: preferenceSource,
             },
           }
         },

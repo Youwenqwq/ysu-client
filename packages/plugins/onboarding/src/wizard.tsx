@@ -10,7 +10,9 @@ import {
   Globe,
   Info,
   Lock,
+  Palette,
   Puzzle,
+  Store,
 } from "lucide-react"
 import type { SessionSnapshot } from "@orahako/academic-sdk"
 import type { DerivedComponentProps, ObservableSource, SlotComponent } from "@orahako/sdk"
@@ -412,6 +414,9 @@ export interface OnboardingWizardInject {
   readonly retrySchoolDiscovery: () => void
   readonly hasAnalytics?: () => boolean
   readonly setAnalyticsConsent?: (enabled: boolean) => void
+  readonly hasMarket?: () => boolean
+  readonly getMarketEnabled?: () => boolean
+  readonly setMarketEnabled?: (enabled: boolean) => void
   readonly isNative: () => boolean
   readonly hasProvider: (schoolId: string) => boolean
   readonly activateSchoolChoice: (school: OnboardingSchoolChoice) => Promise<void>
@@ -443,7 +448,9 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
   const completed = useStore((state) => state.completed)
   const storedSchoolId = useStore((state) => state.selectedSchoolId)
 
-  const [step, setStep] = useState<"welcome" | "agreement" | "school" | "permissions">("welcome")
+  const [step, setStep] = useState<"welcome" | "agreement" | "market" | "school" | "permissions">(
+    "welcome"
+  )
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true)
   const [selectedSchoolId, setSelectedSchoolId] = useState(
     () => storedSchoolId ?? schools[0]?.id ?? ""
@@ -473,7 +480,8 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
   const hydrated = storeHydrated && session.hasHydrated
   const visible = hydrated && !completed
   const schoolLocked = storedSchoolId !== null
-  const activeStep: "welcome" | "agreement" | "school" | "permissions" = schoolLocked
+  const showMarketStep = props.hasMarket?.() ?? false
+  const activeStep: "welcome" | "agreement" | "market" | "school" | "permissions" = schoolLocked
     ? "permissions"
     : step
   const onPermissionsStep = visible && activeStep === "permissions"
@@ -563,14 +571,28 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
 
   // A persisted school choice means the user already confirmed it; never unlock it again.
   const activeSchoolId = selectedSchoolId || schools[0]?.id || ""
-  const totalSteps = 3
-  const currentStepNumber = activeStep === "agreement" ? 1 : activeStep === "school" ? 2 : 3
+  const totalSteps = showMarketStep ? 4 : 3
+  const currentStepNumber =
+    activeStep === "agreement"
+      ? 1
+      : activeStep === "market"
+        ? 2
+        : activeStep === "school"
+          ? showMarketStep
+            ? 3
+            : 2
+          : totalSteps
   const progressPercent = (currentStepNumber / totalSteps) * 100
 
   function acceptTermsAndContinue() {
     if (showAnalyticsOption) {
       props.setAnalyticsConsent?.(analyticsEnabled)
     }
+    setStep(showMarketStep ? "market" : "school")
+  }
+
+  function chooseMarketAndContinue(enabled: boolean) {
+    props.setMarketEnabled?.(enabled)
     setStep("school")
   }
 
@@ -820,6 +842,76 @@ export const OnboardingWizard: SlotComponent<OnboardingWizardProps> = (props) =>
                     className="size-4 transition-transform duration-200 group-hover:translate-x-1"
                   />
                 </Button>
+              </section>
+            ) : activeStep === "market" ? (
+              <section key="market" data-onboarding-step="market">
+                <h1 className="text-2xl font-semibold tracking-tight">{t("marketTitle")}</h1>
+                <p className="mt-1.5 mb-6 text-sm text-muted-foreground">{t("marketDesc")}</p>
+
+                <div className="divide-y divide-border border-y border-border">
+                  {[
+                    {
+                      id: "themes",
+                      icon: Palette,
+                      title: t("marketBenefitThemesTitle"),
+                      desc: t("marketBenefitThemesDesc"),
+                    },
+                    {
+                      id: "extensions",
+                      icon: Store,
+                      title: t("marketBenefitExtensionsTitle"),
+                      desc: t("marketBenefitExtensionsDesc"),
+                    },
+                  ].map((item, index) => {
+                    const Icon = item.icon
+                    return (
+                      <div
+                        key={item.id}
+                        data-onboarding-item=""
+                        style={{ animationDelay: `${index * 45}ms` }}
+                        className="flex items-start gap-3 py-4"
+                      >
+                        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-border">
+                          <Icon className="size-4 text-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">{item.title}</p>
+                          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                            {item.desc}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
+                  {t("marketNote")}
+                </p>
+
+                <div className="mt-6 flex flex-col gap-2.5">
+                  <Button
+                    type="button"
+                    data-onboarding-market-enable=""
+                    onClick={() => chooseMarketAndContinue(true)}
+                    className="group h-11 w-full rounded-xl bg-foreground text-background transition-all hover:bg-foreground/90 active:scale-[0.985]"
+                  >
+                    <span>{t("enableMarket")}</span>
+                    <ArrowRight
+                      data-icon="inline-end"
+                      className="size-4 transition-transform duration-200 group-hover:translate-x-1"
+                    />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    data-onboarding-market-skip=""
+                    onClick={() => chooseMarketAndContinue(false)}
+                    className="h-11 w-full rounded-xl transition-all active:scale-[0.985]"
+                  >
+                    {t("skipMarket")}
+                  </Button>
+                </div>
               </section>
             ) : activeStep === "school" ? (
               <section key="school" data-onboarding-step="school">

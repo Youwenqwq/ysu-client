@@ -49,6 +49,27 @@ export interface MarketplaceIndex {
 }
 
 const MARKET_CACHE_PREFIX = "orahako-plugin-market-cache:"
+const GITHUB_RAW_PREFIX = /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/
+const JSDELIVR_GH_PREFIX = /^https:\/\/cdn\.jsdelivr\.net\/gh\/([^/]+)\/([^/@]+)@([^/]+)\/(.+)$/
+
+/**
+ * Expand a GitHub Raw or jsDelivr URL into an ordered candidate list
+ * preferring jsDelivr CDN with automatic fallback to GitHub Raw.
+ * Custom / third-party URLs are returned as-is.
+ */
+export function resolveMarketUrls(url: string): readonly string[] {
+  const rawMatch = GITHUB_RAW_PREFIX.exec(url)
+  if (rawMatch) {
+    const [, owner, repo, ref, filePath] = rawMatch
+    return [`https://cdn.jsdelivr.net/gh/${owner}/${repo}@${ref}/${filePath}`, url]
+  }
+  const cdnMatch = JSDELIVR_GH_PREFIX.exec(url)
+  if (cdnMatch) {
+    const [, owner, repo, ref, filePath] = cdnMatch
+    return [url, `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${filePath}`]
+  }
+  return [url]
+}
 
 export interface PluginMarketResult {
   index: MarketplaceIndex
@@ -110,28 +131,33 @@ export function loadCachedPluginMarket(indexUrl: string): PluginMarketResult | u
 }
 
 export async function loadPluginMarket(indexUrl: string): Promise<PluginMarketResult> {
-  try {
-    const response = await fetch(indexUrl, { cache: "no-store" })
-    if (!response.ok) throw new Error(`Plugin market returned HTTP ${response.status}`)
-    const index = validateMarketplaceIndex(await response.json())
+  const candidates = resolveMarketUrls(indexUrl)
+  let lastError: unknown
+  for (const candidateUrl of candidates) {
     try {
-      localStorage.setItem(
-        `${MARKET_CACHE_PREFIX}${encodeURIComponent(indexUrl)}`,
-        JSON.stringify(index)
-      )
-    } catch {
-      // A fresh index remains usable when persistent storage is unavailable.
+      const response = await fetch(candidateUrl, { cache: "no-store" })
+      if (!response.ok) throw new Error(`Plugin market returned HTTP ${response.status}`)
+      const index = validateMarketplaceIndex(await response.json())
+      try {
+        localStorage.setItem(
+          `${MARKET_CACHE_PREFIX}${encodeURIComponent(indexUrl)}`,
+          JSON.stringify(index)
+        )
+      } catch {
+        // A fresh index remains usable when persistent storage is unavailable.
+      }
+      return { index, stale: false }
+    } catch (error) {
+      lastError = error
     }
-    return { index, stale: false }
-  } catch (error) {
-    try {
-      const cached = localStorage.getItem(`${MARKET_CACHE_PREFIX}${encodeURIComponent(indexUrl)}`)
-      if (cached) return { index: validateMarketplaceIndex(JSON.parse(cached)), stale: true }
-    } catch {
-      // Fall through to the network error when no valid cache exists.
-    }
-    throw error
   }
+  try {
+    const cached = localStorage.getItem(`${MARKET_CACHE_PREFIX}${encodeURIComponent(indexUrl)}`)
+    if (cached) return { index: validateMarketplaceIndex(JSON.parse(cached)), stale: true }
+  } catch {
+    // Fall through to the network error when no valid cache exists.
+  }
+  throw lastError
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {

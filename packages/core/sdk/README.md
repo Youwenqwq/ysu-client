@@ -274,13 +274,14 @@ Market indexes keep `schemaVersion: 1`; individual releases declare
 `apiVersion: 1`, `version`, `platforms` (`web` or `android`), `zipUrl`, `sha256`,
 `size` and `publishedAt`. Set `minAppVersion` to the oldest compatible app
 release if needed. Compatibility is filtered by API, platform, app version and
-native capabilities before selecting the highest matching SemVer. To publish to
-`Youwenqwq/orahako-plugin-registry`, run `pnpm run ingest <path/to/plugin.zip> --changelog "..."`
-followed by `pnpm run validate` in the registry repository, then commit the
-updated `plugins/<id>.json`, generated `dist/plugins.json`, and
-`dist/plugins/<id>/<version>.zip`. The app reads both index and ZIPs from that
-repository's `main` branch through GitHub Raw. Official external plugin sources
-(maintained separately from the host app) live in `Youwenqwq/orahako-official-plugins`.
+native capabilities before selecting the highest matching SemVer. Direct pushes to
+`Youwenqwq/orahako-plugin-registry`'s `main` branch are prohibited: official plugins
+in `Youwenqwq/orahako-official-plugins` publish by pushing a `<plugin-id>@<version>`
+tag so CI builds, creates a GitHub Release, and opens a reviewed ingest Pull Request
+in `orahako-plugin-registry`; community plugins open a Pull Request against
+`orahako-plugin-registry` after running `pnpm run ingest`, `pnpm run validate`, and
+`pnpm run check:immutable`. The app reads both index and ZIPs from `main` via
+jsDelivr CDN with automatic fallback to GitHub Raw.
 
 ## Verification
 

@@ -91,6 +91,7 @@ class MiniDomNode {
 
   addEventListener(): void {}
   removeEventListener(): void {}
+  focus(): void {}
   findAll(predicate: (node: MiniDomNode) => boolean): MiniDomNode[] {
     const matches: MiniDomNode[] = []
     const visit = (node: MiniDomNode) => {
@@ -129,12 +130,24 @@ function mountDom() {
   const prevAct = globals.IS_REACT_ACT_ENVIRONMENT
   const prevForm = globals.HTMLFormElement
   const prevElem = globals.HTMLElement
+  const prevGetComputedStyle = globals.getComputedStyle
+  const prevRaf = globals.requestAnimationFrame
+  const prevCancelRaf = globals.cancelAnimationFrame
 
+  const getComputedStyleStub = () => ({ animationName: "none" })
+  const rafStub = (cb: () => void) => {
+    cb()
+    return 1
+  }
+  const cancelRafStub = () => {}
   const fakeWin = {
     event: undefined,
     HTMLIFrameElement: class {},
     HTMLFormElement: class {},
     HTMLElement: MiniDomNode,
+    getComputedStyle: getComputedStyleStub,
+    requestAnimationFrame: rafStub,
+    cancelAnimationFrame: cancelRafStub,
     confirm: vi.fn(() => true),
     location: { reload: vi.fn() },
   }
@@ -168,6 +181,9 @@ function mountDom() {
   globals.document = docWithFactories
   globals.HTMLFormElement = fakeWin.HTMLFormElement
   globals.HTMLElement = MiniDomNode
+  globals.getComputedStyle = getComputedStyleStub
+  globals.requestAnimationFrame = rafStub
+  globals.cancelAnimationFrame = cancelRafStub
 
   const container = docWithFactories.createElement("div")
   const root = createRoot(container as never)
@@ -189,6 +205,9 @@ function mountDom() {
       globals.IS_REACT_ACT_ENVIRONMENT = prevAct
       globals.HTMLFormElement = prevForm
       globals.HTMLElement = prevElem
+      globals.getComputedStyle = prevGetComputedStyle
+      globals.requestAnimationFrame = prevRaf
+      globals.cancelAnimationFrame = prevCancelRaf
     },
   }
 }
@@ -225,18 +244,19 @@ describe("@orahako/ui-plugin-manager", () => {
     expect(pluginManagerPlugin.optionalInject).toEqual(["provider"])
     expect(pluginCategory({ kind: "provider" })).toBe("provider")
     expect(pluginCategory({ kind: "runtime" })).toBe("system")
-    expect(pluginCategory({ kind: "shell" })).toBe("system")
+    expect(pluginCategory({ kind: "shell" })).toBe("appearance")
     expect(pluginCategory({ kind: "feature", required: true })).toBe("system")
     expect(pluginCategory({ kind: "theme" })).toBe("appearance")
     expect(pluginCategory({ kind: "feature", categories: ["toybox"] })).toBe("toybox")
     expect(pluginCategory({ kind: "feature" })).toBe("academic")
 
     const grouped = groupByPluginCategory([
-      { id: "t", kind: "theme" as const },
-      { id: "a", kind: "feature" as const },
       { id: "p", kind: "provider" as const },
+      { id: "a", kind: "feature" as const },
+      { id: "s", kind: "shell" as const },
+      { id: "t", kind: "theme" as const },
     ])
-    expect(grouped.map((g) => g.id)).toEqual(["provider", "academic", "appearance"])
+    expect(grouped.map((g) => g.id)).toEqual(["appearance", "academic", "provider"])
   })
 
   it("registers plugins page & navigation, renders installed/shells/market/bundles, and supports sideload & uninstall", async () => {
@@ -535,20 +555,21 @@ describe("@orahako/ui-plugin-manager", () => {
       })
       expect(pageInject.hooks.provider.getSnapshot()).toBe(updatedProvider)
 
-      // Static SSR check: system plugins and the market stay out of the default page.
+      // Static SSR check: system plugins and the market stay out of the default page,
+      // while shell plugins remain visible under appearance.
       const preferences = pageEntry!.store as PluginManagerPreferencesStoreInstance
       let staticHtml = renderToStaticMarkup(
         <ContributionOutlet entry={pageEntry!} slots={host.slots} i18n={host.i18n} />
       )
       expect(staticHtml).toContain("已安装插件")
-      expect(staticHtml).toContain("酸橙盒默认")
-      expect(staticHtml).toContain("紧凑界面")
+      expect(staticHtml).toContain("Default Shell")
+      expect(staticHtml).toContain("Demo Shell")
       expect(staticHtml).not.toContain("必需插件")
       expect(staticHtml).not.toContain("插件更新检查")
 
       preferences.actions.setShowSystemPlugins(true)
-      preferences.actions.setCustomMarketUrl("https://market.example.com/custom.json")
-      preferences.actions.setMarketEnabled(true)
+      host.preferences.setCustomMarketUrl("https://market.example.com/custom.json")
+      host.preferences.setMarketEnabled(true)
       staticHtml = renderToStaticMarkup(
         <ContributionOutlet entry={pageEntry!} slots={host.slots} i18n={host.i18n} />
       )
@@ -556,7 +577,7 @@ describe("@orahako/ui-plugin-manager", () => {
       expect(staticHtml).toContain('aria-label="启用或停用 必需插件"')
       expect(staticHtml).toContain("插件更新检查")
 
-      // Interactive mount loads installed packages, market v3 releases, update badge, and school bundle
+      // Interactive mount loads installed packages, market v1 releases, update badge, and school bundle
       const dom = mountDom()
       await dom.render(
         <ContributionOutlet entry={pageEntry!} slots={host.slots} i18n={host.i18n} />
@@ -565,47 +586,88 @@ describe("@orahako/ui-plugin-manager", () => {
         await new Promise((resolve) => setTimeout(resolve, 20))
       })
 
-      const text = dom.container.textContent
-      expect(text).toContain("Community Toy")
-      expect(text).toContain("卸载")
-      expect(text).toContain("燕大推荐扩展包")
-      expect(text).toContain("v1.0.0 → v1.5.0")
-      expect(text).not.toContain("v9.0.0") // v2 release filtered out!
-      expect(text).toContain("更新全部（1）")
-      expect(text).toContain("Mint Theme")
-      expect(text).not.toContain("Campus Provider")
+      expect(dom.container.textContent).toContain("Community Toy")
+      expect(dom.container.textContent).toContain("卸载")
+      expect(dom.container.textContent).toContain("更新全部（1）")
       expect(fetchMock).toHaveBeenCalledWith("https://market.example.com/custom.json", {
         cache: "no-store",
       })
 
-      // Shell selection persists the clicked fully-qualified id, including the default shell.
-      const shellVariant = (label: string): string | undefined =>
-        findButton(dom.container, label)?.attributes.get("data-variant")
-      expect(shellVariant("演示界面")).toBe("default")
-      expect(shellVariant("酸橙盒默认")).toBe("outline")
-
-      const clickButton = async (label: string): Promise<void> => {
-        const button = findButton(dom.container, label)
-        expect(button).toBeDefined()
+      const clickNode = async (node: MiniDomNode | undefined): Promise<void> => {
+        expect(node).toBeDefined()
         await act(async () => {
-          const onClick = findReactProps(button!).onClick as (() => void) | undefined
+          const props = findReactProps(node!)
+          const onClick = props.onClick as (() => void) | undefined
+          const onMouseDown = props.onMouseDown as
+            | ((event: {
+                button: number
+                ctrlKey: boolean
+                defaultPrevented: boolean
+                preventDefault: () => void
+              }) => void)
+            | undefined
+          const onFocus = props.onFocus as
+            | ((event: { target: MiniDomNode; currentTarget: MiniDomNode }) => void)
+            | undefined
+          const onKeyDown = props.onKeyDown as
+            | ((event: {
+                key: string
+                target: MiniDomNode
+                currentTarget: MiniDomNode
+                defaultPrevented: boolean
+                preventDefault: () => void
+              }) => void)
+            | undefined
+          onMouseDown?.({
+            button: 0,
+            ctrlKey: false,
+            defaultPrevented: false,
+            preventDefault() {},
+          })
+          onFocus?.({ target: node!, currentTarget: node! })
+          onKeyDown?.({
+            key: "Enter",
+            target: node!,
+            currentTarget: node!,
+            defaultPrevented: false,
+            preventDefault() {},
+          })
           onClick?.()
         })
       }
 
-      await clickButton("酸橙盒默认")
+      // Shell selection happens directly on the shell plugin card.
+      const applyDefaultShellBtn = dom.container.findAll(
+        (node) => node.attributes.get("data-plugin-apply-shell") === "orahako.shell:default"
+      )[0]
+      expect(applyDefaultShellBtn?.textContent.trim()).toBe("使用此界面")
+      await clickNode(applyDefaultShellBtn)
       expect(host.preferences.getActiveShell()).toBe("orahako.shell:default")
-      expect(shellVariant("酸橙盒默认")).toBe("default")
-      expect(shellVariant("演示界面")).toBe("outline")
 
-      await clickButton("紧凑界面")
-      expect(host.preferences.getActiveShell()).toBe("orahako.shell:compact")
+      const applyAltShellBtn = dom.container.findAll(
+        (node) => node.attributes.get("data-plugin-apply-shell") === "demo.shell:alt"
+      )[0]
+      await clickNode(applyAltShellBtn)
+      expect(host.preferences.getActiveShell()).toBeUndefined()
 
-      await clickButton("演示界面")
-      expect(host.preferences.getActiveShell()).toBe("demo.shell:alt")
+      // Switch to the Marketplace tab to verify bundles and market listings.
+      const marketTab = dom.container.findAll(
+        (node) => node.attributes.get("data-plugin-tab") === "market"
+      )[0]
+      await clickNode(marketTab)
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      })
+
+      const marketText = dom.container.textContent
+      expect(marketText).toContain("燕大推荐扩展包")
+      expect(marketText).toContain("v1.0.0 → v1.5.0")
+      expect(marketText).not.toContain("v9.0.0") // v2 release filtered out!
+      expect(marketText).toContain("Mint Theme")
+      expect(marketText).not.toContain("Campus Provider")
 
       // Bundles resolve relative ZIPs against the market currently shown on the page.
-      await clickButton("一键开启")
+      await clickNode(findButton(dom.container, "一键开启"))
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 100))
       })
@@ -667,7 +729,7 @@ describe("@orahako/ui-plugin-manager", () => {
       await host.bootstrap()
       const pageEntry = host.ui?.findPage("orahako.plugin-manager", "plugins")
       const preferences = pageEntry!.store as PluginManagerPreferencesStoreInstance
-      preferences.actions.setMarketEnabled(true)
+      host.preferences.setMarketEnabled(true)
 
       const dom = mountDom()
       await dom.render(
@@ -684,12 +746,10 @@ describe("@orahako/ui-plugin-manager", () => {
       fetchMock.mockImplementation(
         async () => new Response(JSON.stringify(marketIndex), { status: 200 })
       )
-      const refresh = dom.container.findAll(
-        (node) => node.attributes.get("aria-label") === "刷新市场"
-      )[0]
-      expect(refresh).toBeDefined()
+      const checkNow = findButton(dom.container, "检查更新")
+      expect(checkNow).toBeDefined()
       await act(async () => {
-        const onClick = findReactProps(refresh!).onClick as (() => void) | undefined
+        const onClick = findReactProps(checkNow!).onClick as (() => void) | undefined
         onClick?.()
       })
       await act(async () => {
@@ -764,7 +824,7 @@ describe("@orahako/ui-plugin-manager", () => {
       await host.bootstrap()
       const pageEntry = host.ui?.findPage("orahako.plugin-manager", "plugins")
       const preferences = pageEntry!.store as PluginManagerPreferencesStoreInstance
-      preferences.actions.setMarketEnabled(true)
+      host.preferences.setMarketEnabled(true)
       preferences.actions.setLastUpdateCheck(Date.now())
 
       const dom = mountDom()
@@ -778,7 +838,49 @@ describe("@orahako/ui-plugin-manager", () => {
       expect(fetchMock).not.toHaveBeenCalled()
       expect(dom.container.textContent).not.toContain("网络不可用，正在显示上次缓存的市场索引。")
 
-      // Manual refresh failing falls back to cache and now shows the offline notice.
+      // Switch to Marketplace tab and trigger manual refresh; failing falls back to cache and shows offline notice.
+      const marketTab = dom.container.findAll(
+        (node) => node.attributes.get("data-plugin-tab") === "market"
+      )[0]
+      await act(async () => {
+        const props = findReactProps(marketTab!)
+        const onMouseDown = props.onMouseDown as
+          | ((event: {
+              button: number
+              ctrlKey: boolean
+              defaultPrevented: boolean
+              preventDefault: () => void
+            }) => void)
+          | undefined
+        const onFocus = props.onFocus as
+          | ((event: { target: MiniDomNode; currentTarget: MiniDomNode }) => void)
+          | undefined
+        const onKeyDown = props.onKeyDown as
+          | ((event: {
+              key: string
+              target: MiniDomNode
+              currentTarget: MiniDomNode
+              defaultPrevented: boolean
+              preventDefault: () => void
+            }) => void)
+          | undefined
+        const onClick = props.onClick as (() => void) | undefined
+        onMouseDown?.({
+          button: 0,
+          ctrlKey: false,
+          defaultPrevented: false,
+          preventDefault() {},
+        })
+        onFocus?.({ target: marketTab!, currentTarget: marketTab! })
+        onKeyDown?.({
+          key: "Enter",
+          target: marketTab!,
+          currentTarget: marketTab!,
+          defaultPrevented: false,
+          preventDefault() {},
+        })
+        onClick?.()
+      })
       const refresh = dom.container.findAll(
         (node) => node.attributes.get("aria-label") === "刷新市场"
       )[0]

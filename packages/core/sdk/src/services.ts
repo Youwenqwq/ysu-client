@@ -33,6 +33,8 @@ export interface PluginHostPreferenceSnapshot {
   readonly activeShell?: string
   readonly activeTheme?: string
   readonly startupPage?: string
+  readonly marketEnabled?: boolean
+  readonly customMarketUrl?: string
 }
 
 /** Host-owned, persisted preference facade exposed to the app runtime. */
@@ -46,6 +48,10 @@ export interface PluginHostPreferences {
   setActiveTheme(themeId: string | undefined): void
   getStartupPage(): string | undefined
   setStartupPage(route: string | undefined): void
+  getMarketEnabled(): boolean
+  setMarketEnabled(enabled: boolean): void
+  getCustomMarketUrl(): string
+  setCustomMarketUrl(url: string): void
 }
 
 export interface InstalledPluginSummary {
@@ -107,6 +113,10 @@ export interface PluginPackageRuntime {
   setActiveTheme?(themeId: string | undefined): void
   getStartupPage?(): string | undefined
   setStartupPage?(route: string | undefined): void
+  getMarketEnabled?(): boolean
+  setMarketEnabled?(enabled: boolean): void
+  getCustomMarketUrl?(): string
+  setCustomMarketUrl?(url: string): void
   defaultLanding?(): string | undefined
   defaultShell?(): string | undefined
   safeMode?(): boolean
