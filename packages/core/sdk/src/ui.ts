@@ -135,6 +135,11 @@ export interface ShellSpec<
 > {
   readonly id: string
   readonly name: string
+  /**
+   * Whether this shell consumes host theme CSS overrides (`registerTheme`).
+   * Defaults to false so self-styled third-party shells are isolated from host themes.
+   */
+  readonly supportsThemes?: boolean
   readonly dictionary?: Dict
   readonly children?: Children
   /**
@@ -152,6 +157,7 @@ export interface PluginShellContribution {
   readonly id: string
   readonly pluginId: string
   readonly name: string
+  readonly supportsThemes?: boolean
   readonly dictionary?: unknown
   readonly children?: ChildrenSpec
   readonly store?: unknown

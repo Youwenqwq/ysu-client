@@ -319,6 +319,7 @@ export class PluginUIRegistry
       id: spec.id,
       pluginId: manifest.id,
       name: spec.name,
+      ...(spec.supportsThemes !== undefined ? { supportsThemes: spec.supportsThemes } : {}),
       ...(spec.dictionary !== undefined ? { dictionary: spec.dictionary } : {}),
       ...(spec.children !== undefined ? { children: spec.children } : {}),
       ...(resolvedStore !== undefined ? { store: resolvedStore } : {}),

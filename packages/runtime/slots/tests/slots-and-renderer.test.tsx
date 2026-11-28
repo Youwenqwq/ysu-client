@@ -805,7 +805,7 @@ describe("OrahakoApp root component (root slot, shell selection/fallback, Kernel
       },
       inject: ["ui"],
       apply(ctx) {
-        ctx.ui.registerShell({ id: "main", name: "Default" }, (props) => {
+        ctx.ui.registerShell({ id: "main", name: "Default", supportsThemes: true }, (props) => {
           selectShellFn = props.selectShell
           return <div data-shell="default">DefaultShell:{props.children}</div>
         })

@@ -1068,7 +1068,7 @@ export function OrahakoApp({
 
   return (
     <Fragment>
-      {themeElement}
+      {activeShellEntry.supportsThemes === true ? themeElement : null}
       <ShellErrorBoundary
         key={shellBoundaryKey(activeShellEntry)}
         shell={activeShellEntry}

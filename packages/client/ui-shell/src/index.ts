@@ -346,6 +346,7 @@ export const uiShellPlugin = definePlugin<
       {
         id: DEFAULT_SHELL_ID,
         name: appNameZh,
+        supportsThemes: true,
         dictionary: shellDictionary,
         children: defaultShellChildren,
         declareChildren: false,

@@ -405,6 +405,13 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
       : undefined
 
   const defaultShellId = getDefaultShell?.()
+  const activeShellEntry =
+    uiSnapshot.shells.find(
+      (shell) =>
+        activeShellId !== undefined &&
+        (activeShellId === `${shell.pluginId}:${shell.id}` || activeShellId === shell.id)
+    ) ?? uiSnapshot.shells[0]
+  const activeShellSupportsThemes = activeShellEntry?.supportsThemes === true
 
   const renderAppearanceAction = (pluginId: string, status: string): ReactNode => {
     if (status !== "active") return null
@@ -429,6 +436,8 @@ export const PluginsPage: SlotComponent<PluginsPageProps> = (props) => {
         </Button>
       )
     }
+
+    if (!activeShellSupportsThemes) return null
 
     const pluginThemes = uiSnapshot.themes.filter((theme) => theme.pluginId === pluginId)
     if (pluginThemes.length > 1) {

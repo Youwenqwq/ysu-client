@@ -73,6 +73,13 @@ export const AppearanceSettingsSection: SlotComponent<AppearanceSettingsProps> =
     !activeShellId || activeShellId === props.defaultShellQualifiedId || activeShellId === "default"
 
   const shells = uiSnapshot.shells
+  const activeShellEntry =
+    shells.find(
+      (shell) =>
+        activeShellId !== undefined &&
+        (activeShellId === `${shell.pluginId}:${shell.id}` || activeShellId === shell.id)
+    ) ?? shells[0]
+  const activeShellSupportsThemes = activeShellEntry?.supportsThemes === true
   const shellItems = shells.map((shell) => ({
     value: `${shell.pluginId}:${shell.id}`,
     label: shell.name,
@@ -136,7 +143,7 @@ export const AppearanceSettingsSection: SlotComponent<AppearanceSettingsProps> =
         </div>
       )}
 
-      {customThemes.length > 0 && (
+      {activeShellSupportsThemes && customThemes.length > 0 && (
         <a
           href={props.themeHref}
           onClick={(event) => handleSpaClick(event, props.navigateToTheme)}
