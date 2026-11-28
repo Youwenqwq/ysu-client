@@ -5,6 +5,7 @@ import type { Translator } from "@orahako/sdk"
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@orahako/ui-primitives"
 import type { GradesDictionary } from "./dictionary"
 import { gpaBandIndex } from "./gpa-band"
+import { resolvePrimaryGpa, type GpaDisplayMode } from "./store"
 
 function toNumber(numericValue: number | undefined, rawText?: string): number | null {
   if (typeof numericValue === "number" && Number.isFinite(numericValue)) {
@@ -88,6 +89,7 @@ export interface GpaSummaryProps {
   readonly gpaScale?: ProviderGPAScale
   readonly termWeightedGpa: string | null
   readonly gpaVisible: boolean
+  readonly gpaDisplayMode?: GpaDisplayMode
   readonly onSetGpaVisible: (visible: boolean) => void
   readonly t: Translator<GradesDictionary>
 }
@@ -97,6 +99,7 @@ export function GpaSummary({
   gpaScale,
   termWeightedGpa,
   gpaVisible,
+  gpaDisplayMode = "initial",
   onSetGpaVisible,
   t,
 }: GpaSummaryProps): ReactNode {
@@ -118,7 +121,8 @@ export function GpaSummary({
   const totalCredits = credits.reduce((sum, segment) => sum + segment.value, 0)
   const failedCredits = toNumber(gpa?.numericRequiredCreditFailed, gpa?.requiredCreditFailed) ?? 0
 
-  const gpaValue = toNumber(gpa?.numericGpaInitial, gpa?.gpaInitial)
+  const primaryGpa = resolvePrimaryGpa(gpa, gpaDisplayMode)
+  const gpaValue = primaryGpa.numeric
   const band =
     gpaValue === null || !gpaScale ? null : gpaScale.bands[gpaBandIndex(gpaValue, gpaScale.bands)]!
   const encourageKey = !band
@@ -232,7 +236,11 @@ export function GpaSummary({
 
             <div className="flex flex-col divide-y divide-border">
               <div className="py-1.5">
-                <StatRow label={t("grades.gpaHighest")} value={gpa?.gpaHighest} />
+                {primaryGpa.mode === "highest" ? (
+                  <StatRow label={t("grades.gpaInitial")} value={gpa?.gpaInitial} />
+                ) : (
+                  <StatRow label={t("grades.gpaHighest")} value={gpa?.gpaHighest} />
+                )}
               </div>
               <div className="py-1.5">
                 <StatRow label={t("grades.requiredGpaHighest")} value={gpa?.requiredGpaHighest} />

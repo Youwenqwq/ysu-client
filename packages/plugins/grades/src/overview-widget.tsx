@@ -25,6 +25,7 @@ import {
   gradeKey,
   isGradeScored,
   normalizeGradeUser,
+  resolvePrimaryGpa,
   type GradeGachaState,
   type GradesSettingsStoreInstance,
 } from "./store"
@@ -54,8 +55,11 @@ export const GpaSummaryWidget: SlotComponent<GpaSummaryWidgetProps> = (props) =>
   const query = props.useGpa()
   const compact = useIsMobile()
   const visible = useStore((state) => state.gpaVisible)
+  const gpaDisplayMode = useStore((state) => state.gpaDisplayMode)
   const data = query.data
-  const gpa = data?.gpaInitial ?? data?.numericGpaInitial ?? "-"
+  const primaryGpa = resolvePrimaryGpa(data, gpaDisplayMode)
+  const gpaLabelKey = primaryGpa.mode === "highest" ? "grades.gpaHighest" : "grades.gpaInitial"
+  const gpa = primaryGpa.text ?? "-"
   const weightedAvg = data?.weightedAvg ?? data?.numericWeightedAvg ?? "-"
   const arithmeticAvg = data?.arithmeticAvg ?? data?.numericArithmeticAvg ?? "-"
 
@@ -73,7 +77,7 @@ export const GpaSummaryWidget: SlotComponent<GpaSummaryWidgetProps> = (props) =>
         className="flex w-full min-w-0 flex-col gap-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
       >
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <span className="truncate">{t("grades.gpaInitial")}</span>
+          <span className="truncate">{t(gpaLabelKey)}</span>
           {visible ? <EyeOff className="size-3 shrink-0" /> : <Eye className="size-3 shrink-0" />}
         </span>
         {data === undefined && query.isLoading ? (
@@ -94,7 +98,7 @@ export const GpaSummaryWidget: SlotComponent<GpaSummaryWidgetProps> = (props) =>
       <CardHeader className="flex flex-row items-center justify-between gap-1">
         <CardTitle className="flex items-center gap-2">
           <BarChart3 className="size-4 shrink-0 text-primary" />
-          {t("grades.gpaInitial")}
+          {t(gpaLabelKey)}
         </CardTitle>
         <Button
           type="button"
@@ -157,7 +161,9 @@ export const RecentGradesWidget: SlotComponent<RecentGradesWidgetProps> = (props
   const gachaState = props.useGacha()
 
   const gpaVisible = useStore((s) => s.gpaVisible)
+  const gpaDisplayMode = useStore((s) => s.gpaDisplayMode)
   const gachaEnabled = useStore((s) => s.gradeGachaEnabled)
+  const primaryGpa = resolvePrimaryGpa(gpaQuery.data, gpaDisplayMode)
 
   const user = normalizeGradeUser(session.username)
   const pendingKeys = new Set((gachaState.pendingByUser[user] ?? []).map((item) => item.key))
@@ -182,7 +188,7 @@ export const RecentGradesWidget: SlotComponent<RecentGradesWidgetProps> = (props
           {t("widgets.recentGrades.title")}
         </CardTitle>
         <div className="flex items-center gap-1">
-          {gpaQuery.data?.gpaInitial && (
+          {primaryGpa.text && (
             <button
               type="button"
               onClick={() => actions.toggleGpaVisible()}
@@ -190,7 +196,7 @@ export const RecentGradesWidget: SlotComponent<RecentGradesWidgetProps> = (props
               className="flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted"
             >
               <span className="font-medium text-foreground tabular-nums">
-                GPA {gpaVisible ? gpaQuery.data.gpaInitial : "***"}
+                GPA {gpaVisible ? primaryGpa.text : "***"}
               </span>
               {gpaVisible ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
             </button>

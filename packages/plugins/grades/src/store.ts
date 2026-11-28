@@ -1,4 +1,4 @@
-import type { Grade } from "@orahako/academic-sdk"
+import type { GPAStats, Grade } from "@orahako/academic-sdk"
 import { defineStore, type StoreInstance } from "@orahako/sdk"
 
 export const ALL_TERM = "__all__"
@@ -94,20 +94,55 @@ export function toPendingGrade(grade: Grade): PendingGrade {
   }
 }
 
+export type GpaDisplayMode = "initial" | "highest"
+
+function parseGpaNumber(numericValue: number | undefined, rawText?: string): number | null {
+  if (typeof numericValue === "number" && Number.isFinite(numericValue)) {
+    return numericValue
+  }
+  if (!rawText) return null
+  const parsed = Number.parseFloat(rawText)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+export function resolvePrimaryGpa(
+  gpa: GPAStats | undefined,
+  mode: GpaDisplayMode = "initial"
+): { readonly numeric: number | null; readonly text: string | undefined; readonly mode: GpaDisplayMode } {
+  const highestNumeric = parseGpaNumber(gpa?.numericGpaHighest, gpa?.gpaHighest)
+  const highestText = gpa?.gpaHighest ?? (highestNumeric !== null ? String(highestNumeric) : undefined)
+  if (mode === "highest" && (highestNumeric !== null || highestText !== undefined)) {
+    return { numeric: highestNumeric, text: highestText, mode: "highest" }
+  }
+  const initialNumeric = parseGpaNumber(gpa?.numericGpaInitial, gpa?.gpaInitial)
+  const initialText = gpa?.gpaInitial ?? (initialNumeric !== null ? String(initialNumeric) : undefined)
+  return { numeric: initialNumeric, text: initialText, mode: "initial" }
+}
+
 export interface GradesSettingsState {
   readonly gpaVisible: boolean
+  readonly gpaDisplayMode: GpaDisplayMode
   readonly gradeGachaEnabled: boolean
 }
 
 export const gradesSettingsStore = defineStore({
   init: (): GradesSettingsState => ({
     gpaVisible: false,
+    gpaDisplayMode: "initial",
     gradeGachaEnabled: true,
   }),
   persist: {
     key: "grades-settings",
     mode: "local",
-    version: 1,
+    version: 2,
+    migrate(persisted): GradesSettingsState {
+      const previous = persisted as Partial<GradesSettingsState> | undefined
+      return {
+        gpaVisible: previous?.gpaVisible ?? false,
+        gpaDisplayMode: previous?.gpaDisplayMode === "highest" ? "highest" : "initial",
+        gradeGachaEnabled: previous?.gradeGachaEnabled ?? true,
+      }
+    },
   },
   actions: {
     setGpaVisible(ctx, gpaVisible: boolean) {
@@ -115,6 +150,11 @@ export const gradesSettingsStore = defineStore({
     },
     toggleGpaVisible(ctx) {
       ctx.set((prev) => ({ ...prev, gpaVisible: !prev.gpaVisible }))
+    },
+    setGpaDisplayMode(ctx, gpaDisplayMode: GpaDisplayMode) {
+      ctx.set((prev) =>
+        prev.gpaDisplayMode === gpaDisplayMode ? prev : { ...prev, gpaDisplayMode }
+      )
     },
     setGradeGachaEnabled(ctx, gradeGachaEnabled: boolean) {
       ctx.set((prev) =>

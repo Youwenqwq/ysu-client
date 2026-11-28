@@ -63,7 +63,7 @@ import {
 import { ToggleGroup } from "@orahako/ui-primitives"
 import * as gradesPublic from "../src"
 import { GRADES_PLUGIN_ID, gradesPlugin } from "../src"
-import { gradeGachaStore, gradeKey, gradesSettingsStore } from "../src/store"
+import { gradeGachaStore, gradeKey, gradesSettingsStore, resolvePrimaryGpa } from "../src/store"
 
 type EventListenerFn = (event: unknown) => void
 
@@ -1162,5 +1162,30 @@ describe("@orahako/plugin-grades export discipline, gacha store & runtime integr
     expect(runtime.context.get("overview")).toBeUndefined()
 
     runtime.dispose()
+  })
+
+  it("resolves primary GPA display mode with initial default and highest option", () => {
+    const gpa = {
+      gpaInitial: "3.42",
+      numericGpaInitial: 3.42,
+      gpaHighest: "3.78",
+      numericGpaHighest: 3.78,
+    }
+    expect(resolvePrimaryGpa(gpa, "initial")).toEqual({
+      numeric: 3.42,
+      text: "3.42",
+      mode: "initial",
+    })
+    expect(resolvePrimaryGpa(gpa, "highest")).toEqual({
+      numeric: 3.78,
+      text: "3.78",
+      mode: "highest",
+    })
+    // Falls back gracefully to initial when provider omits gpaHighest
+    expect(resolvePrimaryGpa({ gpaInitial: "3.42", numericGpaInitial: 3.42 }, "highest")).toEqual({
+      numeric: 3.42,
+      text: "3.42",
+      mode: "initial",
+    })
   })
 })

@@ -10,6 +10,10 @@ export const gradesDictionary = defineDictionary({
       notifyGrades: "成绩",
       gpaVisible: "默认显示绩点数值",
       gpaVisibleDesc: "关闭后在成绩页与总览中默认隐藏绩点",
+      gpaDisplayMode: "默认显示绩点口径",
+      gpaDisplayModeDesc: "初始绩点符合保研评判口径，最高绩点计入补考/重修",
+      gpaModeInitial: "初始",
+      gpaModeHighest: "最高",
     },
     widgets: {
       gpaSummary: {
@@ -137,6 +141,11 @@ export const gradesDictionary = defineDictionary({
       notifyGrades: "Grades",
       gpaVisible: "Show GPA Values by Default",
       gpaVisibleDesc: "Mask GPA values by default on Grades and Overview when disabled",
+      gpaDisplayMode: "Primary GPA Display",
+      gpaDisplayModeDesc:
+        "Initial GPA reflects first-attempt standards; Highest GPA includes retakes",
+      gpaModeInitial: "Initial",
+      gpaModeHighest: "Highest",
     },
     widgets: {
       gpaSummary: {

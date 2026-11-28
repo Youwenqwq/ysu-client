@@ -119,6 +119,7 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
   const gachaHydrated = props.useGachaHydrated()
 
   const gpaVisible = useStore((s) => s.gpaVisible)
+  const gpaDisplayMode = useStore((s) => s.gpaDisplayMode)
   const gachaEnabled = useStore((s) => s.gradeGachaEnabled)
 
   const { term, sortMode, filterDrawerOpen } = props.useView()
@@ -456,6 +457,7 @@ export const GradesPage: SlotComponent<GradesPageProps> = (props) => {
         gpaScale={gpaScale}
         termWeightedGpa={termWeightedGpa}
         gpaVisible={gpaVisible}
+        gpaDisplayMode={gpaDisplayMode}
         onSetGpaVisible={actions.setGpaVisible}
         t={t}
       />
